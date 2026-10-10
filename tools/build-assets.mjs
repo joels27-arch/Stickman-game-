@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cutoutMainSubject } from '../src/imageproc.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = (n) => path.join(root, 'assets/concept', n);
@@ -18,46 +19,9 @@ const has = (n) => fs.existsSync(src(n));
 const kb = (f) => `${(fs.statSync(f).size / 1024).toFixed(0)} KB`;
 
 async function removeBackground(file) {
-  const img = sharp(file).ensureAlpha();
-  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
-  const { width: w, height: h } = info;
-  const d = data;
-  let br = 0, bg = 0, bb = 0, n = 0;
-  const sample = (x, y) => { const i = (y * w + x) * 4; br += d[i]; bg += d[i + 1]; bb += d[i + 2]; n++; };
-  for (let x = 0; x < w; x += 4) { sample(x, 0); sample(x, h - 1); }
-  for (let y = 0; y < h; y += 4) { sample(0, y); sample(w - 1, y); }
-  br /= n; bg /= n; bb /= n;
-  const isBg = (p) => {
-    const i = p * 4, r = d[i], g = d[i + 1], b = d[i + 2];
-    const light = (r + g + b) / 3, sat = Math.max(r, g, b) - Math.min(r, g, b);
-    const dist = Math.abs(r - br) + Math.abs(g - bg) + Math.abs(b - bb);
-    return (dist < 70 && light > 150) || (light > 225 && sat < 28);
-  };
-  const mark = new Uint8Array(w * h);
-  const stack = [];
-  for (let x = 0; x < w; x++) stack.push(x, (h - 1) * w + x);
-  for (let y = 0; y < h; y++) stack.push(y * w, y * w + w - 1);
-  while (stack.length) {
-    const p = stack.pop();
-    if (mark[p] || !isBg(p)) continue;
-    mark[p] = 1;
-    const x = p % w;
-    if (x > 0) stack.push(p - 1);
-    if (x < w - 1) stack.push(p + 1);
-    if (p >= w) stack.push(p - w);
-    if (p < w * (h - 1)) stack.push(p + w);
-  }
-  for (let p = 0; p < w * h; p++) {
-    if (mark[p]) { d[p * 4 + 3] = 0; continue; }
-    const x = p % w;
-    let e = 0;
-    if (x > 0 && mark[p - 1]) e++;
-    if (x < w - 1 && mark[p + 1]) e++;
-    if (p >= w && mark[p - w]) e++;
-    if (p < w * (h - 1) && mark[p + w]) e++;
-    if (e) d[p * 4 + 3] = Math.min(d[p * 4 + 3], 255 - e * 45);
-  }
-  return sharp(d, { raw: { width: w, height: h, channels: 4 } }).trim({ threshold: 1 });
+  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  cutoutMainSubject(data, info.width, info.height);
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).trim({ threshold: 1 });
 }
 
 async function monuments() {

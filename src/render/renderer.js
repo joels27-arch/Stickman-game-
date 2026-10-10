@@ -79,35 +79,53 @@ export class Renderer {
 
   // Split the background image into horizontal bands rendered at different
   // parallax speeds; each band is pre-scaled and mirrored for seamless tiling.
+  // Background image = scenery (above its ground line) split into horizontal
+  // bands at different parallax speeds + its ground strip, which scrolls 1:1
+  // with the battlefield so units stand on it. Bands are pre-scaled and mirrored
+  // for seamless tiling.
   buildLayers(biome) {
     const bg = this.assets.backgrounds[biome];
     if (!bg) return;
     const img = bg.img;
     const dpr = this.dpr;
-    const Ht = Math.ceil((this.groundY + 4) * dpr);
-    const k = Ht / img.height;
+    const g = bg.ground || 0.88;
+    const sceneH = img.height * g;
+    const Ht = Math.ceil((this.groundY + 2) * dpr);
+    const k = Ht / sceneH;
     const Tw = Math.ceil(img.width * k);
     const count = this.q.parallax >= 3 ? 3 : 1;
+    const mirrored = (sy, sh, dh) => {
+      const c = makeCanvas(Tw * 2, dh);
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, sy, img.width, sh, 0, 0, Tw, dh);
+      ctx.save(); ctx.translate(Tw * 2, 0); ctx.scale(-1, 1); ctx.drawImage(img, 0, sy, img.width, sh, 0, 0, Tw, dh); ctx.restore();
+      return c;
+    };
     this.layers = [];
     for (let i = 0; i < count; i++) {
-      const L = count === 1 ? { f: 0.18, y0: 0, y1: 1, fade0: 0, fade1: 0 } : PARALLAX[i];
-      const c = makeCanvas(Tw * 2, Ht);
-      const ctx = c.getContext('2d');
-      ctx.drawImage(img, 0, 0, Tw, Ht);
-      ctx.save(); ctx.translate(Tw * 2, 0); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, Tw, Ht); ctx.restore();
+      const L = count === 1 ? { f: 0.18, fade0: 0, fade1: 0 } : PARALLAX[i];
+      const c = mirrored(0, sceneH, Ht);
       if (L.fade1 > 0) {
+        const ctx = c.getContext('2d');
         ctx.globalCompositeOperation = 'destination-in';
-        const g = ctx.createLinearGradient(0, 0, 0, Ht);
-        g.addColorStop(0, 'rgba(0,0,0,0)');
-        g.addColorStop(L.fade0, 'rgba(0,0,0,0)');
-        g.addColorStop(L.fade1, 'rgba(0,0,0,1)');
-        g.addColorStop(1, 'rgba(0,0,0,1)');
-        ctx.fillStyle = g; ctx.fillRect(0, 0, c.width, Ht);
+        const gr = ctx.createLinearGradient(0, 0, 0, Ht);
+        gr.addColorStop(0, 'rgba(0,0,0,0)');
+        gr.addColorStop(L.fade0, 'rgba(0,0,0,0)');
+        gr.addColorStop(L.fade1, 'rgba(0,0,0,1)');
+        gr.addColorStop(1, 'rgba(0,0,0,1)');
+        ctx.fillStyle = gr; ctx.fillRect(0, 0, c.width, Ht);
         ctx.globalCompositeOperation = 'source-over';
       }
-      this.layers.push({ canvas: c, f: L.f, tw: Tw * 2 });
+      this.layers.push({ canvas: c, f: L.f, tw: Tw * 2, y: 0 });
+    }
+    // the image's own ground strip, only when it comes from real art
+    this.imageGround = bg.source === 'image' && g < 0.95;
+    if (this.imageGround) {
+      const gh = Math.ceil(img.height * (1 - g) * k);
+      this.layers.push({ canvas: mirrored(sceneH, img.height - sceneH, gh), f: 1, tw: Tw * 2, y: Math.floor(this.groundY * dpr) - 1, ground: true });
     }
     this.groundColor = bg.groundColor;
+    this.bottomColor = bg.bottomColor;
   }
 
   initAmbient(biome) {
@@ -145,8 +163,8 @@ export class Renderer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = biome.sky[0];
     ctx.fillRect(0, 0, W, H);
-    if (!this.debugSkip?.bg) this.drawBackground(ctx, W, H, gy, dpr);
     this.drawGroundBand(ctx, W, H, gy, biome);
+    if (!this.debugSkip?.bg) this.drawBackground(ctx, W, H, gy, dpr);
 
     // world transform
     const camX = this.cam.x + this.cam.sx / s;
@@ -193,13 +211,22 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     for (const L of this.layers) {
       const off = -((this.cam.x * this.s * L.f * dpr) % L.tw);
-      const sy = this.cam.sy * dpr * L.f;
+      const sy = L.y + this.cam.sy * dpr * L.f;
       for (let x = off; x < W * dpr; x += L.tw) ctx.drawImage(L.canvas, Math.floor(x), sy);
     }
     ctx.restore();
   }
 
   drawGroundBand(ctx, W, H, gy, b) {
+    if (this.imageGround) {
+      // below the art's ground strip: continue with its own bottom colour
+      const c = this.bottomColor || b.dirtDark;
+      const g = ctx.createLinearGradient(0, gy, 0, H);
+      g.addColorStop(0, c); g.addColorStop(1, b.dirtDark);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, gy - 1, W, H - gy + 1);
+      return;
+    }
     const g = ctx.createLinearGradient(0, gy, 0, H);
     g.addColorStop(0, this.groundColor || b.ground);
     g.addColorStop(0.08, b.ground);
@@ -213,6 +240,7 @@ export class Renderer {
   }
 
   drawGroundDetails(ctx, x0, x1, biome) {
+    if (this.imageGround) return; // the art already has its own ground texture
     const step = 26;
     const start = Math.floor(x0 / step) * step;
     for (let x = start; x < x1; x += step) {
@@ -244,6 +272,7 @@ export class Renderer {
   }
 
   drawForeground(ctx, x0, x1, biome) {
+    if (this.imageGround) return;
     // dark silhouette tufts at the bottom edge for depth
     const y = DEPTH * DEPTH_SCALE + 22;
     const col = biome === 'snow' ? 'rgba(200,215,235,0.9)' : biome === 'volcano' ? 'rgba(15,8,6,0.9)' : biome === 'desert' ? 'rgba(150,105,55,0.9)' : biome === 'night' ? 'rgba(8,12,24,0.92)' : 'rgba(45,80,30,0.9)';

@@ -2,6 +2,7 @@
 // Tries optimized files (assets/game/*.webp) first, then the raw concept PNGs,
 // and finally falls back to code-drawn art so the game always runs.
 import { BIOMES } from './config.js';
+import { cutoutMainSubject, detectGroundLine } from './imageproc.js';
 
 const BIOME_QUADS = { desert: [0, 0], snow: [1, 0], volcano: [0, 1], night: [1, 1] };
 
@@ -45,45 +46,7 @@ export function removeLightBackground(img, maxH = 720) {
   const cornerA = d[3];
   if (cornerA < 20) return trim(c, ctx, data);
 
-  // reference background color: median-ish of the border pixels
-  let br = 0, bg = 0, bb = 0, n = 0;
-  for (let x = 0; x < w; x += 4) for (const y of [0, h - 1]) { const i = (y * w + x) * 4; br += d[i]; bg += d[i + 1]; bb += d[i + 2]; n++; }
-  for (let y = 0; y < h; y += 4) for (const x of [0, w - 1]) { const i = (y * w + x) * 4; br += d[i]; bg += d[i + 1]; bb += d[i + 2]; n++; }
-  br /= n; bg /= n; bb /= n;
-
-  const isBg = (i) => {
-    const r = d[i], g = d[i + 1], b = d[i + 2];
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    const light = (r + g + b) / 3;
-    const dist = Math.abs(r - br) + Math.abs(g - bg) + Math.abs(b - bb);
-    return (dist < 70 && light > 150) || (light > 225 && max - min < 28);
-  };
-  const mark = new Uint8Array(w * h);
-  const stack = [];
-  for (let x = 0; x < w; x++) { stack.push(x, (h - 1) * w + x); }
-  for (let y = 0; y < h; y++) { stack.push(y * w, y * w + w - 1); }
-  while (stack.length) {
-    const p = stack.pop();
-    if (mark[p]) continue;
-    if (!isBg(p * 4)) continue;
-    mark[p] = 1;
-    const x = p % w, y = (p / w) | 0;
-    if (x > 0) stack.push(p - 1);
-    if (x < w - 1) stack.push(p + 1);
-    if (y > 0) stack.push(p - w);
-    if (y < h - 1) stack.push(p + w);
-  }
-  for (let p = 0; p < w * h; p++) {
-    if (mark[p]) { d[p * 4 + 3] = 0; continue; }
-    // feather pixels touching the removed area
-    const x = p % w, y = (p / w) | 0;
-    let edge = 0;
-    if (x > 0 && mark[p - 1]) edge++;
-    if (x < w - 1 && mark[p + 1]) edge++;
-    if (y > 0 && mark[p - w]) edge++;
-    if (y < h - 1 && mark[p + w]) edge++;
-    if (edge) d[p * 4 + 3] = Math.min(d[p * 4 + 3], 255 - edge * 45);
-  }
+  cutoutMainSubject(d, w, h);
   ctx.putImageData(data, 0, 0);
   return trim(c, ctx, data);
 }
@@ -148,6 +111,16 @@ function cropQuadrant(img, qx, qy) {
   const c = makeCanvas(w - inset * 2, h - inset * 2);
   c.getContext('2d').drawImage(img, qx * w + inset, qy * h + inset, w - inset * 2, h - inset * 2, 0, 0, c.width, c.height);
   return c;
+}
+
+// Ground line of a background image (fraction of its height), measured on a
+// downscaled copy for speed.
+function groundLineOf(img) {
+  const w = 240, h = Math.max(60, Math.round(240 * img.height / img.width));
+  const c = makeCanvas(w, h);
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, h);
+  return detectGroundLine(ctx.getImageData(0, 0, w, h).data, w, h);
 }
 
 // Average color of a horizontal band (used to blend the code-drawn ground).
@@ -344,9 +317,13 @@ export class Assets {
         img = cropQuadrant(raw.bg_biomes, qx, qy);
       }
       if (!img) { img = proceduralBackground(biome); source = 'code'; }
-      let groundColor = null;
-      try { groundColor = sampleBand(img, 0.9, 0.99); } catch (e) { /* tainted canvas on file:// */ }
-      this.backgrounds[biome] = { img, groundColor, source };
+      let groundColor = null, bottomColor = null, ground = 0.88;
+      try {
+        if (source === 'image') ground = groundLineOf(img);
+        groundColor = sampleBand(img, ground + 0.01, Math.min(1, ground + 0.04));
+        bottomColor = sampleBand(img, 0.97, 1);
+      } catch (e) { /* tainted canvas on file:// */ }
+      this.backgrounds[biome] = { img, groundColor, bottomColor, ground, source };
     }
     this.icon = raw.icon;
     onProgress(1);

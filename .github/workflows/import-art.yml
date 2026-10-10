@@ -1,0 +1,33 @@
+# Imports the optimized art bundle built in the Higgsfield sandbox.
+# tools/art-bundle.url holds "<url> <sha256>"; pushing a change to it runs this job,
+# which downloads the zip, verifies its checksum, extracts ONLY assets/ and icons/,
+# and commits the result back to the same branch.
+name: Import art bundle
+on:
+  push:
+    paths: ['tools/art-bundle.url']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify
+        run: |
+          read -r url sum < tools/art-bundle.url
+          curl -fsSL "$url" -o "$RUNNER_TEMP/art.zip"
+          echo "$sum  $RUNNER_TEMP/art.zip" | sha256sum -c -
+      - name: Extract assets/ and icons/ only
+        run: |
+          unzip -o "$RUNNER_TEMP/art.zip" 'assets/*' 'icons/*' -d .
+          git status --short
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets icons
+          git diff --cached --quiet && exit 0
+          git commit -m "Import art bundle (processed on Higgsfield)"
+          git push

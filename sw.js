@@ -1,19 +1,19 @@
 // INKFALL service worker: precache the app shell, then cache-first for
 // everything same-origin (so optimized art in assets/game/ is cached on first use).
-const VERSION = 'inkfall-v1';
+const VERSION = 'inkfall-v2';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
-  './src/main.js', './src/config.js', './src/assets.js', './src/audio.js', './src/input.js', './src/save.js',
+  './src/main.js', './src/config.js', './src/assets.js', './src/imageproc.js', './src/audio.js', './src/input.js', './src/save.js',
   './src/core/util.js', './src/core/loop.js',
   './src/game/world.js', './src/game/unit.js', './src/game/team.js', './src/game/ai.js', './src/game/levels.js',
-  './src/render/renderer.js', './src/render/stick.js', './src/render/fx.js',
+  './src/render/renderer.js', './src/render/stick.js', './src/render/fx.js', './src/render/spritecache.js',
   './src/ui/hud.js', './src/ui/menus.js', './src/ui/tutorial.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png',
 ];
 const OPTIONAL = [
   './assets/game/monument_blue.webp', './assets/game/monument_red.webp',
   './assets/game/bg_grassland.webp', './assets/game/bg_desert.webp', './assets/game/bg_snow.webp',
-  './assets/game/bg_volcano.webp', './assets/game/bg_night.webp',
+  './assets/game/bg_volcano.webp', './assets/game/bg_night.webp', './assets/game/manifest.json',
 ];
 
 self.addEventListener('install', (e) => {
