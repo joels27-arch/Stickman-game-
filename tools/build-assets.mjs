@@ -127,3 +127,7 @@ async function icons() {
 await monuments();
 await backgrounds();
 await icons();
+// manifest lets the game request only files that exist (no 404 probing)
+const files = fs.readdirSync(path.join(root, 'assets/game')).filter((f) => f.endsWith('.webp') || f.endsWith('.png'));
+fs.writeFileSync(out('manifest.json'), JSON.stringify({ files }, null, 1));
+console.log(`✓ assets/game/manifest.json (${files.length} files)`);

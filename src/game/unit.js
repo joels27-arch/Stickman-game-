@@ -51,13 +51,13 @@ export class Unit {
     const ratio = keepRatio ? this.hp / this.maxHp : 1;
     let hp = d.hp * team.mods.hp[this.type] * team.mods.allHp;
     let dmg = d.dmg * team.mods.dmg[this.type] * team.mods.allDmg;
-    let range = d.range, aoe = d.aoe || 0, channel = d.channel || 0, mine = 1, brace = 0.45, restealth = 2.5;
+    let range = d.range, aoe = d.aoe || 0, channel = d.channel || 0, mine = 1, brace = 0.55, restealth = 2.5;
     if (tier) {
       hp *= up.hp || 1; dmg *= up.dmg || 1; range *= up.range || 1; aoe *= up.aoe || 1;
       channel *= up.channel || 1; mine = up.mine || 1; if (up.brace) brace = up.brace;
       if (up.restealth) restealth *= up.restealth;
     }
-    if (this.boss) { hp *= 5; dmg *= 1.5; }
+    if (this.boss) { hp *= 3.5; dmg *= 1.35; }
     this.tier = tier;
     this.maxHp = hp; this.dmg = dmg; this.range = range; this.aoe = aoe;
     this.channel = channel; this.mineMul = mine; this.braceMul = brace; this.restealth = restealth;
@@ -266,7 +266,7 @@ export class Unit {
     if (kind === 'volley') dur = 0.5;
     this.atkDur = Math.min(dur, Math.max(0.25, this.def.cd * 0.9));
     if (kind === 'slam' || kind === 'volley') this.atkDur = dur;
-    if (kind === 'normal') this.cdT = this.def.cd * (this.braced ? 1.5 : 1);
+    if (kind === 'normal') this.cdT = this.def.cd * (this.braced ? 1.4 : 1);
     if (target) this.facing = sign(target.x - this.x) || this.facing;
     this.setAnim(kind === 'mine' ? 'mine' : 'attack');
     if (this.type === 'bowman' && kind === 'normal') world.emit('sfx', { name: 'bowdraw', x: this.x });
@@ -313,7 +313,7 @@ export class Unit {
     }
     const reach = this.range + 10;
     let hits = 0;
-    const maxHits = this.controlled ? 3 : 1;
+    const maxHits = this.controlled ? 3 : this.type === 'shieldbearer' ? 2 : 1; // spears pierce
     if (t && (t.isStructure ? !t.dead : t.alive) && this.distTo(t) <= reach + 4) {
       world.damage(t, dmg, this, { kind: this.type === 'shieldbearer' ? 'pierce' : 'slash', knock: this.controlled ? 90 : 40 });
       hits++;
@@ -492,7 +492,9 @@ export class Unit {
       if (this.target && stance === 'defend') {
         // leash: don't chase too far from the defensive line
         const lineX = world.defendLine(this.team);
-        if ((this.target.x - lineX) * team.dir > 260) this.target = null;
+        // ...but always answer ranged units that are shooting into our lines
+        const reach = this.target.isStructure || this.target.def.melee ? 0 : this.target.range + 30;
+        if ((this.target.x - lineX) * team.dir > 260 + reach) this.target = null;
       }
     }
     const t = this.target;
@@ -503,7 +505,7 @@ export class Unit {
         this.facing = sign(t.x - this.x) || this.facing;
         if (this.type === 'shieldbearer') {
           // brace when facing ranged pressure or holding a line
-          this.braced = this.braceHold || stance === 'defend' || world.rangedThreat(this);
+          this.braced = this.braceHold || stance === 'defend' || !t.isStructure || world.rangedThreat(this);
         }
         if (this.cdT <= 0) {
           if (this.type === 'inkcaster') {

@@ -152,7 +152,7 @@ export class FX {
   explosion(x, z, r, kind, color, ring) {
     const gy = z * DEPTH_SCALE;
     const smash = kind === 'smash';
-    this.p('flash', x, gy - (smash ? 4 : 10), gy, 0, 0, 0.22, r * (smash ? 0.7 : 1), smash ? 'rgba(255,240,200,0.8)' : color, { grav: 0 });
+    this.p('flash', x, gy - (smash ? 4 : 10), gy, 0, 0, 0.16, r * (smash ? 0.6 : 0.55), smash ? 'rgba(255,240,200,0.8)' : 'rgba(255,255,255,0.75)', { grav: 0 });
     if (ring || !smash) this.p('ring', x, gy, gy, 0, 0, 0.4, r, smash ? 'rgba(90,70,50,0.7)' : color, { grav: 0 });
     if (smash) {
       this.dust(x, z, 10, 'rgba(120,100,80,0.55)', 9);
@@ -330,7 +330,7 @@ export class FX {
           ctx.beginPath(); ctx.arc(x, y, o.size * (1.6 - k * 0.6), 0, TAU); ctx.fill();
           break;
         case 'flash':
-          ctx.fillStyle = o.color; ctx.globalAlpha = k * 0.8;
+          ctx.fillStyle = o.color; ctx.globalAlpha = k * k * 0.8;
           ctx.beginPath(); ctx.arc(x, y, o.size * (1.1 - k * 0.5), 0, TAU); ctx.fill();
           break;
         case 'ring':

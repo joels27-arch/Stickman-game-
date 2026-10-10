@@ -92,7 +92,7 @@ export class AIController {
           adv += (COUNTERS[type]?.[ft] || 0) * foeCounts[ft];
           weak += (COUNTERS[ft]?.[type] || 0) * foeCounts[ft];
         }
-        s += this.p.counter * 2.5 * (adv - weak) / foeTotal;
+        s += (0.6 + this.p.counter * 3) * (adv - weak) / foeTotal;
       }
       // keep a healthy mix: penalise types we already have many of
       s -= w.countType(this.team, type) * 0.1;
@@ -103,17 +103,19 @@ export class AIController {
       scores.push([type, s]);
     }
     scores.sort((a, b) => b[1] - a[1]);
+    if (!scores.length) return;
+    const underThreat = w.armyStrength(1 - this.team, t.monument.x, 700) > w.armyStrength(this.team, t.monument.x, 700) + 1;
     for (let i = 0; i < scores.length; i++) {
       const type = scores[i][0];
       const r = t.train(w, type);
       if (r === '') { this.saving = null; return; }
       if (r === 'pop') return;
-      // smart AIs save up for their top pick instead of spamming cheap units
-      if (i === 0 && (r === 'gold' || r === 'ink')) {
+      // smart AIs save up for a clearly better pick instead of spamming cheap units
+      if (i === 0 && (r === 'gold' || r === 'ink') && !underThreat) {
         const d = UNITS[type];
+        const gap = scores.length > 1 ? scores[0][1] - scores[1][1] : 1;
         const close = t.gold >= d.cost * 0.5 && (d.ink === 0 || t.ink >= d.ink * 0.5);
-        const underThreat = w.armyStrength(1 - this.team, t.monument.x, 700) > 1;
-        if (close && !underThreat && this.rng() < 0.3 + this.p.counter * 0.6) { this.saving = type; return; }
+        if ((close || gap > 0.5) && this.rng() < 0.3 + this.p.counter * 0.65) { this.saving = type; return; }
       }
     }
   }
@@ -164,7 +166,7 @@ export class WaveDirector {
   constructor(world) {
     this.world = world;
     this.wave = 0;
-    this.breakT = 12;
+    this.breakT = 25;
     this.spawnQueue = [];
     this.spawnT = 0;
     this.active = false;
@@ -172,7 +174,7 @@ export class WaveDirector {
   }
 
   composition(wave) {
-    const budget = 260 + wave * 140 + Math.pow(wave, 1.6) * 40;
+    const budget = 110 + wave * 140 + Math.pow(wave, 1.7) * 35;
     const pool = ['blade', 'blade', 'bowman'];
     if (wave >= 3) pool.push('shieldbearer');
     if (wave >= 5) pool.push('inkcaster');

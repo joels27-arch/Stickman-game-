@@ -44,6 +44,7 @@ export class Input {
     this.game.audio.unlock();
     if (!this.playing) return;
     e.preventDefault();
+    if (this.spellArmed) this.lastMouseX = e.clientX;
     const W = window.innerWidth;
     const ctrl = this.world.control.unit;
     if (ctrl && e.clientX < W * 0.45 && this.joyId === null && e.pointerType !== 'mouse') {
@@ -58,7 +59,7 @@ export class Input {
   }
 
   move(e) {
-    if (e.pointerType === 'mouse') this.lastMouseX = e.clientX;
+    if (e.pointerType === 'mouse' || (this.spellArmed && e.pointerId !== this.joyId)) this.lastMouseX = e.clientX;
     if (!this.playing) return;
     if (e.pointerId === this.joyId) {
       e.preventDefault();

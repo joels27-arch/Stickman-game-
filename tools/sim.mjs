@@ -5,6 +5,7 @@ import { AIController } from '../src/game/ai.js';
 import { UNITS, DT } from '../src/config.js';
 
 const quick = process.argv.includes('--quick');
+const N = +(process.argv.find((a) => a.startsWith('--games='))?.slice(8) || 32);
 
 function match(d0, d1, maxT = 900, allowed0 = undefined) {
   const w = new World({ width: 3000, teams: [{ allowed: allowed0 }, {}] });
@@ -56,11 +57,11 @@ for (const [a, b] of runs) {
 // no single unit should dominate: a mono-type AI should lose to a mixed AI
 if (!quick) {
   for (const diff of ['normal', 'hard']) {
-    console.log(`\nMono-unit AI (blue) vs mixed AI (red), both ${diff}, 8 games each:`);
+    console.log(`\nMono-unit AI (blue) vs mixed AI (red), both ${diff}, ${N} games each:`);
     for (const type of types) {
       let wins = 0;
-      for (let i = 0; i < 8; i++) if (match(diff, diff, 900, ['digger', type]).winner === 0) wins++;
-      console.log(`  only ${type.padEnd(13)} won ${wins}/8`);
+      for (let i = 0; i < N; i++) if (match(diff, diff, 900, ['digger', type]).winner === 0) wins++;
+      console.log(`  only ${type.padEnd(13)} won ${wins}/${N}  (${Math.round(wins / N * 100)}%)`);
     }
   }
 }

@@ -225,6 +225,7 @@ export class World {
     }
     if (t.controlled) a *= 0.75;
     if (opts.kind === 'arrow' && t.def.arrowVuln) a *= t.def.arrowVuln;
+    if (opts.spell && t.type === 'digger') a *= SPELL.workerMul; // workers duck for cover
     t.hp -= a;
     t.hitFlash = 0.1;
     t.lastHitDir = fromDir;
@@ -266,7 +267,7 @@ export class World {
       const dx = Math.abs(u.x - x), dz = Math.abs(u.z - z);
       if (dx > r + u.halfW || dz > r * 0.6 + 12) return;
       const f = 1 - 0.5 * Math.min(1, dx / r);
-      this.damage(u, dmg * f, src, { kind: opts.kind || 'blast', knock: (opts.knock || 0) * f, lift: (opts.lift || 0) * f, team, dir: sign(u.x - x) });
+      this.damage(u, dmg * f, src, { kind: opts.kind || 'blast', knock: (opts.knock || 0) * f, lift: (opts.lift || 0) * f, team, dir: sign(u.x - x), spell: opts.spell });
     };
     if (team === -1) { for (const u of this.units) hitUnit(u); }
     else { const list = this.teamUnits[1 - team].slice(); for (const u of list) hitUnit(u); }
@@ -424,7 +425,7 @@ export class World {
         p.y = 0;
         if (p.kind === 'arrow') { this.fx?.arrowGround(p); this.emit('sfx', { name: 'arrowland', x: p.x, quiet: true }); }
         else if (p.kind === 'orb') this.blast(p.x, p.z, p.aoe, p.dmg, p.team, p.owner, { kind: 'blast', knock: 90, lift: 160, structureMul: 0.6 });
-        else if (p.kind === 'bomb') this.blast(p.x, p.z, p.aoe, p.dmg, p.team, null, { kind: 'blast', knock: 110, lift: 200, structureMul: 0.3, shake: 6 });
+        else if (p.kind === 'bomb') this.blast(p.x, p.z, p.aoe, p.dmg, p.team, null, { kind: 'blast', knock: 110, lift: 200, structureMul: 0.3, shake: 6, spell: true });
         else if (p.kind === 'meteor') this.blast(p.x, p.z, p.aoe, p.dmg, -1, null, { kind: 'blast', knock: 130, lift: 220, structureMul: 0.2, shake: 8 });
         p.active = false;
       }

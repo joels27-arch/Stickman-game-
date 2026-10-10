@@ -37,9 +37,9 @@ export const LEVELS = [
   { id: 10, name: 'Ember Road', biome: 'volcano', twist: 'Meteor Rain', desc: 'Burning rocks fall from the sky — on friend and foe alike.',
     difficulty: 'hard', player: T4, enemy: T4, meteors: true, stars: { hp: 0.5, time: 600 }, reward: 'colossus' },
   { id: 11, name: 'The Iron Giant', biome: 'volcano', twist: 'Boss Colossus', desc: 'A colossal champion leads the enemy. Bring it down.',
-    difficulty: 'normal', player: ALL, enemy: T3, boss: true, stars: { hp: 0.5, time: 600 } },
+    difficulty: 'easy', player: ALL, enemy: ['digger', 'blade', 'bowman', 'shieldbearer'], boss: true, stars: { hp: 0.5, time: 600 } },
   { id: 12, name: 'Inkfall', biome: 'volcano', twist: 'Final Battle', desc: 'The enemy empire throws everything at you. End this war.',
-    difficulty: 'insane', player: ALL, enemy: ALL, enemyMonument: 1.4, meteors: true, stars: { hp: 0.4, time: 720 } },
+    difficulty: 'insane', player: ALL, enemy: ALL, enemyMonument: 1.25, meteors: true, stars: { hp: 0.4, time: 720 } },
 ];
 
 export const UNLOCK_BY_LEVEL = { shieldbearer: 3, inkcaster: 5, shadow: 7, colossus: 10 };
@@ -51,7 +51,7 @@ export function makeRules(level) {
   if (level.speedMul) rules.speedMul = level.speedMul;
   if (level.limitedGold) { rules.limitedGold = level.limitedGold; rules.limitedInk = level.limitedInk; }
   if (level.enemyIncome) rules.incomeMul = [1, level.enemyIncome];
-  let meteorT = 8, bossT = 25, ambushDone = false, startDone = false;
+  let meteorT = 8, bossT = 70, ambushDone = false, startDone = false;
   rules.update = (w, dt) => {
     if (!startDone) {
       startDone = true;
@@ -83,7 +83,7 @@ export function makeRules(level) {
     if (level.boss) {
       bossT -= dt;
       if (bossT <= 0) {
-        bossT = 160;
+        bossT = 180;
         const u = w.spawnUnit('colossus', 1);
         u.boss = true; u.applyStats(w, false); u.hp = u.maxHp;
         w.boss = u;

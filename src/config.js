@@ -30,8 +30,8 @@ export const UNITS = {
   },
   blade: {
     name: 'Blade', role: 'Fast melee swordsman',
-    cost: 75, ink: 0, time: 3, pop: 1,
-    hp: 110, dmg: 13, range: 22, cd: 0.8, speed: 88, scale: 1,
+    cost: 85, ink: 0, time: 3, pop: 1,
+    hp: 100, dmg: 13, range: 22, cd: 0.8, speed: 88, scale: 1,
     aggro: 170, melee: true,
     upgrade: { name: 'Tempered Steel', cost: 200, ink: 0, desc: '+25% damage, +15% HP', dmg: 1.25, hp: 1.15 },
     ability: { name: 'Dash Slash', cd: 5 },
@@ -46,24 +46,24 @@ export const UNITS = {
   },
   shieldbearer: {
     name: 'Shieldbearer', role: 'Tank — braces to block',
-    cost: 160, ink: 0, time: 5, pop: 2,
+    cost: 175, ink: 0, time: 5, pop: 2,
     hp: 370, dmg: 16, range: 34, cd: 1.4, speed: 42, scale: 1.1,
     aggro: 160, melee: true,
-    upgrade: { name: 'Tower Shields', cost: 250, ink: 2, desc: '+30% HP, stronger brace', hp: 1.3, brace: 0.25 },
+    upgrade: { name: 'Tower Shields', cost: 250, ink: 2, desc: '+30% HP, stronger brace', hp: 1.3, brace: 0.4 },
     ability: { name: 'Brace', cd: 0.5 },
   },
   inkcaster: {
     name: 'Inkcaster', role: 'Mage — area ink blast',
     cost: 190, ink: 3, time: 7, pop: 2,
-    hp: 90, dmg: 42, range: 270, cd: 4.2, speed: 46, scale: 1,
-    aggro: 320, melee: false, channel: 1.3, aoe: 62,
+    hp: 95, dmg: 50, range: 270, cd: 4.0, speed: 46, scale: 1,
+    aggro: 320, melee: false, channel: 1.1, aoe: 62,
     upgrade: { name: 'Black Tide', cost: 300, ink: 4, desc: '+30% blast radius, faster channel', aoe: 1.3, channel: 0.75 },
     ability: { name: 'Quick Blast', cd: 9 },
   },
   shadow: {
     name: 'Shadow', role: 'Stealth assassin',
     cost: 170, ink: 2, time: 6, pop: 2,
-    hp: 95, dmg: 22, range: 20, cd: 0.9, speed: 98, scale: 0.95,
+    hp: 110, dmg: 25, range: 20, cd: 0.9, speed: 98, scale: 0.95,
     aggro: 240, melee: true, backstab: 2.6,
     upgrade: { name: 'Ink Veil', cost: 250, ink: 3, desc: 'Faster restealth, +20% damage', dmg: 1.2, restealth: 0.6 },
     ability: { name: 'Vanish', cd: 10 },
@@ -100,13 +100,13 @@ export const ECONOMY = {
   passiveGold: 0,              // gold/s trickle (kept 0 — economy is diggers)
 };
 
-export const SPELL = { name: 'Ink Storm', ink: 6, cd: 50, dmg: 42, radius: 110, bombs: 6 };
+export const SPELL = { name: 'Ink Storm', ink: 8, cd: 55, dmg: 42, radius: 110, bombs: 6, workerMul: 0.4 };
 
 export const MONUMENT = { hp: 5000, width: 110, height: 270 };
 
 export const DIFFICULTY = {
   easy:   { label: 'Easy',   think: 2.6, income: 0.8,  diggers: 5,  aggression: 1.6,  counter: 0.15, spells: false, minArmy: 5, startGold: 0,   upgrades: false, accuracy: 0.7 },
-  normal: { label: 'Normal', think: 1.6, income: 1.0,  diggers: 7,  aggression: 1.25, counter: 0.5,  spells: true,  minArmy: 4, startGold: 0,   upgrades: true,  accuracy: 0.85 },
+  normal: { label: 'Normal', think: 1.6, income: 1.0,  diggers: 7,  aggression: 1.25, counter: 0.6,  spells: true,  minArmy: 4, startGold: 0,   upgrades: true,  accuracy: 0.85 },
   hard:   { label: 'Hard',   think: 1.0, income: 1.15, diggers: 9,  aggression: 1.05, counter: 0.8,  spells: true,  minArmy: 4, startGold: 100, upgrades: true,  accuracy: 0.95 },
   insane: { label: 'Insane', think: 0.6, income: 1.35, diggers: 10, aggression: 0.95, counter: 1.0,  spells: true,  minArmy: 3, startGold: 250, upgrades: true,  accuracy: 1.0 },
 };

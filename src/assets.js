@@ -302,13 +302,23 @@ export class Assets {
       ['bg_snow', ['assets/game/bg_snow.webp']],
       ['bg_volcano', ['assets/game/bg_volcano.webp']],
       ['bg_night', ['assets/game/bg_night.webp']],
+      // the raw sheet is only needed when the optimized crops aren't there
       ['bg_biomes', ['assets/concept/bg_biomes.png']],
-      ['icon', ['assets/game/icon-512.png', 'icons/icon-512.png']],
+      ['icon', ['icons/icon-512.png']],
     ];
+    // assets/game/manifest.json (written by `npm run assets`) lists the optimized
+    // files that exist, so we never request missing ones.
+    let built = null;
+    try {
+      const r = await fetch('assets/game/manifest.json', { cache: 'no-cache' });
+      if (r.ok) built = new Set((await r.json()).files);
+    } catch (e) { /* offline or file:// */ }
+    const usable = (src) => !src.startsWith('assets/game/') || (built && built.has(src.slice(12)));
     const raw = {};
     let done = 0;
+    const haveCrops = built && ['desert', 'snow', 'volcano', 'night'].every((b) => built.has(`bg_${b}.webp`));
     await Promise.all(tasks.map(async ([name, srcs]) => {
-      raw[name] = await loadFirst(srcs);
+      raw[name] = name === 'bg_biomes' && haveCrops ? null : await loadFirst(srcs.filter(usable));
       done++;
       onProgress(done / (tasks.length + 2));
     }));

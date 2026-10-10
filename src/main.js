@@ -54,7 +54,9 @@ class Game {
     });
     // first touch anywhere unlocks audio (iOS)
     const unlock = () => { this.audio.unlock(); this.audio.startMusic(this.state === 'menu' ? 'menu' : 'battle'); };
-    window.addEventListener('pointerdown', unlock, { once: false, passive: true });
+    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('touchend', unlock, { passive: true });
+    window.addEventListener('keydown', unlock);
     this.startDemo();
     document.getElementById('loading').classList.remove('show');
     this.menus.showMain();
@@ -285,7 +287,11 @@ class Game {
         }
         break;
       case 'death': this.audio.play('death', d.unit.x, true); break;
-      case 'structureDestroyed': this.fx.collapse(d.s); break;
+      case 'structureDestroyed':
+        this.fx.collapse(d.s);
+        // show the collapse
+        if (playing && d.s.kind === 'monument') { this.renderer.cam.follow = null; this.renderer.cam.tx = d.s.x - this.renderer.viewW / 2; }
+        break;
       case 'deposit':
         if (playing && Math.random() < 0.5) this.audio.play('coin', d.unit.x, true);
         if (playing && this.settings.dmgNumbers) this.fx.text(d.unit.x, -50, `+${Math.round(d.amount)}`, d.kind === 'gold' ? '#ffd34a' : '#7fe0ff');
