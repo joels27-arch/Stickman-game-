@@ -19,7 +19,7 @@ export function portraitCanvas(type, colors, size = 64, hat = null) {
   const ctx = c.getContext('2d');
   ctx.scale(dpr, dpr);
   const big = type === 'colossus';
-  const sc = big ? size / 150 : size / 62;
+  const sc = big ? size / 66 : size / 62;
   drawShowcase(ctx, type, size * 0.5, size * 0.93, sc, colors, 0.4, { hat });
   return c;
 }
@@ -40,32 +40,34 @@ export class HUD {
     const keys = ['1', '2', '3', '4', '5', '6', '7'];
     this.root.innerHTML = `
       <div class="topbar">
-        <div class="res">
-          <div class="chip" id="cGold"><i class="ico g"></i><span>0</span></div>
-          <div class="chip" id="cInk"><i class="ico i"></i><span>0</span></div>
-          <div class="chip" id="cPop">${ICONS.pop}<span>0/20</span></div>
+        <div class="tl">
+          <button class="ibtn" id="pauseBtn" title="Pause (Esc)">❚❚</button>
+          <div class="plank">
+            <div class="res">
+              <div class="chip" id="cGold"><i class="ico g"></i><span>0</span></div>
+              <div class="chip" id="cInk"><i class="ico i"></i><span>0</span></div>
+              <div class="chip" id="cPop">${ICONS.pop}<span>0/20</span></div>
+            </div>
+          </div>
+          <div class="cmds">
+            <button class="cmd" data-stance="garrison" title="Garrison (C)">${ICONS.garrison}<small>GARRISON</small></button>
+            <button class="cmd" data-stance="defend" title="Defend (Z)">${ICONS.defend}<small>DEFEND</small></button>
+            <button class="cmd atk" data-stance="attack" title="Attack (X)">${ICONS.attack}<small>ATTACK</small></button>
+          </div>
         </div>
         <div class="mm">
           <div class="mhp"><i id="hpB" style="background:${TEAM_COLORS[0]}"></i></div>
           <canvas id="minimap"></canvas>
           <div class="mhp"><i id="hpR" style="background:${TEAM_COLORS[1]}"></i></div>
         </div>
-        <div class="tr">
-          <button class="ibtn" id="spell" title="Ink Storm (Q)">${ICONS.ink}<div class="ring"></div></button>
-          <button class="ibtn" id="pauseBtn" title="Pause (Esc)">❚❚</button>
-        </div>
-      </div>
-      <div class="cmds">
-        <button class="cmd" data-stance="defend">${ICONS.defend}DEFEND</button>
-        <button class="cmd atk" data-stance="attack">${ICONS.attack}ATTACK</button>
-        <button class="cmd" data-stance="garrison">${ICONS.garrison}GARRISON</button>
       </div>
       <button class="pan l" data-pan="-1">◀</button>
       <button class="pan r" data-pan="1">▶</button>
       <div class="bottombar">
         ${UNIT_ORDER.map((t, i) => `<button class="tbtn" data-type="${t}"><span class="key">${keys[i]}</span><span class="cost"></span><span class="badge"></span><div class="ring"></div></button>`).join('')}
         <button class="tbtn" data-type="pop" style="display:none"><div class="lbl"></div></button>
-        <button class="tbtn toggle" id="upgToggle"><div class="lbl">⬆<br>UPGRADE</div></button>
+        <button class="tbtn toggle" id="upgToggle" title="Upgrades (U)"><div class="lbl">⬆<br>UPG</div></button>
+        <button class="ibtn" id="spell" title="Ink Storm (Q)"><svg viewBox="0 0 24 24"><path d="M13 2 5 13h6l-2 9 9-12h-6z" fill="#2a1600"/></svg><div class="ring"></div></button>
       </div>
       <div class="ctrlname ctrl"></div>
       <div class="joyhint ctrl">DRAG<br>TO MOVE</div>

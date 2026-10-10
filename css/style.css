@@ -225,3 +225,80 @@ h3 { margin: 0 0 4px; font-size: 15px; font-weight: 900; }
   .chip { font-size: 12px; padding: 2px 8px; min-width: 52px; }
   .ibtn { height: 30px; }
 }
+
+/* ================================================================
+   Gold & wood HUD theme: gold coin buttons, a wooden resource plank,
+   round command medallions (overrides the base HUD styles above).
+   ================================================================ */
+:root {
+  --gold-hi: #fff2a6; --gold: #ffcc1f; --gold-mid: #f0a800; --gold-lo: #a86a00; --gold-edge: #4a2c00;
+  --wood-hi: #b07a3f; --wood: #8a5a2b; --wood-lo: #5b3714; --wood-edge: #2e1a08;
+  --coin: radial-gradient(circle at 38% 30%, var(--gold-hi) 0 8%, var(--gold) 30%, var(--gold-mid) 68%, var(--gold-lo) 100%);
+}
+#hud .ibtn, #hud .cmd, #hud .tbtn, #hud .abtn {
+  border: 3px solid var(--gold-edge);
+  box-shadow: inset 0 -4px 0 rgba(120, 70, 0, 0.55), inset 0 3px 0 rgba(255, 255, 220, 0.6), 0 3px 0 var(--gold-edge);
+}
+.topbar { align-items: flex-start; }
+.tl { display: flex; align-items: center; gap: 6px; }
+#pauseBtn { width: 38px; height: 38px; border-radius: 50%; background: var(--coin); color: var(--gold-edge); font-size: 13px; }
+.plank {
+  background: linear-gradient(180deg, var(--wood-hi), var(--wood) 45%, var(--wood-lo));
+  border: 3px solid var(--wood-edge); border-radius: 10px 22px 22px 10px; padding: 3px 12px 3px 8px;
+  box-shadow: inset 0 2px 0 rgba(255, 220, 160, 0.35), 0 3px 0 var(--wood-edge);
+}
+.plank .res { gap: 10px; }
+.plank .chip { background: none; border: none; padding: 0; min-width: 0; font-size: 15px; text-shadow: 0 2px 0 var(--wood-edge), 0 0 3px #000; }
+.plank .ico.g { width: 15px; height: 15px; }
+
+#hud .cmds { position: static; flex-direction: row; gap: 5px; background: linear-gradient(180deg, var(--wood-hi), var(--wood-lo)); border: 3px solid var(--wood-edge); border-radius: 30px; padding: 3px 5px; box-shadow: 0 3px 0 var(--wood-edge); }
+#hud .cmd { width: clamp(40px, 11vh, 50px); height: clamp(40px, 11vh, 50px); border-radius: 50%; background: var(--coin); color: var(--gold-edge); gap: 0; font-size: 0; }
+#hud .cmd svg { width: 58%; height: 58%; }
+#hud .cmd small { position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); font-size: 8.5px; font-weight: 900; color: #fff; text-shadow: 0 1px 0 #000, 0 0 2px #000; letter-spacing: 0.04em; white-space: nowrap; }
+#hud .cmd { position: relative; }
+#hud .cmd.on { background: radial-gradient(circle at 38% 30%, #fff 0 8%, #8fd3ff 30%, var(--blue) 70%, #123d7a 100%); color: #fff; }
+#hud .cmd.on.atk { background: radial-gradient(circle at 38% 30%, #fff 0 8%, #ff9a8a 30%, var(--red) 70%, #6e1010 100%); }
+
+.mm { margin-top: 3px; }
+#minimap { border: 3px solid var(--wood-edge); background: rgba(46, 26, 8, 0.75); box-shadow: 0 3px 0 var(--wood-edge); }
+.mhp { border: 2px solid var(--wood-edge); height: 10px; }
+
+/* train buttons: gold coins with a cost tab */
+.bottombar { justify-content: flex-start; align-items: flex-end; gap: 7px; padding-left: 4px; }
+#hud .tbtn { border-radius: 50%; background: var(--coin); overflow: visible; margin-bottom: 10px; }
+#hud .tbtn .ring { border-radius: 50%; }
+#hud .tbtn canvas { top: 6% !important; height: 70% !important; width: 70% !important; }
+#hud .tbtn .cost {
+  left: 50%; right: auto; bottom: -11px; transform: translateX(-50%);
+  background: linear-gradient(180deg, var(--wood-hi), var(--wood-lo)); border: 2px solid var(--wood-edge); border-radius: 9px;
+  padding: 1px 7px; color: #fff; font-size: 11px; text-shadow: 0 1px 0 #000;
+}
+#hud .tbtn .cost b { color: var(--gold-hi); }
+#hud .tbtn .cost em { color: #9fe3ff; }
+#hud .tbtn .key { color: var(--gold-edge); opacity: 0.6; top: 6px; left: 50%; transform: translateX(-50%); display: none; }
+#hud .tbtn .badge { background: var(--red); top: -4px; right: -4px; }
+#hud .tbtn.no { filter: grayscale(0.85) brightness(0.8); opacity: 0.75; }
+#hud .tbtn.up { background: radial-gradient(circle at 38% 30%, #fff 0 8%, #d9f7c0 30%, #7cc54e 70%, #2f6a12 100%); }
+#hud .tbtn.maxed { background: radial-gradient(circle at 38% 30%, #fff 0 8%, #cfe9ff 30%, #7aa9d6 70%, #2a4e74 100%); }
+#hud .tbtn.toggle { width: calc(var(--tb) * 0.72); height: calc(var(--tb) * 0.72); background: var(--coin); color: var(--gold-edge); }
+#hud .tbtn.toggle.on { background: radial-gradient(circle at 38% 30%, #fff 0 8%, #d9f7c0 30%, #7cc54e 70%, #2f6a12 100%); color: #fff; }
+#hud .tbtn .lbl { font-size: 10px; }
+#hud #spell { width: calc(var(--tb) * 0.95); height: calc(var(--tb) * 0.95); border-radius: 50%; background: var(--coin); margin: 0 0 10px 8px; }
+#hud #spell svg { width: 60%; height: 60%; }
+#hud #spell .ring { border-radius: 50%; }
+#hud #spell.ready { box-shadow: 0 0 0 3px #fff6b0, 0 0 16px var(--gold), 0 3px 0 var(--gold-edge); }
+#hud #spell.armed { background: radial-gradient(circle at 38% 30%, #fff 0 8%, #8fd3ff 30%, var(--blue) 70%, #123d7a 100%); }
+
+/* direct-control buttons in the same coin style */
+#hud #atkBtn { background: radial-gradient(circle at 38% 30%, #fff 0 8%, #ff9a8a 30%, var(--red) 70%, #6e1010 100%); }
+#hud #spcBtn { background: var(--coin); color: var(--gold-edge); }
+#hud #relBtn { background: radial-gradient(circle at 38% 30%, #fff 0 8%, #999 30%, #444 70%, #111 100%); }
+#hud #atkBtn, #hud #spcBtn, #hud #relBtn { right: calc(14px + var(--sr)); }
+#hud #spcBtn { right: calc(14px + var(--sr) + clamp(64px, 19vh, 88px) + 12px); }
+#hud #atkBtn { bottom: calc(14px + var(--sb)); }
+#hud #spcBtn { bottom: calc(20px + var(--sb)); }
+#hud #relBtn { bottom: calc(26px + var(--sb) + clamp(64px, 19vh, 88px)); }
+.ctrlname { top: calc(58px + var(--st)); background: linear-gradient(180deg, var(--wood-hi), var(--wood-lo)); border-color: var(--gold); }
+#hud.controlling .bottombar { right: calc(220px + var(--sr)); }
+.pan { background: linear-gradient(180deg, var(--wood-hi), var(--wood-lo)); border-color: var(--wood-edge); color: var(--gold-hi); }
+#hud .ctrlname { left: auto; right: calc(12px + var(--sr)); transform: none; top: calc(56px + var(--st)); }
