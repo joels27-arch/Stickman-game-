@@ -52,6 +52,9 @@ class Game {
       if (document.hidden && this.state === 'playing') this.pause();
       if (this.audio.ctx) { if (document.hidden) this.audio.ctx.suspend(); else this.audio.ctx.resume(); }
     });
+    // rotating to portrait on a phone shows the rotate overlay — pause underneath it
+    const portrait = window.matchMedia('(orientation: portrait) and (max-width: 900px)');
+    portrait.addEventListener?.('change', (e) => { if (e.matches && this.state === 'playing') this.pause(); });
     // first touch anywhere unlocks audio (iOS)
     const unlock = () => { this.audio.unlock(); this.audio.startMusic(this.state === 'menu' ? 'menu' : 'battle'); };
     window.addEventListener('pointerdown', unlock, { passive: true });
