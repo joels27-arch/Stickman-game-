@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="INKFALL — a side-scrolling stick-figure real-time strategy war game.">
+  <meta name="theme-color" content="#101218">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="INKFALL">
+  <meta name="format-detection" content="telephone=no">
+  <title>INKFALL</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- loading screen -->
+  <div id="loading" class="screen show">
+    <div class="logo">INK<span>FALL</span></div>
+    <div class="bar"><i id="loadbar"></i></div>
+    <div id="loadtext" class="muted">Mixing the ink…</div>
+  </div>
+
+  <!-- portrait warning -->
+  <div id="rotate">
+    <div class="phone"></div>
+    <p>Rotate your phone to landscape</p>
+  </div>
+
+  <div id="ui"></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

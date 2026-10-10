@@ -1,0 +1,16 @@
+{
+  "name": "inkfall",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "INKFALL — a side-scrolling stick-figure RTS for the browser and iPhone",
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "assets": "node tools/build-assets.mjs",
+    "sim": "node tools/sim.mjs",
+    "test": "node tools/sim.mjs --quick"
+  },
+  "devDependencies": {
+    "sharp": "^0.33.5"
+  }
+}
