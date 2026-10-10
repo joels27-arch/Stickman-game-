@@ -40,7 +40,7 @@ At runtime, the loader prefers `assets/game/*.webp`. If those are missing it use
 
 Units are **never** sprites from the concept sheets. They are skeletal stick figures drawn in code (forward kinematics, procedural animation) with per-unit accessories matching the concept art. Large battles cache animation frames into small canvases (`src/render/spritecache.js`). The game runs a short on-device benchmark to choose between cached frames and full vector drawing.
 
-> Note: the repository ships with code-drawn placeholder icons. Run `npm run assets` after adding `icon.png` to replace them.
+> The art in this repo was processed in the Higgsfield sandbox with this same pipeline. The resulting bundle was imported by `.github/workflows/import-art.yml`: it downloads the zip listed in `tools/art-bundle.url`, verifies the SHA-256, and commits only `assets/` and `icons/`. The monument cutout keeps only the main tower, dropping concept-sheet titles, logos and inset sketches. Each background's ground strip is detected automatically and drawn as the walkable floor.
 
 ## How to play
 
