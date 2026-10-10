@@ -487,7 +487,8 @@ export class Unit {
     this.thinkT -= dt;
     if (this.thinkT <= 0 || (this.target && (this.target.isStructure ? this.target.dead : !this.target.alive || this.target.garrisoned))) {
       this.thinkT = 0.2 + Math.random() * 0.1;
-      const aggro = this.def.aggro + (this.ranged ? this.range * 0.1 : 0);
+      // defenders watch a wider area so nothing can snipe the line unanswered
+      const aggro = this.def.aggro + (this.ranged ? this.range * 0.1 : 0) + (stance === 'defend' ? 220 : 0);
       this.target = world.findTarget(this, aggro, { prefer: this.type === 'shadow' ? 'ranged' : null });
       if (this.target && stance === 'defend') {
         // leash: don't chase too far from the defensive line

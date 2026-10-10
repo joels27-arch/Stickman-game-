@@ -10,13 +10,13 @@ import { makeCanvas } from '../assets.js';
 const TAU = Math.PI * 2;
 // local-space bounds per type (unscaled world units; origin at the feet)
 const BOX = {
-  default: [-32, -74, 40, 6],
-  digger: [-30, -74, 36, 6],
+  default: [-32, -78, 40, 6],
+  digger: [-30, -78, 38, 6],
   bowman: [-26, -66, 30, 6],
-  shieldbearer: [-26, -76, 48, 6],
+  shieldbearer: [-26, -76, 54, 6],
   inkcaster: [-26, -106, 30, 6],
   shadow: [-26, -60, 34, 6],
-  colossus: [-34, -86, 40, 6],
+  colossus: [-36, -98, 50, 6],
 };
 
 export class SpriteCache {

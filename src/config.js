@@ -106,7 +106,7 @@ export const MONUMENT = { hp: 5000, width: 110, height: 270 };
 
 export const DIFFICULTY = {
   easy:   { label: 'Easy',   think: 2.6, income: 0.8,  diggers: 5,  aggression: 1.6,  counter: 0.15, spells: false, minArmy: 5, startGold: 0,   upgrades: false, accuracy: 0.7 },
-  normal: { label: 'Normal', think: 1.6, income: 1.0,  diggers: 7,  aggression: 1.25, counter: 0.6,  spells: true,  minArmy: 4, startGold: 0,   upgrades: true,  accuracy: 0.85 },
+  normal: { label: 'Normal', think: 1.6, income: 1.0,  diggers: 7,  aggression: 1.25, counter: 0.7,  spells: true,  minArmy: 4, startGold: 0,   upgrades: true,  accuracy: 0.85 },
   hard:   { label: 'Hard',   think: 1.0, income: 1.15, diggers: 9,  aggression: 1.05, counter: 0.8,  spells: true,  minArmy: 4, startGold: 100, upgrades: true,  accuracy: 0.95 },
   insane: { label: 'Insane', think: 0.6, income: 1.35, diggers: 10, aggression: 0.95, counter: 1.0,  spells: true,  minArmy: 3, startGold: 250, upgrades: true,  accuracy: 1.0 },
 };
