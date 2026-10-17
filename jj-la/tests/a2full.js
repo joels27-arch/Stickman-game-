@@ -46,7 +46,7 @@ const { chromium } = require('playwright');
  await ev(()=>{ if(MI.d.yun) MI.d.yun.bar=1.1; }); await W(400); res.m14cam=await ev(()=>MI.step);
  await ev(()=>{ enterRoom("vault",{x:550,y:300,a:0}); MI.def.tick(MI,.1); }); await W(400); res.m14vault=await ev(()=>MI.step);
  await ev(()=>{ if(MI.d.paul) MI.d.paul.bar=1.1; MI.def.tick(MI,.1); }); await W(400); res.m14drill=await ev(()=>MI.step);
- await ev(()=>{ ['bag0','bag1','bag2','bag3'].forEach((k,i)=>{ const sp=[[250,575],[840,575],[460,560],[640,560]][i]; jj.x=VAULT.r.x+sp[0]; jj.y=VAULT.r.y+sp[1]; MI.def.tick(MI,.1); }); }); await W(300); res.m14bags=await ev(()=>[MI.step,MI.d.bags]);
+ await ev(()=>{ ['bag0','bag1','bag2','bag3'].forEach((k,i)=>{ const sp=[[260,640],[840,640],[460,560],[640,560]][i]; jj.x=VAULT.r.x+sp[0]; jj.y=VAULT.r.y+sp[1]; MI.def.tick(MI,.1); }); }); await W(300); res.m14bags=await ev(()=>[MI.step,MI.d.bags]);
  await ev(()=>{ enterRoom("bank",{x:700,y:130,a:0}); MI.def.tick(MI,.1); }); await W(400); res.m14hall=await ev(()=>MI.step);
  await ev(()=>{ if(MI.d.swat) for(const n of MI.d.swat) if(!n.dead) killNpc(n,0,0); }); await W(400); res.m14swat=await ev(()=>MI.step);
  await ev(()=>{ jj.x=RBANK.r.x+700; jj.y=RBANK.r.y+870; MI.def.tick(MI,.1); }); await W(400); res.m14exit=await ev(()=>[MI.step,!!CURROOM]);

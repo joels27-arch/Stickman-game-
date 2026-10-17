@@ -78,7 +78,8 @@ function drawRockets(q){ for (const r of rockets){ q.save(); q.translate(r.x,r.y
 // ================= HEALTH / WASTED =================
 function hurt(d){ if (jj.dead||d<=0||FLY) return; jj.hp-=d; if (d>=12&&jj.hp>0) bark("hurt",.6); jj.lastHurt=performance.now()/1000; jj.flash=.35; hudDirty=true; if (jj.hp<=0){ jj.hp=0; wasted(); } }
 function wasted(){ if (jj.dead) return; clearWanted(true); if (jj.veh){ const v=jj.veh; jj.veh=null; const p=landNear(v.x,v.y); jj.x=p.x; jj.y=p.y; } jj.dead=true; jj.deadT=0; W.swing=0; showDest(false); closePhone(); hudDirty=true; }
-function respawn(){ setCinema(false); blackout(false); if (CURROOM) leaveRoomRaw(); sgReset(); npcBoot=30; jj.h=0; jj.roof=null; jj.glide=null; jj.dead=false; jj.hp=100; { const H=MS.done.mh&&typeof SALEDOOR!=="undefined"?SALEDOOR:DOOR; jj.x=H.x; jj.y=H.y+30; } jj.ang=0; cam.x=jj.x; cam.y=jj.y; hudDirty=true; }
+function homeSpot(){ const H=MS.done.mh&&typeof SALEDOOR!=="undefined"?SALEDOOR:DOOR; return {x:H.x,y:H.y+30}; }
+function respawn(){ setCinema(false); blackout(false); if (CURROOM) leaveRoomRaw(); sgReset(); npcBoot=30; jj.h=0; jj.roof=null; jj.glide=null; jj.dead=false; jj.hp=100; { const H=homeSpot(); jj.x=H.x; jj.y=H.y; } jj.ang=0; cam.x=jj.x; cam.y=jj.y; hudDirty=true; }
 function updateHealth(dt,t){ if (jj.dead){ jj.deadT+=dt; if (jj.deadT>4) respawn(); return; } jj.flash=Math.max(0,jj.flash-dt);
   if (jj.hp<100&&t-jj.lastHurt>6){ jj.hp=Math.min(100,jj.hp+dt*4); hudDirty=true; }
   nearShop=false;

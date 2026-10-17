@@ -221,7 +221,7 @@ function updateWanted(dt){ if (CURROOM) return; const T=jj.veh||jj;
   if (WANT.bustT>1.5) startBust(); }
 function startBust(){ WANT.busted=.01; WANT.bustT=0; jj.lock=4; jj.moving=false; sfx("door"); }
 function finishBust(){ WANT.busted=0; const fee=Math.min(cash,Math.max(50,Math.round(cash*.1))); cash-=fee; clearWanted(true); for (const n of npcs) if (n.cop) n.leave=true;
-  if (MI) failMission("Du wurdest verhaftet."); jj.lock=0; jj.hp=Math.max(jj.hp,60); jj.x=6935; jj.y=1560; jj.ang=0; cam.x=jj.x; cam.y=jj.y; hudDirty=true; saveGame();
+  if (MI) failMission("Du wurdest verhaftet."); jj.lock=0; jj.hp=Math.max(jj.hp,60); { const H=homeSpot(); jj.x=H.x; jj.y=H.y; } jj.ang=0; cam.x=jj.x; cam.y=jj.y; hudDirty=true; saveGame();
   toast(fee?"Kaution bezahlt: −$"+fee:"Auf Bewährung raus. Benimm dich, JJ."); }
 function updateCopHeli(dt){ const h=WANT.heli, T=jj.veh||jj; h.rot+=dt*30; if (heliRope(dt,h,T)){ h.lx+=(T.x-h.lx)*Math.min(1,dt*3); h.ly+=(T.y-h.ly)*Math.min(1,dt*3); return; }
   const tx=h.leave?T.x+3000:(WANT.seenT>0?WANT.sx:T.x)+Math.sin(performance.now()/1400)*60, ty=h.leave?T.y-2000:(WANT.seenT>0?WANT.sy:T.y)-30;

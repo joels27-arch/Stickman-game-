@@ -316,7 +316,7 @@ $("bigmap").addEventListener("pointerdown",e=>{ e.preventDefault(); if (e.target
 document.getElementById("load").hidden=true;
 document.getElementById("go").addEventListener("click",()=>{ initAudio(); document.getElementById("title").classList.add("off"); started=true; document.body.classList.add("play"); setTimeout(()=>{ document.getElementById("title").hidden=true; },800);
   syncBadge(); hudDirty=true;
-  if (!MS.done.m1){ jj.x=MDEF[0].loc.x; jj.y=MDEF[0].loc.y; jj.hidden=true; cam.x=AX; cam.y=450; startMission(MDEF[0]); } else { if (!MS.done.m2) setupRide(); renderObj(); } });
+  if (!MS.done.m1){ jj.x=MDEF[0].loc.x; jj.y=MDEF[0].loc.y; jj.hidden=true; cam.x=AX; cam.y=450; startMission(MDEF[0]); } else { if (!MS.done.m2) setupRide(); else { const H=homeSpot(); jj.x=H.x; jj.y=H.y; jj.ang=0; cam.x=jj.x; cam.y=jj.y; } renderObj(); } });
 if (loadGame()&&MS.done.m1){ $("go").textContent="WEITER"; $("newg").hidden=false; }
 if (OUTFITS[OUTFIT]&&!OWN_OUT.includes(OUTFITS[OUTFIT].id)) OWN_OUT.push(OUTFITS[OUTFIT].id); if (MS.done.m1&&!CHATS.mama.msgs.length) CHATS.mama.msgs.push({text:MAMA_TXT(),me:false,time:"16:02"}); if (MS.done.m12) OWN_CARS.slice(-3).forEach((c,i)=>spawnOwnedCar(c,i,!!MS.done.mh));
 $("newg").addEventListener("click",()=>{ resetGame(); location.reload(); });

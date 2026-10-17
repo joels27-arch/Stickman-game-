@@ -39,6 +39,10 @@ Top-down-Open-World-Spiel (GTA-2-Stil). Ausgeliefert wird **eine HTML-Datei** `i
 - Gefängnis: Türsteher (`JAIL.b`, `bouncerAI`) greifen nur an, wenn JJ sie angreift. Sind beide erledigt, führt die Tür (`JDOOR`) in den Gefängnishof (`enterJailYard`, raus über `JYIN`). Der alte Zellenblock-Raum (`enterJailIn`) ist nicht mehr erreichbar.
 - Achtung: Alle Dateien teilen sich einen globalen Namensraum – gleichnamige Funktionen überschreiben sich still (so war `freeSpot` doppelt → Heli flog ins Nichts; jetzt `heliSpot`).
 - Test-Sprung zu Mission i: `jumpToMission(i)` in der Konsole.
+- Spawnpunkt (Spielstart, Tod, Verhaftung): `homeSpot()` = Onkel Bobbys Haus, nach `mh` die Villa (`SALEDOOR`).
+- Missions-Startpunkte (`def.loc`), die in einem Hindernis liegen, werden am Ende von `missions-act3.js` automatisch auf freien Boden verschoben (sonst steckt JJ nach dem Sprung fest).
+- Bank (m14): Personal-Tor öffnet beim Stürmen, Tresortür öffnet nach dem Bohren wirklich (`setGate(VAULT,"door",true)`), Taschen vor den Goldpaletten; `cleanup` schließt alles wieder.
+- Dialog-Ton: wie Akt 1 – frech, Running Gags (Yunus' Tauben, Bobbys Couch „Gerald“ und Bier, Luka zu laut/Clownsmasken/Tiger, Paul traut keinem, Mo ängstlich).
 
 ## Tests (Playwright, headless Chromium)
 ```
