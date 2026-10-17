@@ -166,12 +166,12 @@ function drawSign(q,vx,vy,vis){ if (!vis(8400,SIGN.y,700)) return; const k=1+70/
 // ================= POLIZEI / FAHNDUNG (1–5 Sterne) =================
 const COP_LOOK={skin:"#c99572",skinHi:"#ddb08c",shirt:"#1f3d7a",shirtHi:"#3060b0",pants:"#141c2e",shoe:"#0b0b0d",cap:"#141c2e"};
 const WANT={heat:0,lv:0,seenT:0,lx:0,ly:0,sx:0,sy:0,spT:0,wT:0,bustT:0,busted:0,heli:null,shown:-1,flash:false};
-const WANT_CARS=[0,1,2,3,3,4,5], WANT_TANKS=[0,0,0,0,1,1,3];
+const WANT_CARS=[0,1,2,2,3,3,4], WANT_TANKS=[0,0,0,0,0,1,2];
 function wantOff(){ return !started||!!CRIDE||!!GOLF||!!RIDE&&RIDE.phase==="drive"&&!RIDE.done||!!CINE||!!ESC||!!(typeof FLY!=="undefined"&&FLY)||jj.dead||WANT.busted>0||!!(MI&&MI.def.id==="m3"&&MI.step>=1&&MI.step<3); }
 function copsNear(x,y,r){ for (const v of vehicles) if (v.type==="police"&&!v.wreck&&!v.gone&&(v.driver||v.cop)&&v!==jj.veh&&Math.hypot(v.x-x,v.y-y)<r) return true;
   for (const n of npcs) if (n.cop&&!n.dead&&Math.hypot(n.x-x,n.y-y)<r) return true; return false; }
 function crime(amt,why){ if (wantOff()) return; const before=WANT.lv; WANT.heat=Math.min(6.99,WANT.heat+amt); WANT.knowT=Math.max(WANT.knowT||0,7); WANT.lv=Math.min(6,Math.floor(WANT.heat));
-  if (WANT.lv>before){ WANT.seenT=0; WANT.lx=jj.x; WANT.ly=jj.y; WANT.spT=0; sfx("ping"); if (before===0){ toast(why?why+" – die Polizei sucht dich!":"Die Polizei sucht dich!"); bark("crash",1); }
+  if (WANT.lv>before){ WANT.seenT=0; WANT.lx=jj.x; WANT.ly=jj.y; WANT.spT=Math.max(WANT.spT,3); sfx("ping"); if (before===0){ toast(why?why+" – die Polizei sucht dich!":"Die Polizei sucht dich!"); bark("crash",1); }
     else if (WANT.lv===5) toast(LANG==="en"?"★★★★★ SWAT & roadblocks!":"★★★★★ SWAT & Straßensperren!"); else if (WANT.lv===6) toast(LANG==="en"?"★★★★★★ MILITARY – airstrikes!":"★★★★★★ MILITÄR – Luftangriffe!"); } }
 let killBy=null;
 // Passanten überfahren ruft keine Polizei. Zu Fuß getötet (Schläge/Waffen): die ersten zwei bleiben unbemerkt,
@@ -186,7 +186,7 @@ function clearWanted(silent){ WANT.heat=0; WANT.lv=0; WANT.seenT=0; WANT.bustT=0
   for (const n of npcs) if (n.cop&&!n.dead){ n.hostile=false; n.leave=true; n.panic=0; }
   if (WANT.heli) WANT.heli.leave=true; if (!silent) toast("Abgehängt! Die Cops geben auf."); }
 function spawnCopCar(){ const p=roadSpotAway(jj.x,jj.y,620,950); if (!p) return; const v=addVeh("police",p.x,p.y,p.a,"",{ai:true,driver:true,cop:true,crew:2,lights:true});
-  if (WANT.lv>=4){ v.t=Object.assign({},VT.police,{max:VT.police.max*1.12,acc:VT.police.acc*1.15,hp:VT.police.hp*1.3}); v.hp=v.t.hp; } }
+  if (WANT.lv>=4){ v.t=Object.assign({},VT.police,{hp:VT.police.hp*1.3}); v.hp=v.t.hp; } }
 function spawnCop(x,y){ const n={x,y,ang:0,step:0,moving:false,run:false,look:COP_LOOK,hostile:true,cop:true,dead:false,deadT:0,cd:.8+rnd(),weapon:WANT.lv>=3?"pistol":null,range:20,sp:WANT.lv>=3?105:95,hits:0}; npcs.push(n); return n; }
 function copSees(){ const T=jj.veh||jj; for (const v of vehicles) if (v.cop&&!v.wreck&&!v.gone&&!v.leave&&Math.hypot(v.x-T.x,v.y-T.y)<480) return true;
   for (const n of npcs) if (n.cop&&!n.dead&&!n.leave&&Math.hypot(n.x-T.x,n.y-T.y)<380&&losClear(n.x,n.y,T.x,T.y)) return true;
@@ -205,8 +205,8 @@ function updateWanted(dt){ if (CURROOM) return; const T=jj.veh||jj;
     if (WANT.seenT>8+WANT.lv*3){ clearWanted(); return; } }
   // Verstärkung
   WANT.spT-=dt; const cars=vehicles.filter(v=>v.cop&&!v.gone&&!v.wreck&&!v.leave&&v.ai).length;
-  if (WANT.spT<=0&&cars<WANT_CARS[WANT.lv]){ WANT.spT=WANT.lv>=4?2:3.2; spawnCopCar(); }
-  { const tk=vehicles.filter(v=>v.type==="tank"&&!v.gone&&!v.wreck&&!v.leave).length; WANT.tkT=(WANT.tkT||0)-dt; if (WANT.tkT<=0&&tk<WANT_TANKS[WANT.lv]){ WANT.tkT=6; spawnTank(); if (!WANT.tankTold){ WANT.tankTold=1; toast("PANZER! Die meinen es ernst."); } } }
+  if (WANT.spT<=0&&cars<WANT_CARS[WANT.lv]){ WANT.spT=WANT.lv>=4?4:5; spawnCopCar(); }
+  { const tk=vehicles.filter(v=>v.type==="tank"&&!v.gone&&!v.wreck&&!v.leave).length; WANT.tkT=(WANT.tkT||0)-dt; if (WANT.tkT<=0&&tk<WANT_TANKS[WANT.lv]){ WANT.tkT=15; spawnTank(); if (!WANT.tankTold){ WANT.tankTold=1; toast("PANZER! Die meinen es ernst."); } } }
   for (const n of npcs) if (n.cop&&n.patrol&&!n.hostile&&!n.dead&&!n.leave&&Math.hypot(n.x-T.x,n.y-T.y)<800){ n.hostile=true; n.sp=95; n.cd=.8; }
   WANT.heliCd=Math.max(0,(WANT.heliCd||0)-dt); if (WANT.lv>=3&&!WANT.heli&&WANT.heliCd<=0) WANT.heli={x:T.x-900,y:T.y-500,a:0,rot:0,cd:2,leave:false,lx:T.x,ly:T.y};
   // festgefahrene Streifenwagen außer Sicht ersetzen
@@ -228,7 +228,7 @@ function updateCopHeli(dt){ const h=WANT.heli, T=jj.veh||jj; h.rot+=dt*30; if (h
   const dx=tx-h.x, dy=ty-h.y, d=Math.hypot(dx,dy), sp=Math.min(d*1.2,h.leave?420:250); if (d>1){ h.x+=dx/d*sp*dt; h.y+=dy/d*sp*dt; } let da=Math.atan2(dy,dx)-h.a; da=Math.atan2(Math.sin(da),Math.cos(da)); if (d>40) h.a+=da*Math.min(1,dt*2);
   { const sx=WANT.seenT>0?WANT.sx:T.x, sy=WANT.seenT>0?WANT.sy:T.y, ex=sx-h.lx, ey=sy-h.ly, ed=Math.hypot(ex,ey), ms=(WANT.seenT>0?140:230)*dt, kk=ed>ms?ms/ed:1; if (Math.hypot(h.lx-h.x,h.ly-h.y)>320||ed>900){ h.lx=h.x; h.ly=h.y; } else { h.lx+=ex*kk; h.ly+=ey*kk; } }
   if (h.leave&&offView(h.x,h.y,300)){ WANT.heli=null; return; }
-  if (!h.leave&&WANT.lv>=4&&WANT.seenT===0&&!jj.dead&&d<260){ h.cd-=dt; if (h.cd<=0){ h.cd=WANT.lv>=6?3.6:1.3+rnd()*.6; if (WANT.lv>=6){ const lx=T.x+(jj.veh?Math.cos(jj.veh.a)*jj.veh.v*.5:0), ly=T.y+(jj.veh?Math.sin(jj.veh.a)*jj.veh.v*.5:0); SHELLS.push({x:h.x,y:h.y,tx:lx+(rnd()-.5)*60,ty:ly+(rnd()-.5)*60,t:0,dur:.7,sx:h.x,sy:h.y,src:JETSRC}); sfx("boom"); return; } const hit=rnd()<.2, ex=T.x+(hit?0:(rnd()-.5)*50), ey=T.y+(hit?0:(rnd()-.5)*50); tracers.push({x1:h.x,y1:h.y,x2:ex,y2:ey,t:.07}); sfx("shot"); if (hit){ if (jj.veh) damageVeh(jj.veh,6); else hurt(6); } } } }
+  if (!h.leave&&WANT.lv>=4&&WANT.seenT===0&&!jj.dead&&d<260){ h.cd-=dt; if (h.cd<=0){ h.cd=WANT.lv>=6?5:2.2+rnd()*.8; if (WANT.lv>=6){ const lx=T.x+(jj.veh?Math.cos(jj.veh.a)*jj.veh.v*.5:0), ly=T.y+(jj.veh?Math.sin(jj.veh.a)*jj.veh.v*.5:0); SHELLS.push({x:h.x,y:h.y,tx:lx+(rnd()-.5)*60,ty:ly+(rnd()-.5)*60,t:0,dur:.7,sx:h.x,sy:h.y,src:JETSRC}); sfx("boom"); return; } const hit=rnd()<.2, ex=T.x+(hit?0:(rnd()-.5)*50), ey=T.y+(hit?0:(rnd()-.5)*50); tracers.push({x1:h.x,y1:h.y,x2:ex,y2:ey,t:.07}); sfx("shot"); if (hit){ if (jj.veh) damageVeh(jj.veh,6); else hurt(6); } } } }
 function drawCopSpot(q){ const h=WANT.heli; if (!h||h.leave) return; q.save(); q.globalCompositeOperation="lighter"; const g=q.createRadialGradient(h.lx,h.ly,8,h.lx,h.ly,110); g.addColorStop(0,"rgba(255,250,220,.32)"); g.addColorStop(.7,"rgba(255,250,220,.12)"); g.addColorStop(1,"rgba(255,250,220,0)"); q.fillStyle=g; q.beginPath(); q.arc(h.lx,h.ly,110,0,7); q.fill(); q.restore(); }
 function drawCopHeli(q,vx,vy){ const h=WANT.heli; if (!h) return; drawRope(q,vx,vy); const z=300, k=1+z/D, X=vx+(h.x-vx)*k, Y=vy+(h.y-vy)*k;
   q.save(); q.translate(h.x+z*.45,h.y+z*.17); q.rotate(h.a); q.fillStyle="rgba(25,15,40,.22)"; q.beginPath(); q.ellipse(0,0,24,10,0,0,7); q.fill(); q.fillRect(-46,-2.5,26,5); q.restore();
@@ -251,7 +251,7 @@ function drawTankTop(q,v){ const a=(v.tur==null?v.a:v.tur)-v.a; q.save(); q.rota
 function spawnTank(){ const p=roadSpotAway(jj.x,jj.y,700,1000); if (!p) return; const v=addVeh("tank",p.x,p.y,p.a,"#55623a",{ai:true,driver:true,cop:true,crew:0,tur:p.a,cd:2.5}); }
 function updateTanks(dt){ const T=jj.veh||jj;
   for (const v of vehicles){ if (v.type!=="tank"||v.gone||v.wreck) continue; const ta=Math.atan2(T.y-v.y,T.x-v.x); let d=ta-(v.tur==null?v.a:v.tur); d=Math.atan2(Math.sin(d),Math.cos(d)); v.tur=(v.tur==null?v.a:v.tur)+Math.max(-1.6*dt,Math.min(1.6*dt,d));
-    v.cd-=dt; const dist=Math.hypot(T.x-v.x,T.y-v.y); if (WANT.lv>=4&&!jj.dead&&v.cd<=0&&dist<580&&Math.abs(d)<.12&&losClear(v.x,v.y,T.x,T.y)){ v.cd=3.2; const er=(rnd()-.5)*50, tx=T.x+(jj.veh?Math.cos(jj.veh.a)*jj.veh.v*.6:0)+er, ty=T.y+(jj.veh?Math.sin(jj.veh.a)*jj.veh.v*.6:0)+er;
+    v.cd-=dt; const dist=Math.hypot(T.x-v.x,T.y-v.y); if (WANT.lv>=5&&!jj.dead&&v.cd<=0&&dist<520&&Math.abs(d)<.12&&losClear(v.x,v.y,T.x,T.y)){ v.cd=5.5; const er=(rnd()-.5)*50, tx=T.x+(jj.veh?Math.cos(jj.veh.a)*jj.veh.v*.6:0)+er, ty=T.y+(jj.veh?Math.sin(jj.veh.a)*jj.veh.v*.6:0)+er;
       SHELLS.push({x:v.x+Math.cos(v.tur)*46,y:v.y+Math.sin(v.tur)*46,tx,ty,t:0,dur:Math.max(.25,dist/900),sx:v.x+Math.cos(v.tur)*46,sy:v.y+Math.sin(v.tur)*46,src:v}); sfx("boom"); shake=Math.max(shake,5); emit("flash",v.x+Math.cos(v.tur)*48,v.y+Math.sin(v.tur)*48,{size:70,life:.12,max:.12,grow:80}); } }
   for (let i=SHELLS.length-1;i>=0;i--){ const s=SHELLS[i]; s.t+=dt; const f=Math.min(1,s.t/s.dur); s.x=s.sx+(s.tx-s.sx)*f; s.y=s.sy+(s.ty-s.sy)*f; if (f>=1){ SHELLS.splice(i,1); explosion(s.tx,s.ty,.85,s.src); } } }
 function drawShells(q){ for (const s of SHELLS){ q.strokeStyle="rgba(255,220,150,.6)"; q.lineWidth=2; q.beginPath(); q.moveTo(s.x,s.y); q.lineTo(s.x-(s.tx-s.sx)*.05,s.y-(s.ty-s.sy)*.05); q.stroke(); q.fillStyle="#222"; q.beginPath(); q.arc(s.x,s.y,3,0,7); q.fill(); } }

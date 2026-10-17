@@ -111,9 +111,9 @@ function explosion(x,y,pow,src){ sfx("boom"); shake=Math.max(shake,16*pow); for 
   for (let i=0;i<26;i++){ const a=rnd()*6.28, sp=200+rnd()*420; emit("spark",x,y,{vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:.4+rnd()*.4,max:.8}); }
   for (let i=0;i<12;i++){ const a=rnd()*6.28, sp=120+rnd()*260; emit("debris",x,y,{vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,size:3+rnd()*5,life:1.4,max:1.4,vr:(rnd()-.5)*20,col:rnd()<.5?"#2a2522":src?shade(src.col||"#888888",.6):"#5a5048"}); }
   if (!inWater(x,y)){ g.save(); g.globalAlpha=.85; g.drawImage(SCORCH,x-60*pow,y-60*pow,120*pow,120*pow); g.restore(); }
-  const R=130*pow;
-  for (const v of vehicles){ if (v===src||v.z>.3) continue; const d=Math.hypot(v.x-x,v.y-y); if (d<R){ const f=1-d/R; damageVeh(v,170*f*pow,null); const a=Math.atan2(v.y-y,v.x-x); v.sx+=Math.cos(a)*260*f; v.sy+=Math.sin(a)*260*f; v.rotV+=(rnd()-.5)*6*f; } }
-  if (!jj.veh&&!jj.dead&&!jj.h){ const d=Math.hypot(jj.x-x,jj.y-y); if (d<R*.85) hurt(95*(1-d/(R*.85))*pow); } }
+  const R=130*pow, soft=src&&(src.cop||src.jet)?.45:1;   // Polizei-/Militär-Explosionen treffen JJ schwächer
+  for (const v of vehicles){ if (v===src||v.z>.3) continue; const d=Math.hypot(v.x-x,v.y-y); if (d<R){ const f=1-d/R; damageVeh(v,170*f*pow*(v===jj.veh?soft:1),null); const a=Math.atan2(v.y-y,v.x-x); v.sx+=Math.cos(a)*260*f; v.sy+=Math.sin(a)*260*f; v.rotV+=(rnd()-.5)*6*f; } }
+  if (!jj.veh&&!jj.dead&&!jj.h){ const d=Math.hypot(jj.x-x,jj.y-y); if (d<R*.85) hurt(95*(1-d/(R*.85))*pow*soft); } }
 // ---------- fließender Verkehr: Autos folgen ihrer Spur, biegen an Kreuzungen ab ----------
 const HD=[[1,0],[0,1],[-1,0],[0,-1]];
 const roadOri=(x,y,hor)=>{ for (const r of roads) if ((r.w>r.h)===hor&&x>r.x&&x<r.x+r.w&&y>r.y&&y<r.y+r.h) return r; return null; };

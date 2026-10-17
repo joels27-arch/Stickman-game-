@@ -34,6 +34,7 @@ Top-down-Open-World-Spiel (GTA-2-Stil). Ausgeliefert wird **eine HTML-Datei** `i
 - Schleichen: `SG` (`sgStart`, `sgGuard`, `sgCam`, `sgLaser`, `knockOut`).
 - Shops: LA ARMS (`armsOpen()`), DRIP STORE Klamotten (`clothesOpen()`, `CLO`), Rico's Autos (`ricoOpen()`, Autokauf ab m12). Beide über `openRico("o"|"c")`.
 - Fahrten mit Chauffeur: `RIDE` (Onkel Bobby → Luka nach m1, `setupRide`; Luka → Yunus nach m2, `setupLukaRide`, Route per `roadRoute`). Tutorial 1 (`TUT_STEPS`, `jjla-tut3`) läuft bei Bobby, Tutorial 2 (`TUT2_STEPS`: Handy/Bank, Waffen- & Outfit-Rad, `jjla-tut4`) bei Luka.
+- Fahndungs-Balance (v103): `WANT_CARS=[0,1,2,2,3,3,4]`, Panzer erst ab 5 Sternen (`WANT_TANKS=[0,0,0,0,0,1,2]`, Schuss alle 5,5 s), Nachschub alle 4–5 s, erster Wagen frühestens 3 s nach Sternaufstieg; Explosionen mit Polizei-/Jet-Quelle machen JJ nur 45 % Schaden (`soft` in `explosion`). Bankcoup: Fluchtwagen `getaway()` vor der Bank, danach 4 Sterne.
 - Fahndung durch Passanten: Überfahren zählt nicht; zu Fuß getötet ab dem 3. Opfer innerhalb 90 s (`CIVK`, `wantOnKill`).
 - LA ARMS: Kaufpunkt `SISPOT` vor der Theke, Knopf/E öffnet den Laden (`onShopSpot`). Handy (Touch): `#radioChip` sitzt im `#hud` links neben dem Geld.
 - Gefängnis: Türsteher (`JAIL.b`, `bouncerAI`) greifen nur an, wenn JJ sie angreift. Sind beide erledigt, führt die Tür (`JDOOR`) in den Gefängnishof (`enterJailYard`, raus über `JYIN`). Der alte Zellenblock-Raum (`enterJailIn`) ist nicht mehr erreichbar.
