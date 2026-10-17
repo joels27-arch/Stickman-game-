@@ -189,7 +189,7 @@ function driveInput(v){ let thr=0, steer=0, brake=!!keys.Space; if (PAD.on&&(PAD
   if (touchBrake) brake=true; return {thr,steer,brake}; }
 // ---------- helicopters (stealable + JJ's private pickup) ----------
 let priv=null;   // the private heli object (a vehicle) while it is in play
-function freeSpot(x,y,r){ for (let rad=0;rad<700;rad+=30) for (let i=0;i<Math.max(1,rad/12);i++){ const a=i/Math.max(1,rad/12)*6.283+rad*.1, px=x+Math.cos(a)*rad, py=y+Math.sin(a)*rad; if (spotOK(px,py,r)) return {x:px,y:py}; } return null; }
+function heliSpot(x,y,r){ for (let rad=0;rad<700;rad+=30) for (let i=0;i<Math.max(1,rad/12);i++){ const a=i/Math.max(1,rad/12)*6.283+rad*.1, px=x+Math.cos(a)*rad, py=y+Math.sin(a)*rad; if (spotOK(px,py,r)) return {x:px,y:py}; } return null; }
 function spotOK(x,y,r){ if (x<r||y<r||x>WW-r||y>WH-r) return false; for (let a=0;a<6.28;a+=.785) for (const f of [0,.5,1]){ const px=x+Math.cos(a)*r*f, py=y+Math.sin(a)*r*f; if (solidAt(px,py)||inWater(px,py)) return false; }
   for (const v of vehicles) if (v.z<.3&&!v.priv&&Math.hypot(v.x-x,v.y-y)<r+v.t.l*.5) return false; return true; }
 function bAt(x,y,m){ for (const b of buildings) if (x>b.x+m&&x<b.x+b.w-m&&y>b.y+m&&y<b.y+b.h-m) return b; return null; }
@@ -215,7 +215,7 @@ const DEST=[{n:"Zuhause",x:1000,y:2260},{n:"Downtown",x:BLOCKS[4].x+BLOCKS[4].w*
 function callHeli(){ if (!UNLOCK.pickup) { toast("Noch nicht freigeschaltet"); return; } if (priv&&!priv.gone&&!priv.wreck){ toast(priv.mode==="leave"?"Der Heli ist gerade unterwegs":"Dein Heli ist schon unterwegs"); return; }
   if (jj.veh&&jj.veh.t.kind==="heli"){ toast("Du sitzt schon im Heli"); return; }
   let spot=null, tz=0; if (jj.roof){ const b=jj.roof; for (const [ox,oy] of [[70,0],[-70,0],[0,60],[0,-60],[50,40],[-50,-40]]){ const x=jj.x+ox, y=jj.y+oy; if (x>b.x+34&&x<b.x+b.w-34&&y>b.y+30&&y<b.y+b.h-30){ spot={x,y}; break; } } if (!spot) spot={x:b.x+b.w/2,y:b.y+b.h/2}; tz=b.H/240; }
-  else spot=freeSpot(jj.x+120,jj.y+70,62); if (!spot){ toast("Hier kann der Heli nicht landen"); return; }
+  else spot=heliSpot(jj.x+120,jj.y+70,62); if (!spot){ toast("Hier kann der Heli nicht landen"); return; }
   const ex=jj.x<WW/2?-200:WW+200, ey=Math.max(100,Math.min(WH-100,jj.y-600));
   priv=addVeh("heli",ex,ey,Math.atan2(spot.y-ey,spot.x-ex),"#15161a",{priv:true,z:1,auto:true,mode:"in",tx:spot.x,ty:spot.y,tz});
   priv.t=Object.assign({},VT.heli,{n:"Privat-Heli"}); toast("Privat-Heli ist unterwegs"); pushMsg("marco","Bin unterwegs! Wink mal, damit ich dich nicht plattmache.",true); }
@@ -232,7 +232,7 @@ function privLeave(v){ v.mode="leave"; v.auto=true; const ex=v.x<WW/2?-300:WW+30
 function boardPriv(v){ v.auto=true; v.mode="choose"; showDest(true); }
 function chooseDest(i){ showDest(false); const v=jj.veh; if (!v||!v.priv) return;
   if (i<0){ v.auto=false; v.mode="self"; toast("Du fliegst selbst. Aussteigen = landen."); return; }
-  const d=DEST[i], spot=freeSpot(d.x,d.y,62)||d; v.tx=spot.x; v.ty=spot.y; v.tz=0; v.mode="fly"; toast("Flug nach "+d.n); }
+  const d=DEST[i], spot=heliSpot(d.x,d.y,62)||d; v.tx=spot.x; v.ty=spot.y; v.tz=0; v.mode="fly"; toast("Flug nach "+d.n); }
 
 // ---------- entering / exiting ----------
 const peds=[];
@@ -271,11 +271,12 @@ function doorTarget(){ if (jj.veh||jj.dead||jj.h||jj.glide||paused||!started) re
   if (d(RICO)<44&&ricoOpen()) return {lbl:"RICO'S BETRETEN",fn:hot?cool:()=>openRico("c")};
   if (d(CLO)<40&&clothesOpen()) return {lbl:L2("DRIP STORE BETRETEN","ENTER DRIP STORE"),fn:hot?cool:()=>openRico("o")};
   if (d(DOOR,-4)<34&&!(MI&&MI.def.id==="m1"&&MI.step<2)) return {lbl:"HAUS BETRETEN",fn:hot?cool:enterHomeIn};
-  if (JAIL.open&&d(JDOOR)<36) return {lbl:"REINGEHEN",fn:enterJailIn};
+  if (JAIL.open&&d(JDOOR)<36) return {lbl:"REINGEHEN",fn:enterJailYard};
+  if (d(JYIN)<34&&jj.x<JAILR.x+JAILR.w) return {lbl:L2("RAUSGEHEN","GO OUT"),fn:leaveJailYard};
   { const h=WANT.heli; if (h&&h.rope&&h.rope.t>1&&!h.rope.up&&!CLIMB&&Math.hypot(jj.x-h.rope.x,jj.y-h.rope.y)<46) return {lbl:"SEIL HOCHKLETTERN",fn:startClimb}; }
   if (!CRIDE&&!GOLF&&Math.hypot(jj.x-CST.sx,jj.y-CST.sy)<70) return {lbl:"ACHTERBAHN FAHREN · $10",fn:hot?cool:startCoaster};
   if (!CRIDE&&!GOLF&&(Math.hypot(jj.x-5220,jj.y-5325)<60||Math.hypot(jj.x-GH[0].tee[0],jj.y-GH[0].tee[1])<60)) return {lbl:"GOLF SPIELEN · $25",fn:hot?cool:startGolf};
-  { const pn=planeNear(); if (pn) return UNLOCK.plane?{lbl:"FLUGZEUG FLIEGEN",fn:()=>boardPlane(pn)}:{lbl:"🔒 FLIEGEN",fn:planeLocked}; }
+  { const pn=planeNear(); if (pn) return UNLOCK.plane||MI&&MI.def.id==="mf"?{lbl:"FLUGZEUG FLIEGEN",fn:()=>boardPlane(pn)}:{lbl:"🔒 FLIEGEN",fn:planeLocked}; }
   if (MI&&MI.def.id==="m6"&&MI.step===4&&MI.d.door&&d(MI.d.door)<46) return {lbl:"VILLA BETRETEN",fn:()=>{ MI.d.goIn=true; }};
   return null; }
 function enterExit(){ if (CRIDE||GOLF) return; if (SHOPIN){ if (onShopSpot()) openShop(); return; } if (!jj.veh&&boardRide()) return; if (!FLY&&!jj.veh&&lakeSwim()){ toggleDive(); return; } if (FLY){ if (FLY.h<=0&&Math.abs(FLY.v)<40) leavePlane(false); else toast("Erst landen und anhalten!"); return; } if (CINE){ if (CINE.ready) finishArrival(); return; } if (jj.dead||jj.lock||jj.glide) return; { const tt=talkTarget(); if (tt){ doTalk(tt); return; } } { const dg=doorTarget(); if (dg){ dg.fn(); return; } }  if (!jj.veh&&nearShop){ openShop(); return; } if (jj.veh){ const v=jj.veh;

@@ -127,7 +127,7 @@ function updateJail(dt){ const d=Math.hypot(jj.x-JDOOR.x,jj.y-JDOOR.y);
 function bouncerAI(n,dt){ if (n.sayT>0) n.sayT-=dt; if (paused) return true; const dj=Math.hypot(jj.x-n.x,jj.y-n.y), dh=Math.hypot(jj.x-n.home.x,jj.y-n.home.y);
   if (n.idle){ n.moving=false; if (dj<260&&!jj.veh) n.ang=Math.atan2(-(jj.x-n.x),jj.y-n.y);
     if (dj<140&&!n.warned&&!jj.veh&&!jj.dead){ n.warned=true; n.say=n.line; n.sayT=2.6; } if (dj>240) n.warned=false;
-    if (n.hits>0||(dj<58&&!jj.veh&&!jj.dead)){ for (const b of JAIL.b) if (!b.dead&&b.idle){ b.idle=false; if (b!==n){ b.say="Jetzt bist du fällig!"; b.sayT=2; } } }
+    if (n.hits>0){ for (const b of JAIL.b) if (!b.dead&&b.idle){ b.idle=false; if (b!==n){ b.say="Jetzt bist du fällig!"; b.sayT=2; } } }
     return n.idle; }
   if (jj.dead||jj.veh||dh>460){ const dx=n.home.x-n.x, dy=n.home.y-n.y, L=Math.hypot(dx,dy); if (L<8){ n.idle=true; n.hits=0; n.ang=0; n.moving=false; return true; }
     const sp=n.sp*dt; n.x+=dx/L*sp; n.y+=dy/L*sp; n.moving=true; n.step+=dt*12; n.ang=Math.atan2(-dx,dy); return true; }
@@ -136,6 +136,10 @@ function drawJailDoor(q,vx,vy,t){ if (Math.abs(JDOOR.x-vx)>1200||Math.abs(JDOOR.
   const x=7160, y0=702, y1=742, h=34; if (vx>x-4){ const a=P(x,y0,0), b2=P(x,y1,0), c=P(x,y1,h), d=P(x,y0,h); q.fillStyle=JAIL.open?"#0d0d10":"#3a3f46"; q.beginPath(); q.moveTo(...a); q.lineTo(...b2); q.lineTo(...c); q.lineTo(...d); q.closePath(); q.fill(); q.strokeStyle="#1b1d21"; q.lineWidth=2; q.stroke(); }
   const L=P(x+3,(y0+y1)/2,h+6), pu=.7+.3*Math.sin(t*5); q.save(); q.globalCompositeOperation="lighter"; const col=JAIL.open?"80,255,140":"255,70,60"; const gr=q.createRadialGradient(L[0],L[1],1,L[0],L[1],26); gr.addColorStop(0,`rgba(${col},${.9*pu})`); gr.addColorStop(1,`rgba(${col},0)`); q.fillStyle=gr; q.beginPath(); q.arc(L[0],L[1],26,0,7); q.fill(); q.restore();
   if (JAIL.open&&Math.hypot(jj.x-JDOOR.x,jj.y-JDOOR.y)<160){ q.fillStyle=`rgba(255,214,10,${.45+.35*Math.sin(t*4)})`; q.beginPath(); q.arc(JDOOR.x,JDOOR.y,10,0,7); q.fill(); } }
+// Tür → Gefängnishof (kein Zellenblock): JJ steht innen an der Mauer, raus geht's am selben Punkt
+const JYIN={x:7116,y:748}; L2("RAUS","OUT");
+function enterJailYard(){ jj.x=JYIN.x-14; jj.y=JYIN.y+6; jj.ang=Math.PI/2; cam.x=jj.x; cam.y=jj.y; sfx("door"); hudDirty=true; }
+function leaveJailYard(){ jj.x=JDOOR.x+24; jj.y=JDOOR.y; jj.ang=-Math.PI/2; cam.x=jj.x; cam.y=jj.y; sfx("door"); hudDirty=true; }
 // ---------- Häftlinge im Hof ----------
 const YARD=[ {k:"ball",cx:6875,cy:865,r:46,ph:0},{k:"ball",cx:6875,cy:865,r:46,ph:2.1},{k:"ball",cx:6875,cy:865,r:46,ph:4.2},
   {k:"sit",x:7045,y:794,a:0},{k:"sit",x:7080,y:874,a:0},{k:"sit",x:7050,y:954,a:0},{k:"lap",ph:0},{k:"lap",ph:3},{k:"lean",x:6712,y:1000,a:-Math.PI/2},{k:"lean",x:6712,y:1040,a:-Math.PI/2},{k:"lift",x:6950,y:1050,a:Math.PI}];

@@ -33,6 +33,8 @@ Top-down-Open-World-Spiel (GTA-2-Stil). Ausgeliefert wird **eine HTML-Datei** `i
 - Fahrten mit Chauffeur: `RIDE` (Onkel Bobby → Luka nach m1, `setupRide`; Luka → Yunus nach m2, `setupLukaRide`, Route per `roadRoute`). Tutorial 1 (`TUT_STEPS`, `jjla-tut3`) läuft bei Bobby, Tutorial 2 (`TUT2_STEPS`: Handy/Bank, Waffen- & Outfit-Rad, `jjla-tut4`) bei Luka.
 - Fahndung durch Passanten: Überfahren zählt nicht; zu Fuß getötet ab dem 3. Opfer innerhalb 90 s (`CIVK`, `wantOnKill`).
 - LA ARMS: Kaufpunkt `SISPOT` vor der Theke, Knopf/E öffnet den Laden (`onShopSpot`). Handy (Touch): `#radioChip` sitzt im `#hud` links neben dem Geld.
+- Gefängnis: Türsteher (`JAIL.b`, `bouncerAI`) greifen nur an, wenn JJ sie angreift. Sind beide erledigt, führt die Tür (`JDOOR`) in den Gefängnishof (`enterJailYard`, raus über `JYIN`). Der alte Zellenblock-Raum (`enterJailIn`) ist nicht mehr erreichbar.
+- Achtung: Alle Dateien teilen sich einen globalen Namensraum – gleichnamige Funktionen überschreiben sich still (so war `freeSpot` doppelt → Heli flog ins Nichts; jetzt `heliSpot`).
 - Test-Sprung zu Mission i: `jumpToMission(i)` in der Konsole.
 
 ## Tests (Playwright, headless Chromium)
@@ -50,5 +52,6 @@ Alle müssen `[]` (keine Fehler) bzw. alle Missionen `true` melden.
 Vorher `node build.cjs`. Dann Ordner per Drag & Drop auf Netlify (`src/` und `build.cjs` stören dort nicht), oder `netlify deploy --prod --dir .`
 
 ## Offene Punkte
+- Akt 3: Mission im Gefängnishof (Eingang über `JDOOR` → Hof, Häftlinge `YARD`).
 - Radio-MP3s einbauen, sobald Joel welche schickt.
 - Sprecher-Stimmen für Dialoge: noch keine Entscheidung (erste KI-Probe wurde verworfen).
