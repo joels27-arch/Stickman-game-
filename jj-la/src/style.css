@@ -96,7 +96,7 @@ button{touch-action:manipulation}
 #jumpHint{display:none;position:fixed;z-index:12;pointer-events:none;transform:translate(-50%,-100%);flex-direction:column;align-items:center;gap:2px;font:800 14px var(--ui);letter-spacing:.08em;color:#ffd60a;text-shadow:0 2px 8px rgba(0,0,0,.8)}
 #jumpHint b{font-size:34px;animation:jhb .8s ease-in-out infinite} #jumpHint span{background:rgba(18,16,22,.9);border:2px solid #ffd60a;border-radius:12px;padding:6px 12px;white-space:nowrap}
 @keyframes jhb{50%{transform:translateY(8px)}}
-body.cinema #zone,body.cinema #help,body.cinema #wanted,body.cinema #flyHud,body.cinema #lapChip,body.cinema #radioChip,body.cinema #airHud,body.cinema #hpBox,body.cinema #hud,body.cinema #phoneBtn,body.cinema #veh,body.cinema #tb,body.cinema #obj,body.cinema #pnote,body.cinema #toast{display:none!important}
+body.cinema #zone,body.cinema #help,body.cinema #wanted,body.cinema #flyHud,body.cinema #lapChip,body.cinema #mTimer,body.cinema #radioChip,body.cinema #airHud,body.cinema #hpBox,body.cinema #hud,body.cinema #phoneBtn,body.cinema #veh,body.cinema #tb,body.cinema #obj,body.cinema #pnote,body.cinema #toast{display:none!important}
 #blackout{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 1.2s ease;z-index:7} #blackout.on{opacity:1}
 body.jumpcue #jumpHint{display:flex} #jumpHint.side{transform:translate(-100%,-50%);flex-direction:row-reverse;gap:8px} #jumpHint.side b{animation:jhs .8s ease-in-out infinite} @keyframes jhs{50%{transform:translateX(8px)}}
 body.jumpcue #bEnter{background:#ffd60a!important;color:#15131a!important;border-color:#fff!important;animation:jcue .9s ease-in-out infinite;z-index:11}
@@ -164,6 +164,10 @@ body:not(.play) #phoneBtn{display:none}
 #bBrake{position:absolute;right:0;bottom:0;width:80px;height:80px} #bBrake:active{background:rgba(226,69,58,.4)}
 #toast{position:fixed;left:50%;bottom:calc(130px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(8px);padding:8px 16px;font-weight:700;font-size:14px;letter-spacing:.04em;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:4;white-space:nowrap}
 #toast.on{opacity:1;transform:translateX(-50%)}
+#mTimer{position:fixed;left:50%;top:calc(96px + env(safe-area-inset-top,0px));transform:translateX(-50%);padding:5px 16px;border-radius:12px;border:1px solid rgba(255,214,10,.6);background:rgba(18,16,22,.86);color:#ffd60a;font:400 26px "Bebas Neue",Impact,sans-serif;letter-spacing:.06em;font-variant-numeric:tabular-nums;pointer-events:none;white-space:nowrap;z-index:3}
+#mTimer.hot{color:#ff3b30;border-color:#ff3b30;animation:mtPulse .5s ease-in-out infinite alternate}
+@keyframes mtPulse{from{transform:translateX(-50%) scale(1)}to{transform:translateX(-50%) scale(1.08)}}
+body:not(.play) #mTimer{display:none}
 #mdone{position:fixed;left:50%;top:calc(60px + env(safe-area-inset-top,0px));transform:translate(-50%,-14px);display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 300px);padding:7px 16px;border-radius:999px;background:rgba(14,12,18,.62);border:1px solid rgba(255,214,10,.35);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);font-family:var(--ui);color:#f6efe2;font-size:13px;opacity:0;transition:opacity .35s,transform .35s;pointer-events:none;z-index:4}
 #mdone.on{opacity:1;transform:translate(-50%,0)}
 #mdone .k{font-weight:700;letter-spacing:.14em;font-size:10px;color:#ffd60a}

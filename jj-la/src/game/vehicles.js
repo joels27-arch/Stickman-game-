@@ -212,7 +212,7 @@ function updateHeli(v,dt,me){ v.rot+=dt*(v.z>0||me||v.spin?42:0); if (v.wreck){ 
   v.x=Math.max(40,Math.min(WW-40,v.x+v.vx*dt)); v.y=Math.max(40,Math.min(WH-40,v.y+v.vy*dt)); v.v=sp;
   if (sp>30){ let d=Math.atan2(v.vy,v.vx)-v.a; d=Math.atan2(Math.sin(d),Math.cos(d)); v.a+=d*Math.min(1,dt*2.6); } }
 const DEST=[{n:"Zuhause",x:1000,y:2260},{n:"Downtown",x:BLOCKS[4].x+BLOCKS[4].w*.5,y:BLOCKS[4].y+BLOCKS[4].h*.5+90},{n:"Flughafen",x:1500+AX,y:960},{n:"Heliport",x:HELIPAD.x,y:HELIPAD.y},{n:"Strand",x:560,y:3150},{n:"Palm Heights",x:3460,y:2440}];
-function callHeli(){ if (!UNLOCK.pickup) { toast("Noch nicht freigeschaltet"); return; } if (priv&&!priv.gone&&!priv.wreck){ toast(priv.mode==="leave"?"Der Heli ist gerade unterwegs":"Dein Heli ist schon unterwegs"); return; }
+function callHeli(){ if (!UNLOCK.pickup) { toast("Noch nicht freigeschaltet"); return; } if (MI&&MI.def.noHeli){ toast(L2("Mo geht nicht ran!","Mo isn't answering!")); return; } if (priv&&!priv.gone&&!priv.wreck){ toast(priv.mode==="leave"?"Der Heli ist gerade unterwegs":"Dein Heli ist schon unterwegs"); return; }
   if (jj.veh&&jj.veh.t.kind==="heli"){ toast("Du sitzt schon im Heli"); return; }
   let spot=null, tz=0; if (jj.roof){ const b=jj.roof; for (const [ox,oy] of [[70,0],[-70,0],[0,60],[0,-60],[50,40],[-50,-40]]){ const x=jj.x+ox, y=jj.y+oy; if (x>b.x+34&&x<b.x+b.w-34&&y>b.y+30&&y<b.y+b.h-30){ spot={x,y}; break; } } if (!spot) spot={x:b.x+b.w/2,y:b.y+b.h/2}; tz=b.H/240; }
   else spot=heliSpot(jj.x+120,jj.y+70,62); if (!spot){ toast("Hier kann der Heli nicht landen"); return; }

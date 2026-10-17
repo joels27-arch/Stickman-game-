@@ -13,12 +13,12 @@ const SHOPITEMS=SHOPITEMS_.slice().sort((a,b)=>a.p-b.p);
 function openShop(){ shopOpen=true; shopArmed=false; closePhone(); $("shop").hidden=false; renderShop(); sfx("door"); }
 function closeShop(){ shopOpen=false; $("shop").hidden=true; }
 function renderShop(){ $("sCash").textContent="Bar $"+cash.toLocaleString("en-US")+" · Karte $"+BANK.toLocaleString("en-US");
-  $("sGrid").innerHTML=SHOPITEMS.map(it=>{ const owned=W.own[it.id], locked=false;
+  $("sGrid").innerHTML=SHOPITEMS.map(it=>{ const owned=W.own[it.id], locked=!owned&&!UNLOCK[it.lock];
     const lbl=owned?"GEKAUFT":locked?"GESPERRT":!canPay(it.p)?"ZU TEUER":"KAUFEN";
     const am=it.ammo&&owned?`<div class="row2 amr"><span class="pr">Munition: ${W.mag[it.id]+W.res[it.id]} ${it.ammo.l}</span><button data-ammo="${it.id}" ${!canPay(it.ammo.p)?"disabled":""}>+${it.ammo.n} · $${it.ammo.p}</button></div>`:"";
     return `<div class="sit"><img src="${WICON[it.icon]}" alt=""><b>${it.n}</b><small>${locked?"Wird in einer Mission freigeschaltet.":it.d}</small><div class="row2"><span class="pr">$${it.p.toLocaleString("en-US")}</span><button data-buy="${it.id}" ${owned||locked||!canPay(it.p)?"disabled":""}>${lbl}</button></div>${am}</div>`; }).join(""); }
 $("sGrid").addEventListener("click",e=>{ const ba=e.target.closest("button[data-ammo]"); if (ba){ const it=SHOPITEMS.find(i=>i.id===ba.dataset.ammo); if (!it||!canPay(it.ammo.p)) return; pay(it.ammo.p); W.res[it.id]+=it.ammo.n; sfx("reload"); hudDirty=true; saveGame(); renderShop(); return; }
-  const b=e.target.closest("button[data-buy]"); if (!b) return; const it=SHOPITEMS.find(i=>i.id===b.dataset.buy); if (!it||!canPay(it.p)||W.own[it.id]) return; pay(it.p); sfx("reload"); W.own[it.id]=true;
+  const b=e.target.closest("button[data-buy]"); if (!b) return; const it=SHOPITEMS.find(i=>i.id===b.dataset.buy); if (!it||!canPay(it.p)||W.own[it.id]||!UNLOCK[it.lock]) return; pay(it.p); sfx("reload"); W.own[it.id]=true;
   if (MAGSZ[it.id]){ W.mag[it.id]=MAGSZ[it.id]; W.res[it.id]+=it.start||0; } setWeapon(it.id); hudDirty=true; saveGame(); renderShop(); });
 $("sClose").addEventListener("click",closeShop); $("shop").addEventListener("pointerdown",e=>{ if (e.target===$("shop")) closeShop(); });
 
@@ -101,13 +101,13 @@ function renderRico(){ $("rCash").textContent="$"+(cash+BANK).toLocaleString("en
   const card=(img,emo,n,d,price,btn,dis,cls,data)=>`<div class="sit">${img?`<img src="${img}" alt="">`:`<div style="font-size:34px;text-align:center">${emo}</div>`}<b>${n}</b><small>${d}</small><div class="row2"><span class="pr">${price}</span><button ${data} class="${cls||""}" ${dis?"disabled":""}>${btn}</button></div></div>`;
   if (ricoTab==="o") $("rGrid").innerHTML=OUTFITS.map((o,i)=>{ const own=OWN_OUT.includes(o.id), cur=OUTFIT===i, pr=OUT_PRICE[o.id]||300;
       return card(ricoIcon("o"+i),"👕",tr(o.n),own?(cur?"Trägst du gerade.":"Gehört dir. Auch über das Outfit-Rad wählbar."):"Neuer Look – hilft auch, die Cops abzuschütteln.",own?"✓":"$"+pr.toLocaleString("en-US"),own?(cur?"AN":"ANZIEHEN"):canPay(pr)?"KAUFEN":"ZU TEUER",cur||(!own&&!canPay(pr)),own?"eq":"",`data-ro="${i}"`); }).join("");
-  else if (!MS.done.m12) $("rGrid").innerHTML=`<div class="sit" style="grid-column:1/-1"><b>${L2("🔒 Noch keine Autos","🔒 No cars yet")}</b><small>${L2("Rico verkauft dir erst Autos, wenn ihr die Fluchtwagen besorgt habt.","Rico sells you cars once you have secured the getaway cars.")}</small></div>`;
+  else if (!MS.done.m12&&!(MI&&MI.def.id==="m12"&&MI.step>=4)) $("rGrid").innerHTML=`<div class="sit" style="grid-column:1/-1"><b>${L2("🔒 Noch keine Autos","🔒 No cars yet")}</b><small>${L2("Rico verkauft dir erst Autos, wenn ihr die Fluchtwagen besorgt habt.","Rico sells you cars once you have secured the getaway cars.")}</small></div>`;
   else $("rGrid").innerHTML=RICO_CARS.map(r=>{ const n=OWN_CARS.filter(c=>c.id===r.id).length;
       return card(ricoIcon("c"+r.id),"🚗",tr(VT[r.type].n),r.d+(n?` <b style="color:#7ee36a">· Besitzt du (${n})</b>`:""),"$"+r.p.toLocaleString("en-US"),canPay(r.p)?"KAUFEN":"ZU TEUER",!canPay(r.p),"",`data-rc="${r.id}"`); }).join(""); }
 $("ricoShop").addEventListener("click",e=>{ const t=e.target.closest("button"); if (e.target===$("ricoShop")||t&&t.id==="rClose"){ closeRico(); return; } if (!t) return;
   if (t.dataset.rt){ ricoTab=t.dataset.rt; renderRico(); return; }
-  if (t.dataset.ro!=null){ const i=+t.dataset.ro, o=OUTFITS[i], pr=OUT_PRICE[o.id]||300; if (!OWN_OUT.includes(o.id)){ if (!canPay(pr)) return; pay(pr); OWN_OUT.push(o.id); toast("👕 "+tr(o.n)+(LANG==="en"?" bought":" gekauft")); } applyOutfit(i); WH_.icons={}; if (WANT.lv>0) trick("outfit",LANG==="en"?"New outfit":"Neues Outfit"); sfx("door"); saveGame(); renderRico(); return; }
-  if (t.dataset.rc){ const r=RICO_CARS.find(x=>x.id===t.dataset.rc); if (!r||!canPay(r.p)) return; pay(r.p); const c={id:r.id,col:r.col}; OWN_CARS.push(c); if (OWN_CARS.length>6) OWN_CARS.shift(); spawnOwnedCar(c,OWN_CARS.length-1); sfx("reload"); saveGame(); renderRico();
+  if (t.dataset.ro!=null){ const i=+t.dataset.ro, o=OUTFITS[i], pr=OUT_PRICE[o.id]||300; if (!OWN_OUT.includes(o.id)){ if (!canPay(pr)) return; pay(pr); OWN_OUT.push(o.id); toast("👕 "+tr(o.n)+(LANG==="en"?" bought":" gekauft")); } if (MI&&i!==OUTFIT) MI.d.dressed=true; applyOutfit(i); WH_.icons={}; if (WANT.lv>0) trick("outfit",LANG==="en"?"New outfit":"Neues Outfit"); sfx("door"); saveGame(); renderRico(); return; }
+  if (t.dataset.rc){ const r=RICO_CARS.find(x=>x.id===t.dataset.rc); if (!r||!canPay(r.p)) return; pay(r.p); if (MI) MI.d.carBought=true; const c={id:r.id,col:r.col}; OWN_CARS.push(c); if (OWN_CARS.length>6) OWN_CARS.shift(); spawnOwnedCar(c,OWN_CARS.length-1); sfx("reload"); saveGame(); renderRico();
     toast(LANG==="en"?"🚗 "+tr(VT[r.type].n)+" is parked out front at Rico's":"🚗 "+tr(VT[r.type].n)+" steht vor Rico's bereit"); } });
 // ---------- Sunset Strip: Neon, Lichterketten ----------
 function drawStrip(q,t,vis){ if (!vis(1000,1000,1400)) return; q.save(); q.globalCompositeOperation="lighter";

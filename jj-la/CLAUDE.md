@@ -16,7 +16,7 @@ Top-down-Open-World-Spiel (GTA-2-Stil). Ausgeliefert wird **eine HTML-Datei** `i
 - `src/game/*.js`: Spielcode. Die Dateien werden in der Reihenfolge der Liste `GAME` in `build.cjs` zu **einem** Skript zusammengefügt (gemeinsamer globaler Gültigkeitsbereich, Funktionen sind überall sichtbar – keine Imports/Exports). Neue Datei → in `GAME` eintragen.
   - `world.js` Weltlayout, Helfer, Boden · `graphics.js` Sprites, Gebäude, Figuren-Rig, FX, Sound · `vehicles.js` Fahrzeuge, Verkehr, Helis, Autoklau · `npcs.js` Passanten, Meeresleben · `combat.js` Waffen, Leben, Fahrzeuge zeichnen
   - `ui.js` HUD, Handy, Eingabe · `loop.js` Hauptschleife, GPS, Radio, Skills · `story.js` Dialoge, Karten, Missions-Helfer · `activities.js` Flugzeuge, Lake, Santa Luna, Golf, Controller · `police-ai.js` Taktik, Polizei, Crew, Gegner-KI, Wegfindung
-  - `missions-act1.js` Ankunft, Intro, Safe, Tutorial, m1–m6 · `rooms.js` Innenräume, Schleichen · `missions-act2.js` mh, mf, m7–m14 · `shops.js` LA ARMS, Schlossknacken/Autoklau-Minigames, Rico's, Strip, Gefängnis, große Karte, Spielstart
+  - `missions-act1.js` Ankunft, Intro, Safe, Tutorial, m1–m6 · `rooms.js` Innenräume, Schleichen · `missions-act2.js` mh, mf, m7–m14 · `missions-act3.js` m15–m19 (Story-Ende) · `shops.js` LA ARMS, Schlossknacken/Autoklau-Minigames, Rico's, Strip, Gefängnis, große Karte, Spielstart
 - Syntax-Check: `node --check src/game/<datei>.js` (jede Datei ist einzeln gültig).
 
 ## Aufbau des Spiels
@@ -25,7 +25,10 @@ Top-down-Open-World-Spiel (GTA-2-Stil). Ausgeliefert wird **eine HTML-Datei** `i
 - Figuren: Cutout-Rig aus `chars.webp` (`RIGM`, `drawRig`, `rigFor`). Lokal: vorwärts = +y, `ang=atan2(-dx,dy)`. Köpfe sind zentriert (echte Draufsicht).
 - Fahrzeuge/Palmen gemalt aus `veh.webp` (`paintedCar`). Bodentexturen aus `tex.webp` (`TEXP`).
 - Übersetzung: DOM-Übersetzer über `I18N`-Map. Neue Texte mit `L2("deutsch","english")` registrieren, Dialoge mit `TL([[wer,de,en],…])`.
-- Missionen: `MDEF` (Akt 1: m1–m6; Akt 2 via `act2Def`: mh, mf, m7–m14). Helfer: `talk`, `obj`, `fig`, `figSay`, `walkTo`, `spawnFoe`, `spawnChaser`, `holdRing`, `completeMission`, `failMission`, `LEADS`, `crewMsg`.
+- Missionen: `MDEF` (Akt 1: m1–m6; Akt 2 via `act2Def`: mh, mf, m7–m14; Akt 3 via `act3Def`: m15 Gefängnishof, m16 Lukas Verrat + 2-Min-Zeitlimit, m17 Lukas Flucht, m18 Leuchtturm/Donny, m19 Finale Santoro → ENDE). Akt-3-Defs haben auch `act2:true` (Raum-Aufräumen), Unterscheidung über `act3`.
+- Zeitlimit: `mTimer(m,sek)`, `mTimerTick(m,dt)` (true = abgelaufen), `mTimerStop(m)`; Anzeige `#mTimer`. `def.noHeli` sperrt Heli-Rufen. Endgegner: `n.boss`/`n.bossMax` (Treffer, `killNpc` ist umhüllt).
+- Waffen-Freischaltung (LA ARMS sperrt wirklich über `UNLOCK`): Akt 1 Schläger m2, Schrotflinte m3, SCAR m4 · Akt 2 Raketenwerfer m9 · Akt 3 Granatwerfer m15, Alien-Blaster m17.
+- Pflichtkäufe Akt 2: m10 erst im DRIP STORE umziehen (`MI.d.dressed`), m12 am Ende Auto bei Rico kaufen (`MI.d.carBought`, Rico gibt $3.000). Helfer: `talk`, `obj`, `fig`, `figSay`, `walkTo`, `spawnFoe`, `spawnChaser`, `holdRing`, `completeMission`, `failMission`, `LEADS`, `crewMsg`.
 - Missions-Türen/Prompts: `def.door(m,d)` → wird in `doorTarget()` abgefragt. `MI.talk={ok,fn,lbl}` für E-Aktionen.
 - Innenräume (Bank, Tresor, Brooks' Haus, Whitmore-Villa, Museum): `defRoom`, `enterRoom`, `exitRoom`, `CURROOM`, `CURSOL`. Räume liegen im Meer außerhalb der Insel, außen wird schwarz maskiert.
 - Schleichen: `SG` (`sgStart`, `sgGuard`, `sgCam`, `sgLaser`, `knockOut`).
@@ -44,6 +47,7 @@ node err.js       # Fehler beim Laden/Spielen (DE)
 node err_en.js    # dasselbe auf Englisch
 node mis.js       # Akt 1 komplett durchspielen
 node a2full.js    # alle Akt-2-Missionen durchschalten
+node a3full.js    # alle Akt-3-Missionen (inkl. Zeitlimit-Fehlschlag)
 node ../build.cjs --check   # index.html passt zu src/
 ```
 Alle müssen `[]` (keine Fehler) bzw. alle Missionen `true` melden.
@@ -52,6 +56,5 @@ Alle müssen `[]` (keine Fehler) bzw. alle Missionen `true` melden.
 Vorher `node build.cjs`. Dann Ordner per Drag & Drop auf Netlify (`src/` und `build.cjs` stören dort nicht), oder `netlify deploy --prod --dir .`
 
 ## Offene Punkte
-- Akt 3: Mission im Gefängnishof (Eingang über `JDOOR` → Hof, Häftlinge `YARD`).
 - Radio-MP3s einbauen, sobald Joel welche schickt.
 - Sprecher-Stimmen für Dialoge: noch keine Entscheidung (erste KI-Probe wurde verworfen).

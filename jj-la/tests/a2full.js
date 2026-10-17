@@ -26,7 +26,7 @@ const { chromium } = require('playwright');
  // M9
  await jump('m9'); for (let w=0;w<3;w++){ await W(400); await ev(()=>{ if(MI.d.wf) for (const n of MI.d.wf) if(!n.dead) killNpc(n,0,0); }); await W(1500); await skip(); } await W(300); res.m9=await ev(()=>MS.done.m9);
  // M10
- await jump('m10'); await ev(()=>{ jj.x=WDOOR.x; jj.y=WDOOR.y; { const t=doorTarget(); if (t) t.fn(); else window.__miss=(window.__miss||[]).concat([[MI&&MI.def.id,MI&&MI.step,paused,!!DLG,!!cardMode]]); } }); await W(400); res.m10sg=await ev(()=>[SG.on,SG.guards.length,SG.cams.length]);
+ await jump('m10'); await ev(()=>{ openRico('o'); const b=document.querySelector('#rGrid button[data-ro="1"]'); if (b) b.click(); closeRico(); }); await W(300); res.m10dress=await ev(()=>[MI.step,OUTFIT]); await ev(()=>{ jj.x=WDOOR.x; jj.y=WDOOR.y; { const t=doorTarget(); if (t) t.fn(); else window.__miss=(window.__miss||[]).concat([[MI&&MI.def.id,MI&&MI.step,paused,!!DLG,!!cardMode]]); } }); await W(400); res.m10sg=await ev(()=>[SG.on,SG.guards.length,SG.cams.length]);
  await ev(()=>{ if(MI.d.card){ jj.x=MI.d.card.x; jj.y=MI.d.card.y; } }); await W(400);
  await ev(()=>{ jj.x=WVILLA.r.x+840; jj.y=WVILLA.r.y+585; }); await W(1700); res.m10=await ev(()=>MS.done.m10);
  // M11
@@ -37,7 +37,7 @@ const { chromium } = require('playwright');
  await jump('m12');
  for (let i=0;i<2;i++){ await ev(()=>{ const c=addVeh("sports",RICO.x,RICO.y,0,"#f00",{}); c.unlocked=true; c.v=0; jj.x=c.x; jj.y=c.y; getIn(c); MI.def.tick(MI,.1); exitVeh(true); }); await W(200); }
  res.m12cars=await ev(()=>[MI.step,MI.d.cars]);
- await ev(()=>{ const bt=addVeh("boat",1000,3320,0,"#fff",{}); bt.v=0; jj.x=bt.x; jj.y=bt.y; getIn(bt); }); await W(200); await ev(()=>MI.def.tick(MI,.1)); await W(300); await skip(); res.m12=await ev(()=>MS.done.m12);
+ await ev(()=>{ const bt=addVeh("boat",1000,3320,0,"#fff",{}); bt.v=0; jj.x=bt.x; jj.y=bt.y; getIn(bt); }); await W(200); await ev(()=>MI.def.tick(MI,.1)); await W(300); await skip(); res.m12buy=await ev(()=>[MI&&MI.step,ricoTab]); await ev(()=>{ exitVeh(true); openRico('c'); const b=document.querySelector('#rGrid button[data-rc="moto"]'); if (b) b.click(); closeRico(); }); await W(400); await skip(); await W(300); res.m12=await ev(()=>[MS.done.m12,OWN_CARS.length]);
  // M13
  await jump('m13'); for (let i=0;i<5;i++){ await ev(()=>{ if (!MI||!MI.d.pts) return; const pt=MI.d.pts[MI.d.cp]; if (!pt) return; jj.x=pt.x; jj.y=pt.y; }); await W(300); } await skip(); await W(300); res.m13=await ev(()=>[MS.done.m13,MI&&MI.step,MI&&MI.d.cp]);
  // M14

@@ -80,7 +80,7 @@ act2Def({id:"m8",n:"Das Haus vom Wachmann",loc:ACT2_SPOTS.brooks,giver:[["Yunus"
     if (m.step===3&&jj.y>o.r.y+376&&Math.abs(jj.x-(o.r.x+90))<36){ exitRoom({x:BROOKSWIN.x,y:BROOKSWIN.y-22},Math.PI); o.night=false; o.dog=null; m.step=4; obj(L2("Verschwinde aus Eastside","Get out of Eastside")); setTimeout(()=>{ if (MI===m) completeMission(); },1500); } },
   after(){ crewMsg("rico","Rico hier. Mit Codes kommt ihr ins Foyer – aber die Tresortür braucht die Schlüsselkarte vom Direktor Whitmore. Erst noch was anderes: Santoros Leute wollen dich im Luna Park treffen. Riecht nach Falle."); }});
 // ---------- M9: Falle im Luna Park (Schießerei) ----------
-act2Def({id:"m9",n:"Falle im Luna Park",loc:ACT2_SPOTS.luna,giver:[["Luka",44,-4]],cash:2000,ruf:140,
+act2Def({id:"m9",n:"Falle im Luna Park",loc:ACT2_SPOTS.luna,giver:[["Luka",44,-4]],cash:2000,ruf:140,unlock:["rpg"],unlockTxt:"Raketenwerfer bei LA ARMS",
   intro:"Santoros Männer wollen reden – im Luna Park auf der Insel. Natürlich ist es eine Falle. Kämpf dich raus.",
   start(m){ talk(TL([["Dario","JJ. Mr. Santoro bietet dir Geld, damit du aufhörst, nach Donny zu suchen.","JJ. Mr. Santoro offers you money to stop looking for Donny."],["JJ","Wo ist er?","Where is he?"],["Dario","Lebendig. Noch. … Jungs! JETZT!","Alive. For now. … Boys! NOW!"]]),()=>{
       m.step=1; m.d.wave=0; this.wave(m); }); },
@@ -91,8 +91,9 @@ act2Def({id:"m9",n:"Falle im Luna Park",loc:ACT2_SPOTS.luna,giver:[["Luka",44,-4
 // ---------- M10: Die Villa vom Direktor (Stealth Schlüsselkarte) ----------
 act2Def({id:"m10",n:"Villa Whitmore",loc:ACT2_SPOTS.whit,giver:[["Rico",44,-4]],cash:3000,ruf:150,
   intro:"Bankdirektor Whitmore hat die Schlüsselkarte für den Tresor in seiner Villa. Er golft gerade. Schleich an seiner Security vorbei und hol die Karte.",
-  start(m){ talk(TL([["Rico","Kameras, zwei Wachen. Werd gesehen und sie machen den Tresor für Wochen dicht.","Cameras, two guards. Get seen and they lock the vault down for weeks."],["JJ","Also lautlos.","So, quiet."],["Rico","Lautlos. Die Karte liegt im Arbeitszimmer. Schlag Wachen von hinten aus, wenn's sein muss.","Quiet. The card's in the study. Knock guards out from behind if you must."]]),()=>{
-      m.step=1; obj(L2("Geh zur Hintertür der Villa","Go to the villa's back door"),{x:WDOOR.x,y:WDOOR.y}); }); },
+  start(m){ talk(TL([["Rico","Kameras, zwei Wachen. Werd gesehen und sie machen den Tresor für Wochen dicht.","Cameras, two guards. Get seen and they lock the vault down for weeks."],["JJ","Also lautlos.","So, quiet."],["Rico","Lautlos. Die Karte liegt im Arbeitszimmer. Schlag Wachen von hinten aus, wenn's sein muss.","Quiet. The card's in the study. Knock guards out from behind if you must."],
+      ["Rico","Und so wie du aussiehst, kennt dich halb Palm Heights von den Fahndungsfotos. Hol dir im DRIP STORE einen neuen Look.","And looking like that, half of Palm Heights knows you from the wanted posters. Get a new look at the DRIP STORE."]]),()=>{
+      m.d.dress=1; obj(L2("Zieh dich im DRIP STORE um – neues Outfit kaufen oder anziehen","Change at the DRIP STORE – buy or wear a new outfit"),CLO); }); },
   door(m,d){ if (m.step===1&&!CURROOM&&d({x:WDOOR.x,y:WDOOR.y})<42) return {lbl:L2("REINSCHLEICHEN","SNEAK IN"),fn:()=>{ m.step=2; const o=WVILLA; o.missionOnly=true; enterRoom("wvilla",{x:860,y:548,a:Math.PI});
       sgStart(()=>{ guardsToFoes(); m.d.blown=1; });
       sgGuard(o,330,420,[[330,120,2],[620,120,1.5],[620,470,2],[150,470,1.5]],{range:200,fov:.5});
@@ -100,7 +101,8 @@ act2Def({id:"m10",n:"Villa Whitmore",loc:ACT2_SPOTS.whit,giver:[["Rico",44,-4]],
       sgCam(o,480,40,Math.PI/2,.7,{range:230}); sgCam(o,940,320,Math.PI,.6,{range:230});
       m.d.card={x:o.r.x+160,y:o.r.y+150}; obj(L2("Hol die Schlüsselkarte aus dem Arbeitszimmer","Grab the keycard from the study"),m.d.card); } };
     return null; },
-  tick(m,dt){ if (CURROOM!==WVILLA) return; if (m.d.blown&&!m.d.failT){ m.d.failT=1; obj(L2("Enttarnt! Hol die Karte und hau ab!","Blown! Grab the card and run!")); }
+  tick(m,dt){ if (m.d.dress===1&&m.d.dressed&&$("ricoShop").hidden){ m.d.dress=2; m.step=1; toast(L2("👕 Neuer Look!","👕 New look!")); obj(L2("Geh zur Hintertür der Villa","Go to the villa's back door"),{x:WDOOR.x,y:WDOOR.y}); }
+    if (CURROOM!==WVILLA) return; if (m.d.blown&&!m.d.failT){ m.d.failT=1; obj(L2("Enttarnt! Hol die Karte und hau ab!","Blown! Grab the card and run!")); }
     if (m.step===2&&!m.d.got&&Math.hypot(jj.x-m.d.card.x,jj.y-m.d.card.y)<30){ m.d.got=1; m.step=3; sfx("reload"); toast(L2("💳 Schlüsselkarte!","💳 Keycard!")); SG.on=SG.on&&m.d.blown; obj(L2("Raus aus der Villa","Get out of the villa"),{x:WVILLA.r.x+840,y:WVILLA.r.y+580}); }
     if (m.step===3&&jj.y>WVILLA.r.y+560&&jj.x>WVILLA.r.x+800){ exitRoom({x:WDOOR.x,y:WDOOR.y+20}); sgReset(); m.step=4; obj(L2("Verschwinde aus Palm Heights","Leave Palm Heights")); setTimeout(()=>{ if (MI===m) completeMission(); },1400); } },
   after(){ crewMsg("enzo","Enzo, Pauls Hehler. Die Tresortür braucht Diamantbohrer. Gegentausch: Hol mir den 'Stern von Malibu' aus dem L.A. Museum. Laser, Kameras – euer Spezialgebiet."); }});
@@ -127,15 +129,17 @@ act2Def({id:"m11",n:"Der Stern von Malibu",loc:ACT2_SPOTS.mus,giver:[["Yunus",40
   cleanup(){ MUSEUM.night=false; MUSEUM.taken=false; },
   after(){ crewMsg("rico","Fast soweit. Ihr braucht Fluchtwagen und ein Boot. Klau zwei schnelle Karren und bring sie zu mir – und schnapp dir ein Speedboot am Hafen."); }});
 // ---------- M12: Die Fluchtwagen (Autos klauen + Boot) ----------
-act2Def({id:"m12",n:"Die Fluchtwagen",loc:ACT2_SPOTS.docks,giver:[["Rico",44,-4]],cash:2000,ruf:120,
-  intro:"Für den Bankcoup braucht ihr Fluchtfahrzeuge: zwei schnelle Wagen für Rico und ein Speedboot am Hafen als Notausgang übers Wasser.",
+act2Def({id:"m12",n:"Die Fluchtwagen",loc:ACT2_SPOTS.docks,giver:[["Rico",44,-4]],cash:0,ruf:120,unlockTxt:"Autos kaufen bei Rico's",
+  intro:"Für den Bankcoup braucht ihr Fluchtfahrzeuge: zwei schnelle Wagen für Rico und ein Speedboot am Hafen als Notausgang übers Wasser. Danach kaufst du dir bei Rico ein eigenes Auto.",
   start(m){ talk(TL([["Rico","Zwei schnelle Karren vor meinen Laden. Geknackt, nicht gekauft – muss sauber sein.","Two fast cars outside my shop. Hot-wired, not bought – has to be clean."],["JJ","Und das Boot?","And the boat?"],["Rico","Am Hafen liegt ein Speedboot. Fahr's zum Steg am Strand. Das ist euer Notausgang.","There's a speedboat at the harbor. Take it to the beach pier. That's your escape hatch."]]),()=>{
       m.step=1; m.d.cars=0; obj(L2("Klau ein schnelles Auto und bring es zu Rico (0/2)","Steal a fast car and bring it to Rico (0/2)"),{x:RICO.x,y:RICO.y}); }); },
   tick(m,dt){ if (m.step===1){ const v=jj.veh;
       if (v&&v.t.kind==="car"&&v.unlocked&&Math.hypot(v.x-RICO.x,v.y-RICO.y)<120&&Math.abs(v.v)<30&&!v.delivered){ v.delivered=1; v.keep=true; m.d.cars++; sfx("ping"); toast(L2("🚗 Abgeliefert ("+m.d.cars+"/2)","🚗 Delivered ("+m.d.cars+"/2)"));
         if (m.d.cars>=2){ m.step=2; obj(L2("Hol ein Speedboot am Hafen","Grab a speedboat at the harbor"),{x:960,y:3410}); } else obj(L2("Noch ein schnelles Auto zu Rico ("+m.d.cars+"/2)","One more fast car to Rico ("+m.d.cars+"/2)"),{x:RICO.x,y:RICO.y}); } }
     if (m.step===2){ const v=jj.veh;
-      if (v&&v.t.kind==="boat"){ obj(L2("Bring das Boot zum Steg am Strand","Take the boat to the beach pier"),{x:1000,y:3320}); if (Math.hypot(v.x-1000,v.y-3320)<80&&Math.abs(v.v)<40){ m.step=3; v.keep=true; talk(TL([["Rico","Perfekt. Wagen und Boot stehen. Jetzt fehlt nur noch der Plan.","Perfect. Cars and boat ready. Now you just need the plan."]]),()=>completeMission()); } } } },
+      if (v&&v.t.kind==="boat"){ obj(L2("Bring das Boot zum Steg am Strand","Take the boat to the beach pier"),{x:1000,y:3320}); if (Math.hypot(v.x-1000,v.y-3320)<80&&Math.abs(v.v)<40){ m.step=3; v.keep=true; talk(TL([["Rico","Perfekt. Wagen und Boot stehen.","Perfect. Cars and boat ready."],["Rico","Und du? Fährst immer noch geklaute Karren? Hier sind $3.000 für die Wagen – kauf dir bei mir was Eigenes.","And you? Still driving stolen rides? Here's $3,000 for the cars – buy something of your own from me."]]),()=>{
+        cash+=3000; hudDirty=true; toast(L2("+$3.000 von Rico","+$3,000 from Rico")); m.step=4; obj(L2("Kauf dir bei Rico's Autos ein eigenes Auto","Buy your own car at Rico's"),{x:RICO.x,y:RICO.y}); }); } } }
+    if (m.step===4&&m.d.carBought&&$("ricoShop").hidden){ m.step=5; talk(TL([["Rico","Gute Wahl. Jetzt fehlt nur noch der Plan.","Good choice. Now you just need the plan."]]),()=>completeMission()); } },
   after(){ crewMsg("yunus","Letzter Schritt vor dem Coup: Wir fahren die Bank ab. Wachwechsel, Kameras, Fluchtroute. Ich schick dir die Punkte."); }});
 // ---------- M13: Der Probelauf (Recon-Fahrt mit Checkpoints) ----------
 act2Def({id:"m13",n:"Der Probelauf",loc:ACT2_SPOTS.recon,giver:[["Yunus",40,8]],cash:1500,ruf:120,
@@ -189,7 +193,7 @@ act2Def({id:"m14",n:"Central Bank",wave(m,n){ m.d.wave++; for (let i=0;i<n;i++){
       if (left===0&&WANT.lv>2){ WANT.lv=2; WANT.heat=Math.min(WANT.heat,2.5); }
       d.esc=left===0?Math.max(0,Math.min(1,d.esc+(WANT.seenT>0?-dt/20:dt/6))):0; if (left===0&&(WANT.lv===0||d.esc>=1)){ m.step=10; clearWanted(true);
         talk(TL([["Luka","WIR HABEN'S! Santoros ganzes Vermögen!","WE GOT IT! Santoro's entire fortune!"],["Paul","Und in den Unterlagen steht, wo er Donny festhält.","And the papers say where he's holding Donny."],["JJ","Leuchtturm am Kap von Santa Luna. Ich hol dich, Donny.","Lighthouse at Santa Luna cape. I'm coming, Donny."]]),()=>{ completeMission();
-          setTimeout(()=>showCard({done:true},`<div class="mk">${L2("AKT 2 ABGESCHLOSSEN","ACT 2 COMPLETE")}</div><h2>${L2("Die Spur","The Trail")}</h2><p>${L2("Santoros Geld ist weg, sein Netzwerk zerschlagen – und JJ weiß endlich, wo Donny ist. Am Leuchtturm von Santa Luna wartet das Finale.","Santoro's money is gone, his network broken – and JJ finally knows where Donny is. The finale waits at the Santa Luna lighthouse.")}<br><br><b>${L2("Akt 3 folgt.","Act 3 coming.")}</b></p>`,"OK"),400); }); } } }});
+          setTimeout(()=>showCard({done:true,next:act3Intro},`<div class="mk">${L2("AKT 2 ABGESCHLOSSEN","ACT 2 COMPLETE")}</div><h2>${L2("Die Spur","The Trail")}</h2><p>${L2("Santoros Geld ist weg, sein Netzwerk zerschlagen – und JJ weiß endlich, wo Donny ist. Am Leuchtturm von Santa Luna wartet das Finale.","Santoro's money is gone, his network broken – and JJ finally knows where Donny is. The finale waits at the Santa Luna lighthouse.")}<br><br><b>${L2("Weiter mit Akt 3: Für Donny.","On to Act 3: For Donny.")}</b></p>`,L2("WEITER","NEXT")),400); }); } } }});
 Object.assign(LEADS,{
   mh:{from:"earl",hint:"Onkel Bobby wartet vor seinem Haus",bark:""},
   mf:{from:"marco",hint:"Mo wartet am Flughafen",bark:"Flugstunde bei Mo. Ab zum Flughafen."},

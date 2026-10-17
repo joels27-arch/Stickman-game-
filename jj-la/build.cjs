@@ -22,6 +22,7 @@ const GAME = [
   "missions-act1.js",  // Ankunft, Intro, Safe-Minispiel, Tutorial, Missionen m1–m6
   "rooms.js",          // Akt-2-Infrastruktur: Innenräume, Schleichen, Bank/Tresor/Häuser/Museum
   "missions-act2.js",  // Akt 2: mh, mf, m7–m14
+  "missions-act3.js",  // Akt 3: m15–m19 (Gefängnishof, Verrat mit Zeitlimit, Lukas Flucht, Leuchtturm, Finale)
   "shops.js",          // LA ARMS, Schlossknacken & Autoklau-Minigames, Rico's, Strip, Gefängnis, Innenräume, große Karte, Start
 ].map(f => "game/" + f);
 
