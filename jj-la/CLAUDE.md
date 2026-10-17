@@ -1,6 +1,6 @@
 # JJ in Los Angeles – Projektnotizen für Claude Code
 
-Top-down-Open-World-Spiel (GTA-2-Stil) in **einer HTML-Datei**: `index.html`. Hauptzielgerät: **iPhone im Querformat** (Touch). Controller-Steuerung ist absichtlich deaktiviert (`PAD_ENABLED=false`).
+Top-down-Open-World-Spiel (GTA-2-Stil). Ausgeliefert wird **eine HTML-Datei** `index.html`, bearbeitet wird aber in `src/` (siehe unten). Hauptzielgerät: **iPhone im Querformat** (Touch). Controller-Steuerung ist absichtlich deaktiviert (`PAD_ENABLED=false`).
 
 ## Arbeitsweise (vom Besitzer Joel)
 - Antworten auf Deutsch, knapp.
@@ -9,9 +9,18 @@ Top-down-Open-World-Spiel (GTA-2-Stil) in **einer HTML-Datei**: `index.html`. Ha
 - Nach Änderungen: `sw.js` Cache-Version hochzählen (`jjla-vNN`), sonst sehen Handys die alte Version.
 - ZIP nur liefern, wenn Joel danach fragt.
 
-## Aufbau von index.html
-- Der Spielcode steht in `<script type="text/plain" id="mainjs">`. Ein kleiner Loader lädt vorher `chars.webp`, `veh.webp`, `tex.webp` in `window.ASSETS` und injiziert dann den Code.
-- Syntax-Check: Inhalt von `#mainjs` extrahieren und `node --check` laufen lassen.
+## Quellcode & Build
+- **Nie `index.html` direkt bearbeiten** – sie wird aus `src/` gebaut: `node build.cjs` (ohne Abhängigkeiten). `node build.cjs --check` prüft, ob `index.html` aktuell ist. Nach jeder Änderung in `src/` bauen und `index.html` mit committen (Netlify liefert sie direkt aus, kein Build auf Netlify).
+- `src/shell.html`: HTML-Gerüst (DOM, Loader, Service-Worker). Zeilen `@@include …@@` werden beim Bauen ersetzt.
+- `src/style.css`: komplettes CSS. `src/i18n.js`: Sprache/Übersetzer (`LANG`, `I18N`, `L2`, `TL`, `tr`).
+- `src/game/*.js`: Spielcode. Die Dateien werden in der Reihenfolge der Liste `GAME` in `build.cjs` zu **einem** Skript zusammengefügt (gemeinsamer globaler Gültigkeitsbereich, Funktionen sind überall sichtbar – keine Imports/Exports). Neue Datei → in `GAME` eintragen.
+  - `world.js` Weltlayout, Helfer, Boden · `graphics.js` Sprites, Gebäude, Figuren-Rig, FX, Sound · `vehicles.js` Fahrzeuge, Verkehr, Helis, Autoklau · `npcs.js` Passanten, Meeresleben · `combat.js` Waffen, Leben, Fahrzeuge zeichnen
+  - `ui.js` HUD, Handy, Eingabe · `loop.js` Hauptschleife, GPS, Radio, Skills · `story.js` Dialoge, Karten, Missions-Helfer · `activities.js` Flugzeuge, Lake, Santa Luna, Golf, Controller · `police-ai.js` Taktik, Polizei, Crew, Gegner-KI, Wegfindung
+  - `missions-act1.js` Ankunft, Intro, Safe, Tutorial, m1–m6 · `rooms.js` Innenräume, Schleichen · `missions-act2.js` mh, mf, m7–m14 · `shops.js` LA ARMS, Schlossknacken/Autoklau-Minigames, Rico's, Strip, Gefängnis, große Karte, Spielstart
+- Syntax-Check: `node --check src/game/<datei>.js` (jede Datei ist einzeln gültig).
+
+## Aufbau des Spiels
+- Der Spielcode steht in `index.html` in `<script type="text/plain" id="mainjs">`. Ein kleiner Loader lädt vorher `chars.webp`, `veh.webp`, `tex.webp` in `window.ASSETS` und injiziert dann den Code.
 - Welt: `WW=10900`, `LANDW=9400` (Festland-Bodencanvas `ground`), `WH0=3700`, `WH=6500`; Insel Santa Luna auf `ground2` (`G2`); Nordost-Insel Bel Air Key (JJs Villa `NEVILLA`, Garage `NEGARAGE`, Brücke `NEBR`) auf `ground3` (`G3`). Bodenzeichnung läuft einmal beim Start über den Proxy-Kontext `g`.
 - Figuren: Cutout-Rig aus `chars.webp` (`RIGM`, `drawRig`, `rigFor`). Lokal: vorwärts = +y, `ang=atan2(-dx,dy)`. Köpfe sind zentriert (echte Draufsicht).
 - Fahrzeuge/Palmen gemalt aus `veh.webp` (`paintedCar`). Bodentexturen aus `tex.webp` (`TEXP`).
@@ -30,11 +39,12 @@ node err.js       # Fehler beim Laden/Spielen (DE)
 node err_en.js    # dasselbe auf Englisch
 node mis.js       # Akt 1 komplett durchspielen
 node a2full.js    # alle Akt-2-Missionen durchschalten
+node ../build.cjs --check   # index.html passt zu src/
 ```
 Alle müssen `[]` (keine Fehler) bzw. alle Missionen `true` melden.
 
 ## Deploy
-Ordner per Drag & Drop auf Netlify, oder `netlify deploy --prod --dir .`
+Vorher `node build.cjs`. Dann Ordner per Drag & Drop auf Netlify (`src/` und `build.cjs` stören dort nicht), oder `netlify deploy --prod --dir .`
 
 ## Offene Punkte
 - Radio-MP3s einbauen, sobald Joel welche schickt.

@@ -1,0 +1,69 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta charset="utf-8">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#0c0907">
+<title>JJ in Los Angeles</title>
+<style>
+@@include style.css@@
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Semi+Condensed:wght@500;700&family=Special+Elite&family=Permanent+Marker&display=swap">
+<canvas id="game"></canvas>
+<div id="zone" class="chip"><b>ZUHAUSE</b><span id="zsub">Eastside</span></div>
+<div id="help" class="chip">WASD laufen/fahren · Shift rennen · Klick/Leertaste angreifen · Q / 1–7 Waffe · R nachladen/Radio · E einsteigen · P Handy · M Karte · Maus zielen</div>
+<div id="sal"></div>
+<div id="wanted" hidden></div>
+<div id="flyHud" hidden></div>
+<div id="lapChip" hidden></div>
+<div id="wheel" hidden><div class="wtabs"><button data-t="w">WAFFEN</button><button data-t="o">OUTFIT</button></div><div id="wring"></div><div id="wmid"><b id="wmN"></b><small id="wmS"></small></div></div>
+<div id="golfUI" hidden><div class="gt"><b id="gH">LOCH 1/3</b><span id="gS"></span></div><div class="gbar"><i id="gP"></i></div><div class="gb"><button id="gL" aria-label="links">◀</button><button id="gHit">SCHLAGEN</button><button id="gR" aria-label="rechts">▶</button><button id="gQ" aria-label="beenden">✕</button></div><small id="gTip"></small></div>
+<button id="radioChip" hidden aria-label="Radiosender wechseln"><span id="rIco"></span><span class="rt"><b id="rName"></b><small id="rTag"></small></span><i class="lv">● LIVE</i><kbd>R</kbd><span class="nx">▶</span></button>
+<div id="airHud" hidden><span>LUFT</span><b></b></div>
+<div id="hpBox" class="chip"><svg class="heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.6-9.3-9C1.2 8.8 3 5 6.6 5c2.1 0 3.6 1.2 5.4 3.1C13.8 6.2 15.3 5 17.4 5 21 5 22.8 8.8 21.3 12 19 16.4 12 21 12 21z"/></svg><div class="bar"><i id="hpFill"></i></div><div class="stam"><i id="stFill"></i></div></div>
+<div id="hud">
+  <div id="ruf" class="chip">★ Niemand</div>
+  <div id="cash" class="chip">$7</div>
+  <button id="wpn" class="chip" aria-label="Waffe wechseln"><img id="wImg" alt=""><span><b id="wName"></b><em id="ammo"></em></span></button>
+
+</div>
+<div id="pnote"></div><button id="phoneBtn" aria-label="Handy"><svg viewBox="0 0 44 64" aria-hidden="true"><defs><linearGradient id="pbS" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3fb4ff"/><stop offset=".55" stop-color="#5a5cf0"/><stop offset="1" stop-color="#c04bd8"/></linearGradient><linearGradient id="pbB" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4a4b52"/><stop offset=".5" stop-color="#1b1c21"/><stop offset="1" stop-color="#2e2f35"/></linearGradient></defs>
+    <rect x="3" y="2" width="38" height="60" rx="8" fill="url(#pbB)" stroke="#5a5b62" stroke-width="1.2"/><rect x="6.5" y="7" width="31" height="50" rx="5" fill="url(#pbS)"/><rect x="17" y="9" width="10" height="3" rx="1.5" fill="#0b0b0e"/>
+    <g fill="#fff"><rect x="10" y="17" width="7" height="7" rx="2" fill="#4cd964"/><rect x="19" y="17" width="7" height="7" rx="2" fill="#e6c26c"/><rect x="28" y="17" width="7" height="7" rx="2" fill="#ff6b5a"/><rect x="10" y="27" width="7" height="7" rx="2" fill-opacity=".85"/><rect x="19" y="27" width="7" height="7" rx="2" fill-opacity=".85"/><rect x="28" y="27" width="7" height="7" rx="2" fill-opacity=".85"/></g>
+    <rect x="16" y="52" width="12" height="2" rx="1" fill="#fff" fill-opacity=".8"/><path d="M8 8 L22 8 L9 40 Z" fill="#fff" fill-opacity=".12"/></svg><i id="pBadge" hidden>0</i></button>
+<div id="veh" class="chip" hidden><div class="spd"><b id="vSpd">0</b><small>KM/H</small></div><div class="vi"><span id="vName"></span><div class="bar"><i id="vFill"></i></div><small id="vAlt"></small></div></div>
+<div id="blackout"></div><div id="jumpHint"><b>👇</b><span>TIPPE AUF SPRINGEN</span></div>
+<button id="bEnter" class="chip" hidden></button>
+<div id="tb"><button id="bBrake" hidden>BREMSE</button><button id="bJump" hidden aria-label="Abspringen"><svg viewBox="0 0 24 24"><path d="M3 10a9 7 0 0 1 18 0z" fill="#ff6a3d"/><path d="M3 10l9 9 9-9M8 10l4 9 4-9" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="20" r="1.8" fill="currentColor"/></svg><span>SPRUNG</span></button><button id="bAct" aria-label="Angreifen"><img id="aImg" alt=""></button></div>
+<div id="toast" class="chip"></div>
+<div id="mdone" hidden></div>
+<div id="obj" class="chip" hidden><small id="oT"></small><b id="oX"></b></div>
+<div id="ivid" hidden><video id="ivv" playsinline preload="none"></video><div id="isub"></div><button id="isnd" hidden>🔊 TON AN</button><button id="iskip">ÜBERSPRINGEN ›</button></div>
+<div id="dlg" hidden><b id="dWho"></b><p id="dTxt"></p><i>▶</i></div>
+<div id="mcard" hidden><div class="mcb"><div id="mcBody"></div><div class="mcbtn"><button id="mcB">SPÄTER</button><button id="mcA">STARTEN</button></div></div></div>
+<div id="dest" hidden><div class="dbox"><h3>WOHIN, JJ?</h3><div class="dl"></div><p>Mo fliegt dich hin</p></div></div>
+<div id="phone"><div class="ph"><div class="scr"><div class="island"></div><div class="sb"><span id="phClock" hidden></span><span></span><span class="si"><svg viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx=".8"/><rect x="5" y="5" width="3" height="6" rx=".8"/><rect x="10" y="2.5" width="3" height="8.5" rx=".8"/><rect x="15" y="0" width="3" height="11" rx=".8"/></svg><svg viewBox="0 0 16 11"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.2-1.3A10.4 10.4 0 0 0 8 .4 10.4 10.4 0 0 0 .6 3.4l1.2 1.3A8.7 8.7 0 0 1 8 2.2zm0 3.5c1.4 0 2.7.5 3.7 1.4l1.2-1.3A7.2 7.2 0 0 0 8 3.9 7.2 7.2 0 0 0 3.1 5.8l1.2 1.3c1-.9 2.3-1.4 3.7-1.4zM8 9.2l2-2.1a3 3 0 0 0-4 0z"/></svg><svg viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="15" height="8" rx="1.8"/><rect x="23.6" y="4" width="1.6" height="4" rx=".8" fill-opacity=".45"/></svg></span></div><div id="phBody"></div><button class="homebar" id="phHome" aria-label="Home"></button></div></div></div>
+<div id="notif"><span id="nIco"></span><div class="nt"><div class="nh"><span id="nApp">NACHRICHTEN</span><span>jetzt</span></div><b id="nFrom"></b><p id="nText"></p><small>Tippen oder <kbd>P</kbd> – Handy öffnen</small></div></div>
+<div id="bigmap" hidden><div class="mbox"><div class="mhd"><b>KARTE</b><span>Tippen = Ziel · Ziehen = schieben</span><div class="mz"><button id="mzOut" aria-label="Rauszoomen">−</button><i id="mzLbl">1×</i><button id="mzIn" aria-label="Reinzoomen">+</button><button id="mzMe" aria-label="Zu JJ">◎</button></div><button id="mClose" aria-label="Karte schließen">×</button></div><canvas id="mapc"></canvas><div class="leg"><i style="background:#ffb347"></i>JJ<i style="background:#d8303a;box-shadow:0 0 0 1.5px #fff"></i>Waffenladen<i style="background:#ffd60a"></i>Mission</div></div></div>
+<div id="ricoShop" hidden><div class="sbox rbox"><div class="shd"><div><b>RICO'S</b><span>Autos &amp; Klamotten</span></div><div class="scash" id="rCash"></div><button id="rClose" aria-label="Laden verlassen">×</button></div><div class="rtabs"><button data-rt="o" class="on">👕 KLAMOTTEN</button><button data-rt="c">🚗 AUTOS</button></div><div class="sgrid" id="rGrid"></div></div></div>
+<div id="mg" hidden><div class="pkbox mgbox"><div class="pkh"><b id="mgT"></b><button id="mgX" aria-label="Abbrechen">×</button></div><canvas id="mgC" width="720" height="340"></canvas><div id="mgCtl"></div><div class="pkhint" id="mgH"></div></div></div>
+<div id="pick" hidden><div class="pkbox"><div class="pkh"><b>SCHLOSS KNACKEN</b><button id="pkX" aria-label="Abbrechen">×</button></div><div class="pkpins" id="pkPins"></div><div class="pkbar" id="pkBar"><i id="pkZone"></i><span id="pkNeedle"></span></div><div class="pkhint" id="pkHint"></div></div></div>
+<div id="shop" hidden><div class="sbox"><div class="shd"><div><b>LA ARMS</b><span>Waffen &amp; Munition</span></div><div class="scash" id="sCash"></div><button id="sClose" aria-label="Laden verlassen">×</button></div><div class="sgrid" id="sGrid"></div></div></div>
+<div id="hack" hidden><div class="box"><h3>LAPTOP ENTSCHLÜSSELN</h3><div class="log" id="hackLog"></div><div class="seq" id="hackSeq"></div><div class="bar"><i id="hackBar"></i></div><div class="pad"><span></span><button data-k="0">↑</button><span></span><button data-k="3">←</button><button data-k="2">↓</button><button data-k="1">→</button></div><small>Tipp die Codes in der richtigen Reihenfolge ab · Pfeiltasten / WASD</small></div></div>
+<div id="safe" hidden><div class="box"><h3>SAFE KNACKEN</h3><p>Drück, wenn der Zeiger im grünen Feld ist.</p><canvas id="safeC" width="440" height="440"></canvas><div class="lights"><i></i><i></i><i></i></div><div class="row"><button id="safeX">ABBRUCH</button><button id="safeBtn">KLICK</button></div></div></div>
+<div id="tut" hidden><div class="hl" id="tutHl"></div><div class="tip" id="tutTip"></div></div>
+<div id="rot"><div><svg viewBox="0 0 64 64" fill="none" stroke="#ffb347" stroke-width="3"><rect x="20" y="6" width="24" height="44" rx="5"/><path d="M29 44h6"/><path d="M50 52a22 22 0 0 1-30 4" stroke-linecap="round"/><path d="M18 51l2 5 5-1" stroke-linecap="round" stroke-linejoin="round"/></svg><div>DREH DEIN IPHONE INS QUERFORMAT</div></div></div>
+<div id="title"><div class="tbg"></div><div class="case">
+<div class="side"><h1><span>JJ IN</span>LOS ANGELES</h1><div class="tease">Täter oder Jäger?</div><button id="go">LOS</button><button id="newg" hidden>NEUES SPIEL</button><button id="optb">OPTIONEN</button><div id="langSel"><button data-l="de">DE</button><button data-l="en">EN</button></div><div id="load">STADT WIRD GEBAUT …</div></div>
+</div><div class="lamp"></div>
+<div id="opts" hidden><div class="obox"><h3>OPTIONEN</h3><div id="olist"></div><button id="oclose">FERTIG</button></div></div></div>
+<script>
+@@include i18n.js@@
+</script>
+<script type="text/plain" id="mainjs">
+@@include game@@
+</script>
+<script>
+// Bilder (Figuren, Fahrzeuge, Texturen) zuerst laden, dann das Spiel starten
+(function(){ const srcs={chars:"chars.webp",veh:"veh.webp",tex:"tex.webp"}; window.ASSETS={}; let left=0, done=false; const go=()=>{ if (done) return; done=true; const s=document.createElement("script"); s.textContent=document.getElementById("mainjs").textContent; document.body.appendChild(s); };
+  for (const k in srcs){ left++; const im=new Image(); im.onload=()=>{ ASSETS[k]=im; if (--left===0) go(); }; im.onerror=()=>{ if (--left===0) go(); }; im.src=srcs[k]; } setTimeout(go,5000); })();
+</script>
+
+<script>if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
