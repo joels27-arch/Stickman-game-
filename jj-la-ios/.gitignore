@@ -1,5 +1,4 @@
 node_modules/
-ios/App/App/public/
 ios/App/build/
 ios/DerivedData/
 *.xcuserstate
