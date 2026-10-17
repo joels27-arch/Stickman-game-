@@ -36,11 +36,11 @@ Alle müssen `[]` (keine Fehler) bzw. alle Missionen `true` melden.
 ## Deploy
 Ordner per Drag & Drop auf Netlify, oder `netlify deploy --prod --dir .`
 
-## Offene Punkte (zuletzt von Joel gemeldet, noch NICHT umgesetzt)
-1. Flugzeug-Absprung: Wenn JJ aus dem Flugzeug springen muss, den Sprung-Button deutlich hervorheben (Pfeil/Puls + kurzer Hinweis), weil Spieler ihn sonst nicht finden.
-2. Mission „Das Haus vom Wachmann“ (Hund): JJ kann sich nach dem Einsteigen/Aussteigen durchs Fenster manchmal nicht bewegen – Spawn- und Exit-Punkte prüfen, nicht in/zu nah an Wänden/Möbeln.
-3. Hund professioneller zeichnen und das Vorbeischleichen klar sichtbar machen (z. B. Lärmradius/Geräuschanzeige, „langsam gehen“-Hinweis).
-4. Beispielnachrichten im Handy („Yo, was geht“ usw.) entfernen.
-5. GPS-Route: Die Linie soll ab der Autospitze flüssig mit der Fahrgeschwindigkeit verschwinden (jetzt ruckelt sie mit ca. 1–2 FPS, weil die Route nur einmal pro Sekunde neu berechnet wird – `updateRoute`/`drawRoute`).
-6. Radio-Widget (`#radioChip`) kleiner bzw. unauffälliger machen, aber weiterhin bedienbar.
-7. Bug: Der Podcast (Talk-Sender mit Big Ronnie & John, Datei `radio_hai.mp3`) ist im Auto nicht mehr zu hören – prüfen (`DJ`, `updateDJ`, `STATIONS`, Reihenfolge Pacific → Podcast → Aus).
+## Erledigt (v92)
+1. Flugzeug-Absprung: `#bEnter.jumpcall` – oranger Fallschirm-Knopf mit Puls und „HIER TIPPEN ➜“ (Desktop: „DRÜCK E ➜“), solange `CINE.ready`.
+2. „Das Haus vom Wachmann“: Ausgang liegt jetzt in der echten Fensterlücke (lokal x 56–124, y > 378), JJ landet draußen vor dem Fenster (`BROOKSWIN.y-18`) statt im Haus. Hund liegt weiter weg vom Fenster-Spawn.
+3. Hund neu gezeichnet (`drawBDog`: schlafend eingerollt / wach stehend, Blick in Laufrichtung), Hörradius (70) als gestrichelter Ring, 220er-Ring beim Rennen, Lärmanzeige über JJ + „langsam gehen“-Hinweis (`BDOG_RUN`).
+4. Schnellantworten („Yo, was geht?“ …) im Handy-Chat entfernt.
+5. GPS: A* weiter 1×/s (`routeRaw`), aber `updateRoute` schneidet die Linie jedes Frame ab der Autospitze ab.
+6. `#radioChip` kompakter/halbtransparent (ohne Untertitel und ▶).
+7. Podcast: iOS blockierte `play()` außerhalb einer Berührung. `djUnlock()` startet das Audio-Element bei der ersten Berührung einmal stumm; der Radio-Knopf ruft `play()` direkt auf.

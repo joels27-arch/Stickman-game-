@@ -22,7 +22,7 @@ const { chromium } = require('playwright');
  // M8
  await jump('m8'); await ev(()=>{ jj.x=BROOKSWIN.x; jj.y=BROOKSWIN.y; { const t=doorTarget(); if (t) t.fn(); else window.__miss=(window.__miss||[]).concat([[MI&&MI.def.id,MI&&MI.step,paused,!!DLG,!!cardMode]]); } }); await W(400);
  await ev(()=>{ jj.x=BHOUSE.r.x+420; jj.y=BHOUSE.r.y+358; { const t=doorTarget(); if (t) t.fn(); else window.__miss=(window.__miss||[]).concat([[MI&&MI.def.id,MI&&MI.step,paused,!!DLG,!!cardMode]]); } }); await W(300); await safe(); await W(400); await skip();
- await ev(()=>{ jj.x=BHOUSE.r.x+30; jj.y=BHOUSE.r.y+405; }); await W(1800); res.m8=await ev(()=>MS.done.m8); res.m8room=await ev(()=>!!CURROOM);
+ await ev(()=>{ jj.x=BHOUSE.r.x+90; jj.y=BHOUSE.r.y+392; }); await W(1800); res.m8=await ev(()=>MS.done.m8); res.m8room=await ev(()=>!!CURROOM);
  // M9
  await jump('m9'); for (let w=0;w<3;w++){ await W(400); await ev(()=>{ if(MI.d.wf) for (const n of MI.d.wf) if(!n.dead) killNpc(n,0,0); }); await W(1500); await skip(); } await W(300); res.m9=await ev(()=>MS.done.m9);
  // M10
