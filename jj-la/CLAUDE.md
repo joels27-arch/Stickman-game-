@@ -43,7 +43,11 @@ Top-down-Open-World-Spiel (GTA-2-Stil). Ausgeliefert wird **eine HTML-Datei** `i
 - Spawnpunkt (Spielstart, Tod, Verhaftung): `homeSpot()` = Onkel Bobbys Haus, nach `mh` die Villa (`SALEDOOR`).
 - Missions-Startpunkte (`def.loc`), die in einem Hindernis liegen, werden am Ende von `missions-act3.js` automatisch auf freien Boden verschoben (sonst steckt JJ nach dem Sprung fest).
 - Bank (m14): Personal-Tor öffnet beim Stürmen, Tresortür öffnet nach dem Bohren wirklich (`setGate(VAULT,"door",true)`), Taschen vor den Goldpaletten; `cleanup` schließt alles wieder.
-- Dialog-Ton: wie Akt 1 – frech, Running Gags (Yunus' Tauben, Bobbys Couch „Gerald“ und Bier, Luka zu laut/Clownsmasken/Tiger, Paul traut keinem, Mo ängstlich).
+- Dialog-Ton & Figuren (Akt 2/3, ikonisch statt nur Gags):
+  - JJ: trocken, nummerierte „Regeln“ aus 8 Jahren Exil (Regel 1: Familie ist nicht verhandelbar – von Donny; Regel 14: Wer „vertrau mir“ sagt, dem vertraust du nicht → Payoff bei Lukas Verrat), bewertet Dinge „x von zehn“.
+  - Santoro: höflicher Tarantino-Bösewicht, bietet Espresso an, nennt JJ „Mister Niemand“, „Wie unhöflich.“
+  - Luka: Wolf-of-Wall-Street-Hype („kein Bankraub, ein BÖRSENGANG“), alles ist ein Verkauf, sagt „Vertrau mir“, will einen Tiger.
+  - Yunus: Tauben sind Regierungsdrohnen aus Ohio. Mo: Pilot mit Höhenangst, hat ein Flugzeug an einen Elvis verloren. Bobby: Couch „Gerald“. Rico: Boot „Valentina“. Enzo: Diamant „Gisela“. Dario: Hotdog-oder-Sandwich-Debatte.
 
 ## Tests (Playwright, headless Chromium)
 ```
