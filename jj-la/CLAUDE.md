@@ -12,7 +12,7 @@ Top-down-Open-World-Spiel (GTA-2-Stil) in **einer HTML-Datei**: `index.html`. Ha
 ## Aufbau von index.html
 - Der Spielcode steht in `<script type="text/plain" id="mainjs">`. Ein kleiner Loader lädt vorher `chars.webp`, `veh.webp`, `tex.webp` in `window.ASSETS` und injiziert dann den Code.
 - Syntax-Check: Inhalt von `#mainjs` extrahieren und `node --check` laufen lassen.
-- Welt: `WW=9400`, `WH0=3700` (Festland-Bodencanvas `ground`), `WH=6500`; Insel Santa Luna auf zweitem Canvas `ground2` (`G2`). Bodenzeichnung läuft einmal beim Start über den Proxy-Kontext `g`.
+- Welt: `WW=10900`, `LANDW=9400` (Festland-Bodencanvas `ground`), `WH0=3700`, `WH=6500`; Insel Santa Luna auf `ground2` (`G2`); Nordost-Insel Bel Air Key (JJs Villa `NEVILLA`, Garage `NEGARAGE`, Brücke `NEBR`) auf `ground3` (`G3`). Bodenzeichnung läuft einmal beim Start über den Proxy-Kontext `g`.
 - Figuren: Cutout-Rig aus `chars.webp` (`RIGM`, `drawRig`, `rigFor`). Lokal: vorwärts = +y, `ang=atan2(-dx,dy)`. Köpfe sind zentriert (echte Draufsicht).
 - Fahrzeuge/Palmen gemalt aus `veh.webp` (`paintedCar`). Bodentexturen aus `tex.webp` (`TEXP`).
 - Übersetzung: DOM-Übersetzer über `I18N`-Map. Neue Texte mit `L2("deutsch","english")` registrieren, Dialoge mit `TL([[wer,de,en],…])`.
@@ -20,7 +20,7 @@ Top-down-Open-World-Spiel (GTA-2-Stil) in **einer HTML-Datei**: `index.html`. Ha
 - Missions-Türen/Prompts: `def.door(m,d)` → wird in `doorTarget()` abgefragt. `MI.talk={ok,fn,lbl}` für E-Aktionen.
 - Innenräume (Bank, Tresor, Brooks' Haus, Whitmore-Villa, Museum): `defRoom`, `enterRoom`, `exitRoom`, `CURROOM`, `CURSOL`. Räume liegen im Meer außerhalb der Insel, außen wird schwarz maskiert.
 - Schleichen: `SG` (`sgStart`, `sgGuard`, `sgCam`, `sgLaser`, `knockOut`).
-- Shops: LA ARMS (`armsOpen()`), Rico's (`ricoOpen()`).
+- Shops: LA ARMS (`armsOpen()`), DRIP STORE Klamotten (`clothesOpen()`, `CLO`), Rico's Autos (`ricoOpen()`, Autokauf ab m12). Beide über `openRico("o"|"c")`.
 - Test-Sprung zu Mission i: `jumpToMission(i)` in der Konsole.
 
 ## Tests (Playwright, headless Chromium)
@@ -36,11 +36,6 @@ Alle müssen `[]` (keine Fehler) bzw. alle Missionen `true` melden.
 ## Deploy
 Ordner per Drag & Drop auf Netlify, oder `netlify deploy --prod --dir .`
 
-## Erledigt (v92)
-1. Flugzeug-Absprung: `#bEnter.jumpcall` – oranger Fallschirm-Knopf mit Puls und „HIER TIPPEN ➜“ (Desktop: „DRÜCK E ➜“), solange `CINE.ready`.
-2. „Das Haus vom Wachmann“: Ausgang liegt jetzt in der echten Fensterlücke (lokal x 56–124, y > 378), JJ landet draußen vor dem Fenster (`BROOKSWIN.y-18`) statt im Haus. Hund liegt weiter weg vom Fenster-Spawn.
-3. Hund neu gezeichnet (`drawBDog`: schlafend eingerollt / wach stehend, Blick in Laufrichtung), Hörradius (70) als gestrichelter Ring, 220er-Ring beim Rennen, Lärmanzeige über JJ + „langsam gehen“-Hinweis (`BDOG_RUN`).
-4. Schnellantworten („Yo, was geht?“ …) im Handy-Chat entfernt.
-5. GPS: A* weiter 1×/s (`routeRaw`), aber `updateRoute` schneidet die Linie jedes Frame ab der Autospitze ab.
-6. `#radioChip` kompakter/halbtransparent (ohne Untertitel und ▶).
-7. Podcast: iOS blockierte `play()` außerhalb einer Berührung. `djUnlock()` startet das Audio-Element bei der ersten Berührung einmal stumm; der Radio-Knopf ruft `play()` direkt auf.
+## Offene Punkte
+- Radio-MP3s einbauen, sobald Joel welche schickt.
+- Sprecher-Stimmen für Dialoge: noch keine Entscheidung (erste KI-Probe wurde verworfen).

@@ -50,5 +50,10 @@ const { chromium } = require('playwright');
  await ev(()=>{ enterRoom("bank",{x:700,y:130,a:0}); MI.def.tick(MI,.1); }); await W(400); res.m14hall=await ev(()=>MI.step);
  await ev(()=>{ if(MI.d.swat) for(const n of MI.d.swat) if(!n.dead) killNpc(n,0,0); }); await W(400); res.m14swat=await ev(()=>MI.step);
  await ev(()=>{ jj.x=RBANK.r.x+700; jj.y=RBANK.r.y+870; MI.def.tick(MI,.1); }); await W(400); res.m14exit=await ev(()=>[MI.step,!!CURROOM]);
- await ev(()=>clearWanted(true)); await W(600); await skip(); await W(400); res.m14=await ev(()=>MS.done.m14);
+ await skip(); await W(300);
+ await ev(()=>{ const car=vehicles.find(v=>v.t.kind==='car'&&!v.gone&&!v.wreck&&!v.missionV&&!v.driver&&v.type!=='police'); getIn(car); car.v=0; const p=landNear(jj.x+60,jj.y+40); car.x=p.x; car.y=p.y; window.__hp0=car.hp; }); await ev(()=>{ window._g2=setInterval(()=>{ jj.hp=100; },50); });
+ console.log('pre', await ev(()=>[!!MI, MI&&MI.step, jj.dead, !!jj.veh, MI&&MI.d.hunt&&MI.d.hunt.length, MS.done.m14])); const samp=[]; for (let k=0;k<3;k++){ await ev(()=>{ const v=jj.veh; if (v){ v.v=Math.min(260,v.v+120); } }); await W(1000); samp.push(await ev(()=>!MI?('NOMI dead='+jj.dead+' done='+MS.done.m14+' toast='+($('toast')&&$('toast').textContent)):MI.d.hunt.map(v=>[Math.round(Math.hypot(v.x-jj.x,v.y-jj.y)),Math.round(Math.abs(v.v)),v.wreck?1:0,v.hp|0]).join('|')+' myhp '+(jj.veh?jj.veh.hp|0:'-'))); }
+ res.chase=samp; await p.screenshot({path:'m14chase.png'});
+ for (let w=0;w<4;w++){ await ev(()=>{ if (!MI) return; for (const v of MI.d.hunt) if (!v.wreck) damageVeh(v,999); MI.d.ht=Math.max(MI.d.ht,60*(1+0)); }); await W(800); }
+ await ev(()=>clearWanted(true)); await W(800); await skip(); await W(400); res.m14=await ev(()=>MS.done.m14); res.m14st=await ev(()=>MI&&[MI.step,MI.d.wave]);
  console.log(JSON.stringify(res,null,0)); console.log('MISS',JSON.stringify(await ev(()=>window.__miss||[]))); console.log('ERRORS', errs.slice(0,8)); await b.close(); })();
