@@ -237,7 +237,7 @@ function chooseDest(i){ showDest(false); const v=jj.veh; if (!v||!v.priv) return
 // ---------- entering / exiting ----------
 const peds=[];
 // JJ redet: kurze Sprüche als Sprechblase über ihm (nicht im HUD)
-const BARKS={ arrive:["Acht Jahre weg – und L.A. stinkt noch immer nach Koks und Nutten."],
+const BARKS={ arrive:["8 Jahre weg – und L.A. stinkt noch immer nach Koks und Kahis."],
   jack:["Raus da, f*ck, ich hab's eilig!","Sorry – Familien-Notfall!","Ich bring ihn zurück. Wahrscheinlich nicht.","Aussteigen, Kollege. Sh*t happens.","Danke fürs Vorwärmen.","Du fährst eh scheiße."],
   free:["Schlüssel steckt. Danke, L.A.","Riecht nach Pommes. Passt.","Keiner guckt? Keiner guckt."],
   ko:["Gute Nacht, Arschloch.","Das war für Donny.","Hättest mal Yoga gemacht.","Bleib liegen, Champ.","F*ck yeah.","Sh*t, mein Knöchel. Egal."],
