@@ -44,7 +44,7 @@ function fitObj(L,T){ const hp=$("hpBox"); if (!hp) return; const r=hp.getBoundi
   if (T<r.bottom+6){ const room=Math.floor(r.left-L-10); if (room>=150){ o.style.maxWidth=room+"px"; } else { o.style.maxWidth=""; o.style.top=Math.ceil(r.bottom+8)+"px"; } }
   else o.style.maxWidth=""; }
 function renderObj(){ const el=$("obj"); if (MI){ el.hidden=false; $("oT").textContent="MISSION "+(MDEF.indexOf(MI.def)+1)+" · "+MI.def.n; $("oX").textContent=MI.obj||""; }
-  else if (RIDE&&!RIDE.done&&started){ el.hidden=false; $("oT").textContent="NÄCHSTE MISSION · Der Schläger"; $("oX").textContent=RIDE.phase==="drive"?"Onkel Bobby fährt dich zu Luka …":"Steig bei Onkel Bobby ins Auto"; }
+  else if (RIDE&&!RIDE.done&&started){ el.hidden=false; $("oT").textContent=RIDE.objT; $("oX").textContent=RIDE.phase==="drive"?RIDE.objDrive:RIDE.objWait; }
   else { const d=nextDef(); if (d&&started&&MS.done.m1&&LEAD===d.id){ el.hidden=false; $("oT").textContent="NÄCHSTE MISSION · "+d.n; $("oX").textContent=(LEADS[d.id]||{}).hint||d.n; } else el.hidden=true; } }
 function offView(x,y,m){ const W2=cssW/view.sc, H2=cssH/view.sc; return x<view.ox-m||x>view.ox+W2+m||y<view.oy-m||y>view.oy+H2+m; }
 function spawnOutside(x,y){ if (offView(x,y,30)) return [x,y]; let ax=x-jj.x, ay=y-jj.y; if (Math.hypot(ax,ay)<5){ const a=rnd()*6.28; ax=Math.cos(a); ay=Math.sin(a); }

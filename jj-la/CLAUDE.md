@@ -30,6 +30,9 @@ Top-down-Open-World-Spiel (GTA-2-Stil). Ausgeliefert wird **eine HTML-Datei** `i
 - Innenräume (Bank, Tresor, Brooks' Haus, Whitmore-Villa, Museum): `defRoom`, `enterRoom`, `exitRoom`, `CURROOM`, `CURSOL`. Räume liegen im Meer außerhalb der Insel, außen wird schwarz maskiert.
 - Schleichen: `SG` (`sgStart`, `sgGuard`, `sgCam`, `sgLaser`, `knockOut`).
 - Shops: LA ARMS (`armsOpen()`), DRIP STORE Klamotten (`clothesOpen()`, `CLO`), Rico's Autos (`ricoOpen()`, Autokauf ab m12). Beide über `openRico("o"|"c")`.
+- Fahrten mit Chauffeur: `RIDE` (Onkel Bobby → Luka nach m1, `setupRide`; Luka → Yunus nach m2, `setupLukaRide`, Route per `roadRoute`). Tutorial 1 (`TUT_STEPS`, `jjla-tut3`) läuft bei Bobby, Tutorial 2 (`TUT2_STEPS`: Handy/Bank, Waffen- & Outfit-Rad, `jjla-tut4`) bei Luka.
+- Fahndung durch Passanten: Überfahren zählt nicht; zu Fuß getötet ab dem 3. Opfer innerhalb 90 s (`CIVK`, `wantOnKill`).
+- LA ARMS: Kaufpunkt `SISPOT` vor der Theke, Knopf/E öffnet den Laden (`onShopSpot`). Handy (Touch): `#radioChip` sitzt im `#hud` links neben dem Geld.
 - Test-Sprung zu Mission i: `jumpToMission(i)` in der Konsole.
 
 ## Tests (Playwright, headless Chromium)

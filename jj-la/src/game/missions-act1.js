@@ -64,33 +64,53 @@ addEventListener("keydown",e=>{ if (SAFE&&["Space","Enter","KeyE"].includes(e.co
 // ---------- Fahrt mit Onkel Bobby zu Luka (währenddessen läuft das Tutorial) ----------
 let RIDE=null; const RIDE_TO={x:3980,y:3005};
 function setupRide(){ if (RIDE||MS.done.m2) return; const car=EARLCAR; if (car.gone||car.wreck) return; car.noBoard=true; car.driver=false; car.v=0;
-  leaver("Onkel Bobby",EARL.x,EARL.y,"Komm, steig ein.",car.x+24,car.y,{gone:true,wait:1.2}); RIDE={car,t:0,phase:"walk",say:"",sayT:0,done:false,step:0,earl:LEAVERS[LEAVERS.length-1]}; }
+  leaver("Onkel Bobby",EARL.x,EARL.y,"Komm, steig ein.",car.x+24,car.y,{gone:true,wait:1.2}); RIDE={car,t:0,phase:"walk",say:"",sayT:0,done:false,step:0,earl:LEAVERS[LEAVERS.length-1],
+    kind:"bobby",who:"Bobby",wp:RIDE_WP,to:RIDE_TO,maxT:30,tut:startTut,gpsN:"Onkel Bobbys Auto",boardSay:"Anschnallen. Ich fahr wie meine Oma – also schnell.",lines:[[13,"Luka … der hat mit 12 schon Autos aufgemacht. Laut, dumm, loyal."]],endSay:"Da vorne ist Luka. Und JJ … mach keinen Scheiß.",
+    objT:"NÄCHSTE MISSION · Der Schläger",objDrive:"Onkel Bobby fährt dich zu Luka …",objWait:"Steig bei Onkel Bobby ins Auto"}; }
+// Straßenroute fürs Chauffieren: A* auf dem Straßenraster, nur die Abbiegepunkte bleiben übrig
+function roadRoute(x,y,tx,ty){ const r=astar(nearRoad(x,y),nearRoad(tx,ty)); if (!r||!r.length) return [[tx,ty]]; const out=[];
+  for (let i=0;i<r.length;i++){ const p=r[i], a=r[i-1], b=r[i+1]; if (!a||!b||(p[0]-a[0])*(b[1]-p[1])!==(p[1]-a[1])*(b[0]-p[0])) out.push(p); }
+  if (out.length>1&&Math.hypot(out[0][0]-x,out[0][1]-y)<80) out.shift(); return out; }
+// Nach Mission 2: Luka steigt mit JJ ins Auto und fährt ihn zu Yunus (unterwegs: Tutorial 2)
+function setupLukaRide(m){ if (RIDE) return; const a0=m.ally, ok=c=>c&&!c.wreck&&!c.gone&&c.t.kind==="car"&&!(c.burn>0);
+  let car=a0&&a0.inCar&&ok(a0.car)?a0.car:null; if (!car&&ok(m.d.lastCar)&&Math.hypot(m.d.lastCar.x-jj.x,m.d.lastCar.y-jj.y)<700) car=m.d.lastCar;
+  if (!car){ const k=nearRoad(jj.x,jj.y), p=k>=0?{x:(k%RCW)*RC+RC/2,y:((k/RCW)|0)*RC+RC/2}:landNear(jj.x+60,jj.y); car=addVeh("sedan",p.x,p.y,0,"#2b5d8a",{}); }
+  if (jj.veh===car) exitVeh(true); car.noBoard=true; car.driver=false; car.v=0; car.keep=true; car.unlocked=true;
+  const Y=giverSpots(MDEF[2])[0], wasIn=!!(a0&&a0.inCar&&a0.car===car);
+  RIDE={car,t:0,phase:wasIn?"wait":"walk",say:"",sayT:0,done:false,step:0,earl:null,
+    kind:"luka",who:"Luka",wp:null,to:{x:Y.x,y:Y.y},maxT:60,tut:startTut2,gpsN:L2("Lukas Auto","Luka's car"),boardSay:L2("Ich fahr. Du guckst aufs Handy – ich zeig dir was.","I'll drive. You check your phone – let me show you something."),
+    lines:[[24,L2("Yunus ist komisch, aber der Typ hackt dir 'ne Ampel mit 'nem Toaster.","Yunus is weird, but he can hack a traffic light with a toaster.")]],endSay:L2("Da im Park ist Yunus. Ich hol uns Tacos – bis später, Bro!","Yunus is in the park. I'm getting us tacos – later, bro!"),
+    objT:L2("NÄCHSTE MISSION · Der Hacker","NEXT MISSION · The Hacker"),objDrive:L2("Luka fährt dich zu Yunus …","Luka drives you to Yunus …"),objWait:L2("Steig bei Luka ins Auto","Get in Luka's car")};
+  if (wasIn){ car.driver=true; gps={n:RIDE.gpsN,x:car.x,y:car.y}; routeT=0; RIDE.say=L2("Steig ein, Bro – ich fahr dich zu Yunus.","Get in, bro – I'll drive you to Yunus."); RIDE.sayT=4; }
+  else { const P=vLocal(car,0,-(car.t.w/2+11)); leaver("Luka",a0?a0.x:jj.x+30,a0?a0.y:jj.y,L2("Komm, steig ein – ich fahr dich zu Yunus.","Come on, get in – I'll drive you to Yunus."),P[0],P[1],{gone:true,wait:1.2}); RIDE.earl=LEAVERS[LEAVERS.length-1]; }
+  renderObj(); }
 function boardRide(){ const R2=RIDE; if (!R2||R2.phase!=="wait") return false; const car=R2.car; if (Math.hypot(jj.x-car.x,jj.y-car.y)>75) return false;
-  hideNotif(); closePhone(); getIn(car); car.chauffeur=true; car.driver=true; R2.phase="drive"; R2.say="Anschnallen. Ich fahr wie meine Oma – also schnell."; R2.sayT=4.5; jj.lock=99; gps=null; renderObj(); { const tw=()=>{ if (!RIDE||RIDE.done) return; if (Math.abs(RIDE.car.v||0)>70) startTut(); else setTimeout(tw,300); }; setTimeout(tw,1200); } return true; }
+  if (!R2.wp){ R2.wp=roadRoute(car.x,car.y,R2.to.x,R2.to.y); const e=R2.wp[R2.wp.length-1]; R2.to={x:e[0],y:e[1]}; }
+  hideNotif(); closePhone(); getIn(car); car.chauffeur=true; car.driver=true; R2.phase="drive"; R2.say=R2.boardSay; R2.sayT=4.5; jj.lock=99; gps=null; renderObj(); { const tw=()=>{ if (!RIDE||RIDE.done) return; if (Math.abs(RIDE.car.v||0)>70&&RIDE.tut()) return; setTimeout(tw,300); }; setTimeout(tw,1200); } return true; }
 function startRide(){ setupRide(); }
 const RIDE_WP=[[930,2470],[1010,2530],[1120,2530],[1155,2610],[1155,2955],[1230,3005],[3980,3005]];
-function chauffeurDrive(v,dt){ const R2=RIDE; let wi=R2.wi||0; let [gx,gy]=RIDE_WP[Math.min(wi,RIDE_WP.length-1)]; if (wi<RIDE_WP.length-1&&Math.hypot(gx-v.x,gy-v.y)<55){ R2.wi=++wi; [gx,gy]=RIDE_WP[wi]; }
-  const d=Math.hypot(RIDE_TO.x-v.x,RIDE_TO.y-v.y); let df=Math.atan2(gy-v.y,gx-v.x)-v.a; df=Math.atan2(Math.sin(df),Math.cos(df));
-  let thr=1, steer=Math.max(-1,Math.min(1,df*2.8)), brake=false; const nxt=RIDE_WP[wi+1], dw=Math.hypot(gx-v.x,gy-v.y);
-  if (Math.abs(df)>.35&&v.v>90) { thr=0; brake=v.v>140; } if (nxt&&dw<160&&v.v>110) thr=0; if (v.v>175) thr=0; if (wi===RIDE_WP.length-1&&d<300) thr=Math.min(thr,.3); if (wi===RIDE_WP.length-1&&d<120){ thr=0; brake=true; }
+function chauffeurDrive(v,dt){ const R2=RIDE, WP=R2.wp, TO=R2.to; let wi=R2.wi||0; let [gx,gy]=WP[Math.min(wi,WP.length-1)]; if (wi<WP.length-1&&Math.hypot(gx-v.x,gy-v.y)<55){ R2.wi=++wi; [gx,gy]=WP[wi]; }
+  const d=Math.hypot(TO.x-v.x,TO.y-v.y); let df=Math.atan2(gy-v.y,gx-v.x)-v.a; df=Math.atan2(Math.sin(df),Math.cos(df));
+  let thr=1, steer=Math.max(-1,Math.min(1,df*2.8)), brake=false; const nxt=WP[wi+1], dw=Math.hypot(gx-v.x,gy-v.y);
+  if (Math.abs(df)>.35&&v.v>90) { thr=0; brake=v.v>140; } if (nxt&&dw<160&&v.v>110) thr=0; if (v.v>175) thr=0; if (wi===WP.length-1&&d<300) thr=Math.min(thr,.3); if (wi===WP.length-1&&d<120){ thr=0; brake=true; }
   R2.blk=Math.max(0,(R2.blk||0)-dt*.5); const careful=R2.blk<2.5;
   if (careful) for (const o of vehicles){ if (o===v||o.gone||o.z>.2) continue; const ox=o.x-v.x, oy=o.y-v.y, ahead=ox*Math.cos(v.a)+oy*Math.sin(v.a), side=Math.abs(-ox*Math.sin(v.a)+oy*Math.cos(v.a)); if (ahead>0&&ahead<90&&side<26){ thr=0; brake=true; } }
   if (careful) for (const n of npcs){ if (n.dead) continue; const ox=n.x-v.x, oy=n.y-v.y, ahead=ox*Math.cos(v.a)+oy*Math.sin(v.a), side=Math.abs(-ox*Math.sin(v.a)+oy*Math.cos(v.a)); if (ahead>0&&ahead<70&&side<22){ thr=0; brake=true; if (!R2.honk){ R2.honk=1; sfx("ping"); } } }
   if (brake&&Math.abs(v.v)<15&&d>140) R2.blk+=dt*1.5; else if (R2.blk>=2.5&&R2.blk<4) R2.blk=4.5;
   return {thr,steer,brake}; }
 function updateRide(dt){ const R2=RIDE; if (!R2) return; const v=R2.car; R2.sayT-=dt;
-  if (R2.phase!=="drive"&&(MS.done.m2||MI&&MI.def.id==="m2")){ v.driver=false; RIDE=null; renderObj(); return; }
-  if (R2.phase==="walk"){ if (!LEAVERS.includes(R2.earl)||R2.earl.gone&&R2.earl.done){ R2.phase="wait"; v.driver=true; sfx("door"); gps={n:"Onkel Bobbys Auto",x:v.x,y:v.y}; routeT=0; renderObj(); } return; }
+  if (R2.phase!=="drive"&&(R2.kind==="bobby"?(MS.done.m2||MI&&MI.def.id==="m2"):(MS.done.m3||!!MI||v.wreck||v.gone))){ v.driver=false; if (R2.kind!=="bobby") v.noBoard=false; RIDE=null; renderObj(); return; }
+  if (R2.phase==="walk"){ if (!LEAVERS.includes(R2.earl)||R2.earl.gone&&R2.earl.done){ R2.phase="wait"; v.driver=true; sfx("door"); gps={n:R2.gpsN,x:v.x,y:v.y}; routeT=0; renderObj(); } return; }
   if (R2.phase==="wait") return;
   R2.t+=dt;
   if (R2.done){ if (v.gone||offView(v.x,v.y,100)){ v.gone=true; RIDE=null; } else if (!v.ai){ v.chauffeur=false; } return; }
   if (jj.veh!==v){ R2.done=true; v.chauffeur=false; jj.lock=0; return; }
-  jj.lock=99; if (R2.t>13&&R2.step===0){ R2.step=1; R2.say="Luka … der hat mit 12 schon Autos aufgemacht. Laut, dumm, loyal."; R2.sayT=4.5; }
-  const d=Math.hypot(RIDE_TO.x-v.x,RIDE_TO.y-v.y);
-  if (R2.t>30&&d>300){ v.x=RIDE_TO.x-260; v.y=RIDE_TO.y; v.a=0; v.v=120; R2.wi=RIDE_WP.length-1; }
-  if (d<140&&Math.abs(v.v)<25&&!TUT){ R2.done=true; v.v=0; jj.lock=0; exitVeh(true); v.chauffeur=false; v.driver=true; R2.say="Da vorne ist Luka. Und JJ … mach keinen Scheiß."; R2.sayT=4; sfx("door"); renderObj(); hudDirty=true;
+  jj.lock=99; { const L=R2.lines[R2.step]; if (L&&R2.t>L[0]){ R2.step++; R2.say=L[1]; R2.sayT=4.5; } }
+  const TO=R2.to, WP=R2.wp, d=Math.hypot(TO.x-v.x,TO.y-v.y);
+  if (R2.t>R2.maxT&&d>300){ if (R2.kind==="bobby"){ v.x=TO.x-260; v.y=TO.y; v.a=0; } else { const p=WP[WP.length-2]||[TO.x-260,TO.y]; v.x=p[0]; v.y=p[1]; v.a=Math.atan2(TO.y-p[1],TO.x-p[0]); } v.v=120; R2.wi=WP.length-1; }
+  if (d<140&&Math.abs(v.v)<25&&!TUT){ R2.done=true; v.v=0; jj.lock=0; exitVeh(true); v.chauffeur=false; v.driver=true; R2.say=R2.endSay; R2.sayT=4; sfx("door"); renderObj(); hudDirty=true;
     setTimeout(()=>{ if (RIDE&&RIDE.car===v){ v.ai=false; v.v=0; v.leaveT=1; } },400); } }
-function drawRideSay(q){ const R2=RIDE; if (!R2||R2.sayT<=0) return; drawSay(q,R2.car.x,R2.car.y-44,"Bobby: "+R2.say); }
+function drawRideSay(q){ const R2=RIDE; if (!R2||R2.sayT<=0) return; drawSay(q,R2.car.x,R2.car.y-44,R2.who+": "+R2.say); }
 
 const TUT_STEPS=[
   {el:"obj",t:"Mission",p:L2("Hier steht dein nächstes Ziel.","Your next goal is shown here."),d:2.6},
@@ -99,17 +119,31 @@ const TUT_STEPS=[
   {el:"cash",t:"Bargeld",p:L2("Dein Geld in der Tasche.","The cash in your pocket."),d:2.4},
   {el:"phoneBtn",t:"Handy",p:L2("Nachrichten, Karte und Apps.","Messages, map and apps."),d:2.6},
   {el:"help",t:"Steuerung",p:L2("So steuerst du JJ.","This is how you control JJ."),d:2.6}];
+const TUT2_STEPS=[
+  {el:"phoneBtn",t:L2("Handy","Phone"),p:touch?L2("Tippe aufs Handy: Nachrichten, Karte, GPS – und deine Bank.","Tap the phone: messages, map, GPS – and your bank."):L2("Drück P fürs Handy: Nachrichten, Karte, GPS – und deine Bank.","Press P for the phone: messages, map, GPS – and your bank."),d:3.4},
+  {sel:"#phone .ph",t:L2("Bank-App","Bank app"),p:L2("Geld für Missionen landet auf deinem Konto. Hier zahlst du Bargeld ein oder hebst ab – wirst du verhaftet, ist nur das Bargeld in der Tasche weg.","Mission pay lands in your account. Deposit or withdraw cash here – if you get arrested, only the cash in your pocket is gone."),d:6,
+    enter:()=>{ openPhone(); phoneView.screen="bank"; renderPhone(); },leave:()=>closePhone()},
+  {t:L2("Waffen-Rad","Weapon wheel"),p:touch?L2("Zu Fuß: Tippe oben rechts auf deinen Waffen-Knopf – das Rad geht auf. Waffe antippen = wechseln.","On foot: tap your weapon button at the top right – the wheel opens. Tap a weapon to switch."):L2("Zu Fuß: Q gedrückt halten öffnet das Waffen-Rad – Maus auf die Waffe, loslassen. Q kurz tippen = nächste Waffe.","On foot: hold Q to open the weapon wheel – point at a weapon, release. Tap Q = next weapon."),d:5},
+  {t:L2("Outfit-Rad","Outfit wheel"),p:touch?L2("Im Rad oben auf OUTFIT tippen: Klamotten wechseln (neue gibt's im DRIP STORE). Unbeobachtet umziehen = ein Fahndungsstern weniger.","Tap OUTFIT at the top of the wheel to change clothes (new ones at the DRIP STORE). Changing unseen = one wanted star less."):L2("C gedrückt halten öffnet das Outfit-Rad (neue Klamotten gibt's im DRIP STORE). Unbeobachtet umziehen = ein Fahndungsstern weniger.","Hold C to open the outfit wheel (new clothes at the DRIP STORE). Changing unseen = one wanted star less."),d:5.5}];
 let TUT=null, tutTried=false, tutWait=0;
-function startTut(){ try{ if (localStorage.getItem("jjla-tut3")) return; }catch(e){} if (TUT||!started||DLG||cardMode||CINE) return;
-  TUT={i:0,t:0}; $("tut").hidden=false; showTut(); }
-function updateTut(dt){ if (!TUT) return; TUT.t+=dt; const st=TUT_STEPS[TUT.i]; if (TUT.t>((st&&st.d)||3.4)){ nextTut(); } else if (TUT.i<TUT_STEPS.length&&Math.floor(TUT.t*4)!==Math.floor((TUT.t-dt)*4)) showTut(); }
-function showTut(){ const st=TUT_STEPS[TUT.i], el=$(st.el); if (!el||el.hidden||!el.getBoundingClientRect().width){ return nextTut(); }
-  const r=el.getBoundingClientRect(), pad=6, hl=$("tutHl"), tip=$("tutTip");
-  hl.style.left=(r.left-pad)+"px"; hl.style.top=(r.top-pad)+"px"; hl.style.width=(r.width+pad*2)+"px"; hl.style.height=(r.height+pad*2)+"px";
-  tip.innerHTML=`<small>${TUT.i+1} / ${TUT_STEPS.length}</small><b>${st.t}</b><p>${st.p}</p><i style="width:${Math.min(100,TUT.t/(st.d||3.4)*100)}%;height:2px;background:var(--sun);padding:0;margin-top:8px"></i>`;
-  const tw=Math.min(300,innerWidth-32), left=Math.max(16,Math.min(innerWidth-tw-16,r.left+r.width/2-tw/2)); tip.style.left=left+"px"; tip.style.top=(r.bottom+16)+"px"; }
-function nextTut(){ if (!TUT) return; TUT.i++; TUT.t=0; if (TUT.i<TUT_STEPS.length){ showTut(); return; }
-  $("tut").hidden=true; TUT=null; try{ localStorage.setItem("jjla-tut3","1"); }catch(e){} }
+function startTut(){ return runTut(TUT_STEPS,"jjla-tut3"); }
+function startTut2(){ return runTut(TUT2_STEPS,"jjla-tut4"); }
+function runTut(steps,key){ try{ if (localStorage.getItem(key)) return true; }catch(e){} if (TUT) return TUT.key===key; if (!started||DLG||cardMode||CINE) return false;
+  TUT={i:0,t:0,steps,key}; $("tut").hidden=false; showTut(); return true; }
+function updateTut(dt){ if (!TUT) return; TUT.t+=dt; const st=TUT.steps[TUT.i]; if (TUT.t>((st&&st.d)||3.4)){ nextTut(); } else if (TUT.i<TUT.steps.length&&Math.floor(TUT.t*4)!==Math.floor((TUT.t-dt)*4)) showTut(); }
+function showTut(){ const S=TUT.steps, st=S[TUT.i]; if (st.enter&&!TUT.entered){ TUT.entered=true; st.enter(); }
+  const el=st.sel?document.querySelector(st.sel):st.el?$(st.el):null; if (st.el||st.sel){ if (!el||el.hidden||!el.getBoundingClientRect().width){ return nextTut(); } }
+  const hl=$("tutHl"), tip=$("tutTip"), pad=6, M=12;
+  tip.innerHTML=`<small>${TUT.i+1} / ${S.length}</small><b>${st.t}</b><p>${st.p}</p><i style="width:${Math.min(100,TUT.t/(st.d||3.4)*100)}%;height:2px;background:var(--sun);padding:0;margin-top:8px"></i>`;
+  const tw=tip.offsetWidth||Math.min(300,innerWidth-32), th=tip.offsetHeight||110; let left, top;
+  if (el){ const r=el.getBoundingClientRect(); hl.hidden=false; hl.style.left=(r.left-pad)+"px"; hl.style.top=(r.top-pad)+"px"; hl.style.width=(r.width+pad*2)+"px"; hl.style.height=(r.height+pad*2)+"px";
+    left=r.left+r.width/2-tw/2; top=r.bottom+16;
+    if (top+th>innerHeight-M){ top=r.top-16-th; }                                                              // passt nicht drunter → drüber
+    if (top<M){ top=r.top+r.height/2-th/2; left=r.left-16-tw>=M?r.left-16-tw:r.right+16; } }                   // auch nicht drüber → daneben
+  else { hl.hidden=true; left=innerWidth/2-tw/2; top=innerHeight/2-th/2; }
+  tip.style.left=Math.max(M,Math.min(innerWidth-tw-M,left))+"px"; tip.style.top=Math.max(M,Math.min(innerHeight-th-M,top))+"px"; }
+function nextTut(){ if (!TUT) return; const S=TUT.steps, st=S[TUT.i]; if (st&&st.leave) st.leave(); TUT.i++; TUT.t=0; TUT.entered=false; if (TUT.i<S.length){ showTut(); return; }
+  $("tut").hidden=true; $("tutHl").hidden=false; const key=TUT.key; TUT=null; try{ localStorage.setItem(key,"1"); }catch(e){} }
 $("tutTip").addEventListener("pointerdown",e=>{ e.preventDefault(); e.stopPropagation(); nextTut(); });
 function finishArrival(){ if (!CINE||!CINE.ready) return; document.body.classList.remove("jumpcue"); const P=ARRIVAL, cb=CINE.cb; CINE=null; $("dlg").hidden=true; $("dlg").classList.remove("sub"); document.body.classList.remove("talk"); jj.hidden=false; paused=!!(DLG||cardMode); $("toast").classList.remove("on"); jj.x=P.x; jj.y=P.y+14; jj.h=P.h+110; jj.roof=null; jj.veh=null; jj.glide={vx:Math.cos(P.a)*150,vy:Math.sin(P.a)*150+60}; jj.ang=Math.atan2(-jj.glide.vx,jj.glide.vy); P.fly=true; sfx("swing"); cb&&cb(); setTimeout(()=>{ barkT=0; bark("arrive"); },700); }
 function drawArrival(q,vx,vy,air){ const P=ARRIVAL; if (!P||P.gone) return; if (air!==(P.h>2)) return; const k=1+P.h/D, X=vx+(P.x-vx)*k, Y=vy+(P.y-vy)*k;
@@ -143,9 +177,9 @@ MDEF.push({id:"m2",n:"Der Schläger",loc:{x:4120,y:3110},giver:[["Luka",44,-4]],
   start(m){ talk([["Luka","JJ! Mein Bruder! Acht Jahre, Digga – und du siehst immer noch scheiße aus!"],["JJ","Und du redest immer noch zu laut, Luka."],["Luka",L2("Die Cuervos vom Steg waren in der Nacht in Venice, als Donny verschwand. Die wissen was. Mit leeren Händen gehst du da nicht hin.","The Cuervos from the pier were in Venice the night Donny vanished. They know something. Do not go there empty-handed.")],["Luka","Wir klauen uns 'ne Karre und fahren zu LA ARMS. Du holst dir 'nen Baseballschläger."],["JJ","Mit welchem Geld, Genie?"],["Luka","Mit meinem. Hier, 150 Dollar. Den Schläger darfst du behalten."]],()=>{ setTimeout(()=>showContact("luka"),700); cash+=150; hudDirty=true; toast("+$150 von Luka"); UNLOCK.bat=true; const g=giverSpots(this)[0]; m.ally={n:"Luka",x:g.x,y:g.y,ang:0,step:0,moving:false,cd:1.4}; m.ride=true; m.step=W.own.bat?3:0; if (m.step===3) this.toFoes(m); }); },
   say(m,t,o){ if (m.d.ot!==t){ m.d.ot=t; obj(t,o); } },
   toFoes(m){ m.step=3; this.say(m,"Fahr mit Luka zum Steg – zu den Cuervos",{x:930,y:3150}); },
-  tick(m,dt){ const a=m.ally; if (!a) return; const v=jj.veh, P=v||jj, FOES={x:930,y:3150};
+  tick(m,dt){ const a=m.ally; if (!a) return; const v=jj.veh, P=v||jj, FOES={x:930,y:3150}; if (v&&v.t.kind==="car") m.d.lastCar=v; if (a.stayIn&&m.step>=3&&(v||!a.car||Math.hypot(jj.x-a.car.x,jj.y-a.car.y)>250)) a.stayIn=false;
     if (m.step===0){ if (a.inCar){ m.step=1; } else this.say(m,v&&v.t.kind==="car"&&!v.driver?"Halt an – Luka steigt ein":"Klau ein Auto – Luka fährt mit"); }
-    if (m.step===1){ this.say(m,"Fahr mit Luka zu LA ARMS",{x:SHOP.x,y:SHOP.y-30}); if (Math.hypot(P.x-SHOP.x,P.y-SHOP.y)<260){ m.step=2; allySay(a,"Geh rein und hol dir den Schläger. Ich wart hier.",3); } }
+    if (m.step===1){ this.say(m,"Fahr mit Luka zu LA ARMS",{x:SHOP.x,y:SHOP.y-30}); if (Math.hypot(P.x-SHOP.x,P.y-SHOP.y)<260){ m.step=2; if (a.inCar) a.stayIn=true; allySay(a,"Geh rein und hol dir den Schläger. Ich wart hier.",3); } }
     if (m.step===2){ this.say(m,v?"Steig aus und geh in LA ARMS":"Geh rein und kauf den Baseballschläger",{x:SHOP.x,y:SHOP.y-10});
       if (W.own.bat&&!SHOPIN&&!shopOpen&&!DLG){ talk([["Luka","Ein Baseballschläger. Old School. Steht dir."],["JJ","Danke, Bro. Ich zahl's dir zurück."],["Luka","Zahl's den Cuervos heim. Mit dem Schläger."]],()=>{ if (W.own.bat) setWeapon("bat"); this.toFoes(m); }); m.step=2.5; } }
     if (m.step===3&&!DLG&&Math.hypot(P.x-FOES.x,P.y-FOES.y)<480){ m.step=4; m.noBoard=true; for (const [x,y] of [[880,3150],[930,3190],[980,3140]]) spawnFoe(x,y,{sp:105,stay:true}); toast("Da sind sie!"); }

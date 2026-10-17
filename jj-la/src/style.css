@@ -108,6 +108,7 @@ body.drive #help,body:not(.play) #hud,body:not(.play) #tb,body:not(.play) #help{
 #hpBox{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:8px 14px;z-index:3}
 #hpBox .bar{width:180px;height:12px}
 body:not(.play) #hpBox{display:none}
+#hud #radioChip{position:static;left:auto;right:auto;bottom:auto;align-self:center;order:-1}
 #wanted{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));top:calc(62px + env(safe-area-inset-top,0px));padding:4px 8px;border-radius:12px;background:rgba(18,16,22,.55);display:flex;gap:3px;z-index:3;font-size:24px;line-height:1;pointer-events:none}
 #wanted i{font-style:normal;color:rgba(255,255,255,.22);text-shadow:0 2px 0 rgba(0,0,0,.55)}
 #wanted i.on{color:#ffd23f;text-shadow:0 0 10px rgba(255,180,40,.7),0 2px 0 #5a3a00}

@@ -220,6 +220,7 @@ function updateDJ(){ const inCar=jj.veh&&!jj.veh.wreck&&started, talk=inCar&&STA
   if (talk){ djEnsure(); if (DJ.a){ if (DJ.a.paused) DJ.a.play().catch(()=>{}); const tv=DLG||paused?.12:.9; DJ.a.volume+=(tv-DJ.a.volume)*.1; } }
   else if (DJ.a&&!DJ.a.paused) DJ.a.pause();
   const el=$("radioChip"); if (el){ const key=inCar?radioIdx:-1; if (el.dataset.k!==String(key)){ el.dataset.k=String(key); el.hidden=!inCar; if (inCar){ const st=STATIONS[radioIdx]; $("rIco").textContent=st.ico; $("rName").textContent=st.n; $("rTag").textContent=st.tag; el.style.setProperty("--c",st.col); el.classList.toggle("live",!!st.talk); } } } }
+if (touch) $("hud").insertBefore($("radioChip"),$("cash"));   // Handy: Radio oben neben dem Geld
 $("radioChip").addEventListener("pointerdown",e=>{ e.preventDefault(); e.stopPropagation(); if (jj.veh) setRadio(radioIdx+1); });
 function updateRadio(){ updateDJ(); if (!AC) return; if (!radioBus){ radioBus=AC.createGain(); radioBus.gain.value=0; radioBus.connect(master); }
   const inCar=jj.veh&&!jj.veh.wreck, bg=!inCar&&SET.bgRadio&&started&&!SHOPIN, on=inCar?STATIONS[radioIdx].bpm>0:bg; if (inCar!==radioWasCar){ if (inCar&&!radioFirst){ radioFirst=true; radioIdx=0; } radioWasCar=inCar; radioStep=0; radioNext=AC.currentTime+.05; } radioBus.gain.setTargetAtTime(on?(inCar?.32:.06):0,AC.currentTime,.4); if (!on){ radioNext=AC.currentTime+.05; return; }

@@ -365,7 +365,10 @@ let shake=0;
 
 // ================= SOUND =================
 let AC=null, master=null, eng=null;
-function initAudio(){ if (AC) return; try{ AC=new (window.AudioContext||window.webkitAudioContext)(); master=AC.createGain(); master.gain.value=.55; master.connect(AC.destination);
+function resumeAudio(){ if (AC&&AC.state!=="running"&&AC.state!=="closed") try{ AC.resume().catch(()=>{}); }catch(e){} }
+for (const ev of ["pointerdown","touchend","keydown"]) addEventListener(ev,resumeAudio,{capture:true,passive:true});
+document.addEventListener("visibilitychange",()=>{ if (!document.hidden) resumeAudio(); });
+function initAudio(){ if (AC) return; try{ if (navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){} try{ AC=new (window.AudioContext||window.webkitAudioContext)(); master=AC.createGain(); master.gain.value=.55; master.connect(AC.destination);
   const o=AC.createOscillator(), f=AC.createBiquadFilter(), gn=AC.createGain(); o.type="sawtooth"; o.frequency.value=50; f.type="lowpass"; f.frequency.value=420; gn.gain.value=0; o.connect(f); f.connect(gn); gn.connect(master); o.start(); eng={o,f,gn}; }catch(e){ AC=null; } }
 function noiseBuf(){ const b=AC.createBuffer(1,AC.sampleRate*1.2,AC.sampleRate), d=b.getChannelData(0); for (let i=0;i<d.length;i++) d[i]=Math.random()*2-1; return b; }
 let NB=null;

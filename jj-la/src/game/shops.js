@@ -228,6 +228,8 @@ function drawJailIn(t){ const P=JAILIN, q=ctx; const k=Math.min(cssW/(JI.W+30),c
   q.setTransform(dpr,0,0,dpr,0,0); }
 // ---------- LA ARMS interior ----------
 let SHOPIN=null, shopDoorArmed=true; const SI={W:440,H:300,cy:112,door:220};
+const SISPOT={x:SI.W/2,y:SI.cy+40}; L2("KAUFEN","BUY");   // Kaufpunkt vor dem Verkäufer: hinstellen + Knopf/E
+function onShopSpot(){ return !!SHOPIN&&!shopOpen&&Math.hypot(SHOPIN.x-SISPOT.x,SHOPIN.y-SISPOT.y)<22; }
 const SIIMG={}; function siImg(k){ if (!SIIMG[k]){ const im=new Image(); im.src=WICON[k]; SIIMG[k]=im; } return SIIMG[k]; }
 const KEEPER={skin:"#d9a37c",skinHi:"#ecbd98",shirt:"#4a3b2a",shirtHi:"#6b563d",pants:"#2a2620",shoe:"#1d1a16",cap:"#7a1d22"};
 function enterShopIn(){ shopDoorArmed=false; SHOPIN={x:SI.door,y:SI.H-62,ang:Math.PI,step:0,moving:false,walkAmt:0,counterArmed:true,t:0}; closePhone(); sfx("door"); $("zone").style.visibility="hidden"; }
@@ -241,8 +243,7 @@ function updateShopIn(dt){ const P=SHOPIN; P.t+=dt; if (shopOpen){ P.moving=fals
     let d=Math.atan2(-mx,my)-P.ang; d=Math.atan2(Math.sin(d),Math.cos(d)); P.ang+=d*Math.min(1,dt*14); P.step+=dt*13.5; }
   P.walkAmt+=((P.moving?1:0)-P.walkAmt)*Math.min(1,dt*9);
   if (P.y>SI.H-4){ leaveShopIn(); return; }
-  if (P.y<SI.cy+24&&Math.abs(P.x-SI.W/2)<150&&P.counterArmed){ P.counterArmed=false; openShop(); }
-  if (P.y>SI.cy+50) P.counterArmed=true; }
+}
 function drawShopIn(t){ const P=SHOPIN, q=ctx; const k=Math.min(cssW/(SI.W+30),cssH/(SI.H+30)), ox=(cssW-SI.W*k)/2, oy=(cssH-SI.H*k)/2+8;
   q.setTransform(dpr,0,0,dpr,0,0); q.fillStyle="#08070a"; q.fillRect(0,0,cssW,cssH);
   q.setTransform(dpr*k,0,0,dpr*k,dpr*ox,dpr*oy); const W2=SI.W, H2=SI.H; q.transform(1,0,0,-1,0,H2); const upr=(x,y,fn)=>{ q.save(); q.translate(x,y); q.scale(1,-1); fn(); q.restore(); };
@@ -268,7 +269,9 @@ function drawShopIn(t){ const P=SHOPIN, q=ctx; const k=Math.min(cssW/(SI.W+30),c
   // door + mat
   q.fillStyle="#5a4a36"; q.fillRect(SI.door-26,H2-24,52,16); q.fillStyle="rgba(255,255,255,.7)"; q.font='700 9px "Barlow Semi Condensed",sans-serif'; q.textAlign="center"; q.textBaseline="middle"; upr(SI.door,H2-16,()=>q.fillText("AUSGANG ↑",0,0));
   // counter hint
-  if (!shopOpen&&P.y>SI.cy+30){ const pu=.5+Math.sin(t*4)*.5; q.strokeStyle=`rgba(255,214,10,${.35+pu*.4})`; q.lineWidth=2; q.strokeRect(W2/2-150,SI.cy+20,300,16); }
+  if (!shopOpen){ const pu=.5+Math.sin(t*4)*.5, on=onShopSpot(); q.fillStyle=on?"rgba(255,214,10,.38)":"rgba(255,214,10,.14)"; q.beginPath(); q.arc(SISPOT.x,SISPOT.y,18,0,7); q.fill();
+    q.strokeStyle=`rgba(255,214,10,${.45+pu*.45})`; q.lineWidth=2; q.setLineDash([5,4]); q.stroke(); q.setLineDash([]);
+    q.fillStyle="#ffd60a"; q.font='700 10px "Barlow Semi Condensed",sans-serif'; q.textAlign="center"; q.textBaseline="middle"; upr(SISPOT.x,SISPOT.y+30,()=>q.fillText("KAUFEN",0,0)); }
   drawPerson(q,{x:P.x,y:P.y,ang:P.ang,moving:P.moving,step:P.step,walkAmt:P.walkAmt},LOOK,W.cur==="fist"?{}:{weapon:W.cur});
   q.setTransform(dpr,0,0,dpr,0,0); }
 // ---------- big map ----------

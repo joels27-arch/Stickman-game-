@@ -174,7 +174,11 @@ function crime(amt,why){ if (wantOff()) return; const before=WANT.lv; WANT.heat=
   if (WANT.lv>before){ WANT.seenT=0; WANT.lx=jj.x; WANT.ly=jj.y; WANT.spT=0; sfx("ping"); if (before===0){ toast(why?why+" – die Polizei sucht dich!":"Die Polizei sucht dich!"); bark("crash",1); }
     else if (WANT.lv===5) toast(LANG==="en"?"★★★★★ SWAT & roadblocks!":"★★★★★ SWAT & Straßensperren!"); else if (WANT.lv===6) toast(LANG==="en"?"★★★★★★ MILITARY – airstrikes!":"★★★★★★ MILITÄR – Luftangriffe!"); } }
 let killBy=null;
-function wantOnKill(n){ const kb=killBy; killBy=null; if (kb&&kb!==jj.veh) return; if (n.cop){ crime(1.5,"Polizist getötet"); return; } if (n.hostile) return; if (Math.hypot(n.x-jj.x,n.y-jj.y)<700) crime(.4,"Mehrere Tote"); }
+// Passanten überfahren ruft keine Polizei. Zu Fuß getötet (Schläge/Waffen): die ersten zwei bleiben unbemerkt,
+// ab dem dritten (innerhalb von 90 s) kommt die Polizei.
+const CIVK={n:0,t:0};
+function wantOnKill(n){ const kb=killBy; killBy=null; if (kb&&kb!==jj.veh) return; if (n.cop){ crime(1.5,"Polizist getötet"); return; } if (n.hostile||kb) return; if (Math.hypot(n.x-jj.x,n.y-jj.y)>=700) return;
+  const now=performance.now(); if (now-CIVK.t>90000) CIVK.n=0; CIVK.t=now; CIVK.n++; if (CIVK.n===3) crime(1,"Mehrere Tote"); else if (CIVK.n>3) crime(.4,"Mehrere Tote"); }
 function wantOnShot(){ if (!started) return; if (copsNear(jj.x,jj.y,450)) crime(1,"Schüsse auf Polizisten"); }
 function wantOnJack(v){ if (v.missionV) return; if (v.type==="police"&&v.driver) crime(1,"Polizist angegriffen"); }
 function clearWanted(silent){ WANT.heat=0; WANT.lv=0; WANT.seenT=0; WANT.bustT=0;
@@ -270,7 +274,7 @@ const LEAVERS=[];
 function leaver(n,x,y,say,tx,ty,o){ LEAVERS.push(Object.assign({n,x,y,ang:0,step:0,moving:false,say,sayT:3.2,wait:3.8,tx,ty,life:30},o||{})); }
 const LEAVE={
   m1:()=>setupRide(),
-  m2:(m)=>{ const a0=m.ally, a=a0&&a0.inCar&&a0.car?{x:a0.car.x+30,y:a0.car.y+30}:(a0||giverSpots(MDEF[1])[0]); leaver("Luka",a.x,a.y,"Wir sehen uns später, Bro!",a.x+420,a.y-160); },
+  m2:(m)=>setupLukaRide(m),
   m3:(m)=>{ const a=m.ally; const x=a&&!a.inCar?a.x:PSPOT.x+10, y=a&&!a.inCar?a.y:PSPOT.y-26; leaver("Yunus",x,y,"Wir sehen uns später, Bro. Ich muss noch die Tauben hacken.",YGAR.x,YGAR.y-20,{gone:true,wait:4}); },
   m4:()=>leaver("Paul",YACHT.x-YACHT.l*.32,YACHT.y,"Wir sehen uns später. Für Donny.",YACHT.x-YACHT.l*.32,YACHT.y,{wait:9,life:12}),
   m6:()=>{} };
@@ -417,7 +421,7 @@ function seatDoor(c,i,out){ const S=SEATS[i%3]; return vLocal(c,c.t.l*S[0],S[1]*
 function exitRider(a){ const c=a.car; a.inCar=false; a.car=null; a.vx=a.vy=0; if (!c||c.wreck||c.gone){ const p=landNear(jj.x,jj.y); a.x=p.x; a.y=p.y; return; }
   const P=seatDoor(c,a.seat||0,2); if (blockedAt(P[0],P[1],6)){ const p=landNear(P[0],P[1]); a.x=p.x; a.y=p.y; } else { a.x=P[0]; a.y=P[1]; } a.hold=true; a.exitT=0; a.exitCar=c; c.door=1; c.doorSide=SEATS[(a.seat||0)%3][1]; c.doorClosing=false; sfx("door"); }
 function updateRiders(m,dt){ const list=allyList(m), v=jj.veh, carOK=!!(v&&v.t.kind==="car"&&!v.wreck&&!JACK&&!v.driver&&jj.veh===v);
-  for (const a of list) if (a.inCar&&(jj.veh!==a.car||a.car.wreck)) exitRider(a);
+  for (const a of list) if (a.inCar&&(a.car.wreck||a.car.gone||jj.veh!==a.car&&!(a.stayIn&&!jj.veh))) exitRider(a);   // stayIn: wartet im Auto, solange JJ zu Fuß ist
   for (const a of list){ if (a.exitT==null) continue; const c=a.exitCar; a.exitT+=dt; const sd=SEATS[(a.seat||0)%3][1];
     if (a.exitT<.35&&c){ const nx=-Math.sin(c.a)*sd, ny=Math.cos(c.a)*sd, x=a.x+nx*60*dt, y=a.y+ny*60*dt; if (walkable(x,y)){ a.x=x; a.y=y; } a.moving=true; a.step+=dt*14; a.ang=Math.atan2(-nx,ny); } else if (c&&!c.doorClosing&&c.door>0) c.doorClosing=true;
     if (a.exitT>.5){ a.hold=false; a.exitT=null; } }
