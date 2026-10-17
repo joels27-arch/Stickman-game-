@@ -1,0 +1,17 @@
+const { chromium, devices } = require('playwright');
+(async()=>{ const b=await chromium.launch(); const ctx=await b.newContext({...devices['iPhone 13 landscape']}); const p=await ctx.newPage(); const W=ms=>p.waitForTimeout(ms);
+ const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+ await p.addInitScript(()=>{localStorage.setItem('jjla-tut3','1'); localStorage.setItem('jjla-save-v1',JSON.stringify({cash:500,done:{m1:true,m2:true,m3:true},own:{fist:true}}));});
+ await p.goto('file://'+require('path').resolve(__dirname,'../index.html')); await W(900); await p.click('#go'); await W(2500);
+ const S=async(n,f,w=900)=>{ await p.evaluate(f); await W(w); await p.screenshot({path:'rm_'+n+'.png'}); };
+ await S('bankext',()=>{ jj.x=BANKDOOR.x; jj.y=BANKDOOR.y+60; cam.x=jj.x; cam.y=jj.y-60; });
+ console.log(await p.evaluate(()=>{ const t=doorTarget(); return t&&t.lbl; }));
+ await S('bank1',()=>{ jj.x=BANKDOOR.x; jj.y=BANKDOOR.y; doorTarget().fn(); });
+ await S('bank2',()=>{ jj.x=RBANK.r.x+700; jj.y=RBANK.r.y+300; });
+ await S('bank3',()=>{ jj.x=RBANK.r.x+1200; jj.y=RBANK.r.y+450; });
+ await S('vault',()=>{ enterRoom("vault",{x:550,y:300,a:0}); });
+ await S('house',()=>{ BHOUSE.dog={x:BHOUSE.r.x+150,y:BHOUSE.r.y+350,a:0}; enterRoom("bhouse",{x:250,y:300,a:0}); });
+ await S('villa',()=>{ enterRoom("wvilla",{x:480,y:300,a:0}); });
+ await S('mus',()=>{ exitRoom({x:MUSDOOR.x,y:MUSDOOR.y-30}); enterRoom("museum",{x:800,y:400,a:Math.PI}); });
+ await S('musext',()=>{ exitRoom({x:MUSDOOR.x,y:MUSDOOR.y-60}); });
+ console.log(errs); await b.close(); })();
