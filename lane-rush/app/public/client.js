@@ -797,6 +797,25 @@ const world = (() => {
     }
     ys.sort((a, b) => a - b);
     const top = ys.length ? ys[Math.floor(ys.length / 2)] : box.max.y;
+    // Mow the lawn: grass tufts on the running surface read as obstacles, so
+    // press every vertex above the turf (and inside the track) down onto it.
+    const v = new THREE.Vector3();
+    holder.traverse((o) => {
+      if (!o.isMesh) return;
+      o.geometry = o.geometry.clone();
+      const pos = o.geometry.attributes.position;
+      const inv = o.matrixWorld.clone().invert();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+        if (v.y > top + 0.03) {
+          v.y = top + 0.03;
+          v.applyMatrix4(inv);
+          pos.setXYZ(i, v.x, v.y, v.z);
+        }
+      }
+      pos.needsUpdate = true;
+      o.geometry.computeVertexNormals();
+    });
     const tile = new THREE.Group();
     holder.position.y = -top;
     tile.add(holder);
@@ -1002,6 +1021,8 @@ const world = (() => {
         const x = side * (TRACK_W / 2 + 2.5 + r() * 26);
         if (roll < 0.55) add(trees[Math.floor(r() * 3)], x, MEADOW_Y, z, 0.8 + r() * 0.5, r() * Math.PI * 2);
         else if (roll < 0.85) add(P.bush, side * (TRACK_W / 2 + 1.6 + r() * 10), MEADOW_Y, z, 0.7 + r() * 0.6, r() * Math.PI * 2);
+        // a bush hugging the fence every few metres keeps the meadow edge lively
+        if (r() < 0.45) add(P.bush, side * (TRACK_W / 2 + 1.0 + r() * 1.5), MEADOW_Y, z + r() * 4, 0.5 + r() * 0.4, r() * Math.PI * 2);
         else add(P.rocks, side * (TRACK_W / 2 + 2 + r() * 14), MEADOW_Y, z, 0.6 + r() * 0.8, r() * Math.PI * 2);
       }
     }
@@ -1013,7 +1034,8 @@ const world = (() => {
       c.scale.multiplyScalar(14 + r() * 22);
       c.position.set((r() - 0.5) * 320, 38 + r() * 40, -40 - r() * 230);
       c.rotation.y = (r() - 0.5) * 0.6;
-      c.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.fog = false; } });
+      // unlit, so the clouds stay bright white instead of picking up grey shading
+      c.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ map: o.material.map, color: "#ffffff", fog: false }); });
       c.userData.drift = 0.6 + r() * 1.2;
       clouds.add(c);
     }
