@@ -161,7 +161,7 @@ describe("obstacles and power-ups", () => {
         row.lanes.forEach((k, i) => {
           if (!k) return;
           expect(row.looks[i]).toBeGreaterThanOrEqual(0);
-          expect(row.looks[i]).toBeLessThan(L.LOOKS[k]);
+          expect(row.looks[i]).toBeLessThan(L.LOOKS[k] ?? 0);
         });
         // a barrel row always leaves at least two lanes open
         if (row.lanes.includes("roller")) {
@@ -286,7 +286,7 @@ describe("survival (3 hearts)", () => {
     expect(s.phase).toBe("results");
     // last one standing wins, then whoever lasted longer
     expect(L.standings(s)).toEqual(["p0", "p2", "p1"]);
-    const r = L.rewards(s);
+    const r = L.rewards(s) as any;
     expect(r.p0.medal).toBe("gold");
     expect(r.p2.medal).toBe("silver");
     expect(r.p1.medal).toBe("bronze");
@@ -298,7 +298,7 @@ describe("survival (3 hearts)", () => {
     expect(s.phase).toBe("race");
     s = act(s, "p0", pos(950, s.startAt + 63_000, 3));
     expect(s.phase).toBe("results");
-    expect(L.rewards(s).p0.medal).toBeNull();
+    expect((L.rewards(s) as any).p0.medal).toBeNull();
   });
 
   it("ignores positions once you're out and lets nobody else pick the mode", () => {
@@ -343,7 +343,7 @@ describe("tournament", () => {
     expect(s.cup.points).toEqual({ p2: 16, p0: 20, p1: 18 });
     expect(L.cupStandings(s)).toEqual(["p0", "p1", "p2"]);
     expect(reject(s, "p0", { type: "next" })).toBeTruthy();
-    const r = L.rewards(s);
+    const r = L.rewards(s) as any;
     expect([r.p0.medal, r.p1.medal, r.p2.medal]).toEqual(["gold", "silver", "bronze"]);
     const view = L.viewFor(s, "p1") as any;
     expect(view.cup.race).toBe(3);
