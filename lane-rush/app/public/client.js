@@ -597,7 +597,7 @@ function onServerError(error) {
     return;
   }
   if (error === "box gone") return loseBox();
-  if (["not racing", "race not over", "already started", "no banana", "too soon"].includes(error)) return; // harmless races
+  if (["not racing", "race not over", "already started", "no banana", "no ball", "too soon"].includes(error)) return; // harmless races
   toast(error);
 }
 
@@ -2735,6 +2735,7 @@ function stepMe(dt) {
     const passed = Math.abs(rel) < 0.9 || (prev !== undefined && Math.sign(prev) !== Math.sign(rel));
     if (untouchable || !passed || Math.abs(me.x - b.lane) > 0.6 || me.y > 0.8) continue;
     bowled.add(b.id);
+    act({ type: "bowled", id: b.id });
     hit("bowling");
   }
   // bananas on the track (yours too!)
@@ -2841,7 +2842,7 @@ const nameOf = (id) => (id === playerId ? "You" : net.view?.players.find((p) => 
 /** Turn what changed in the room into callouts (and emote bubbles). */
 function announce(prev, v) {
   if (!prev || v.round !== prev.round) {
-    game.seen = { bowls: new Set((v.bowls || []).map((b) => b.id)), bananas: new Set((v.bananas || []).map((b) => b.id)), emotes: new Set((v.emotes || []).map((e) => e.id)), zaps: new Set((v.zaps || []).map((z) => z.id)) };
+    game.seen = { bowls: new Set((v.bowls || []).map((b) => b.id)), bananas: new Set((v.bananas || []).map((b) => b.id)), emotes: new Set((v.emotes || []).map((e) => e.id)), zaps: new Set((v.zaps || []).map((z) => z.id)), hits: new Set((v.hits || []).map((h) => h.id)) };
     return;
   }
   const seen = game.seen;
@@ -2861,6 +2862,12 @@ function announce(prev, v) {
   for (const z of fresh(v.zaps, seen.zaps)) feed(z.kind === "freeze" ? `❄️ ${nameOf(z.by)} froze everyone` : `⚡ ${nameOf(z.by)} called lightning`);
   for (const b of fresh(v.bowls, seen.bowls)) feed(`🎳 ${nameOf(b.by)} rolled a bowling ball ${b.dir > 0 ? "ahead" : "back"}`);
   for (const b of fresh(v.bananas, seen.bananas)) feed(`🍌 ${nameOf(b.by)} dropped a banana in lane ${b.lane + 1}`);
+  for (const h of fresh(v.hits, seen.hits)) {
+    const victim = h.victim === playerId ? "You" : nameOf(h.victim);
+    const whose = h.by === playerId ? "your" : `${nameOf(h.by)}'s`;
+    feed(h.kind === "banana" ? `🍌 ${victim} slipped on ${whose} banana!` : `🎳 ${victim} got bowled over by ${whose} ball!`);
+    if (h.by === playerId && h.victim !== playerId && game.mode === "race") style(h.kind === "banana" ? "BANANA HIT!" : "STRIKE!", 50);
+  }
 }
 
 // ── emotes ──

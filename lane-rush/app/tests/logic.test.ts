@@ -560,3 +560,18 @@ describe("extras: emotes, scores, heart pickups", () => {
     for (let i = 1; i < h.length; i++) expect(h[i]!.z - h[i - 1]!.z).toBeGreaterThan(L.HEART_EVERY_M - 50);
   });
 });
+
+describe("hit credit", () => {
+  it("credits the thrower when someone slips on their banana or gets bowled", () => {
+    let s = act(lobbyOf(2), "p0", { type: "start", t: T0 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    s = act(s, "p0", { type: "pos", d: 40, lane: 1, y: 0, act: "run", t: s.startAt + 4000 });
+    s = act(s, "p0", { type: "banana", lane: 1, d: 68, t: s.startAt + 4100 });
+    s = act(s, "p1", { type: "slip", id: 1, t: s.startAt + 9000 });
+    s = act(s, "p0", { type: "bowl", lane: 2, d: 40, dir: -1, t: s.startAt + 9500 });
+    s = act(s, "p1", { type: "bowled", id: 1, t: s.startAt + 9800 });
+    expect(reject(s, "p0", { type: "bowled", id: 1 })).toBeTruthy(); // can't bowl yourself
+    const hits = (L.viewFor(s, "p1") as any).hits.map((h: any) => [h.kind, h.by, h.victim]);
+    expect(hits).toEqual([["banana", "p0", "p1"], ["bowling", "p0", "p1"]]);
+  });
+});

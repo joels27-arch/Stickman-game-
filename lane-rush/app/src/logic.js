@@ -533,6 +533,12 @@ export function cupStandings(state) {
     .sort((a, b) => (state.cup.points[b] ?? 0) - (state.cup.points[a] ?? 0) || last.indexOf(a) - last.indexOf(b));
 }
 
+/** Who hit whom with what, for the callouts ("Bob slipped on Alice's banana"). */
+function addHit(state, kind, by, victim, t) {
+  state.hitSeq = (state.hitSeq ?? 0) + 1;
+  state.hitLog = [...(state.hitLog ?? []), { id: state.hitSeq, kind, by, victim, at: t }].slice(-8);
+}
+
 function startRace(state, t) {
   // evict anyone who dropped out before the gun
   for (const id of ids(state)) if (state.players[id].gone) removePlayer(state, id);
@@ -548,6 +554,7 @@ function startRace(state, t) {
   state.bananas = [];
   state.bowls = [];
   state.taken = [];
+  state.hitLog = [];
   for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
 }
 
@@ -673,6 +680,12 @@ export function validateAction(state, playerId, action) {
       if (!EMOTES.includes(action.e)) return { ok: false, error: "bad emote" };
       const t = num(action.t) ? action.t : state.now;
       if (me.emoteAt != null && t - me.emoteAt < EMOTE_COOLDOWN_MS) return { ok: false, error: "too soon" };
+      return { ok: true };
+    }
+    case "bowled": {
+      if (!me) return { ok: false, error: "join first" };
+      if (!(state.bowls ?? []).some((b) => b.id === action.id && b.by !== playerId)) return { ok: false, error: "no ball" };
+      if ((state.hitLog ?? []).some((h) => h.kind === "bowling" && h.victim === playerId && h.ref === action.id)) return { ok: false, error: "no ball" };
       return { ok: true };
     }
     case "take": {
@@ -836,10 +849,18 @@ export function applyAction(state0, playerId, action) {
       // mystery boxes are first come, first served
       state.taken = [...(state.taken ?? []), action.box];
       break;
-    case "slip":
-      // someone ran onto it: it's gone for everyone
+    case "slip": {
+      // someone ran onto it: it's gone for everyone, and its thrower gets the credit
+      const banana = state.bananas.find((b) => b.id === action.id);
       state.bananas = state.bananas.filter((b) => b.id !== action.id);
+      if (banana) addHit(state, "banana", banana.by, playerId, t);
       break;
+    }
+    case "bowled": {
+      const ball = (state.bowls ?? []).find((b) => b.id === action.id);
+      if (ball) addHit(state, "bowling", ball.by, playerId, t);
+      break;
+    }
     case "again": {
       for (const id of ids(state)) if (state.players[id].gone) removePlayer(state, id);
       state.phase = "lobby";
@@ -982,6 +1003,7 @@ export function viewFor(state, playerId) {
     bowls: state.bowls ?? [],
     taken: state.taken ?? [],
     emotes: state.emotes ?? [],
+    hits: state.hitLog ?? [],
   };
 }
 
