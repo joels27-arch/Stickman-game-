@@ -277,11 +277,12 @@
     <div id="soloModal" class="modal" hidden>
       <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="soloTitle">
         <header class="sheet-head">
-          <h2 id="soloTitle">Choose your runner</h2>
+          <h2 id="soloTitle">Play solo</h2>
           <button id="soloClose" class="btn small ghost" type="button">Back</button>
         </header>
         <div id="soloSpot" class="spotlight"></div>
         <div id="soloPicker" class="picker solo-picker"></div>
+        <div id="soloModes" class="solo-modes" role="radiogroup" aria-label="What to play"></div>
         <button id="soloGo" class="btn big go" type="button"><span class="flagico">❤️</span> Run <span class="arrow">→</span></button>
       </div>
     </div>
@@ -308,6 +309,12 @@
         </div>
       </div>
     </section>
+
+    <!-- PARTY CUP: the round reveal -->
+    <div id="spinWheel" class="spin-wheel" hidden>
+      <small id="spinTitle">Round 2</small>
+      <div class="spin-window"><div id="spinReel" class="spin-reel"></div></div>
+    </div>
 
     <!-- PACK OPENING -->
     <div id="packOpen" class="pack-open" hidden>

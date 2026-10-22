@@ -883,8 +883,10 @@ function onState(msg) {
       // solo: skip the lobby and go straight into the run
       if (!game.soloStarting) {
         game.soloStarting = true;
-        if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
-        act({ type: "start", bots: false });
+        const sm = soloMode();
+        const mode = sm === "endless" ? "survival" : sm;
+        if (v.mode !== mode) act({ type: "mode", mode });
+        act({ type: "start", bots: sm !== "endless" });
       }
       return;
     }
@@ -1004,7 +1006,32 @@ function renderSoloPicker() {
       renderSoloPicker();
     },
   });
-  $("#soloGo").replaceChildren(el("span", { class: "flagico", text: "❤️" }), el("span", { text: `Run as ${RUNNERS[cur].name}` }), el("span", { class: "arrow", text: "→" }));
+  // what to play: the endless run on your own, or any mode against 3 bots
+  const pick = soloMode();
+  $("#soloModes").replaceChildren(
+    ...SOLO_MODES.map((m) => {
+      const b = el("button", { class: `solo-mode${m.id === pick ? " on" : ""}`, type: "button", role: "radio", "aria-checked": String(m.id === pick) }, el("b", { text: `${m.icon} ${m.label}` }), el("small", { text: m.sub }));
+      b.addEventListener("click", () => {
+        local.setItem("lr:soloMode", m.id);
+        renderSoloPicker();
+      });
+      return b;
+    }),
+  );
+  const m = SOLO_MODES.find((x) => x.id === pick);
+  $("#soloGo").replaceChildren(el("span", { class: "flagico", text: m.icon }), el("span", { text: pick === "endless" ? `Run as ${RUNNERS[cur].name}` : `Play ${m.label}` }), el("span", { class: "arrow", text: "→" }));
+}
+const SOLO_MODES = [
+  { id: "endless", icon: "🏃", label: "Endless Run", sub: "Just you · beat your best" },
+  { id: "survival", icon: "❤️", label: "Survival", sub: "vs 3 bots" },
+  { id: "chase", icon: "🧠", label: "Brain Chase", sub: "vs 3 bots" },
+  { id: "coinrush", icon: "🪙", label: "Coin Rush", sub: "vs 3 bots" },
+  { id: "potato", icon: "💣", label: "Hot Potato", sub: "vs 3 bots" },
+  { id: "cup", icon: "🏆", label: "Party Cup", sub: "3 rounds vs bots" },
+];
+function soloMode() {
+  const m = local.getItem("lr:soloMode");
+  return SOLO_MODES.some((x) => x.id === m) ? m : "endless";
 }
 $("#soloBtn").addEventListener("click", () => {
   sfx.unlock();
@@ -3110,8 +3137,9 @@ function enterRace(v) {
     el("small", { text: KIND_RULE[game.kind] ?? "" }),
   );
   setTimeout(() => game.round === v.round && tag.classList.add("small"), 7000);
-  tag.classList.remove("small");
+  tag.classList.toggle("small", Boolean(v.cup)); // the cup's reel shows the mode instead
   world.setupMode(game.kind, race.course);
+  if (v.cup && v.phase === "countdown") spinReveal(v.cup.race, game.kind);
   game.lastBlast = Math.max(0, ...(v.blasts || []).map((b) => b.id));
   game.coinGot = new Set();
   renderModeHud();
@@ -3961,7 +3989,8 @@ function recordRace(v, place) {
   if (n < 2 && v.kind === "survival") stats.max("bestRun", d);
   // coins for every race: by place against everyone (bots too), plus hits you landed
   const kos = game.kos ?? 0;
-  const coins = (n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos;
+  // Party Cup rounds pay double
+  const coins = ((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1);
   wallet.addCoins(coins);
   // rank points only count against real people; solo runs pay a little for distance
   const real = v.players.filter((p) => !p.bot).length;
@@ -4483,6 +4512,37 @@ function checkZaps() {
     me.invulnT = 0; // lightning gets through the after-hit blink
     hit("zap");
   }
+}
+
+/** Party Cup: a slot-machine reel lands on this round's mode during the countdown. */
+function spinReveal(round, kind) {
+  const kinds = ["survival", "chase", "coinrush", "potato"];
+  const reel = $("#spinReel");
+  const cards = [];
+  const loops = 5;
+  for (let i = 0; i < loops; i++) for (const k of kinds) cards.push(k);
+  cards.push(kind);
+  reel.replaceChildren(...cards.map((k) => el("div", { class: `spin-card ${k}` }, el("b", { text: `${GAME_MODE_INFO[k].icon} ${KIND_LABEL[k]}` }), el("small", { text: KIND_RULE[k] }))));
+  $("#spinTitle").textContent = `🏆 Party Cup · Round ${round} of 3`;
+  const box = $("#spinWheel");
+  box.hidden = false;
+  box.classList.remove("done");
+  reel.style.transition = "none";
+  reel.style.transform = "translateY(0)";
+  void reel.offsetHeight;
+  const h = reel.firstElementChild?.getBoundingClientRect().height || 80;
+  reel.style.transition = "transform 2.2s cubic-bezier(0.12, 0.8, 0.2, 1)";
+  reel.style.transform = `translateY(${-(cards.length - 1) * h}px)`;
+  let ticks = 0;
+  const tick = setInterval(() => {
+    sfx.lane();
+    if (++ticks > 12) clearInterval(tick);
+  }, 160);
+  setTimeout(() => {
+    box.classList.add("done");
+    sfx.boost();
+  }, 2250);
+  setTimeout(() => (box.hidden = true), 3300);
 }
 
 // ── modes on your screen: the brain, coins, the bomb ──

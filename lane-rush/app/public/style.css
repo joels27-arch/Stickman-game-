@@ -1100,3 +1100,26 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .mirror-frame { position: fixed; z-index: 8; border: 3px solid #fff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); pointer-events: none; }
 .mirror-frame[hidden] { display: none; }
 .mirror-frame small { position: absolute; top: -20px; left: 0; right: 0; text-align: center; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 12px; text-transform: uppercase; color: #fff; text-shadow: 0 1px 3px #000; }
+
+/* solo: what to play */
+.solo-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.solo-mode { display: grid; gap: 2px; padding: 8px 6px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06); color: #fff; cursor: pointer; text-align: center; font: inherit; }
+.solo-mode b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 15px; text-transform: uppercase; line-height: 1.05; }
+.solo-mode small { font-size: 11px; font-weight: 700; color: var(--muted); }
+.solo-mode.on { background: var(--lime); border-color: #fff; color: var(--lime-ink); }
+.solo-mode.on small { color: var(--lime-ink); }
+
+/* party cup round reveal */
+.spin-wheel { position: fixed; z-index: 40; left: 50%; top: 30%; transform: translateX(-50%); display: grid; justify-items: center; gap: 8px; pointer-events: none; }
+.spin-wheel[hidden] { display: none; }
+.spin-wheel > small { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 18px; text-transform: uppercase; color: #ffd23f; text-shadow: 0 2px 6px #000; }
+.spin-window { width: min(320px, 84vw); height: 84px; overflow: hidden; border-radius: 18px; border: 4px solid #fff; background: #12183a; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 10px 14px rgba(0, 0, 0, 0.5), inset 0 -10px 14px rgba(0, 0, 0, 0.5); }
+.spin-reel { will-change: transform; }
+.spin-card { height: 84px; display: grid; place-content: center; text-align: center; gap: 2px; color: #fff; }
+.spin-card b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 28px; text-transform: uppercase; }
+.spin-card small { font-weight: 800; font-size: 13px; color: rgba(255, 255, 255, 0.8); }
+.spin-card.survival { background: linear-gradient(180deg, #ff6b6b, #c21e3a); }
+.spin-card.chase { background: linear-gradient(180deg, #ff8fd0, #b8155f); }
+.spin-card.coinrush { background: linear-gradient(180deg, #ffd56a, #e08a00); }
+.spin-card.potato { background: linear-gradient(180deg, #8a6bff, #3a1d9c); }
+.spin-wheel.done .spin-window { animation: btnPulse 0.35s ease-in-out 2; border-color: #ffd23f; }
