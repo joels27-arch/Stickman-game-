@@ -57,6 +57,8 @@ export const MAPS = ["meadow", "farm", "beach"];
 /** A tournament is three races; each placing scores points, most points wins. */
 export const CUP_RACES = ["survival", "sprint", "survival"];
 export const CUP_POINTS = [10, 5, 3, 1];
+/** Rank points are reported by each player's device (shown to friends in the lobby). */
+export const MAX_RP = 999999;
 export const LIVES = 3;
 export const SURVIVAL_LEN = 9000; // metres of course generated; nobody lasts this long
 export const SURVIVAL_LIMIT_MS = 10 * 60 * 1000;
@@ -593,6 +595,7 @@ export function validateAction(state, playerId, action) {
     case "hello": {
       if (!cleanName(action.name)) return { ok: false, error: "Enter a name first" };
       if (!intIn(action.char, 0, CHARACTERS - 1)) return { ok: false, error: "bad character" };
+      if (action.rp !== undefined && !intIn(action.rp, 0, MAX_RP)) return { ok: false, error: "bad rank" };
       if (action.country !== undefined && action.country !== "" && !COUNTRY_CODES.has(action.country)) {
         return { ok: false, error: "bad country" };
       }
@@ -741,6 +744,7 @@ export function applyAction(state0, playerId, action) {
         me.goneAt = null;
         if (state.phase === "lobby") me.name = cleanName(action.name);
         if (action.country !== undefined) me.country = cleanCountry(action.country);
+        if (action.rp !== undefined) me.rp = action.rp;
       } else {
         const used = new Set(ids(state).map((id) => state.players[id].char));
         let char = action.char;
@@ -751,6 +755,7 @@ export function applyAction(state0, playerId, action) {
           name: cleanName(action.name),
           char,
           country: cleanCountry(action.country),
+          rp: action.rp ?? 0,
           slot,
           gone: false,
           goneAt: null,
@@ -994,6 +999,7 @@ export function viewFor(state, playerId) {
         name: p.name,
         char: p.char,
         country: p.country || "",
+        rp: p.rp ?? 0,
         slot: p.slot,
         d: Math.round(p.d * 100) / 100,
         lane: p.lane,

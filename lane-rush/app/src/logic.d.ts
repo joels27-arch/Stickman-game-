@@ -69,6 +69,7 @@ export const HEART_EVERY_M: number;
 export const CUP_RACES: string[];
 export const CUP_POINTS: number[];
 export function cupStandings(state: unknown): string[];
+export const MAX_RP: number;
 export const LIVES: number;
 export const SURVIVAL_LEN: number;
 export const SURVIVAL_LIMIT_MS: number;

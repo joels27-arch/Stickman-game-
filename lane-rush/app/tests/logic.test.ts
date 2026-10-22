@@ -593,4 +593,14 @@ describe("ready check", () => {
     s = act(s, "p0", { type: "start", t: T0 + 6 });
     expect(s.phase).toBe("countdown");
   });
+
+  it("shows each runner's rank points to the lobby and rejects bad ones", () => {
+    let s: S = L.setup([]);
+    s = act(s, "p0", { type: "hello", name: "Ann", char: 0, create: true, rp: 420, t: T0 });
+    s = act(s, "p1", { type: "hello", name: "Bob", char: 1, create: false, t: T0 + 1 });
+    const v = L.viewFor(s, "p1") as any;
+    expect(v.players.find((p: any) => p.id === "p0").rp).toBe(420);
+    expect(v.players.find((p: any) => p.id === "p1").rp).toBe(0);
+    expect(reject(s, "p2", { type: "hello", name: "Cy", char: 2, create: false, rp: -5 })).toBe("bad rank");
+  });
 });

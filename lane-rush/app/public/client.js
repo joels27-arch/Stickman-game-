@@ -493,6 +493,7 @@ function sendHello() {
     name: myName() || "Runner",
     char: preferredChar(),
     country: myCountry(),
+    rp: rank.rp(),
     create: net.creating || wasHost,
   });
   net.helloSent = true;
@@ -562,45 +563,36 @@ function openShop() {
   renderShop();
   showScreen("shop");
 }
+const RARITY = { bronze: "common", silver: "rare", gold: "epic" };
 function renderShop() {
   const grid = $("#shopGrid");
-  grid.replaceChildren();
-  COLLECTION.forEach((r) => {
-    const owned = wallet.has(r.id);
-    const spend = owned ? null : wallet.plan(r.price);
-    const btn = el("button", { class: `btn ${owned ? "blue" : "go"}`, type: "button" });
-    btn.textContent = owned ? "Owned ✓" : spend ? "Buy with medals" : "Not enough medals";
-    btn.disabled = owned || !spend;
-    const bought = () => {
-      sfx.finish();
-      toast(`${r.name} is in your collection! Racing with them is coming soon.`);
-      renderShop();
-    };
-    btn.addEventListener("click", () => wallet.buy(r) && bought());
-    const coinBtn = owned ? null : el("button", { class: "btn gold coin-buy", type: "button" }, el("i", { class: "coin" }), el("span", { text: r.coins.toLocaleString() }));
-    if (coinBtn) {
-      coinBtn.disabled = wallet.coins() < r.coins;
-      coinBtn.addEventListener("click", () => wallet.buyWithCoins(r) && bought());
-    }
-    const price = el("div", { class: "price" }, el("img", { src: MEDAL_IMG[r.price.medal], alt: "" }), el("span", { text: medalText(r.price.medal, r.price.count) }));
-    const paysWith = spend && (spend.gold || spend.silver || (spend.bronze && r.price.medal !== "bronze"))
-      ? MEDALS.filter((k) => spend[k]).map((k) => medalText(k, spend[k])).join(" + ")
-      : "";
-    const note = el("small", { class: "pays", text: owned ? "" : paysWith && paysWith !== medalText(r.price.medal, r.price.count) ? `Pays with ${paysWith}` : "" });
-    grid.append(
-      el(
-        "div",
-        { class: `skin${owned ? " owned" : ""}` },
-        el("span", { class: "soon", text: "Coming soon" }),
+  grid.replaceChildren(
+    ...COLLECTION.map((r) => {
+      const owned = wallet.has(r.id);
+      const bought = () => {
+        sfx.finish();
+        toast(`${r.name} is in your collection! Racing with them is coming soon.`);
+        renderShop();
+      };
+      const kids = [
+        el("span", { class: "rar", text: RARITY[r.price.medal] }),
         el("img", { class: "pic", src: `/assets/sc_${r.id}.webp`, alt: "" }),
-        el("b", { text: r.name, style: `color:${r.color}` }),
-        price,
-        note,
-        coinBtn,
-        btn,
-      ),
-    );
-  });
+        el("b", { text: r.name }),
+      ];
+      if (owned) {
+        kids.push(el("span", { class: "owned-tag", text: "Owned ✓" }));
+      } else {
+        const coinBtn = el("button", { class: "sbuy", type: "button" }, el("i", { class: "coin" }), el("span", { text: r.coins.toLocaleString() }));
+        coinBtn.disabled = wallet.coins() < r.coins;
+        coinBtn.addEventListener("click", () => wallet.buyWithCoins(r) && bought());
+        const medalBtn = el("button", { class: "smedal", type: "button" }, el("span", { text: "or" }), el("img", { src: MEDAL_IMG[r.price.medal], alt: "" }), el("span", { text: `×${r.price.count}` }));
+        medalBtn.disabled = !wallet.plan(r.price);
+        medalBtn.addEventListener("click", () => wallet.buy(r) && bought());
+        kids.push(coinBtn, medalBtn);
+      }
+      return el("div", { class: `skin ${RARITY[r.price.medal]}${owned ? " owned" : ""}` }, ...kids);
+    }),
+  );
   renderWallet();
 }
 for (const b of document.querySelectorAll(".shopBtn")) b.addEventListener("click", openShop);
@@ -860,6 +852,7 @@ function enterLobby() {
 }
 
 function renderLobby(v) {
+  rememberFriends(v);
   $("#lobbyCode").textContent = net.code;
   $("#lobbyCodeStrip").textContent = net.code;
   const slots = $("#slots");
@@ -885,6 +878,7 @@ function renderLobby(v) {
     );
     card.dataset.id = p.id;
     if (p.id === v.host) card.append(el("span", { class: "crown", text: "👑" }));
+    card.append(el("img", { class: "lg", src: rankOf(p.rp ?? 0).img, alt: rankOf(p.rp ?? 0).name, title: rankOf(p.rp ?? 0).name }));
     if (p.id === playerId) card.append(el("span", { class: "you", text: "YOU" }));
     slots.append(card);
   }
@@ -1040,6 +1034,7 @@ function renderLineup(v, { isHost, gm, mp, mode, what }) {
         "div",
         { class: "tag" },
         el("b", { text: `${p.id === v.host ? "👑 " : ""}${withFlag(p.name, p.country)}` }),
+        el("em", { class: "lgtag" }, el("img", { src: rankOf(p.rp ?? 0).img, alt: "" }), el("span", { text: rankOf(p.rp ?? 0).name })),
         el("span", { class: p.gone ? "no" : ok ? "ok" : "no", text: p.gone ? "Away" : p.id === v.host ? "Host" + (isMe ? " · You" : "") : ok ? "Ready" + (isMe ? " · You" : "") : "Not ready" + (isMe ? " · You" : "") }),
       ),
       el("img", { src: `/assets/full_${RUNNERS[p.char]?.file ?? "c0"}.webp`, alt: RUNNERS[p.char]?.name ?? "" }),
@@ -1167,6 +1162,7 @@ function renderResults(v) {
   renderCup(v);
   const reward = $("#resReward");
   reward.replaceChildren();
+  const rpChange = recordRace(v, v.standings.indexOf(playerId) + 1);
   if (mine?.medal) {
     const fresh = wallet.claim(`${v.startAt}:${playerId}`, mine.medal);
     reward.append(el("img", { src: MEDAL_IMG[mine.medal], alt: "" }), el("span", { text: `+1 ${mine.medal} medal` }));
@@ -1179,6 +1175,7 @@ function renderResults(v) {
       text: v.standings.length < MIN_RACERS_FOR_MEDALS ? "Medals are won in races with 2 or more players" : "No medal this time. Top 3 win medals!",
     }));
   }
+  if (rpChange) reward.append(rankChip(rpChange));
   renderWallet();
 
   const isHost = v.host === playerId;
@@ -2905,6 +2902,7 @@ function stepMe(dt) {
     world.burst(laneX(b.lane), 1.0, -b.z, ["#b06bff", "#ff6bd5", "#6be3ff", "#ffffff", "#ffd84a"], 70);
     me.lastBox = { idx: b.idx, kind: grabBox() };
     game.boxesGrabbed = (game.boxesGrabbed ?? 0) + 1;
+    stats.add("boxes", 1);
     challenge("boxes", game.boxesGrabbed);
   }
   // bowling balls rolling back down the track (not your own)
@@ -2995,6 +2993,7 @@ function style(text, points) {
   me.combo += 1;
   me.bestCombo = Math.max(me.bestCombo, me.combo);
   challenge("combo", me.combo);
+  stats.max("bestCombo", me.combo);
   const mult = Math.min(5, 1 + Math.floor(me.combo / 4)); // x2 from 4 in a row, up to x5
   const gained = points * mult;
   me.score += gained;
@@ -3213,6 +3212,7 @@ function renderDaily() {
 const questModal = $("#questModal");
 $("#questPill").addEventListener("click", () => {
   renderDaily();
+  questTab(true);
   questModal.hidden = false;
 });
 $("#questClose").addEventListener("click", () => (questModal.hidden = true));
@@ -3277,6 +3277,7 @@ function claimStreak() {
   if (st.claimedToday) return;
   const r = STREAK_REWARDS[st.next - 1];
   local.setItem("lr:streak", JSON.stringify({ day: st.next, last: todayKey() }));
+  stats.add("days", 1);
   wallet.addCoins(r.coins);
   if (r.medal) {
     const m = wallet.medals();
@@ -3323,6 +3324,292 @@ $("#streakClose").addEventListener("click", () => (streakModal.hidden = true));
 $("#streakClaim").addEventListener("click", claimStreak);
 streakModal.addEventListener("click", (e) => e.target === streakModal && (streakModal.hidden = true));
 renderStreak();
+// ── ranking: rank points (RP) from race places, leagues to climb ──
+
+const LEAGUES = [
+  { id: "bronze", name: "Bronze", min: 0, steps: [0, 100, 200] },
+  { id: "silver", name: "Silver", min: 350, steps: [350, 500, 650] },
+  { id: "gold", name: "Gold", min: 850, steps: [850, 1050, 1250] },
+  { id: "platinum", name: "Platinum", min: 1500, steps: [1500, 1750, 2000] },
+  { id: "diamond", name: "Diamond", min: 2300, steps: [2300, 2600, 2900] },
+  { id: "master", name: "Brain Master", min: 3300, steps: [3300] },
+];
+const ROMAN = ["I", "II", "III"];
+/** RP for each place, by how many raced: winning a full lobby pays most. */
+const RP_TABLE = { 2: [20, -5], 3: [25, 8, -5], 4: [30, 15, 0, -8] };
+function rankOf(rp) {
+  const lg = [...LEAGUES].reverse().find((l) => rp >= l.min) ?? LEAGUES[0];
+  const div = lg.steps.filter((x) => rp >= x).length - 1;
+  const all = LEAGUES.flatMap((l) => l.steps);
+  const from = lg.steps[div];
+  const next = all.find((x) => x > rp) ?? null;
+  return {
+    league: lg,
+    div,
+    from,
+    next,
+    img: `/assets/lg_${lg.id}.webp`,
+    name: lg.steps.length > 1 ? `${lg.name} ${ROMAN[div]}` : lg.name,
+  };
+}
+const rank = {
+  rp() {
+    const n = Number(local.getItem("lr:rp"));
+    return Number.isFinite(n) && n > 0 ? Math.min(999999, Math.floor(n)) : 0;
+  },
+  add(delta) {
+    const before = this.rp();
+    const after = Math.max(0, before + delta);
+    local.setItem("lr:rp", String(after));
+    renderRankPill();
+    return { delta: after - before, before, after };
+  },
+};
+
+// ── lifetime stats (for all-time challenges) ──
+
+const stats = {
+  all() {
+    try {
+      const s = JSON.parse(local.getItem("lr:stats") || "{}");
+      return s && typeof s === "object" ? s : {};
+    } catch {
+      return {};
+    }
+  },
+  get(k) {
+    return Number(this.all()[k]) || 0;
+  },
+  set(k, v) {
+    const s = this.all();
+    s[k] = v;
+    local.setItem("lr:stats", JSON.stringify(s));
+    renderAchDot();
+  },
+  add(k, n) {
+    this.set(k, this.get(k) + n);
+  },
+  max(k, v) {
+    if (v > this.get(k)) this.set(k, v);
+  },
+};
+/** Count a finished race once: RP, races, wins, podiums, distance. Returns the RP change. */
+function recordRace(v, place) {
+  if (!place) return null;
+  let done = [];
+  try { done = JSON.parse(local.getItem("lr:counted") || "[]"); } catch { /* fresh */ }
+  if (!Array.isArray(done)) done = [];
+  const key = `${v.startAt}:${playerId}`;
+  if (done.includes(key)) return null;
+  done.push(key);
+  local.setItem("lr:counted", JSON.stringify(done.slice(-60)));
+  const n = v.standings.length;
+  const mine = v.players.find((p) => p.id === playerId);
+  const d = Math.round(mine?.d ?? 0);
+  stats.add("races", 1);
+  stats.add("dist", d);
+  if (n >= 2 && place === 1) stats.add("wins", 1);
+  if (n >= 2 && place <= 3) stats.add("podiums", 1);
+  if (n < 2 && v.kind === "survival") stats.max("bestRun", d);
+  // solo endless runs pay a little for distance; real points come from racing friends
+  const delta = n >= 2 ? (RP_TABLE[Math.min(n, 4)]?.[place - 1] ?? 0) : v.kind === "survival" ? Math.min(10, Math.floor(d / 300)) : 0;
+  const before = rankOf(rank.rp());
+  const res = rank.add(delta);
+  const after = rankOf(res.after);
+  res.promoted = after.name !== before.name && res.after > res.before ? after : null;
+  if (res.promoted) {
+    setTimeout(() => {
+      banner(`${after.name.toUpperCase()}!`, 2200);
+      toast(`Promoted to ${after.name}!`);
+      sfx.finish();
+    }, 700);
+  }
+  return res;
+}
+function rankChip(res) {
+  const r = rankOf(res.after);
+  const sign = res.delta > 0 ? "+" : "";
+  return el(
+    "span",
+    { class: `rpchip${res.delta < 0 ? " down" : ""}${res.promoted ? " up" : ""}` },
+    el("img", { src: r.img, alt: "" }),
+    el("b", { text: `${sign}${res.delta} RP` }),
+    el("small", { text: res.promoted ? `Promoted to ${r.name}!` : `${r.name} · ${res.after} RP` }),
+  );
+}
+function renderRankPill() {
+  const r = rankOf(rank.rp());
+  $("#rankPillImg").src = r.img;
+  $("#rankPillName").textContent = r.name;
+  $("#rankPillRp").textContent = `${rank.rp()} RP`;
+}
+
+// ── friends: everyone you've been in a room with, and their rank ──
+
+function friendsList() {
+  try {
+    const f = JSON.parse(local.getItem("lr:friends") || "{}");
+    return f && typeof f === "object" ? f : {};
+  } catch {
+    return {};
+  }
+}
+function rememberFriends(v) {
+  const f = friendsList();
+  let changed = false;
+  for (const p of v.players) {
+    if (p.id === playerId || !p.name) continue;
+    const old = f[p.id];
+    if (old && old.rp === (p.rp ?? 0) && old.name === p.name && old.char === p.char) continue;
+    f[p.id] = { name: p.name, char: p.char, rp: p.rp ?? 0, country: p.country || "", seen: Date.now() };
+    changed = true;
+  }
+  if (!changed) return;
+  // keep the 40 most recent
+  const keep = Object.entries(f).sort((a, b) => b[1].seen - a[1].seen).slice(0, 40);
+  local.setItem("lr:friends", JSON.stringify(Object.fromEntries(keep)));
+}
+
+const rankModal = $("#rankModal");
+function renderRank() {
+  const rp = rank.rp();
+  const r = rankOf(rp);
+  $("#rankBadge").src = r.img;
+  $("#rankName").textContent = r.name;
+  $("#rankRp").textContent = `${rp.toLocaleString()} RP`;
+  const pct = r.next === null ? 100 : Math.round(((rp - r.from) / (r.next - r.from)) * 100);
+  $("#rankBar").style.width = `${pct}%`;
+  $("#rankNext").textContent = r.next === null ? "Top league!" : `${rp} / ${r.next} RP`;
+  const rows = [
+    { id: playerId, name: myName() || "You", char: preferredChar(), rp, country: myCountry(), me: true },
+    ...Object.entries(friendsList()).map(([id, f]) => ({ id, ...f })),
+  ].sort((a, b) => b.rp - a.rp);
+  $("#friendList").replaceChildren(
+    ...rows.map((f, i) => {
+      const fr = rankOf(f.rp);
+      return el(
+        "div",
+        { class: `rrow${f.me ? " me" : ""}${i < 3 ? ` top${i + 1}` : ""}` },
+        el("span", { class: "rpos", text: String(i + 1) }),
+        el("img", { class: "rface", src: portrait(f.char ?? 0), alt: "" }),
+        el("span", { class: "rwho" }, el("b", { text: withFlag(f.name, f.country) + (f.me ? " (you)" : "") }), el("small", { text: fr.name })),
+        el("img", { class: "rlg", src: fr.img, alt: "" }),
+        el("b", { class: "rrp", text: f.rp.toLocaleString() }),
+      );
+    }),
+    rows.length < 2 ? el("p", { class: "rempty", text: "Play with friends: everyone you race with shows up here, so you can compare ranks." }) : null,
+  );
+  $("#leagueList").replaceChildren(
+    ...[...LEAGUES].reverse().map((l) => el(
+      "div",
+      { class: `lrow ${l.id}${l.id === r.league.id ? " me" : ""}` },
+      el("img", { src: `/assets/lg_${l.id}.webp`, alt: "" }),
+      el("span", { class: "rwho" }, el("b", { text: l.name }), el("small", { text: `from ${l.min.toLocaleString()} RP${l.steps.length > 1 ? " · I · II · III" : ""}` })),
+      l.id === r.league.id ? el("span", { class: "you-tag", text: "You" }) : null,
+    )),
+    el("p", { class: "rhow", text: "Races with friends: 1st +30 · 2nd +15 · 3rd 0 · 4th −8 RP (4 players). Solo endless runs: up to +10 RP." }),
+  );
+}
+function rankTab(friends) {
+  $("#tabFriends").classList.toggle("on", friends);
+  $("#tabLeagues").classList.toggle("on", !friends);
+  $("#friendList").hidden = !friends;
+  $("#leagueList").hidden = friends;
+}
+$("#rankPill").addEventListener("click", () => {
+  renderRank();
+  rankTab(true);
+  rankModal.hidden = false;
+});
+$("#tabFriends").addEventListener("click", () => rankTab(true));
+$("#tabLeagues").addEventListener("click", () => rankTab(false));
+$("#rankClose").addEventListener("click", () => (rankModal.hidden = true));
+rankModal.addEventListener("click", (e) => e.target === rankModal && (rankModal.hidden = true));
+renderRankPill();
+
+// ── all-time challenges: lifetime goals in three tiers ──
+
+const ACHIEVEMENTS = [
+  { id: "races", stat: "races", text: (n) => `Play ${n} races`, tiers: [10, 50, 200], coins: [100, 300, 1000], icon: "/assets/ui_star.webp" },
+  { id: "wins", stat: "wins", text: (n) => `Win ${n} race${n > 1 ? "s" : ""} with friends`, tiers: [1, 10, 50], coins: [150, 500, 2000], icon: "/assets/medal_gold.png" },
+  { id: "podiums", stat: "podiums", text: (n) => `Finish top 3 with friends ${n} times`, tiers: [5, 25, 100], coins: [100, 400, 1500], icon: "/assets/medal_silver.png" },
+  { id: "dist", stat: "dist", text: (n) => `Run ${n / 1000} km in total`, tiers: [5000, 25000, 100000], coins: [100, 400, 1500], icon: "/assets/ui_shoe.webp" },
+  { id: "bestRun", stat: "bestRun", text: (n) => `Run ${n.toLocaleString()} m in one endless run`, tiers: [1000, 2500, 5000], coins: [150, 500, 2000], icon: "/assets/ui_watch.webp" },
+  { id: "bananas", stat: "bananas", text: (n) => `Throw ${n} bananas`, tiers: [10, 50, 200], coins: [100, 300, 1000], icon: "/assets/pw_banana.png" },
+  { id: "boxes", stat: "boxes", text: (n) => `Grab ${n} mystery boxes`, tiers: [25, 100, 500], coins: [100, 300, 1000], icon: "/assets/ui_box.webp" },
+  { id: "bestCombo", stat: "bestCombo", text: (n) => `Reach a ${n} combo`, tiers: [10, 20, 30], coins: [100, 400, 1500], icon: "/assets/ui_flame.webp" },
+  { id: "days", stat: "days", text: (n) => `Claim the daily reward ${n} times`, tiers: [3, 7, 30], coins: [100, 300, 1500], icon: "/assets/ui_chest.webp" },
+];
+function achClaimed() {
+  try {
+    const a = JSON.parse(local.getItem("lr:ach") || "{}");
+    return a && typeof a === "object" ? a : {};
+  } catch {
+    return {};
+  }
+}
+/** Next tier for an achievement: index, goal, progress, ready to claim? */
+function achState(a) {
+  const tier = Math.min(Number(achClaimed()[a.id]) || 0, a.tiers.length);
+  const have = stats.get(a.stat);
+  const goal = a.tiers[tier] ?? a.tiers[a.tiers.length - 1];
+  return { tier, have, goal, done: tier >= a.tiers.length, ready: tier < a.tiers.length && have >= goal };
+}
+function renderAchDot() {
+  const any = ACHIEVEMENTS.some((a) => achState(a).ready);
+  $("#tabAll .dot").hidden = !any;
+  $("#questPill").classList.toggle("has-claim", any);
+}
+function renderAch() {
+  $("#achList").replaceChildren(
+    ...ACHIEVEMENTS.map((a) => {
+      const st = achState(a);
+      const pct = st.done ? 100 : Math.round((Math.min(st.have, st.goal) / st.goal) * 100);
+      const stars = el("span", { class: "stars" }, ...a.tiers.map((_, i) => el("i", { class: i < st.tier ? "on" : "", text: "★" })));
+      let right;
+      if (st.done) right = el("div", { class: "qreward done-all" }, el("b", { text: "★★★" }));
+      else if (st.ready) {
+        right = el("button", { class: "aclaim", type: "button" }, el("img", { src: "/assets/ui_c1.webp", alt: "" }), el("b", { text: `+${a.coins[st.tier]}` }));
+        right.addEventListener("click", () => {
+          const c = achClaimed();
+          c[a.id] = st.tier + 1;
+          local.setItem("lr:ach", JSON.stringify(c));
+          wallet.addCoins(a.coins[st.tier]);
+          coinRain(right, 14);
+          sfx.finish();
+          toast(`+${a.coins[st.tier]} coins`);
+          renderAch();
+          renderAchDot();
+        });
+      } else right = el("div", { class: "qreward" }, el("img", { src: "/assets/ui_c1.webp", alt: "" }), el("b", { text: `+${a.coins[st.tier]}` }));
+      return el(
+        "div",
+        { class: `quest ach t${st.tier}${st.ready ? " ready" : ""}${st.done ? " done" : ""}` },
+        el("div", { class: "qicon" }, el("img", { src: a.icon, alt: "" })),
+        el(
+          "div",
+          { class: "qmain" },
+          stars,
+          el("b", { text: a.text(st.goal) }),
+          el("div", { class: "qbar" }, el("i", { style: `width:${pct}%` }), el("span", { text: st.done ? "Complete!" : `${Math.min(st.have, st.goal).toLocaleString()} / ${st.goal.toLocaleString()}` })),
+        ),
+        right,
+      );
+    }),
+  );
+}
+function questTab(daily) {
+  $("#tabDaily").classList.toggle("on", daily);
+  $("#tabAll").classList.toggle("on", !daily);
+  $("#questList").hidden = !daily;
+  $("#questHead").hidden = !daily;
+  $("#achList").hidden = daily;
+  if (!daily) renderAch();
+}
+$("#tabDaily").addEventListener("click", () => questTab(true));
+$("#tabAll").addEventListener("click", () => questTab(false));
+renderAchDot();
+
 // first visit of the day: pop the reward open
 setTimeout(() => {
   if (!streakState().claimedToday && game.mode === "home" && countryModal.hidden) openStreak();
@@ -3470,6 +3757,7 @@ function useItem(lane = me.lane, dir = 1) {
   const kind = me.items.shift();
   if (kind === "banana") {
     game.bananasThrown = (game.bananasThrown ?? 0) + 1;
+    stats.add("bananas", 1);
     challenge("bananas", game.bananasThrown);
     const d = dir > 0 ? me.d + BANANA_AHEAD_M : me.d - BANANA_BEHIND_M;
     act({ type: "banana", lane, d: Math.round(d * 10) / 10 });

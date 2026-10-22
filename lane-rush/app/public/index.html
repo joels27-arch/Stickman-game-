@@ -58,6 +58,7 @@
       <div class="home-dock">
         <div class="quest-row">
           <button id="questPill" class="pill quests" type="button"><img class="pi" src="/assets/ui_star.webp" alt="" /><span><b id="questCount">0/3</b><small>Challenges</small></span></button>
+          <button id="rankPill" class="pill rank" type="button"><img class="pi" id="rankPillImg" src="/assets/lg_bronze.webp" alt="" /><span><b id="rankPillName">Bronze I</b><small id="rankPillRp">0 RP</small></span></button>
           <button class="pill shop shopBtn" type="button"><img class="pi" src="/assets/ui_c3.webp" alt="" /><span><b>Shop</b><small>Characters</small></span></button>
         </div>
         <div class="play-card">
@@ -233,8 +234,36 @@
       <div class="gsheet quest-sheet" role="dialog" aria-modal="true" aria-labelledby="questTitle">
         <div class="ribbon pink"><h2 id="questTitle">Daily challenges</h2></div>
         <button id="questClose" class="gclose" type="button" aria-label="Close">✕</button>
-        <div class="gsub"><span class="reset-badge"><img src="/assets/ui_watch.webp" alt="" /><span>New in <b id="questReset">--:--:--</b></span></span><p id="questSub"></p></div>
+        <div class="gtabs" role="tablist">
+          <button id="tabDaily" class="gtab on" type="button">Daily</button>
+          <button id="tabAll" class="gtab" type="button">All-time <i class="dot" hidden></i></button>
+        </div>
+        <div class="gsub" id="questHead"><span class="reset-badge"><img src="/assets/ui_watch.webp" alt="" /><span>New in <b id="questReset">--:--:--</b></span></span><p id="questSub"></p></div>
         <div id="questList" class="quest-list"></div>
+        <div id="achList" class="quest-list" hidden></div>
+      </div>
+    </div>
+
+    <!-- RANKING: leagues + friends -->
+    <div id="rankModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet rank-sheet" role="dialog" aria-modal="true" aria-labelledby="rankTitle">
+        <div class="ribbon teal"><h2 id="rankTitle">Ranking</h2></div>
+        <button id="rankClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div class="rank-hero">
+          <img id="rankBadge" src="/assets/lg_bronze.webp" alt="" />
+          <div class="rank-info">
+            <b id="rankName">Bronze I</b>
+            <span id="rankRp">0 RP</span>
+            <div class="qbar rbar"><i id="rankBar"></i><span id="rankNext"></span></div>
+          </div>
+        </div>
+        <div class="gtabs" role="tablist">
+          <button id="tabFriends" class="gtab on" type="button">Friends</button>
+          <button id="tabLeagues" class="gtab" type="button">Leagues</button>
+        </div>
+        <div id="friendList" class="rank-list"></div>
+        <div id="leagueList" class="rank-list" hidden></div>
       </div>
     </div>
 
@@ -252,18 +281,16 @@
     </div>
 
     <!-- SHOP -->
-    <section id="shop" class="screen">
-      <div class="frame">
-        <header class="strip top"><span class="runner-ico">🛒</span><span>Character shop</span><i>/</i><span>Pay with medals</span></header>
-        <div class="panel shop-panel">
-          <div class="shop-head">
-            <h2 class="title">Character shop</h2>
-            <div class="wallet" title="Your medals"></div>
-          </div>
-          <p class="small center">Collect new characters before they hit the track: they're coming soon as playable runners. All 8 current runners are free.<br />Win medals in races with friends: 1st gold (worth 10) · 2nd silver (worth 5) · 3rd bronze (worth 3). Bigger medals can pay for cheaper prices.</p>
-          <div id="shopGrid" class="shop-grid"></div>
-          <button id="shopBack" class="btn big blue" type="button">← Back</button>
-        </div>
+    <section id="shop" class="screen shop-screen">
+      <div class="grays" aria-hidden="true"></div>
+      <div class="shop-wrap">
+        <header class="shop-top">
+          <button id="shopBack" class="gback" type="button" aria-label="Back">‹</button>
+          <div class="ribbon gold static"><h2>Shop</h2></div>
+        </header>
+        <div class="wallet shop-wallet" title="Your coins and medals"></div>
+        <p class="shop-note">Collect characters now · playable soon · all 8 runners are free</p>
+        <div id="shopGrid" class="shop-grid"></div>
       </div>
     </section>
 
