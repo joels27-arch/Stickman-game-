@@ -1074,9 +1074,10 @@ const world = (() => {
   stripe(0, false);
   stripe(TRACK_LEN, true);
 
-  // finish arch: two striped posts and a banner
+  // finish arch: two striped posts and a banner (stand-in until the Higgsfield gate loads)
+  const fallbackArch = new THREE.Group();
   {
-    const arch = new THREE.Group();
+    const arch = fallbackArch;
     const postMat = new THREE.MeshLambertMaterial({ color: "#ff5a4e" });
     for (const s of [-1, 1]) {
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 5, 12), postMat);
@@ -1162,6 +1163,15 @@ const world = (() => {
   }
 
   // ── asset loading ──
+  function bananaStandIn() {
+    const m = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.1, 8, 16, Math.PI), new THREE.MeshLambertMaterial({ color: "#ffd21f" }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = 0.1;
+    const g = new THREE.Group();
+    g.add(m);
+    return g;
+  }
+
   function loadGLB(url) {
     return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
   }
@@ -1334,7 +1344,10 @@ const world = (() => {
       loadGLB("/assets/tires.glb").then((g) => (assets.props.crate2 = fitProp(g.scene, { width: 1.4, maxHeight: 2.5 }))),
       loadGLB("/assets/barrel.glb").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
       loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
-      loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))),
+      // nice-to-haves: the game still runs with stand-ins if one of these fails
+      loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
+      loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(g.scene, { width: TRACK_W + 1.6, maxHeight: 6.5 }))).catch(() => {}),
+      loadGLB("/assets/gate_start.glb").then((g) => (assets.props.startGate = fitProp(g.scene, { width: TRACK_W + 1.6, maxHeight: 6 }))).catch(() => {}),
       loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
       loadGLB("/assets/tree_oak.glb").then((g) => (assets.props.oak = fitProp(g.scene, { height: 6.5 }))),
       loadGLB("/assets/tree_pine.glb").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
@@ -1537,6 +1550,19 @@ const world = (() => {
       }
     }
     scene.add(scenery);
+
+    // Higgsfield start and finish gates
+    if (P.startGate) {
+      const g = P.startGate.clone();
+      g.position.set(0, 0, 1.2);
+      scene.add(g);
+    }
+    if (P.finishGate) {
+      const g = P.finishGate.clone();
+      g.position.set(0, 0, -TRACK_LEN);
+      finishGroup.add(g);
+      fallbackArch.visible = false;
+    }
 
     // 3D clouds drifting in the sky; the group follows the camera
     for (let i = 0; i < 16; i++) {
