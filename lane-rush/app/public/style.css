@@ -440,3 +440,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 @media (prefers-reduced-motion: reduce) {
   .countdown.pop, .res-reward img { animation: none; }
 }
+
+/* the lobby tip is information, not an error */
+#lobbyMsg { color: var(--muted); font-weight: 600; }
