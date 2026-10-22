@@ -1405,8 +1405,9 @@ const world = (() => {
       loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
       // nice-to-haves: the game still runs with stand-ins if one of these fails
       loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
-      loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W + 1.6, maxHeight: 6.5 }))).catch(() => {}),
-      loadGLB("/assets/gate_start.glb").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W + 1.6, maxHeight: 6 }))).catch(() => {}),
+      // gates are wide enough that their pillars stand outside the fences
+      loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8.5 }))).catch(() => {}),
+      loadGLB("/assets/gate_start.glb").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8 }))).catch(() => {}),
       loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
       loadGLB("/assets/tree_oak.glb").then((g) => (assets.props.oak = fitProp(g.scene, { height: 6.5 }))),
       loadGLB("/assets/tree_pine.glb").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
