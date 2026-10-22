@@ -98,7 +98,7 @@ export function runSpeed(kind, s) {
  * You hold one power-up at a time and use it when you want (boxes are
  * ignored while you hold or use one). Zaps and bananas go through the server.
  */
-export const POWERS = ["shield", "rocket", "ghost", "lightning", "banana", "bowling", "freeze"];
+export const POWERS = ["shield", "rocket", "lightning", "banana", "bowling", "freeze", "glue", "fake", "boxing", "brainwave", "thunder", "swap"];
 
 /**
  * Mystery-box odds, in percent. Each item has a chance for the leader and a
@@ -107,27 +107,36 @@ export const POWERS = ["shield", "rocket", "ghost", "lightning", "banana", "bowl
  * runners at the back get the big catch-up items. Each column adds up to 100.
  *
  *              leader  last
- *   shield       30      5
- *   banana       30     10
- *   ghost        15     10
- *   bowling      20      5    (rolls back: needs someone behind you)
- *   freeze        5     25
- *   rocket        0     25
- *   lightning     0     20    (hits runners ahead: needs someone ahead)
+ *   shield       25      5
+ *   banana       25      5
+ *   bowling      15      5    (rolls back: needs someone behind you)
+ *   glue         15      0    (dropped behind you)
+ *   fake         15      5    (a fake mystery box, dropped behind you)
+ *   boxing        5      5    (punches whoever is right next to you)
+ *   freeze        0     15
+ *   rocket        0     20
+ *   lightning     0     10    (hits runners ahead: needs someone ahead)
+ *   brainwave     0     10    (flips controls of everyone ahead)
+ *   thunder       0     10    (a storm cloud on the leader; pass it on by touching)
+ *   swap          0     10    (swap places with the runner ahead; back half only)
  *
- * Alone there's nobody to attack, so it's shield 30 · banana 25 · ghost 25 ·
- * rocket 20.
+ * Alone there's nobody to attack, so it's shield 35 · rocket 35 · banana 30.
  */
 const ODDS = {
-  shield: [30, 5],
-  banana: [30, 10],
-  ghost: [15, 10],
-  bowling: [20, 5],
-  freeze: [5, 25],
-  rocket: [0, 25],
-  lightning: [0, 20],
+  shield: [25, 5],
+  banana: [25, 5],
+  bowling: [15, 5],
+  glue: [15, 0],
+  fake: [15, 5],
+  boxing: [5, 5],
+  freeze: [0, 15],
+  rocket: [0, 20],
+  lightning: [0, 10],
+  brainwave: [0, 10],
+  thunder: [0, 10],
+  swap: [0, 10],
 };
-const SOLO_ODDS = { shield: 30, banana: 25, ghost: 25, rocket: 20 };
+const SOLO_ODDS = { shield: 35, rocket: 35, banana: 30 };
 /** How far behind the leader (metres) counts as "as far back as it gets". */
 const GAP_FULL_M = 80;
 
@@ -159,8 +168,9 @@ export function powerOdds({ rank, alive, gapToLeader = 0, last = "" }) {
     const t = standingFor(rank, alive, gapToLeader);
     w = {};
     for (const [k, [lead, back]] of Object.entries(ODDS)) w[k] = lead + (back - lead) * t;
-    if (rank <= 1) w.lightning = 0;
-    if (rank >= alive) w.bowling = 0;
+    if (rank <= 1) w.lightning = w.brainwave = w.thunder = w.swap = 0;
+    if (t < 0.5) w.swap = 0;
+    if (rank >= alive) w.bowling = w.glue = w.fake = 0;
   }
   if (last && w[last] !== undefined) w[last] = 0;
   const total = Object.values(w).reduce((a, b) => a + b, 0);
@@ -181,9 +191,15 @@ export function pickPower(odds, roll) {
 }
 
 /** The power-up everyone starts a race with: defensive or neutral, same odds for all. */
-export const START_POWERS = ["shield", "banana", "ghost"];
+export const START_POWERS = ["shield", "banana", "fake"];
 /** Powers relayed to everyone through the server as a "zap" (an area effect). */
-export const ZAP_KINDS = ["lightning", "freeze"];
+export const ZAP_KINDS = ["lightning", "freeze", "brainwave"];
+/** Things dropped on the track: a banana trips you, glue slows you (2 lanes, stays a while), a fake box trips you. */
+export const DROP_KINDS = ["banana", "glue", "fake"];
+export const GLUE_MS = 8000; // a glue puddle stays this long
+export const CLOUD_MS = 5000; // a thundercloud strikes after this long…
+export const CLOUD_PASS_M = 1.8; // …unless its holder runs into someone (this close, same lane)
+export const PUNCH_RANGE_M = 10;
 export const BOWL_SPEED = 30; // m/s the ball rolls (faster than anyone runs, either way)
 export const BOWL_RANGE_M = 90; // …and how far before it's gone
 export const BANANA_AHEAD_M = 28; // a thrown banana lands this far in front of you…
@@ -451,7 +467,7 @@ function humans(state) {
 }
 
 function freshRunner(p) {
-  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, emoteAt: null, sc: 0, cb: 0, left: false, item: "" };
+  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, emoteAt: null, sc: 0, cb: 0, left: false, item: "", warp: 0 };
 }
 
 function pickHost(state) {
@@ -564,13 +580,97 @@ function startRace(state, t) {
   state.taken = [];
   state.hitLog = [];
   state.rematch = [];
+  state.cloud = null;
+  state.punches = [];
   for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
+}
+
+// ── the trickier power-ups: mind swap, thundercloud, boxing glove ───────────
+
+function racingNow(p) {
+  return p && !p.left && p.outAt === null && p.finish === null && !p.gone;
+}
+/** Everyone still racing who is ahead of `id`, nearest first. */
+function aheadOf(state, id) {
+  const me = state.players[id];
+  return ids(state)
+    .map((x) => state.players[x])
+    .filter((p) => p.id !== id && racingNow(p) && p.d > me.d)
+    .sort((a, b) => a.d - b.d);
+}
+/** Swap distances with the runner just ahead; both bump their warp so stale positions are ignored. */
+function doSwap(state, id, t) {
+  const me = state.players[id];
+  const other = aheadOf(state, id)[0];
+  if (!other) return;
+  const d = me.d;
+  me.d = other.d;
+  other.d = d;
+  me.warp = (me.warp ?? 0) + 1;
+  other.warp = (other.warp ?? 0) + 1;
+  me.at = t;
+  other.at = t;
+  addHit(state, "swap", id, other.id, t);
+}
+/** A storm cloud over the leader; it strikes after CLOUD_MS unless passed on by touching someone. */
+function startCloud(state, id, t) {
+  const lead = ids(state)
+    .map((x) => state.players[x])
+    .filter((p) => p.id !== id && racingNow(p))
+    .sort((a, b) => b.d - a.d)[0];
+  if (!lead) return;
+  state.cloudSeq = (state.cloudSeq ?? 0) + 1;
+  state.cloud = { id: state.cloudSeq, by: id, holder: lead.id, prev: null, at: t, until: t + CLOUD_MS, passAt: t };
+}
+function stepCloud(state, t) {
+  const c = state.cloud;
+  if (!c) return;
+  const holder = state.players[c.holder];
+  if (!racingNow(holder)) {
+    state.cloud = null;
+    return;
+  }
+  if (t >= c.until) {
+    state.cloud = null;
+    addHit(state, "thunder", c.by, holder.id, t);
+    if (holder.bot) botHit(state, holder, t);
+    else {
+      // the holder's own screen applies the strike (like a zap aimed at one runner)
+      state.zapSeq = (state.zapSeq ?? 0) + 1;
+      state.zaps = [...(state.zaps ?? []), { id: state.zapSeq, by: c.by, d: holder.d, at: t, kind: "thunder", target: holder.id }].slice(-6);
+    }
+    return;
+  }
+  if (t - c.passAt < 700) return;
+  // touching someone in your lane passes it on (not straight back to who gave it to you)
+  const near = ids(state)
+    .map((x) => state.players[x])
+    .find((p) => p.id !== holder.id && racingNow(p) && p.lane === holder.lane && Math.abs(p.d - holder.d) < CLOUD_PASS_M && !(p.id === c.prev && t - c.passAt < 1500));
+  if (near) {
+    c.prev = holder.id;
+    c.holder = near.id;
+    c.passAt = t;
+  }
+}
+/** Knock someone a lane away from you; they stagger for a moment. */
+function doPunch(state, id, targetId, t) {
+  const me = state.players[id];
+  const target = state.players[targetId];
+  let dir = target.lane > me.lane ? 1 : target.lane < me.lane ? -1 : target.lane >= LANES - 1 ? -1 : 1;
+  if (target.lane + dir < 0 || target.lane + dir > LANES - 1) dir = -dir;
+  state.punchSeq = (state.punchSeq ?? 0) + 1;
+  state.punches = [...(state.punches ?? []), { id: state.punchSeq, by: id, target: targetId, dir, at: t }].slice(-6);
+  addHit(state, "boxing", id, targetId, t);
+  if (target.bot && (target.shieldUntil ?? 0) <= t) {
+    target.lane = Math.max(0, Math.min(LANES - 1, target.lane + dir));
+    target.slowUntil = t + 900;
+  }
 }
 
 // ── bots: fill empty spots, run the same course, make mistakes ─────────────
 
 export const BOT_NAMES = ["Turbo Tim", "Zippy", "Bolt Bot", "Speedy Sam", "Rocket Rita", "Dash", "Nitro Nia", "Flash Fred", "Sprinty", "Max Speed"];
-const BOT_ITEMS = ["banana", "lightning", "rocket", "shield", "banana", "freeze"];
+const BOT_ITEMS = ["banana", "lightning", "rocket", "shield", "freeze", "glue", "fake", "brainwave", "thunder", "swap", "boxing"];
 const STUN_MS = 1600; // fall + get up, like a real runner
 const courses = new Map();
 function courseFor(state) {
@@ -621,6 +721,11 @@ function fillBots(state) {
   }
 }
 
+/** The second lane a glue puddle covers. */
+export function glueLane2(lane) {
+  return lane >= LANES - 1 ? lane - 1 : lane + 1;
+}
+
 function freeName(state, start) {
   const taken = new Set(ids(state).map((id) => state.players[id].name));
   for (let k = 0; k < BOT_NAMES.length; k++) {
@@ -665,7 +770,13 @@ function stepBots(state, t) {
       p.lastZap = z.id;
       if (z.by === id) continue;
       if (z.kind === "freeze") p.slowUntil = t + 3000;
-      else if (p.d > z.d && (p.rocketUntil ?? 0) <= t) botHit(state, p, t);
+      else if (z.kind === "brainwave") {
+        // a confused bot wobbles into a random lane and slows down
+        if (p.d > z.d) {
+          p.slowUntil = t + 1500;
+          p.lane = Math.max(0, Math.min(LANES - 1, p.lane + (roll(state.seed, bi, z.id) < 0.5 ? -1 : 1)));
+        }
+      } else if (z.kind === "lightning" && p.d > z.d && (p.rocketUntil ?? 0) <= t) botHit(state, p, t);
     }
     if (p.outAt !== null) return;
     let v = 0;
@@ -724,9 +835,15 @@ function stepBots(state, t) {
       p.itemAt = t;
     });
     for (const b of state.bananas ?? []) {
-      if (b.by === id || b.lane !== p.lane || b.d <= d0 - 0.5 || b.d > d1 + 0.5) continue;
+      if (b.d <= d0 - 0.5 || b.d > d1 + 0.5) continue;
+      if (b.kind === "glue") {
+        // glue covers its lane and the next one
+        if (p.lane === b.lane || p.lane === glueLane2(b.lane)) p.slowUntil = Math.max(p.slowUntil ?? 0, t + 1500);
+        continue;
+      }
+      if (b.by === id || b.lane !== p.lane) continue;
       state.bananas = state.bananas.filter((x) => x.id !== b.id);
-      addHit(state, "banana", b.by, id, t);
+      addHit(state, b.kind ?? "banana", b.by, id, t);
       botHit(state, p, t);
       break;
     }
@@ -741,11 +858,26 @@ function stepBots(state, t) {
     // use the item after a moment's thought
     if (p.item && t - (p.itemAt ?? 0) > 1500 + roll(state.seed, bi, t / 1000) * 2500 && (p.stunUntil ?? 0) <= t) {
       const ahead = runners.filter((o) => o.id !== id && !o.left && o.outAt === null && o.d > p.d);
-      if (p.item === "banana") {
+      if (p.item === "banana" || p.item === "glue" || p.item === "fake") {
         state.bananaSeq = (state.bananaSeq ?? 0) + 1;
-        state.bananas = [...(state.bananas ?? []), { id: state.bananaSeq, by: id, lane: p.lane, d: Math.round((d1 - BANANA_BEHIND_M) * 10) / 10, at: t }].slice(-16);
+        state.bananas = [...(state.bananas ?? []), { id: state.bananaSeq, by: id, lane: p.lane, d: Math.round((d1 - BANANA_BEHIND_M) * 10) / 10, at: t, kind: p.item }].slice(-16);
         p.item = "";
-      } else if (p.item === "lightning" || p.item === "freeze") {
+      } else if (p.item === "swap" || p.item === "thunder") {
+        if (ahead.length && !(p.item === "thunder" && state.cloud)) {
+          p.d = d1;
+          if (p.item === "swap") doSwap(state, id, t);
+          else startCloud(state, id, t);
+          p.item = "";
+          p.at = t;
+          return;
+        }
+      } else if (p.item === "boxing") {
+        const near = runners.find((o) => o.id !== id && racingNow(o) && Math.abs(o.d - d1) < PUNCH_RANGE_M && Math.abs(o.lane - p.lane) <= 1);
+        if (near) {
+          doPunch(state, id, near.id, t);
+          p.item = "";
+        }
+      } else if (p.item === "lightning" || p.item === "freeze" || p.item === "brainwave") {
         if (ahead.length) {
           state.zapSeq = (state.zapSeq ?? 0) + 1;
           state.zaps = [...(state.zaps ?? []), { id: state.zapSeq, by: id, d: d1, at: t, kind: p.item }].slice(-6);
@@ -878,6 +1010,7 @@ export function validateAction(state, playerId, action) {
       if (action.v !== undefined && !(num(action.v) && action.v >= 0 && action.v <= 60)) return { ok: false, error: "bad speed" };
       if (action.sc !== undefined && !intIn(action.sc, 0, 10_000_000)) return { ok: false, error: "bad score" };
       if (action.cb !== undefined && !intIn(action.cb, 0, 9999)) return { ok: false, error: "bad combo" };
+      if (action.w !== undefined && !intIn(action.w, 0, 9999)) return { ok: false, error: "bad warp" };
       return { ok: true };
     }
     case "zap": {
@@ -903,9 +1036,26 @@ export function validateAction(state, playerId, action) {
       if (!me) return { ok: false, error: "join first" };
       if (state.phase !== "race" || me.finish !== null || me.left || me.outAt !== null) return { ok: false, error: "not racing" };
       if (!intIn(action.lane, 0, LANES - 1) || !num(action.d)) return { ok: false, error: "bad banana" };
+      if (action.kind !== undefined && !DROP_KINDS.includes(action.kind)) return { ok: false, error: "bad banana" };
       if (action.d < me.d - BANANA_BEHIND_M - 2 * POS_SLACK_M || action.d > me.d + BANANA_AHEAD_M + 2 * POS_SLACK_M) return { ok: false, error: "bad banana" };
       const t = num(action.t) ? action.t : state.now;
       if (me.bananaAt !== null && t - me.bananaAt < BANANA_COOLDOWN_MS) return { ok: false, error: "too soon" };
+      return { ok: true };
+    }
+    case "swap":
+    case "thunder": {
+      if (!me) return { ok: false, error: "join first" };
+      if (state.phase !== "race" || me.finish !== null || me.left || me.outAt !== null) return { ok: false, error: "not racing" };
+      if (action.type === "thunder" && state.cloud) return { ok: false, error: "a cloud is already out" };
+      if (!aheadOf(state, playerId).length) return { ok: false, error: "nobody ahead" };
+      return { ok: true };
+    }
+    case "punch": {
+      if (!me) return { ok: false, error: "join first" };
+      if (state.phase !== "race" || me.finish !== null || me.left || me.outAt !== null) return { ok: false, error: "not racing" };
+      const target = state.players[action.target];
+      if (!target || action.target === playerId || target.left || target.outAt !== null || target.finish !== null) return { ok: false, error: "nobody there" };
+      if (Math.abs(target.d - me.d) > PUNCH_RANGE_M + POS_SLACK_M) return { ok: false, error: "too far" };
       return { ok: true };
     }
     case "emote": {
@@ -1046,7 +1196,8 @@ export function applyAction(state0, playerId, action) {
       }
       const cap = survival ? SURVIVAL_SPEED_CAP : SPEED_CAP;
       const maxD = (cap * elapsed) / 1000 + POS_SLACK_M;
-      me.d = Math.max(me.d, Math.min(action.d, maxD, survival ? SURVIVAL_LEN : TRACK_LEN));
+      // after a mind swap, positions from before the swap are stale
+      if ((action.w ?? 0) === (me.warp ?? 0)) me.d = Math.max(me.d, Math.min(action.d, maxD, survival ? SURVIVAL_LEN : TRACK_LEN));
       me.lane = action.lane;
       me.y = Math.max(0, Math.min(action.y, 5));
       me.act = action.act;
@@ -1087,9 +1238,18 @@ export function applyAction(state0, playerId, action) {
     case "banana": {
       me.bananaAt = t;
       state.bananaSeq = (state.bananaSeq ?? 0) + 1;
-      state.bananas = [...(state.bananas ?? []), { id: state.bananaSeq, by: playerId, lane: action.lane, d: Math.round(action.d * 10) / 10, at: t }].slice(-16);
+      state.bananas = [...(state.bananas ?? []), { id: state.bananaSeq, by: playerId, lane: action.lane, d: Math.round(action.d * 10) / 10, at: t, kind: action.kind ?? "banana" }].slice(-16);
       break;
     }
+    case "swap":
+      doSwap(state, playerId, t);
+      break;
+    case "thunder":
+      startCloud(state, playerId, t);
+      break;
+    case "punch":
+      doPunch(state, playerId, action.target, t);
+      break;
     case "bowl": {
       // a ball rolling from `d` at BOWL_SPEED in `dir` (+1 ahead, -1 back); every client checks it against its own runner
       me.bananaAt = t;
@@ -1109,8 +1269,9 @@ export function applyAction(state0, playerId, action) {
     case "slip": {
       // someone ran onto it: it's gone for everyone, and its thrower gets the credit
       const banana = state.bananas.find((b) => b.id === action.id);
-      state.bananas = state.bananas.filter((b) => b.id !== action.id);
-      if (banana) addHit(state, "banana", banana.by, playerId, t);
+      // glue isn't used up: it slows everyone who runs through it
+      if (banana?.kind !== "glue") state.bananas = state.bananas.filter((b) => b.id !== action.id);
+      if (banana) addHit(state, banana.kind ?? "banana", banana.by, playerId, t);
       break;
     }
     case "bowled": {
@@ -1153,7 +1314,11 @@ export function applyAction(state0, playerId, action) {
         state.phase = "race";
         for (const id of ids(state)) state.players[id].act = "run";
       }
-      if (state.phase === "race") stepBots(state, t);
+      if (state.phase === "race") {
+        stepBots(state, t);
+        stepCloud(state, t);
+        state.bananas = (state.bananas ?? []).filter((b) => b.kind !== "glue" || t - b.at < GLUE_MS);
+      }
       maybeEnd(state, t);
       if (state.phase === "lobby" || state.phase === "results") {
         for (const id of ids(state)) {
@@ -1240,6 +1405,7 @@ export function viewFor(state, playerId) {
         country: p.country || "",
         rp: p.rp ?? 0,
         bot: Boolean(p.bot),
+        warp: p.warp ?? 0,
         slot: p.slot,
         d: Math.round(p.d * 100) / 100,
         lane: p.lane,
@@ -1267,6 +1433,8 @@ export function viewFor(state, playerId) {
     emotes: state.emotes ?? [],
     hits: state.hitLog ?? [],
     rematch: state.rematch ?? [],
+    cloud: state.cloud ?? null,
+    punches: state.punches ?? [],
     botFill: state.botFill !== false,
   };
 }

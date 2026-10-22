@@ -388,7 +388,7 @@ describe("bananas", () => {
     let s = racing();
     s = act(s, "p0", { type: "pos", d: 50, lane: 1, y: 0, act: "run", t: s.startAt + 5000 });
     s = act(s, "p0", { type: "banana", lane: 3, d: 50 + L.BANANA_AHEAD_M, t: s.startAt + 5100 });
-    expect((L.viewFor(s, "p1") as any).bananas).toEqual([{ id: 1, by: "p0", lane: 3, d: 78, at: s.startAt + 5100 }]);
+    expect((L.viewFor(s, "p1") as any).bananas).toEqual([{ id: 1, by: "p0", lane: 3, d: 78, at: s.startAt + 5100, kind: "banana" }]);
     expect(reject(s, "p0", { type: "banana", lane: 2, d: 78, t: s.startAt + 5500 })).toMatch(/soon/);
     s = act(s, "p1", { type: "slip", id: 1 });
     expect(s.bananas).toEqual([]);
@@ -456,9 +456,11 @@ describe("power-up odds", () => {
     const last = L.powerOdds({ rank: 4, alive: 4, gapToLeader: 120 });
     expect(lead.lightning).toBe(0);
     expect(lead.rocket).toBe(0);
-    expect(lead.shield! + lead.banana!).toBe(60);
+    expect(lead.shield! + lead.banana!).toBe(50);
+    expect(lead.swap! + lead.thunder! + lead.brainwave!).toBe(0);
     expect(last.bowling).toBe(0); // nobody behind to roll it at
-    expect(last.rocket! + last.lightning! + last.freeze!).toBeGreaterThan(70);
+    expect(last.glue! + last.fake!).toBe(0);
+    expect(last.rocket! + last.lightning! + last.freeze! + last.brainwave! + last.thunder! + last.swap!).toBeGreaterThan(80);
   });
 
   it("treats a close second more like a leader than someone far behind", () => {
@@ -689,5 +691,66 @@ describe("bots", () => {
     s = race(s, (x) => x.phase === "results");
     s = act(s, "p0", { type: "again", t: s.now + 10 });
     expect(Object.values(s.players).some((p: any) => p.bot)).toBe(false);
+  });
+});
+
+describe("new power-ups", () => {
+  function racing(n: number): S {
+    let s = lobbyOf(n);
+    s = act(s, "p0", { type: "start", bots: false, t: T0 + 50 });
+    return L.applyAction(s, "SYS", { type: "tick", t: s.startAt + 10 });
+  }
+  const at = (s: S, ms: number) => s.startAt + ms;
+
+  it("mind swap trades places with the runner just ahead, and old positions stop counting", () => {
+    let s = racing(3);
+    s = act(s, "p0", { type: "pos", d: 40, lane: 0, y: 0, act: "run", t: at(s, 5000) });
+    s = act(s, "p1", { type: "pos", d: 60, lane: 1, y: 0, act: "run", t: at(s, 5000) });
+    s = act(s, "p2", { type: "pos", d: 50, lane: 2, y: 0, act: "run", t: at(s, 5000) });
+    s = act(s, "p0", { type: "swap", t: at(s, 5100) });
+    expect(s.players.p0.d).toBe(50);
+    expect(s.players.p2.d).toBe(40);
+    // p2's phone hasn't seen the swap yet: its stale 55 m must not undo it
+    s = act(s, "p2", { type: "pos", d: 55, lane: 2, y: 0, act: "run", t: at(s, 5150) });
+    expect(s.players.p2.d).toBe(40);
+    s = act(s, "p2", { type: "pos", d: 41, lane: 2, y: 0, act: "run", w: 1, t: at(s, 5200) });
+    expect(s.players.p2.d).toBe(41);
+    expect(reject(s, "p1", { type: "swap" })).toBe("nobody ahead");
+  });
+
+  it("a thundercloud sits on the leader, passes on contact, and strikes after 5 s", () => {
+    let s = racing(3);
+    s = act(s, "p0", { type: "pos", d: 20, lane: 0, y: 0, act: "run", t: at(s, 3000) });
+    s = act(s, "p1", { type: "pos", d: 50, lane: 1, y: 0, act: "run", t: at(s, 3000) });
+    s = act(s, "p2", { type: "pos", d: 49, lane: 1, y: 0, act: "run", t: at(s, 3000) });
+    s = act(s, "p0", { type: "thunder", t: at(s, 3100) });
+    expect(s.cloud.holder).toBe("p1");
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, 4000) });
+    expect(s.cloud.holder).toBe("p2");
+    s = act(s, "p2", { type: "pos", d: 70, lane: 3, y: 0, act: "run", t: at(s, 5000) });
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, 8200) });
+    expect(s.cloud).toBeNull();
+    expect(s.zaps.at(-1)).toMatchObject({ kind: "thunder", target: "p2", by: "p0" });
+  });
+
+  it("glue covers two lanes, slows instead of tripping, and dries up", () => {
+    let s = racing(2);
+    s = act(s, "p0", { type: "pos", d: 30, lane: 3, y: 0, act: "run", t: at(s, 3000) });
+    s = act(s, "p0", { type: "banana", kind: "glue", lane: 3, d: 25, t: at(s, 3100) });
+    expect(L.glueLane2(3)).toBe(2);
+    s = act(s, "p1", { type: "slip", id: 1, t: at(s, 3500) });
+    expect(s.bananas).toHaveLength(1); // still there for the next runner
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, 3100 + L.GLUE_MS + 10) });
+    expect(s.bananas).toHaveLength(0);
+  });
+
+  it("the boxing glove shoves a nearby runner a lane over", () => {
+    let s = racing(2);
+    s = act(s, "p0", { type: "pos", d: 30, lane: 1, y: 0, act: "run", t: at(s, 3000) });
+    s = act(s, "p1", { type: "pos", d: 33, lane: 2, y: 0, act: "run", t: at(s, 3000) });
+    s = act(s, "p0", { type: "punch", target: "p1", t: at(s, 3100) });
+    expect(s.punches.at(-1)).toMatchObject({ by: "p0", target: "p1", dir: 1 });
+    s = act(s, "p1", { type: "pos", d: 80, lane: 2, y: 0, act: "run", t: at(s, 6000) });
+    expect(reject(s, "p0", { type: "punch", target: "p1" })).toBe("too far");
   });
 });

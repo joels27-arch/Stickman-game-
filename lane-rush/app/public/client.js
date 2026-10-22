@@ -46,6 +46,9 @@ import {
   START_POWERS,
   ROLLER_SPEED,
   ROLLER_TRIGGER_M,
+  glueLane2,
+  PUNCH_RANGE_M,
+  CLOUD_MS,
 } from "/logic.js";
 
 // ── constants ───────────────────────────────────────────────────────────────
@@ -121,7 +124,16 @@ const POWER_INFO = {
   banana: { label: "Banana", hint: "Throw it ahead or drop it behind you" },
   bowling: { label: "Bowling ball", hint: "Roll it ahead or back down a lane" },
   freeze: { label: "Freeze", hint: "Everyone else slows down" },
+  glue: { label: "Glue puddle", hint: "Drop it behind you: sticky over 2 lanes" },
+  fake: { label: "Fake box", hint: "Drop a trap box behind you" },
+  boxing: { label: "Boxing glove", hint: "Punch the runner next to you a lane over" },
+  brainwave: { label: "Brain Wave", hint: "Flips left and right for everyone ahead" },
+  thunder: { label: "Thundercloud", hint: "Storms the leader: pass it on or get zapped" },
+  swap: { label: "Mind Swap", hint: "Swap places with the runner ahead" },
 };
+const WAVE_S = 4; // brain wave: controls flipped this long
+const GLUE_SLOW = 0.45; // speed factor while stuck in glue
+const STAGGER_S = 0.7; // after a punch
 const TOUCH = matchMedia("(pointer: coarse)").matches;
 const BOOST_S = 1.6;
 const LANE_SWITCH_SPEED = 9; // lanes per second
@@ -851,6 +863,7 @@ function onState(msg) {
   net.creating = false; // we are in; never "create" again on reconnect unless host
   for (const p of v.players) remote.ingest(p, v);
   announce(prev, v);
+  applyWarpsAndPunches(v);
 
   if (v.phase === "lobby") {
     if (game.solo && v.host === playerId) {
@@ -2522,21 +2535,64 @@ const world = (() => {
       live.add(b.id);
       let m = bananaMeshes.get(b.id);
       if (!m) {
-        const obj = assets.props.banana.clone();
-        obj.position.set(laneX(b.lane), 3, -b.d);
+        let obj;
+        if (b.kind === "glue") {
+          // a sticky green puddle across two lanes
+          obj = new THREE.Mesh(new THREE.CircleGeometry(1, 28), new THREE.MeshBasicMaterial({ color: 0x5ee05e, transparent: true, opacity: 0.85 }));
+          obj.rotation.x = -Math.PI / 2;
+          obj.scale.set((laneX(1) - laneX(0)) * 1.15, 1.7, 1);
+          obj.position.set((laneX(b.lane) + laneX(glueLane2(b.lane))) / 2, 0.04, -b.d);
+        } else if (b.kind === "fake" && assets.props.box) {
+          // looks just like a real mystery box (a slightly redder glow gives it away to sharp eyes)
+          obj = new THREE.Group();
+          const o = assets.props.box.clone();
+          o.position.y = -0.45;
+          obj.add(o);
+          obj.position.set(laneX(b.lane), 3, -b.d);
+        } else {
+          obj = assets.props.banana.clone();
+          obj.position.set(laneX(b.lane), 3, -b.d);
+        }
         raceGroup.add(obj);
-        m = { obj, born: now };
+        m = { obj, born: now, kind: b.kind };
         bananaMeshes.set(b.id, m);
       }
       const age = (now - m.born) / 1000;
-      m.obj.position.y = Math.max(0.02, 3 * (1 - (age / 0.45) ** 2));
-      m.obj.rotation.y = age < 0.45 ? age * 14 : m.obj.rotation.y;
+      if (m.kind === "glue") {
+        m.obj.material.opacity = 0.85 * Math.min(1, age * 4);
+        continue;
+      }
+      const restY = m.kind === "fake" ? 1.0 : 0.02;
+      m.obj.position.y = Math.max(restY, 3 * (1 - (age / 0.45) ** 2));
+      m.obj.rotation.y = age < 0.45 || m.kind === "fake" ? age * (m.kind === "fake" ? 1.5 : 14) : m.obj.rotation.y;
     }
     for (const [id, m] of bananaMeshes) {
       if (live.has(id)) continue;
       raceGroup.remove(m.obj);
       bananaMeshes.delete(id);
     }
+  }
+
+  // the thundercloud: a dark storm sprite hovering over whoever holds it
+  let cloudSpr = null;
+  function syncCloud(cloud, posOf) {
+    const at = cloud ? posOf(cloud.holder) : null;
+    if (!at) {
+      if (cloudSpr) cloudSpr.visible = false;
+      return;
+    }
+    if (!cloudSpr) {
+      cloudSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex("⛈️"), depthTest: false, transparent: true }));
+      cloudSpr.scale.set(1.6, 1.6, 1);
+      cloudSpr.renderOrder = 12;
+      scene.add(cloudSpr);
+    }
+    cloudSpr.visible = true;
+    const k = performance.now() / 1000;
+    cloudSpr.position.set(at.x, at.y + CHAR_H + 1.3 + Math.sin(k * 5) * 0.08, at.z);
+    // flickers faster as the strike gets close
+    const left = (cloud.until - serverNow()) / 1000;
+    cloudSpr.material.opacity = left < 1.5 && Math.sin(k * 30) > 0 ? 0.55 : 1;
   }
 
   function clearCourse() {
@@ -2641,6 +2697,7 @@ const world = (() => {
     tick,
     setEndless,
     syncBananas,
+    syncCloud,
     syncBowls,
     burst,
     fireworks,
@@ -2803,6 +2860,11 @@ function enterRace(v) {
     // everyone starts each race holding a random power-up
     items: mine?.outAt != null || mine?.finish != null ? [] : [startingItem()],
     frozenT: 0,
+    waveT: 0,
+    glueT: 0,
+    staggerT: 0,
+    warp: mine?.warp ?? 0,
+    lastPunch: Math.max(0, ...(v.punches || []).map((x) => x.id)),
     score: 0,
     combo: 0,
     bestCombo: 0,
@@ -2895,7 +2957,9 @@ function input(kind) {
   if (!canControl()) return;
   if (me.stumbleT > 0) return; // knocked over — wait until you're back up
   if (kind === "left" || kind === "right") {
-    const next = clamp(me.lane + (kind === "left" ? -1 : 1), 0, LANES - 1);
+    // a brain wave flips your controls
+    const dirIn = kind === "left" ? -1 : 1;
+    const next = clamp(me.lane + (me.waveT > 0 ? -dirIn : dirIn), 0, LANES - 1);
     if (next !== me.lane) {
       me.lane = next;
       me.laneAt = performance.now();
@@ -3029,6 +3093,9 @@ function stepMe(dt) {
   me.invulnT = Math.max(0, me.invulnT - dt);
   me.boostT = Math.max(0, me.boostT - dt);
   me.frozenT = Math.max(0, me.frozenT - dt);
+  me.waveT = Math.max(0, (me.waveT ?? 0) - dt);
+  me.glueT = Math.max(0, (me.glueT ?? 0) - dt);
+  me.staggerT = Math.max(0, (me.staggerT ?? 0) - dt);
   if (me.power) {
     me.powerT = Math.max(0, me.powerT - dt);
     if (me.powerT <= 0) endPower();
@@ -3043,6 +3110,8 @@ function stepMe(dt) {
   // everyone speeds up the longer the round lasts (same clock for all)
   let base = runSpeed(game.kind, (serverNow() - v.startAt) / 1000);
   if (me.frozenT > 0) base *= 0.55;
+  if (me.glueT > 0) base *= GLUE_SLOW;
+  if (me.staggerT > 0) base *= 0.6;
   const fast = base + (isSurvival() ? SURVIVAL_BOOST : BOOST_SPEED - BASE_SPEED);
   const rocket = isSurvival() ? base + SURVIVAL_ROCKET : ROCKET_SPEED;
   let target = me.power === "rocket" ? rocket : me.boostT > 0 ? fast : base;
@@ -3143,14 +3212,31 @@ function stepMe(dt) {
     act({ type: "bowled", id: b.id });
     hit("bowling");
   }
-  // bananas on the track (yours too!)
+  // bananas, glue and fake boxes on the track (yours too!)
   for (const b of net.view?.bananas || []) {
+    if (b.kind === "glue") {
+      // a sticky puddle 2 lanes wide and about 3 m long: slows you while you're in it
+      const inLane = Math.abs(me.x - b.lane) < 0.6 || Math.abs(me.x - glueLane2(b.lane)) < 0.6;
+      if (!inLane || me.y > 0.4 || me.power === "rocket" || Math.abs(b.d - me.d) > 1.6) continue;
+      if (me.glueT <= 0) {
+        banner("🟢 STUCK IN GLUE!", 700);
+        sfx.pop();
+        if (!slipped.has(b.id) && b.by !== playerId) act({ type: "slip", id: b.id });
+        slipped.add(b.id);
+      }
+      me.glueT = 0.6;
+      continue;
+    }
     if (untouchable || slipped.has(b.id)) continue;
     if (b.d < prevD - 0.6 || b.d > me.d + 0.6) continue;
-    if (Math.abs(me.x - b.lane) > 0.55 || me.y > 0.5) continue;
+    if (Math.abs(me.x - b.lane) > 0.55 || me.y > (b.kind === "fake" ? 1.6 : 0.5)) continue;
     slipped.add(b.id);
     act({ type: "slip", id: b.id });
-    hit("banana");
+    if (b.kind === "fake") {
+      banner("💥 FAKE BOX!", 900);
+      flash();
+    }
+    hit(b.kind === "fake" ? "fake" : "banana");
   }
   for (const b of course.boosts) {
     if (b.z < prevD - 1 || b.z > me.d + 1) continue;
@@ -3200,6 +3286,7 @@ function hit(kind) {
     zap: "ZAPPED! ⚡",
     banana: "Slipped on a banana! 🍌",
     bowling: "STRIKE! 🎳",
+    fake: "It was a trap! 💥",
   }[kind] || "Ouch!";
   banner(hintText, 900);
 }
@@ -3271,9 +3358,20 @@ function announce(prev, v) {
   for (const h of fresh(v.hits, seen.hits)) {
     const victim = h.victim === playerId ? "You" : nameOf(h.victim);
     const whose = h.by === playerId ? "your" : `${nameOf(h.by)}'s`;
-    feed(h.kind === "banana" ? `🍌 ${victim} slipped on ${whose} banana!` : `🎳 ${victim} got bowled over by ${whose} ball!`);
+    const by = h.by === playerId ? "You" : nameOf(h.by);
+    feed(
+      {
+        banana: `🍌 ${victim} slipped on ${whose} banana!`,
+        bowling: `🎳 ${victim} got bowled over by ${whose} ball!`,
+        glue: `🟢 ${victim} got stuck in ${whose} glue!`,
+        fake: `🎁 ${victim} opened ${whose} fake box!`,
+        swap: `🔄 ${by} swapped places with ${h.victim === playerId ? "you" : nameOf(h.victim)}!`,
+        thunder: `⛈️ ${victim} got struck by ${whose} thundercloud!`,
+        boxing: `🥊 ${by} punched ${h.victim === playerId ? "you" : nameOf(h.victim)}!`,
+      }[h.kind] ?? `${victim} got hit!`,
+    );
     if (h.by === playerId && h.victim !== playerId && game.mode === "race") {
-      style(h.kind === "banana" ? "BANANA HIT!" : "STRIKE!", 50);
+      style({ banana: "BANANA HIT!", bowling: "STRIKE!", fake: "GOTCHA!", thunder: "THUNDER!", boxing: "KNOCKOUT PUNCH!", glue: "STICKY!", swap: "MIND SWAP!" }[h.kind] ?? "HIT!", 50);
       game.kos = (game.kos ?? 0) + 1;
     }
   }
@@ -3999,6 +4097,42 @@ function useItem(lane = me.lane, dir = 1) {
     renderPower();
     return;
   }
+  if (kind === "glue" || kind === "fake") {
+    act({ type: "banana", kind, lane: me.lane, d: Math.round((me.d - BANANA_BEHIND_M) * 10) / 10 });
+    sfx.lane();
+    banner(kind === "glue" ? "🟢 GLUE DROPPED!" : "🎁 TRAP SET!", 800);
+    renderPower();
+    return;
+  }
+  if (kind === "swap" || kind === "thunder" || kind === "boxing") {
+    const v = net.view;
+    const others = (v?.players || []).filter((p) => p.id !== playerId && !p.left && p.outAt == null && p.finish == null);
+    const posOf = (p) => remote.map.get(p.id)?.dispD ?? p.d;
+    let target = null;
+    if (kind === "boxing") {
+      target = others.filter((p) => Math.abs(posOf(p) - me.d) < PUNCH_RANGE_M).sort((a, b) => Math.abs(posOf(a) - me.d) + Math.abs(a.lane - me.lane) - (Math.abs(posOf(b) - me.d) + Math.abs(b.lane - me.lane)))[0];
+    } else target = others.find((p) => posOf(p) > me.d);
+    if (!target || (kind === "thunder" && v?.cloud)) {
+      me.items.unshift(kind); // keep it for when it's useful
+      toast(kind === "boxing" ? "Nobody close enough to punch" : kind === "thunder" && v?.cloud ? "A storm is already out" : "Nobody ahead of you");
+      renderPower();
+      return;
+    }
+    if (kind === "boxing") {
+      act({ type: "punch", target: target.id });
+      banner("🥊 POW!", 700);
+      sfx.hit();
+    } else if (kind === "swap") {
+      act({ type: "swap" });
+      sfx.boost();
+    } else {
+      act({ type: "thunder" });
+      sfx.zap();
+      banner("⛈️ STORM ON THE LEADER!", 900);
+    }
+    renderPower();
+    return;
+  }
   if (kind === "bowling") {
     act({ type: "bowl", lane, d: Math.round(me.d * 10) / 10, dir });
     sfx.roll();
@@ -4032,6 +4166,13 @@ function activatePower(kind) {
     act({ type: "zap", kind: "freeze" });
     sfx.zap();
     banner("❄️ FREEZE! ❄️", 900);
+    renderPower();
+    return;
+  }
+  if (kind === "brainwave") {
+    act({ type: "zap", kind: "brainwave" });
+    sfx.zap();
+    banner("🌀 BRAIN WAVE!", 900);
     renderPower();
     return;
   }
@@ -4070,6 +4211,29 @@ function checkZaps() {
     if (z.id <= me.lastZap) continue;
     me.lastZap = z.id;
     if (z.by === playerId) continue;
+    if (z.kind === "thunder") {
+      if (z.target !== playerId || me.finished || me.out) continue;
+      flash();
+      sfx.zap();
+      banner("⛈️ STRUCK BY THUNDER!", 1100);
+      me.invulnT = 0;
+      if (me.power === "shield") endPower();
+      hit("zap");
+      continue;
+    }
+    if (z.kind === "brainwave") {
+      if (me.finished || me.out || me.d <= z.d) continue;
+      if (me.power === "shield") {
+        endPower();
+        sfx.pop();
+        banner("SHIELD BLOCKED THE BRAIN WAVE", 900);
+        continue;
+      }
+      me.waveT = WAVE_S;
+      sfx.zap();
+      banner("🌀 BRAIN WAVE! LEFT IS RIGHT!", 1300);
+      continue;
+    }
     if (z.kind === "freeze") {
       if (me.finished || me.out) continue;
       if (me.power === "shield") {
@@ -4091,6 +4255,45 @@ function checkZaps() {
     me.invulnT = 0; // lightning gets through the after-hit blink
     hit("zap");
   }
+}
+
+/** Mind swap moved us (our warp went up), or someone punched us. */
+function applyWarpsAndPunches(v) {
+  if (game.mode !== "race" || !v.players) return;
+  const mine = v.players.find((p) => p.id === playerId);
+  if (mine && (mine.warp ?? 0) > (me.warp ?? 0)) {
+    const ahead = mine.d > me.d;
+    me.warp = mine.warp;
+    me.d = mine.d;
+    flash();
+    banner(ahead ? "🔄 SWAPPED AHEAD!" : "🔄 MIND SWAPPED!", 1100);
+    sfx.boost();
+  }
+  for (const pu of v.punches || []) {
+    if (pu.id <= (me.lastPunch ?? 0)) continue;
+    me.lastPunch = pu.id;
+    if (pu.target !== playerId || me.finished || me.out) continue;
+    if (me.power === "shield") {
+      endPower();
+      sfx.pop();
+      banner("SHIELD BLOCKED THE PUNCH", 900);
+      continue;
+    }
+    me.lane = clamp(me.lane + pu.dir, 0, LANES - 1);
+    me.staggerT = STAGGER_S;
+    shake = 0.35;
+    sfx.hit();
+    if (navigator.vibrate) navigator.vibrate(60);
+    banner("🥊 PUNCHED!", 800);
+  }
+}
+/** "⛈️ 3.2 s: run into someone to pass it on!" while the storm is over you. */
+function renderCloudHud() {
+  const c = net.view?.cloud;
+  const box = $("#cloudHud");
+  const mine = c && c.holder === playerId && game.mode === "race";
+  box.hidden = !mine;
+  if (mine) box.textContent = `⛈️ ${Math.max(0, (c.until - serverNow()) / 1000).toFixed(1)} s · bump into someone to pass it on!`;
 }
 
 function frost() {
@@ -4188,6 +4391,7 @@ function sendPos(force = false) {
     v: Math.round(me.speed * 100) / 100,
     sc: me.score,
     cb: me.bestCombo,
+    w: me.warp ?? 0,
   });
 }
 
@@ -4325,6 +4529,11 @@ function frame(now) {
     camera.lookAt(camLook);
     world.cull(back ? fd - 30 : fd);
     world.syncBananas(net.view?.bananas || [], slipped);
+    world.syncCloud(net.view?.cloud, (id) => {
+      const g = id === playerId ? me.runner?.group : remote.map.get(id)?.runner?.group;
+      return g ? g.position : null;
+    });
+    renderCloudHud();
     world.syncBowls(net.view?.bowls || [], serverNow());
     // feel the speed: wider view and speed lines on a rocket or boost
     const zoom = me.power === "rocket" ? 80 : me.boostT > 0 ? 70 : 62;
@@ -4438,7 +4647,7 @@ world
 
 // test hooks for the local dev server only (headless browser checks)
 if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
-  window.__laneRush = { me, hit, grabBox, game, net };
+  window.__laneRush = { me, hit, grabBox, useItem, game, net, remote };
 }
 
 requestAnimationFrame(frame);

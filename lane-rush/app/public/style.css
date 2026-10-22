@@ -1074,3 +1074,5 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .res-reward .nomedal { flex-basis: 100%; font-size: 13px; }
 .res-reward .coinchip img { width: 40px; height: 34px; animation: none; }
 .res-reward .rpchip img { width: 40px; height: 40px; animation: none; }
+.cloud-hud { position: fixed; top: max(120px, calc(env(safe-area-inset-top) + 110px)); left: 50%; transform: translateX(-50%); z-index: 9; padding: 8px 16px; border-radius: 14px; background: rgba(30, 30, 50, 0.85); border: 2px solid #ffd23f; color: #fff; font-weight: 900; font-size: 15px; white-space: nowrap; animation: btnPulse 0.6s ease-in-out infinite; pointer-events: none; }
+.cloud-hud[hidden] { display: none; }
