@@ -6,8 +6,8 @@ cd "$(dirname "$0")/app/public"
 SITE="https://lane-rush-party.higgsfield.app"
 THREE="https://cdn.jsdelivr.net/npm/three@0.160.0"
 mkdir -p assets vendor/jsm/loaders vendor/jsm/utils
-for f in c0.glb c1.glb c2.glb c3.glb hurdle.glb gate.glb crate.glb tree.glb \
-         grass.jpg sky.jpg cover.jpg icon.png p0.png p1.png p2.png p3.png; do
+for f in c0.glb c1b.glb c2.glb c3.glb hurdle.glb gate.glb crate.glb ground.glb tree_oak.glb tree_pine.glb tree_blossom.glb bush.glb rocks.glb fence.glb cloud.glb \
+         grass.jpg sky_pano.jpg cover.jpg icon.png p0.png p1b.png p2.png p3.png; do
   echo "assets/$f"
   curl -fsSL -o "assets/$f" "$SITE/assets/$f"
 done

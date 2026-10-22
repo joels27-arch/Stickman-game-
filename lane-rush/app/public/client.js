@@ -27,7 +27,7 @@ import {
 
 const RUNNERS = [
   { name: "Rex", color: "#ef4a3c", file: "c0" },
-  { name: "Bolt", color: "#2f7df6", file: "c1" },
+  { name: "Bolt", color: "#2f7df6", file: "c1b", pic: "p1b" },
   { name: "Ivy", color: "#2fbf55", file: "c2" },
   { name: "Gizmo", color: "#f5b921", file: "c3" },
 ];
@@ -141,7 +141,7 @@ function toast(text) {
 }
 
 function portrait(i) {
-  return `/assets/p${i}.png`;
+  return `/assets/${RUNNERS[i]?.pic ?? `p${i}`}.png`;
 }
 
 function el(tag, attrs = {}, ...kids) {
@@ -558,51 +558,76 @@ const world = (() => {
   const assets = { chars: [], props: {} };
   let ready = false;
 
-  scene.background = new THREE.Color("#8fd3ff");
-  scene.fog = new THREE.Fog("#cdeeff", 55, 150);
+  // Sky: the Higgsfield panorama wraps around the world on a far cylinder;
+  // above it, a solid colour sampled from the panorama's top edge.
+  scene.background = new THREE.Color("#1f78d1");
+  scene.fog = new THREE.Fog("#bfe9f2", 60, 190);
   scene.add(new THREE.HemisphereLight("#e6f6ff", "#5fae3a", 1.35));
   const sun = new THREE.DirectionalLight("#fff4d6", 1.6);
   sun.position.set(-6, 14, 8);
   scene.add(sun);
 
-  texLoader.load("/assets/sky.jpg", (t) => {
+  const skyGroup = new THREE.Group();
+  scene.add(skyGroup);
+  texLoader.load("/assets/sky_pano.jpg", (t) => {
     t.colorSpace = THREE.SRGBColorSpace;
-    scene.background = t;
+    t.wrapS = THREE.RepeatWrapping;
+    t.repeat.set(2, 1);
+    const R = 300;
+    const H = ((2 * Math.PI * R) / 2) * (t.image.height / t.image.width);
+    const cyl = new THREE.Mesh(
+      new THREE.CylinderGeometry(R, R, H, 64, 1, true),
+      new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, fog: false, depthWrite: false }),
+    );
+    cyl.position.y = H / 2 - 40;
+    cyl.renderOrder = -1;
+    skyGroup.add(cyl);
+    try {
+      const c = document.createElement("canvas");
+      c.width = 16;
+      c.height = 4;
+      c.getContext("2d").drawImage(t.image, 0, 0, t.image.width, 8, 0, 0, 16, 4);
+      const px = c.getContext("2d").getImageData(0, 0, 16, 4).data;
+      let r = 0, g = 0, b = 0;
+      for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; }
+      const n = px.length / 4;
+      scene.background = new THREE.Color().setRGB(r / n / 255, g / n / 255, b / n / 255, THREE.SRGBColorSpace);
+    } catch {
+      /* keep the default top colour */
+    }
   });
 
-  // ground: grass everywhere, four lanes marked with chalk lines
+  // Meadow far below the raised turf track; the track itself is Higgsfield 3D
+  // ground tiles (built once the models load, see buildScenery).
+  const MEADOW_Y = -0.9;
   const grassTex = texLoader.load("/assets/grass.jpg");
   grassTex.colorSpace = THREE.SRGBColorSpace;
   grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
   grassTex.anisotropy = 4;
-  const GROUND_LEN = TRACK_LEN + 260;
-  const groundMat = new THREE.MeshLambertMaterial({ map: grassTex });
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, GROUND_LEN), groundMat);
-  grassTex.repeat.set(90 / 5, GROUND_LEN / 5);
+  const GROUND_LEN = TRACK_LEN + 900;
+  grassTex.repeat.set(700 / 6, GROUND_LEN / 6);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, GROUND_LEN), new THREE.MeshLambertMaterial({ map: grassTex }));
   ground.rotation.x = -Math.PI / 2;
-  ground.position.z = -GROUND_LEN / 2 + 60;
+  ground.position.set(0, MEADOW_Y, -TRACK_LEN / 2);
   scene.add(ground);
 
-  // a slightly lighter, mown track on top of the meadow
+  // flat stand-in for the track until the 3D tiles are loaded
+  const TRACK_W = LANES * LANE_W + 1.6;
   const trackTex = texLoader.load("/assets/grass.jpg");
   trackTex.colorSpace = THREE.SRGBColorSpace;
   trackTex.wrapS = trackTex.wrapT = THREE.RepeatWrapping;
-  trackTex.anisotropy = 4;
-  trackTex.repeat.set((LANES * LANE_W + 1) / 3, GROUND_LEN / 3);
-  const track = new THREE.Mesh(
-    new THREE.PlaneGeometry(LANES * LANE_W + 1, GROUND_LEN),
-    new THREE.MeshLambertMaterial({ map: trackTex, color: "#d9ffb8" }),
-  );
-  track.rotation.x = -Math.PI / 2;
-  track.position.set(0, 0.01, ground.position.z);
-  scene.add(track);
+  trackTex.repeat.set(TRACK_W / 3, GROUND_LEN / 3);
+  const flatTrack = new THREE.Mesh(new THREE.PlaneGeometry(TRACK_W, GROUND_LEN), new THREE.MeshLambertMaterial({ map: trackTex, color: "#d9ffb8" }));
+  flatTrack.rotation.x = -Math.PI / 2;
+  flatTrack.position.set(0, 0, -TRACK_LEN / 2);
+  scene.add(flatTrack);
 
   const chalk = new THREE.MeshBasicMaterial({ color: "#ffffff", fog: true });
   for (let i = 0; i <= LANES; i++) {
     const w = i === 0 || i === LANES ? 0.16 : 0.09;
-    const line = new THREE.Mesh(new THREE.PlaneGeometry(w, GROUND_LEN), chalk);
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(w, TRACK_LEN + 200), chalk);
     line.rotation.x = -Math.PI / 2;
-    line.position.set((i - LANES / 2) * LANE_W, 0.02, ground.position.z);
+    line.position.set((i - LANES / 2) * LANE_W, 0.06, -TRACK_LEN / 2 - 40);
     scene.add(line);
   }
 
@@ -629,7 +654,7 @@ const world = (() => {
       new THREE.MeshBasicMaterial({ map: t }),
     );
     m.rotation.x = -Math.PI / 2;
-    m.position.set(0, 0.03, -z);
+    m.position.set(0, 0.07, -z);
     scene.add(m);
   }
   stripe(0, false);
@@ -752,6 +777,33 @@ const world = (() => {
     return holder;
   }
 
+  /**
+   * The Higgsfield ground slab: scaled to the track's width, with its grassy
+   * top (found by casting rays down onto it) at y = 0 so runners stand on it.
+   */
+  function fitTile(root) {
+    const holder = fitProp(root, { width: TRACK_W });
+    holder.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(holder);
+    const size = box.getSize(new THREE.Vector3());
+    const ray = new THREE.Raycaster();
+    const ys = [];
+    for (const fx of [-0.3, -0.1, 0.1, 0.3]) {
+      for (const fz of [-0.3, 0, 0.3]) {
+        ray.set(new THREE.Vector3(fx * size.x, box.max.y + 1, fz * size.z), new THREE.Vector3(0, -1, 0));
+        const hit = ray.intersectObject(holder, true)[0];
+        if (hit) ys.push(hit.point.y);
+      }
+    }
+    ys.sort((a, b) => a - b);
+    const top = ys.length ? ys[Math.floor(ys.length / 2)] : box.max.y;
+    const tile = new THREE.Group();
+    holder.position.y = -top;
+    tile.add(holder);
+    tile.userData.length = size.z;
+    return tile;
+  }
+
   function stripRootMotion(clip) {
     for (const tr of clip.tracks) {
       if (!/Hips\.position$/.test(tr.name)) continue;
@@ -810,7 +862,14 @@ const world = (() => {
       loadGLB("/assets/hurdle.glb").then((g) => (assets.props.hurdle = fitProp(g.scene, { width: 1.75, maxHeight: 0.75 }))),
       loadGLB("/assets/gate.glb").then((g) => (assets.props.gate = fitProp(g.scene, { width: 1.9, maxHeight: 2.15 }))),
       loadGLB("/assets/crate.glb").then((g) => (assets.props.crate = fitProp(g.scene, { width: 1.55 }))),
-      loadGLB("/assets/tree.glb").then((g) => (assets.props.tree = fitProp(g.scene, { height: 4.2 }))),
+      loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
+      loadGLB("/assets/tree_oak.glb").then((g) => (assets.props.oak = fitProp(g.scene, { height: 6.5 }))),
+      loadGLB("/assets/tree_pine.glb").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
+      loadGLB("/assets/tree_blossom.glb").then((g) => (assets.props.blossom = fitProp(g.scene, { height: 5.4 }))),
+      loadGLB("/assets/bush.glb").then((g) => (assets.props.bush = fitProp(g.scene, { width: 2.4 }))),
+      loadGLB("/assets/rocks.glb").then((g) => (assets.props.rocks = fitProp(g.scene, { width: 2.2 }))),
+      loadGLB("/assets/fence.glb").then((g) => (assets.props.fence = fitProp(g.scene, { width: 3.0, maxHeight: 0.9 }))),
+      loadGLB("/assets/cloud.glb").then((g) => (assets.props.cloud = fitProp(g.scene, { width: 1 }))),
     ];
     let done = 0;
     await Promise.all(jobs.map((j) => j.then(() => onProgress?.(++done / jobs.length))));
@@ -906,24 +965,67 @@ const world = (() => {
   let cullables = []; // {obj, z}
   let scenery = null;
 
+  const clouds = new THREE.Group();
+  scene.add(clouds);
+
   function buildScenery() {
-    if (scenery || !assets.props.tree) return;
+    if (scenery || !assets.props.ground) return;
     scenery = new THREE.Group();
     let s = 12345;
     const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-    for (let z = -40; z < TRACK_LEN + 120; z += 7 + r() * 6) {
+    const P = assets.props;
+    const add = (proto, x, y, z, scale, rotY) => {
+      const o = proto.clone();
+      o.scale.multiplyScalar(scale);
+      o.rotation.y = rotY;
+      o.position.set(x, y, -z);
+      scenery.add(o);
+      cullables.push({ obj: o, z, keep: true, wide: true });
+      return o;
+    };
+
+    // raised turf track made of 3D ground tiles
+    const step = P.ground.userData.length * 0.97;
+    for (let z = -60; z < TRACK_LEN + 160; z += step) add(P.ground, 0, 0, z, 1, 0);
+    flatTrack.visible = false;
+
+    // picket fences along both edges
+    for (let z = -40; z < TRACK_LEN + 120; z += 2.9) {
+      for (const side of [-1, 1]) add(P.fence, side * (TRACK_W / 2 - 0.1), 0, z, 1, Math.PI / 2);
+    }
+
+    // trees, bushes and rocks on the meadow
+    const trees = [P.oak, P.pine, P.blossom];
+    for (let z = -60; z < TRACK_LEN + 160; z += 5 + r() * 5) {
       for (const side of [-1, 1]) {
-        if (r() < 0.25) continue;
-        const t = assets.props.tree.clone();
-        const k = 0.8 + r() * 0.6;
-        t.scale.multiplyScalar(k);
-        t.rotation.y = r() * Math.PI * 2;
-        t.position.set(side * (LANES * LANE_W * 0.5 + 3 + r() * 12), 0, -z);
-        scenery.add(t);
-        cullables.push({ obj: t, z, keep: true });
+        const roll = r();
+        const x = side * (TRACK_W / 2 + 2.5 + r() * 26);
+        if (roll < 0.55) add(trees[Math.floor(r() * 3)], x, MEADOW_Y, z, 0.8 + r() * 0.5, r() * Math.PI * 2);
+        else if (roll < 0.85) add(P.bush, side * (TRACK_W / 2 + 1.6 + r() * 10), MEADOW_Y, z, 0.7 + r() * 0.6, r() * Math.PI * 2);
+        else add(P.rocks, side * (TRACK_W / 2 + 2 + r() * 14), MEADOW_Y, z, 0.6 + r() * 0.8, r() * Math.PI * 2);
       }
     }
     scene.add(scenery);
+
+    // 3D clouds drifting in the sky; the group follows the camera
+    for (let i = 0; i < 16; i++) {
+      const c = P.cloud.clone();
+      c.scale.multiplyScalar(14 + r() * 22);
+      c.position.set((r() - 0.5) * 320, 38 + r() * 40, -40 - r() * 230);
+      c.rotation.y = (r() - 0.5) * 0.6;
+      c.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.fog = false; } });
+      c.userData.drift = 0.6 + r() * 1.2;
+      clouds.add(c);
+    }
+  }
+
+  function tick(camZ, dt) {
+    skyGroup.position.z = camZ;
+    clouds.position.z = camZ;
+    for (const c of clouds.children) {
+      c.position.x += c.userData.drift * dt;
+      if (c.position.x > 170) c.position.x = -170;
+    }
   }
 
   function buildCourseObjects(seed) {
@@ -946,7 +1048,7 @@ const world = (() => {
         new THREE.MeshBasicMaterial({ map: padTex, transparent: true, opacity: 0.95 }),
       );
       pad.rotation.x = -Math.PI / 2;
-      pad.position.set(laneX(b.lane), 0.035, -b.z);
+      pad.position.set(laneX(b.lane), 0.075, -b.z);
       raceGroup.add(pad);
       cullables.push({ obj: pad, z: b.z });
     }
@@ -959,7 +1061,7 @@ const world = (() => {
   }
 
   function cull(d) {
-    for (const c of cullables) c.obj.visible = c.z > d - VIEW_BEHIND && c.z < d + VIEW_AHEAD;
+    for (const c of cullables) c.obj.visible = c.z > d - VIEW_BEHIND && c.z < d + VIEW_AHEAD + (c.wide ? 60 : 0);
   }
 
   // ── lobby showcase: your runner idling in front of the camera ──
@@ -993,6 +1095,7 @@ const world = (() => {
     buildCourseObjects,
     buildScenery,
     cull,
+    tick,
     showcase,
     setShowcase,
     hideShowcase,
@@ -1430,6 +1533,7 @@ function frame(now) {
     world.cull(0);
   }
 
+  world.tick(camera.position.z, dt);
   renderer?.render(scene, camera);
 }
 
