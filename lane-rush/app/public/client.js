@@ -51,14 +51,14 @@ import {
 // ── constants ───────────────────────────────────────────────────────────────
 
 const RUNNERS = [
-  { name: "Rex", color: "#ef4a3c", file: "c0" },
-  { name: "Bolt", color: "#2f7df6", file: "c1b", pic: "p1b" },
-  { name: "Ivy", color: "#2fbf55", file: "c2" },
-  { name: "Gizmo", color: "#f5b921", file: "c3" },
-  { name: "Pip", color: "#e0703a", file: "c4" },
-  { name: "Kiko", color: "#7c4dff", file: "c5" },
-  { name: "Dino", color: "#14b8a6", file: "c6" },
-  { name: "Nova", color: "#8fa3bf", file: "c7" },
+  { name: "Rex", color: "#ef4a3c", file: "c0", tag: "The Viking" },
+  { name: "Bolt", color: "#2f7df6", file: "c1b", pic: "p1b", tag: "Lightning Kid" },
+  { name: "Ivy", color: "#2fbf55", file: "c2", tag: "The Sprinter" },
+  { name: "Gizmo", color: "#f5b921", file: "c3", tag: "Robo Racer" },
+  { name: "Pip", color: "#e0703a", file: "c4", tag: "Pirate Captain" },
+  { name: "Kiko", color: "#7c4dff", file: "c5", tag: "Shadow Ninja" },
+  { name: "Dino", color: "#14b8a6", file: "c6", tag: "Rawr Runner" },
+  { name: "Nova", color: "#8fa3bf", file: "c7", tag: "Space Cadet" },
 ];
 const STARTERS = RUNNERS.length; // every 3D runner is free to play
 
@@ -667,6 +667,56 @@ function requireName() {
   return n;
 }
 
+/**
+ * Character spotlight: your runner big in the middle on a glowing stage, the
+ * previous and next runners greyed out at the sides, arrows to flip through.
+ * `takenBy(i)` names whoever already has runner i (those are skipped).
+ */
+function renderSpotlight(box, cur, { takenBy = () => null, onPick }) {
+  const n = RUNNERS.length;
+  const free = (i) => !takenBy(i) || i === cur;
+  const step = (dir) => {
+    for (let k = 1; k < n; k++) {
+      const i = (cur + dir * k + n * k) % n;
+      if (free(i)) return i;
+    }
+    return cur;
+  };
+  const prev = (cur + n - 1) % n;
+  const next = (cur + 1) % n;
+  const r = RUNNERS[cur];
+  const arrow = (dir, label) => {
+    const b = el("button", { class: `spot-arrow ${dir < 0 ? "l" : "r"}`, type: "button", "aria-label": label, text: dir < 0 ? "‹" : "›" });
+    b.addEventListener("click", () => onPick(step(dir)));
+    return b;
+  };
+  const side = (i, cls) => {
+    const img = el("img", { class: `spot-side ${cls}`, src: portrait(i), alt: "" });
+    img.addEventListener("click", () => free(i) && onPick(i));
+    return img;
+  };
+  box.style.setProperty("--team", r.color);
+  box.replaceChildren(
+    el("div", { class: "spot-floor" }),
+    side(prev, "l"),
+    side(next, "r"),
+    el("img", { class: "spot-hero", src: portrait(cur), alt: r.name }),
+    arrow(-1, "Previous runner"),
+    arrow(1, "Next runner"),
+    el("div", { class: "spot-name" }, el("b", { text: r.name }), el("span", { text: r.tag })),
+    el("div", { class: "spot-dots" }, ...RUNNERS.map((_, i) => el("i", { class: i === cur ? "on" : takenBy(i) ? "taken" : "" }))),
+  );
+  // swipe on phones
+  let sx = null;
+  box.ontouchstart = (e) => (sx = e.touches[0].clientX);
+  box.ontouchend = (e) => {
+    if (sx === null) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    sx = null;
+    if (Math.abs(dx) > 40) onPick(step(dx < 0 ? 1 : -1));
+  };
+}
+
 // Play solo: pick a runner, then a private room starts an endless survival run straight away
 const soloModal = $("#soloModal");
 function renderSoloPicker() {
@@ -696,6 +746,13 @@ function renderSoloPicker() {
       return card;
     }),
   );
+  renderSpotlight($("#soloSpot"), cur, {
+    onPick: (i) => {
+      local.setItem("lr:char", String(i));
+      world.setShowcase(i);
+      renderSoloPicker();
+    },
+  });
   $("#soloGo").replaceChildren(el("span", { class: "flagico", text: "❤️" }), el("span", { text: `Run as ${RUNNERS[cur].name}` }), el("span", { class: "arrow", text: "→" }));
 }
 $("#soloBtn").addEventListener("click", () => {
@@ -819,6 +876,14 @@ function renderLobby(v) {
     picker.append(card);
   });
   if (me) {
+    renderSpotlight($("#lobbySpot"), me.char, {
+      takenBy: (i) => v.players.find((p) => p.char === i && p.id !== playerId)?.name ?? null,
+      onPick: (i) => {
+        if (i === me.char) return;
+        local.setItem("lr:char", String(i));
+        act({ type: "pick", char: i });
+      },
+    });
     local.setItem("lr:char", String(me.char));
     // a runner you don't own (e.g. assigned when yours was taken) is swapped for a free starter
     if (!wallet.owns(me.char)) {
