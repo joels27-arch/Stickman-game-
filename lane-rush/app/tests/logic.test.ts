@@ -511,3 +511,27 @@ describe("rounds get faster, boxes are first come first served", () => {
     for (const c of ["IR", "CO", "PE", "IN"]) expect(codes).toContain(c);
   });
 });
+
+describe("maps", () => {
+  it("lets the host pick the map, and a tournament tours all of them", () => {
+    let s = act(lobbyOf(2), "p0", { type: "map", map: "farm" });
+    expect(reject(s, "p1", { type: "map", map: "beach" })).toMatch(/host/);
+    expect(reject(s, "p0", { type: "map", map: "moon" })).toBeTruthy();
+    let r = act(s, "p0", { type: "start", t: T0 });
+    expect((L.viewFor(r, "p1") as any).raceMap).toBe("farm");
+    s = act(s, "p0", { type: "mode", mode: "tournament" });
+    s = act(s, "p0", { type: "start", t: T0 });
+    const seen = [s.raceMap];
+    for (let race = 2; race <= 3; race++) {
+      s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+      s = act(s, "p1", { type: "pos", d: 10, lane: 1, y: 0, act: "run", hits: 3, t: s.startAt + 1000 });
+      if (s.kind === "sprint") {
+        s = act(s, "p0", { type: "pos", d: L.TRACK_LEN, lane: 0, y: 0, act: "run", t: s.startAt + 60_000 });
+        s = act(s, "p1", { type: "pos", d: L.TRACK_LEN, lane: 1, y: 0, act: "run", t: s.startAt + 61_000 });
+      }
+      s = act(s, "p0", { type: "next", t: s.endAt + 1000 });
+      seen.push(s.raceMap);
+    }
+    expect(seen).toEqual(["farm", "beach", "meadow"]);
+  });
+});

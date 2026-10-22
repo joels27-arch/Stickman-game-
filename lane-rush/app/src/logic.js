@@ -46,6 +46,8 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  * `state.mode` is what the host picked; `state.kind` is the race being run.
  */
 export const GAME_MODES = ["survival", "sprint", "tournament"];
+/** Where you race. The host picks one; a tournament visits them in turn. */
+export const MAPS = ["meadow", "farm", "beach"];
 /** A tournament is three races; each placing scores points, most points wins. */
 export const CUP_RACES = ["survival", "sprint", "survival"];
 export const CUP_POINTS = [10, 5, 3, 1];
@@ -525,6 +527,7 @@ function startRace(state, t) {
   state.round += 1;
   state.seed = ((Math.floor(t) % 2147483647) ^ Math.imul(state.round, 2654435761)) >>> 0;
   state.kind = state.cup ? CUP_RACES[state.cup.race - 1] : state.mode;
+  state.raceMap = state.cup ? MAPS[(MAPS.indexOf(state.map ?? "meadow") + state.cup.race - 1) % MAPS.length] : state.map ?? "meadow";
   state.phase = "countdown";
   state.startAt = t + COUNTDOWN_MS;
   state.endAt = 0;
@@ -552,6 +555,8 @@ export function setup() {
     firstFinishAt: null,
     mode: "survival",
     kind: "survival",
+    map: "meadow",
+    raceMap: "meadow",
     cup: null,
     zaps: [],
     zapSeq: 0,
@@ -596,6 +601,12 @@ export function validateAction(state, playerId, action) {
       if (state.phase !== "lobby") return { ok: false, error: "can only change mode in the lobby" };
       if (state.host !== playerId) return { ok: false, error: "Only the host can pick the mode" };
       if (!GAME_MODES.includes(action.mode)) return { ok: false, error: "bad mode" };
+      return { ok: true };
+    }
+    case "map": {
+      if (state.phase !== "lobby") return { ok: false, error: "can only change map in the lobby" };
+      if (state.host !== playerId) return { ok: false, error: "Only the host can pick the map" };
+      if (!MAPS.includes(action.map)) return { ok: false, error: "bad map" };
       return { ok: true };
     }
     case "start": {
@@ -714,6 +725,9 @@ export function applyAction(state0, playerId, action) {
       break;
     case "mode":
       state.mode = action.mode;
+      break;
+    case "map":
+      state.map = action.map;
       break;
     case "start":
       state.cup = state.mode === "tournament" ? { race: 1, points: {} } : null;
@@ -891,6 +905,8 @@ export function viewFor(state, playerId) {
     firstFinishAt: state.firstFinishAt,
     mode: state.mode ?? "survival",
     kind: state.kind ?? "survival",
+    map: state.map ?? "meadow",
+    raceMap: state.raceMap ?? state.map ?? "meadow",
     cup: state.cup
       ? {
           race: state.cup.race,

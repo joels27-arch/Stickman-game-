@@ -34,6 +34,7 @@ import {
   BANANA_BEHIND_M,
   CUP_RACES,
   CUP_POINTS,
+  MAPS,
   BANANA_AHEAD_M,
   BOWL_SPEED,
   BOWL_RANGE_M,
@@ -89,6 +90,11 @@ const GAME_MODE_INFO = {
   tournament: { label: "Tournament", icon: "🏆", tag: "3 races", text: `Survival, Sprint, Survival. ${CUP_POINTS.slice(0, 3).join(" / ")} points per place. Most points wins.` },
 };
 const KIND_LABEL = { survival: "Survival", sprint: "Sprint" };
+const MAP_INFO = {
+  meadow: { label: "Meadow", text: "Trees, bushes and a picket fence" },
+  farm: { label: "Farm", text: "Wheat fields, barns and windmills" },
+  beach: { label: "Beach", text: "Boardwalk by the sea, palms and huts" },
+};
 const LANE_W = 2.0; // metres between lane centres
 const CHAR_H = 1.55; // runner height in metres
 const JUMP_V = 8.6;
@@ -111,8 +117,8 @@ const POWER_INFO = {
   rocket: { label: "Rocket", hint: "Fly over everything" },
   ghost: { label: "Ghost", hint: "Run through obstacles" },
   lightning: { label: "Lightning", hint: "Everyone ahead falls over" },
-  banana: { label: "Banana", hint: "Throw it into a lane ahead" },
-  bowling: { label: "Bowling ball", hint: "Roll it back at whoever is behind you" },
+  banana: { label: "Banana", hint: "Throw it ahead or drop it behind you" },
+  bowling: { label: "Bowling ball", hint: "Roll it ahead or back down a lane" },
   freeze: { label: "Freeze", hint: "Everyone else slows down" },
 };
 const TOUCH = matchMedia("(pointer: coarse)").matches;
@@ -840,6 +846,23 @@ function renderLobby(v) {
       return b;
     }),
   );
+  const mp = v.map || "meadow";
+  $("#mapPick").replaceChildren(
+    ...MAPS.map((key) => {
+      const info = MAP_INFO[key];
+      const b = el(
+        "button",
+        { class: `map-card${mp === key ? " on" : ""}`, type: "button", style: `--pic:url(/assets/map_${key}.webp)` },
+        el("b", { text: info.label }),
+        el("span", { text: info.text }),
+      );
+      b.disabled = !isHost;
+      b.addEventListener("click", () => mp !== key && act({ type: "map", map: key }));
+      return b;
+    }),
+  );
+  // start fetching the map's 3D props while everyone is still in the lobby
+  for (const key of gm === "tournament" ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
   const what = gm === "tournament" ? "tournament" : gm === "survival" && n < 2 ? "endless run" : `${GAME_MODE_INFO[gm].label} race`;
   const start = $("#startBtn");
   start.replaceChildren(el("span", { class: "flagico", text: GAME_MODE_INFO[gm].icon }), el("span", { text: `Start ${mode} ${what}` }), el("span", { class: "arrow", text: "→" }));
@@ -1320,6 +1343,46 @@ const world = (() => {
     return g;
   }
 
+  /** Farm and beach props load the first time someone picks that map. */
+  const mapLoads = new Map();
+  function ensureMap(map) {
+    if (map === "meadow" || mapReady(map)) return Promise.resolve();
+    if (!mapLoads.has(map)) {
+      const P = assets.props;
+      const jobs =
+        map === "farm"
+          ? [
+              loadGLB("/assets/barn.glb").then((g) => (P.barn = fitProp(g.scene, { height: 7.5 }))),
+              loadGLB("/assets/windmill.glb").then((g) => (P.windmill = fitProp(g.scene, { height: 13 }))),
+              loadGLB("/assets/wheat.glb").then((g) => (P.wheat = fitProp(g.scene, { width: 4.0, maxHeight: 1.7 }))),
+              loadGLB("/assets/tractor.glb").then((g) => (P.tractor = fitProp(g.scene, { width: 3.6 }))),
+              loadGLB("/assets/sunflowers.glb").then((g) => (P.sunflowers = fitProp(g.scene, { height: 2.4 }))),
+              loadGLB("/assets/farm_tile.glb").then((g) => (P.farmTileNext = fitTile(g.scene))),
+            ]
+          : [
+              loadGLB("/assets/palm.glb").then((g) => (P.palm = fitProp(g.scene, { height: 8 }))),
+              loadGLB("/assets/hut.glb").then((g) => (P.hut = fitProp(g.scene, { height: 4.6 }))),
+              loadGLB("/assets/lighthouse.glb").then((g) => (P.lighthouse = fitProp(g.scene, { height: 20 }))),
+              loadGLB("/assets/umbrella.glb").then((g) => (P.umbrella = fitProp(g.scene, { width: 3.2 }))),
+              loadGLB("/assets/board_tile.glb").then((g) => (P.boardTileNext = fitTile(g.scene))),
+            ];
+      // the tile goes in last, so mapReady() only says yes once every prop is there
+      mapLoads.set(
+        map,
+        Promise.all(jobs)
+          .then(() => {
+            if (map === "farm") P.farmTile = P.farmTileNext;
+            else P.boardTile = P.boardTileNext;
+          })
+          .catch((err) => {
+            mapLoads.delete(map);
+            throw err;
+          }),
+      );
+    }
+    return mapLoads.get(map);
+  }
+
   function loadGLB(url) {
     return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
   }
@@ -1662,10 +1725,45 @@ const world = (() => {
   const clouds = new THREE.Group();
   scene.add(clouds);
 
-  function buildScenery() {
-    if (scenery || !assets.props.ground) return;
-    scenery = new THREE.Group();
-    let s = 12345;
+  /**
+   * One scenery set per map, built the first time it's needed. Each map has
+   * its own 3D track tiles, roadside props and ground colour; the start and
+   * finish gates and the clouds are shared.
+   */
+  const mapScenery = {}; // map -> { group, cull: [] }
+  let sceneryCull = [];
+  let activeMap = "";
+  const MAP_GROUND = {
+    meadow: { color: "#ffffff", tex: true },
+    farm: { color: "#e9d68a", tex: true },
+    beach: { color: "#f0dca4", tex: false },
+  };
+  function mapReady(map) {
+    if (map === "farm") return Boolean(assets.props.farmTile);
+    if (map === "beach") return Boolean(assets.props.boardTile);
+    return Boolean(assets.props.ground);
+  }
+  function buildScenery(map = "meadow") {
+    if (!mapReady(map)) map = "meadow";
+    if (!assets.props.ground) return;
+    if (!mapScenery[map]) mapScenery[map] = buildMap(map);
+    for (const [k, m] of Object.entries(mapScenery)) m.group.visible = k === map;
+    scenery = mapScenery[map].group;
+    scenery.position.z = -shift;
+    sceneryCull = mapScenery[map].cull;
+    activeMap = map;
+    const look = MAP_GROUND[map];
+    ground.material.color.set(look.color);
+    ground.material.map = look.tex ? grassTex : null;
+    ground.material.needsUpdate = true;
+    if (!sharedBuilt) buildShared();
+  }
+  let sharedBuilt = false;
+
+  function buildMap(map) {
+    const group = new THREE.Group();
+    const cull = [];
+    let s = 12345 + map.length * 7919;
     const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
     const P = assets.props;
     const add = (proto, x, y, z, scale, rotY) => {
@@ -1673,35 +1771,82 @@ const world = (() => {
       o.scale.multiplyScalar(scale);
       o.rotation.y = rotY;
       o.position.set(x, y, -z);
-      scenery.add(o);
-      cullables.push({ obj: o, z, keep: true, wide: true });
+      group.add(o);
+      cull.push({ obj: o, z, keep: true, wide: true });
       return o;
     };
-
-    // raised turf track made of 3D ground tiles
-    const step = P.ground.userData.length * 0.97;
-    for (let z = -60; z < TRACK_LEN + 160; z += step) add(P.ground, 0, 0, z, 1, 0);
+    const tile = map === "farm" ? P.farmTile : map === "beach" ? P.boardTile : P.ground;
+    const step = tile.userData.length * 0.97;
+    for (let z = -60; z < TRACK_LEN + 160; z += step) add(tile, 0, 0, z, 1, 0);
     flatTrack.visible = false;
-
-    // picket fences along both edges
     for (let z = -40; z < TRACK_LEN + 120; z += 2.9) {
       for (const side of [-1, 1]) add(P.fence, side * (TRACK_W / 2 - 0.1), 0, z, 1, Math.PI / 2);
     }
+    const edge = TRACK_W / 2;
 
-    // trees, bushes and rocks on the meadow
-    const trees = [P.oak, P.pine, P.blossom];
-    for (let z = -60; z < TRACK_LEN + 160; z += 5 + r() * 5) {
-      for (const side of [-1, 1]) {
-        const roll = r();
-        const x = side * (TRACK_W / 2 + 2.5 + r() * 26);
-        if (roll < 0.55) add(trees[Math.floor(r() * 3)], x, MEADOW_Y, z, 0.8 + r() * 0.5, r() * Math.PI * 2);
-        else if (roll < 0.85) add(P.bush, side * (TRACK_W / 2 + 1.6 + r() * 10), MEADOW_Y, z, 0.7 + r() * 0.6, r() * Math.PI * 2);
-        // a bush hugging the fence every few metres keeps the meadow edge lively
-        if (r() < 0.45) add(P.bush, side * (TRACK_W / 2 + 1.0 + r() * 1.5), MEADOW_Y, z + r() * 4, 0.5 + r() * 0.4, r() * Math.PI * 2);
-        else add(P.rocks, side * (TRACK_W / 2 + 2 + r() * 14), MEADOW_Y, z, 0.6 + r() * 0.8, r() * Math.PI * 2);
+    if (map === "meadow") {
+      // trees, bushes and rocks on the meadow
+      const trees = [P.oak, P.pine, P.blossom];
+      for (let z = -60; z < TRACK_LEN + 160; z += 5 + r() * 5) {
+        for (const side of [-1, 1]) {
+          const roll = r();
+          const x = side * (edge + 2.5 + r() * 26);
+          if (roll < 0.55) add(trees[Math.floor(r() * 3)], x, MEADOW_Y, z, 0.8 + r() * 0.5, r() * Math.PI * 2);
+          else if (roll < 0.85) add(P.bush, side * (edge + 1.6 + r() * 10), MEADOW_Y, z, 0.7 + r() * 0.6, r() * Math.PI * 2);
+          // a bush hugging the fence every few metres keeps the meadow edge lively
+          if (r() < 0.45) add(P.bush, side * (edge + 1.0 + r() * 1.5), MEADOW_Y, z + r() * 4, 0.5 + r() * 0.4, r() * Math.PI * 2);
+          else add(P.rocks, side * (edge + 2 + r() * 14), MEADOW_Y, z, 0.6 + r() * 0.8, r() * Math.PI * 2);
+        }
       }
+    } else if (map === "farm") {
+      // wheat right up to the fences, sunflowers along them, a farmyard further out
+      for (let z = -60; z < TRACK_LEN + 160; z += 3.8) {
+        for (const side of [-1, 1]) {
+          for (let k = 0; k < 3; k++) add(P.wheat, side * (edge + 3 + k * 3.8 + r() * 0.6), MEADOW_Y, z + r() * 0.8, 0.95 + r() * 0.2, Math.floor(r() * 4) * (Math.PI / 2));
+          if (r() < 0.35) add(P.sunflowers, side * (edge + 1.0), MEADOW_Y, z + r() * 2, 0.8 + r() * 0.4, r() * Math.PI * 2);
+        }
+      }
+      let side = 1;
+      for (let z = -20; z < TRACK_LEN + 160; z += 34 + r() * 30) {
+        side = -side;
+        const roll = r();
+        if (roll < 0.35) add(P.barn, side * (edge + 22 + r() * 12), MEADOW_Y, z, 1, side > 0 ? -Math.PI / 2 : Math.PI / 2);
+        else if (roll < 0.6) add(P.windmill, side * (edge + 26 + r() * 18), MEADOW_Y, z, 1, r() * Math.PI * 2);
+        else if (roll < 0.8) add(P.tractor, side * (edge + 16 + r() * 6), MEADOW_Y, z, 1, r() * Math.PI * 2);
+        else add(P.oak, side * (edge + 18 + r() * 20), MEADOW_Y, z, 0.9 + r() * 0.4, r() * Math.PI * 2);
+      }
+    } else if (map === "beach") {
+      // the sea on the left, the sand and its huts on the right
+      const sea = new THREE.Mesh(new THREE.PlaneGeometry(500, TRACK_LEN + 1200), new THREE.MeshPhongMaterial({ color: "#21b5e8", emissive: "#0b5d8a", emissiveIntensity: 0.25, shininess: 120, specular: "#ffffff" }));
+      sea.rotation.x = -Math.PI / 2;
+      sea.position.set(-edge - 26 - 250, MEADOW_Y + 0.15, -TRACK_LEN / 2);
+      group.add(sea);
+      const foam = new THREE.Mesh(new THREE.PlaneGeometry(2.2, TRACK_LEN + 1200), new THREE.MeshBasicMaterial({ color: "#eafcff", transparent: true, opacity: 0.85 }));
+      foam.rotation.x = -Math.PI / 2;
+      foam.position.set(-edge - 26, MEADOW_Y + 0.2, -TRACK_LEN / 2);
+      group.add(foam);
+      group.userData.sea = sea;
+      for (let z = -60; z < TRACK_LEN + 160; z += 7 + r() * 7) {
+        // left: palms by the rail, umbrellas on the sand
+        if (r() < 0.7) add(P.palm, -(edge + 2 + r() * 4), MEADOW_Y, z, 0.85 + r() * 0.35, r() * Math.PI * 2);
+        if (r() < 0.5) add(P.umbrella, -(edge + 9 + r() * 12), MEADOW_Y, z + r() * 3, 0.9 + r() * 0.2, r() * Math.PI * 2);
+        // right: palms, huts in a row, the odd rock
+        if (r() < 0.6) add(P.palm, edge + 2 + r() * 6, MEADOW_Y, z, 0.85 + r() * 0.35, r() * Math.PI * 2);
+        if (r() < 0.35) add(P.hut, edge + 14 + r() * 8, MEADOW_Y, z, 1, -Math.PI / 2 + (r() - 0.5) * 0.4);
+        else if (r() < 0.3) add(P.rocks, edge + 10 + r() * 20, MEADOW_Y, z, 0.6 + r() * 0.8, r() * Math.PI * 2);
+      }
+      // lighthouses out on the rocks
+      for (let z = 80; z < TRACK_LEN + 160; z += 260) add(P.lighthouse, -(edge + 55 + r() * 20), MEADOW_Y, z, 1, r() * Math.PI * 2);
     }
-    scene.add(scenery);
+    scene.add(group);
+    return { group, cull };
+  }
+
+  function buildShared() {
+    sharedBuilt = true;
+    const P = assets.props;
+    let s = 4242;
+    const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
 
     // Higgsfield start and finish gates
     if (P.startGate) {
@@ -1937,6 +2082,10 @@ const world = (() => {
       const z = c.keep ? c.z + shift : c.z;
       c.obj.visible = z > d - VIEW_BEHIND && z < d + VIEW_AHEAD + (c.wide ? 60 : 0) && !c.box?.taken;
     }
+    for (const c of sceneryCull) {
+      const z = c.z + shift;
+      c.obj.visible = z > d - VIEW_BEHIND && z < d + VIEW_AHEAD + 60;
+    }
     for (const r of rollers) r.obj.visible = r.z > d - VIEW_BEHIND && r.z < d + VIEW_AHEAD;
   }
 
@@ -1997,6 +2146,11 @@ const world = (() => {
     makeRunner,
     buildCourseObjects,
     buildScenery,
+    ensureMap,
+    mapReady,
+    get activeMap() {
+      return activeMap;
+    },
     cull,
     tick,
     setEndless,
@@ -2094,8 +2248,15 @@ const race = {
 
 function enterRace(v) {
   const needed = v.players.map((p) => p.char);
+  const map = v.raceMap || "meadow";
   if (world.ready && !world.hasChars(needed)) for (const c of needed) world.ensureChar(c).catch(() => {});
-  if (!world.ready || !world.hasChars(needed)) {
+  if (world.ready && !world.mapReady(map)) {
+    world.ensureMap(map).catch(() => {
+      game.mapFailed = true; // race on the meadow instead of waiting forever
+      toast("Couldn't load that map, racing on the meadow");
+    });
+  }
+  if (!world.ready || !world.hasChars(needed) || (!world.mapReady(map) && !game.mapFailed)) {
     // assets still loading — try again on the next state message / frame
     game.pendingRace = true;
     showScreen("race");
@@ -2118,7 +2279,7 @@ function enterRace(v) {
   game.kind = v.kind || "sprint";
   game.len = isSurvival() ? SURVIVAL_LEN : TRACK_LEN;
   world.hideShowcase();
-  world.buildScenery();
+  world.buildScenery(map);
   world.setEndless(isSurvival());
   remote.clear();
   race.course = world.buildCourseObjects(v.seed, game.len);
@@ -2177,7 +2338,7 @@ function enterRace(v) {
   renderHearts(false);
   const tag = $("#raceTag");
   tag.classList.toggle("show", Boolean(v.cup));
-  if (v.cup) tag.textContent = `🏆 Race ${v.cup.race}/${v.cup.races.length} · ${KIND_LABEL[game.kind]}`;
+  if (v.cup) tag.textContent = `🏆 Race ${v.cup.race}/${v.cup.races.length} · ${KIND_LABEL[game.kind]} · ${MAP_INFO[map].label}`;
   const touch = matchMedia("(pointer: coarse)").matches;
   const hint = $("#controlsHint");
   hint.textContent = touch
@@ -2866,7 +3027,7 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
 
-  if (game.pendingRace && world.ready && net.view && (net.view.phase === "countdown" || net.view.phase === "race") && world.hasChars(net.view.players.map((p) => p.char))) {
+  if (game.pendingRace && world.ready && net.view && (net.view.phase === "countdown" || net.view.phase === "race") && world.hasChars(net.view.players.map((p) => p.char)) && world.mapReady(net.view.raceMap || "meadow")) {
     enterRace(net.view);
   }
 
