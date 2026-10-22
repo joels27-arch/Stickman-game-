@@ -663,8 +663,8 @@ export function coinLines(course) {
     const b = rows[i + 1];
     const gap = b.z - a.z;
     if (gap < 9) continue;
-    const open = [0, 1, 2, 3].filter((l) => !a.lanes[l] && !b.lanes[l]);
-    const lanes = open.length ? open : [0, 1, 2, 3].filter((l) => !b.lanes[l]);
+    // only a lane that's clear on both sides, so no crate hides the coins
+    const lanes = [0, 1, 2, 3].filter((l) => !a.lanes[l] && !b.lanes[l]);
     if (!lanes.length) continue;
     const lane = lanes[Math.floor(((a.z * 7.31) % 1) * lanes.length)] ?? lanes[0];
     const n = gap > 16 ? 5 : 3;

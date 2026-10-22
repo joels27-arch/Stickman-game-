@@ -2656,7 +2656,7 @@ const world = (() => {
     if (kind === "coinrush") {
       coinLines(course).forEach((c, i) => {
         const obj = makeCoin(c.v > 1);
-        obj.position.set(laneX(c.lane), 1.0, -c.z);
+        obj.position.set(laneX(c.lane), 1.3, -c.z);
         raceGroup.add(obj);
         const entry = { obj, z: c.z, lane: c.lane, v: c.v, i, got: false };
         coinList.push(entry);
@@ -2715,7 +2715,11 @@ const world = (() => {
     }
     if (modeKind === "coinrush") {
       const k = performance.now() / 1000;
-      for (const c of coinList) if (!c.got && c.obj.visible) c.obj.rotation.y = k * 3 + c.z;
+      for (const c of coinList) {
+        if (c.got || !c.obj.visible) continue;
+        c.obj.rotation.y = k * 3 + c.z;
+        c.obj.position.y = 1.3 + Math.sin(k * 4 + c.z) * 0.12;
+      }
       const live = new Set();
       for (const l of v.loose || []) {
         live.add(l.id);
