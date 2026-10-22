@@ -775,3 +775,4 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .quest.done { opacity: 0.7; }
 .quest.done small { color: #2ec36b; }
 .coin-buy { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.play-card [hidden], .pill [hidden] { display: none !important; }
