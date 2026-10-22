@@ -21,6 +21,7 @@ import {
   BASE_SPEED,
   BOOST_SPEED,
   LANES,
+  COUNTRIES,
 } from "/logic.js";
 
 // ── constants ───────────────────────────────────────────────────────────────
@@ -30,7 +31,16 @@ const RUNNERS = [
   { name: "Bolt", color: "#2f7df6", file: "c1b", pic: "p1b" },
   { name: "Ivy", color: "#2fbf55", file: "c2" },
   { name: "Gizmo", color: "#f5b921", file: "c3" },
+  // shop skins
+  { name: "Pip", color: "#e0703a", file: "c4", price: 100 },
+  { name: "Kiko", color: "#7c4dff", file: "c5", price: 150 },
+  { name: "Dino", color: "#14b8a6", file: "c6", price: 200 },
+  { name: "Nova", color: "#8fa3bf", file: "c7", price: 300 },
 ];
+const STARTERS = 4;
+const COIN_IMG = { gold: "/assets/coin_gold.png", silver: "/assets/coin_silver.png", bronze: "/assets/coin_bronze.png" };
+const flagOf = (code) => (code && code.length === 2 ? String.fromCodePoint(...[...code].map((c) => 127397 + c.charCodeAt(0))) : "");
+const withFlag = (name, code) => (code ? `${flagOf(code)} ${name}` : name);
 const LANE_W = 2.0; // metres between lane centres
 const CHAR_H = 1.55; // runner height in metres
 const JUMP_V = 8.6;
@@ -66,6 +76,51 @@ function store(kind) {
 }
 const local = store("localStorage");
 const session = store("sessionStorage");
+
+// ── wallet: coins and owned skins live on this device ──────────────────────
+const wallet = {
+  coins() {
+    const n = Number(local.getItem("lr:coins"));
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  },
+  owned() {
+    try {
+      const a = JSON.parse(local.getItem("lr:owned") || "[]");
+      return Array.isArray(a) ? a.filter((i) => Number.isInteger(i)) : [];
+    } catch {
+      return [];
+    }
+  },
+  owns(i) {
+    return i < STARTERS || this.owned().includes(i);
+  },
+  add(n) {
+    local.setItem("lr:coins", String(this.coins() + n));
+    renderWallet();
+  },
+  buy(i) {
+    const price = RUNNERS[i]?.price ?? 0;
+    if (this.owns(i) || this.coins() < price) return false;
+    local.setItem("lr:coins", String(this.coins() - price));
+    local.setItem("lr:owned", JSON.stringify([...this.owned(), i]));
+    renderWallet();
+    return true;
+  },
+  /** Credit a race reward once (keyed by the race), so reloads don't pay twice. */
+  claim(key, n) {
+    let done = [];
+    try { done = JSON.parse(local.getItem("lr:claimed") || "[]"); } catch { /* fresh list */ }
+    if (!Array.isArray(done)) done = [];
+    if (done.includes(key)) return false;
+    done.push(key);
+    local.setItem("lr:claimed", JSON.stringify(done.slice(-60)));
+    this.add(n);
+    return true;
+  },
+};
+function renderWallet() {
+  for (const el of document.querySelectorAll(".coinCount")) el.textContent = String(wallet.coins());
+}
 
 function randomId(n, alphabet = "abcdefghijklmnopqrstuvwxyz0123456789") {
   const buf = new Uint32Array(n);
@@ -125,7 +180,7 @@ const sfx = (() => {
 
 // ── UI helpers ──────────────────────────────────────────────────────────────
 
-const screens = { home: $("#home"), lobby: $("#lobby"), results: $("#results") };
+const screens = { home: $("#home"), lobby: $("#lobby"), results: $("#results"), shop: $("#shop") };
 function showScreen(name) {
   for (const [k, el] of Object.entries(screens)) el.classList.toggle("show", k === name);
   $("#hud").classList.toggle("show", name === "race");
@@ -263,6 +318,7 @@ function sendHello() {
     type: "hello",
     name: myName() || "Runner",
     char: preferredChar(),
+    country: myCountry(),
     create: net.creating || wasHost,
   });
   net.helloSent = true;
@@ -271,8 +327,63 @@ function sendHello() {
 
 function preferredChar() {
   const v = Number(local.getItem("lr:char"));
-  return Number.isInteger(v) && v >= 0 && v < 4 ? v : 0;
+  return Number.isInteger(v) && v >= 0 && v < RUNNERS.length && wallet.owns(v) ? v : 0;
 }
+
+function myCountry() {
+  const c = local.getItem("lr:country") || "";
+  return COUNTRIES.some(([code]) => code === c) ? c : "";
+}
+
+// country pickers (home + lobby)
+for (const sel of document.querySelectorAll(".countrySel")) {
+  sel.append(el("option", { value: "", text: "🌍 No country" }));
+  for (const [code, name] of COUNTRIES) sel.append(el("option", { value: code, text: `${flagOf(code)} ${name}` }));
+  sel.value = myCountry();
+  sel.addEventListener("change", () => {
+    local.setItem("lr:country", sel.value);
+    for (const other of document.querySelectorAll(".countrySel")) other.value = sel.value;
+    if (net.view?.joined) act({ type: "country", country: sel.value });
+  });
+}
+
+// ── shop ───────────────────────────────────────────────────────────────────
+let shopReturn = "home";
+function openShop() {
+  shopReturn = game.mode === "lobby" ? "lobby" : game.mode === "results" ? "results" : "home";
+  renderShop();
+  showScreen("shop");
+}
+function renderShop() {
+  const grid = $("#shopGrid");
+  grid.replaceChildren();
+  RUNNERS.forEach((r, i) => {
+    if (i < STARTERS) return;
+    const owned = wallet.owns(i);
+    const can = wallet.coins() >= r.price;
+    const btn = el("button", { class: `btn ${owned ? "blue" : "go"}`, type: "button" });
+    btn.textContent = owned ? "Owned ✓" : can ? `Buy for ${r.price}` : `Need ${r.price - wallet.coins()} more`;
+    btn.disabled = owned || !can;
+    btn.addEventListener("click", () => {
+      if (wallet.buy(i)) {
+        sfx.finish();
+        toast(`${r.name} unlocked! Pick them in the lobby.`);
+        local.setItem("lr:char", String(i));
+        if (net.view?.joined && net.view.phase === "lobby") act({ type: "pick", char: i });
+        renderShop();
+      }
+    });
+    const price = el("div", { class: "price" }, el("img", { src: COIN_IMG.gold, alt: "" }), el("span", { text: String(r.price) }));
+    grid.append(el("div", { class: `skin${owned ? " owned" : ""}` }, el("img", { class: "pic", src: portrait(i), alt: "" }), el("b", { text: r.name, style: `color:${r.color}` }), price, btn));
+  });
+  renderWallet();
+}
+for (const b of document.querySelectorAll(".shopBtn")) b.addEventListener("click", openShop);
+$("#shopBack").addEventListener("click", () => {
+  showScreen(shopReturn);
+  if (shopReturn === "lobby" && net.view) renderLobby(net.view);
+});
+renderWallet();
 
 setInterval(() => {
   if (net.socket?.readyState === WebSocket.OPEN) net.socket.send("__ping");
@@ -418,7 +529,7 @@ function renderLobby(v) {
       "div",
       { class: `slot${p.gone ? " gone" : ""}`, style: `background:${RUNNERS[p.char].color}33` },
       el("img", { src: portrait(p.char), alt: "" }),
-      el("span", { class: "nm", text: p.name }),
+      el("span", { class: "nm", text: withFlag(p.name, p.country) }),
     );
     if (p.id === v.host) s.append(el("span", { class: "crown", text: "👑" }));
     if (p.id === playerId) s.append(el("span", { class: "you", text: "YOU" }));
@@ -431,14 +542,19 @@ function renderLobby(v) {
   RUNNERS.forEach((r, i) => {
     const owner = v.players.find((p) => p.char === i);
     const mine = owner?.id === playerId;
+    const locked = !wallet.owns(i);
+    const sub = locked
+      ? el("small", { class: "lock" }, el("span", { text: "🔒" }), el("img", { src: COIN_IMG.gold, alt: "" }), el("span", { text: String(r.price) }))
+      : el("small", { text: mine ? "You" : owner ? owner.name : "" });
     const card = el(
       "button",
-      { class: `card${mine ? " mine" : ""}${owner && !mine ? " taken" : ""}`, type: "button" },
+      { class: `card${mine ? " mine" : ""}${owner && !mine ? " taken" : ""}${locked ? " locked" : ""}`, type: "button" },
       el("img", { src: portrait(i), alt: "" }),
       el("b", { text: r.name, style: `color:${r.color}` }),
-      el("small", { text: mine ? "You" : owner ? owner.name : "" }),
+      sub,
     );
     card.addEventListener("click", () => {
+      if (locked) return openShop();
       if (owner && !mine) return toast(`${r.name} is taken by ${owner.name}`);
       if (!mine) {
         local.setItem("lr:char", String(i));
@@ -447,7 +563,15 @@ function renderLobby(v) {
     });
     picker.append(card);
   });
-  if (me) local.setItem("lr:char", String(me.char));
+  if (me) {
+    local.setItem("lr:char", String(me.char));
+    // a runner you don't own (e.g. assigned when yours was taken) is swapped for a free starter
+    if (!wallet.owns(me.char)) {
+      const free = [0, 1, 2, 3].find((c) => !v.players.some((p) => p.char === c));
+      if (free !== undefined) act({ type: "pick", char: free });
+    }
+    if ((me.country || "") !== myCountry()) act({ type: "country", country: myCountry() });
+  }
 
   const isHost = v.host === playerId;
   const n = v.players.filter((p) => !p.gone).length;
@@ -456,6 +580,8 @@ function renderLobby(v) {
   $("#startBtn").textContent = n >= 2 ? `Start race (${n}/4)` : "Start solo practice";
   $("#lobbyMsg").textContent = isHost && n < 2 ? "Share the code — friends can join until you press start." : "";
   world.setShowcase(me?.char ?? 0);
+  if (world.ready) for (const p of v.players) world.ensureChar(p.char).catch(() => {});
+  renderWallet();
 }
 
 $("#startBtn").addEventListener("click", () => {
@@ -493,30 +619,53 @@ function showResults(v) {
   renderResults(v);
 }
 
+const PLACE = ["1st", "2nd", "3rd", "4th"];
+const COIN_NAME = { gold: "gold coin", silver: "silver coin", bronze: "bronze coin" };
+
 function renderResults(v) {
   const list = $("#podium");
   list.replaceChildren();
   const byId = new Map(v.players.map((p) => [p.id, p]));
+  const rewards = v.rewards || {};
   v.standings.forEach((id, i) => {
     const p = byId.get(id);
     if (!p) return;
-    const medal = ["🥇", "🥈", "🥉", "4"][i] ?? String(i + 1);
+    const rw = rewards[id];
     const detail = p.left
       ? "left the race"
       : p.finish !== null
         ? `${p.hits} bump${p.hits === 1 ? "" : "s"}`
         : `${Math.round(p.d)} m of ${TRACK_LEN} m`;
+    const earn = rw
+      ? el("span", { class: "earn" }, el("img", { src: COIN_IMG[rw.coin] ?? COIN_IMG.bronze, alt: "" }), el("span", { text: `+${rw.coins}` }))
+      : el("span", { class: "earn", text: "" });
     list.append(
       el(
         "li",
         { class: p.id === playerId ? "me" : "" },
-        el("span", { class: "pl", text: medal }),
+        el("span", { class: `pl p${Math.min(i + 1, 4)}`, text: PLACE[i] ?? `${i + 1}th` }),
         el("img", { src: portrait(p.char), alt: "" }),
-        el("span", { class: "who", text: p.name }, el("small", { text: detail })),
+        el("span", { class: "who", text: withFlag(p.name, p.country) + (p.id === playerId ? " (you)" : "") }, el("small", { text: detail })),
         el("span", { class: "tm", text: p.finish !== null ? fmtTime(p.finish) : "DNF" }),
+        earn,
       ),
     );
   });
+
+  // your place, and your coins (paid once per race)
+  const myPlace = v.standings.indexOf(playerId) + 1;
+  const mine = rewards[playerId];
+  $("#resPlace").innerHTML = myPlace ? `${myPlace}<sup>${ordinal(myPlace)}</sup>` : "–";
+  $("#resTitle").textContent = myPlace === 1 ? "You win!" : myPlace ? `You finished ${PLACE[myPlace - 1] ?? myPlace}` : "Race results";
+  const reward = $("#resReward");
+  reward.replaceChildren();
+  if (mine) {
+    const fresh = wallet.claim(`${v.startAt}:${playerId}`, mine.coins);
+    reward.append(el("img", { src: COIN_IMG[mine.coin] ?? COIN_IMG.bronze, alt: "" }), el("span", { text: `+${mine.coins} coins · ${COIN_NAME[mine.coin] ?? "coin"}` }));
+    if (fresh) sfx.boost();
+  }
+  renderWallet();
+
   const isHost = v.host === playerId;
   $("#againBtn").style.display = isHost ? "" : "none";
   $("#waitHost2").style.display = isHost ? "none" : "block";
@@ -875,9 +1024,22 @@ const world = (() => {
     return { scene: gltf.scene, clips, scale: CHAR_H / h, footY: box.min.y };
   }
 
+  // starters load up front; shop skins load the first time someone uses them
+  const charLoads = new Map();
+  function ensureChar(i) {
+    if (!charLoads.has(i)) {
+      charLoads.set(i, loadChar(i).then((c) => (assets.chars[i] = c)).catch((err) => {
+        charLoads.delete(i);
+        throw err;
+      }));
+    }
+    return charLoads.get(i);
+  }
+  const hasChars = (list) => list.every((i) => assets.chars[i]);
+
   async function load(onProgress) {
     const jobs = [
-      ...[0, 1, 2, 3].map((i) => loadChar(i).then((c) => (assets.chars[i] = c))),
+      ...[0, 1, 2, 3].map((i) => ensureChar(i)),
       loadGLB("/assets/hurdle.glb").then((g) => (assets.props.hurdle = fitProp(g.scene, { width: 1.75, maxHeight: 0.75 }))),
       loadGLB("/assets/gate.glb").then((g) => (assets.props.gate = fitProp(g.scene, { width: 1.9, maxHeight: 2.15 }))),
       loadGLB("/assets/crate.glb").then((g) => (assets.props.crate = fitProp(g.scene, { width: 1.55 }))),
@@ -1094,6 +1256,10 @@ const world = (() => {
   }
   function setShowcase(charIdx) {
     if (!ready) return;
+    if (!assets.chars[charIdx]) {
+      ensureChar(charIdx).then(() => setShowcase(charIdx)).catch(() => {});
+      return;
+    }
     if (show && show.char === charIdx) return;
     if (show) scene.remove(show.r.group);
     const r = makeRunner(charIdx, "", "#fff", true);
@@ -1118,6 +1284,8 @@ const world = (() => {
     buildScenery,
     cull,
     tick,
+    ensureChar,
+    hasChars,
     showcase,
     setShowcase,
     hideShowcase,
@@ -1191,7 +1359,9 @@ const race = {
 };
 
 function enterRace(v) {
-  if (!world.ready) {
+  const needed = v.players.map((p) => p.char);
+  if (world.ready && !world.hasChars(needed)) for (const c of needed) world.ensureChar(c).catch(() => {});
+  if (!world.ready || !world.hasChars(needed)) {
     // assets still loading — try again on the next state message / frame
     game.pendingRace = true;
     showScreen("race");
@@ -1233,7 +1403,7 @@ function enterRace(v) {
     if (p.id === playerId) continue;
     remote.ingest(p, v);
     const r = remote.map.get(p.id);
-    r.runner = world.makeRunner(p.char, p.name, RUNNERS[p.char].color, false);
+    r.runner = world.makeRunner(p.char, withFlag(p.name, p.country), RUNNERS[p.char].color, false);
     r.dispD = p.d;
     r.dispX = laneX(p.lane);
     scene.add(r.runner.group);
@@ -1498,7 +1668,7 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
 
-  if (game.pendingRace && world.ready && net.view && (net.view.phase === "countdown" || net.view.phase === "race")) {
+  if (game.pendingRace && world.ready && net.view && (net.view.phase === "countdown" || net.view.phase === "race") && world.hasChars(net.view.players.map((p) => p.char))) {
     enterRace(net.view);
   }
 

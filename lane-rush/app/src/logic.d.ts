@@ -46,3 +46,7 @@ export const RACE_LIMIT_MS: number;
 export const AFTER_FIRST_MS: number;
 export const LOBBY_GRACE_MS: number;
 export const CHARACTERS: number;
+export const COUNTRIES: [string, string][];
+export const REWARDS: { coin: string; coins: number }[];
+export const DNF_REWARD: { coin: string; coins: number };
+export function rewards(state: unknown): Record<string, { place: number; coin: string; coins: number }>;

@@ -32,7 +32,33 @@ export const COUNTDOWN_MS = 3500;
 export const RACE_LIMIT_MS = 90000; // hard cap on a race
 export const AFTER_FIRST_MS = 15000; // stragglers get this long after the winner
 export const LOBBY_GRACE_MS = 10000; // a dropped lobby player keeps their spot this long
-export const CHARACTERS = 4;
+export const CHARACTERS = 8; // 4 starters + 4 shop skins
+
+/** Countries a runner can cheer for (ISO 3166 alpha-2 + English name). */
+export const COUNTRIES = [
+  ["US", "United States"], ["GB", "United Kingdom"], ["DE", "Germany"], ["FR", "France"],
+  ["IT", "Italy"], ["ES", "Spain"], ["PT", "Portugal"], ["NL", "Netherlands"],
+  ["BE", "Belgium"], ["CH", "Switzerland"], ["AT", "Austria"], ["SE", "Sweden"],
+  ["NO", "Norway"], ["DK", "Denmark"], ["PL", "Poland"], ["TR", "Türkiye"],
+  ["GR", "Greece"], ["UA", "Ukraine"], ["BR", "Brazil"], ["AR", "Argentina"],
+  ["MX", "Mexico"], ["CA", "Canada"], ["JP", "Japan"], ["KR", "South Korea"],
+  ["CN", "China"], ["IN", "India"], ["AU", "Australia"], ["ZA", "South Africa"],
+  ["NG", "Nigeria"], ["EG", "Egypt"],
+];
+const COUNTRY_CODES = new Set(COUNTRIES.map(([c]) => c));
+
+/**
+ * Coins for a finishing place: 1st a gold coin, 2nd silver, 3rd and 4th
+ * bronze. Runners who didn't finish still get a little something; runners
+ * who left get nothing.
+ */
+export const REWARDS = [
+  { coin: "gold", coins: 50 },
+  { coin: "silver", coins: 30 },
+  { coin: "bronze", coins: 20 },
+  { coin: "bronze", coins: 10 },
+];
+export const DNF_REWARD = { coin: "bronze", coins: 5 };
 
 /** Fastest anyone can legitimately be, plus slack for network jitter. */
 const SPEED_CAP = BOOST_SPEED + 1.5;
@@ -110,6 +136,10 @@ const clone = (s) => JSON.parse(JSON.stringify(s));
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const num = (v) => typeof v === "number" && Number.isFinite(v);
 const intIn = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+
+function cleanCountry(raw) {
+  return typeof raw === "string" && COUNTRY_CODES.has(raw) ? raw : "";
+}
 
 function cleanName(raw) {
   if (typeof raw !== "string") return "";
@@ -199,6 +229,9 @@ export function validateAction(state, playerId, action) {
     case "hello": {
       if (!cleanName(action.name)) return { ok: false, error: "Enter a name first" };
       if (!intIn(action.char, 0, CHARACTERS - 1)) return { ok: false, error: "bad character" };
+      if (action.country !== undefined && action.country !== "" && !COUNTRY_CODES.has(action.country)) {
+        return { ok: false, error: "bad country" };
+      }
       if (me) return { ok: true };
       if (action.create && count > 0) return { ok: false, error: "code taken" };
       if (!action.create && count === 0) return { ok: false, error: "No lobby with that code" };
@@ -212,6 +245,11 @@ export function validateAction(state, playerId, action) {
       if (!intIn(action.char, 0, CHARACTERS - 1)) return { ok: false, error: "bad character" };
       const taken = ids(state).some((id) => id !== playerId && state.players[id].char === action.char);
       if (taken) return { ok: false, error: "That runner is taken" };
+      return { ok: true };
+    }
+    case "country": {
+      if (!me) return { ok: false, error: "join first" };
+      if (action.country !== "" && !COUNTRY_CODES.has(action.country)) return { ok: false, error: "bad country" };
       return { ok: true };
     }
     case "start": {
@@ -254,15 +292,17 @@ export function applyAction(state0, playerId, action) {
         me.gone = false;
         me.goneAt = null;
         if (state.phase === "lobby") me.name = cleanName(action.name);
+        if (action.country !== undefined) me.country = cleanCountry(action.country);
       } else {
         const used = new Set(ids(state).map((id) => state.players[id].char));
         let char = action.char;
-        if (used.has(char)) char = [0, 1, 2, 3].find((c) => !used.has(c)) ?? 0;
+        if (used.has(char)) char = [0, 1, 2, 3, 4, 5, 6, 7].find((c) => !used.has(c)) ?? 0;
         const slot = ids(state).length;
         state.players[playerId] = freshRunner({
           id: playerId,
           name: cleanName(action.name),
           char,
+          country: cleanCountry(action.country),
           slot,
           gone: false,
           goneAt: null,
@@ -274,6 +314,9 @@ export function applyAction(state0, playerId, action) {
     }
     case "pick":
       me.char = action.char;
+      break;
+    case "country":
+      me.country = cleanCountry(action.country);
       break;
     case "start": {
       // evict anyone who dropped out of the lobby before the gun
@@ -365,6 +408,19 @@ export function isGameOver() {
   return { over: false };
 }
 
+/** Coins each runner earned this race, keyed by player id (results only). */
+export function rewards(state) {
+  if (state.phase !== "results") return {};
+  const out = {};
+  standings(state).forEach((id, i) => {
+    const p = state.players[id];
+    if (p.left) return;
+    const r = p.finish !== null ? REWARDS[i] ?? DNF_REWARD : DNF_REWARD;
+    out[id] = { place: i + 1, coin: r.coin, coins: r.coins };
+  });
+  return out;
+}
+
 export function viewFor(state, playerId) {
   return {
     phase: state.phase,
@@ -387,6 +443,7 @@ export function viewFor(state, playerId) {
         id: p.id,
         name: p.name,
         char: p.char,
+        country: p.country || "",
         slot: p.slot,
         d: Math.round(p.d * 100) / 100,
         lane: p.lane,
@@ -399,6 +456,7 @@ export function viewFor(state, playerId) {
       };
     }),
     standings: standings(state),
+    rewards: rewards(state),
   };
 }
 

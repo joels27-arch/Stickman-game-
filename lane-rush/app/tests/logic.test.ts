@@ -145,3 +145,28 @@ describe("course", () => {
     }
   });
 });
+
+describe("coins and countries", () => {
+  it("pays gold, silver and bronze by finishing place", () => {
+    let s: S = act(lobbyOf(3), "p0", { type: "start", t: T0 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    const pos = (d: number, t: number) => ({ type: "pos", d, lane: 0, y: 0, act: "run", t });
+    s = act(s, "p2", pos(L.TRACK_LEN, s.startAt + 50_000));
+    s = act(s, "p0", pos(L.TRACK_LEN, s.startAt + 51_000));
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt + 51_000 + L.AFTER_FIRST_MS });
+    expect(s.phase).toBe("results");
+    const r = (L.viewFor(s, "p0") as S).rewards;
+    expect(r.p2).toEqual({ place: 1, coin: "gold", coins: 50 });
+    expect(r.p0).toEqual({ place: 2, coin: "silver", coins: 30 });
+    expect(r.p1).toEqual({ place: 3, coin: "bronze", coins: 5 }); // did not finish
+  });
+
+  it("keeps a valid country and rejects made-up ones", () => {
+    let s: S = L.setup([]);
+    s = act(s, "a", { type: "hello", name: "Ann", char: 5, country: "DE", create: true, t: T0 });
+    expect((L.viewFor(s, "a") as S).players[0]).toMatchObject({ char: 5, country: "DE" });
+    expect(reject(s, "a", { type: "country", country: "XX" })).toBe("bad country");
+    s = act(s, "a", { type: "country", country: "BR", t: T0 });
+    expect(s.players.a.country).toBe("BR");
+  });
+});
