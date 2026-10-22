@@ -108,6 +108,8 @@ describe("lane rush room", () => {
     b.act({ type: "start" });
     expect((await b.error()).error).toMatch(/host/);
 
+    b.act({ type: "ready", ready: true });
+    await a.view((v) => v.players.find((p: any) => p.id === "g")?.ready, "guest ready");
     a.act({ type: "start" });
     const cd = await a.view((v) => v.phase === "countdown", "countdown");
     expect(cd.startAt).toBeGreaterThan(Date.now());

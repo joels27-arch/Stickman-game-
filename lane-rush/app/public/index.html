@@ -101,13 +101,37 @@
           <div id="picker" class="picker"></div>
           <div class="lobby-actions">
             <button id="leaveBtn" class="btn small ghost">Leave</button>
-            <button id="startBtn" class="btn big go"><span class="flagico">🏁</span> Start race <span class="arrow">→</span></button>
-            <div id="waitHost" class="wait">Waiting for the host to start…</div>
+            <button id="lockBtn" class="btn big go"><span class="flagico">✓</span> Lock in <span class="arrow">→</span></button>
           </div>
           <div class="panel-foot"><span id="readyCount">👥 1/4 players ready</span><span class="motto">Same track. Different dreams.</span></div>
           <p id="lobbyMsg" class="msg" role="alert"></p>
         </div>
       </div>
+    </section>
+
+    <!-- LINE-UP: everyone's runner on a pedestal, waiting for READY -->
+    <section id="lineup" class="screen lineup">
+      <div class="lu-arena"><div class="lu-grid"></div><div class="lu-beams"></div></div>
+      <header class="lu-top">
+        <div class="lu-code"><small>Lobby code</small><b id="luCode">----</b><button id="luCopy" class="btn small blue" type="button">Copy invite</button></div>
+        <div class="lu-mode"><small>Game mode</small><b id="luMode">Survival</b><span id="luMap">Meadow</span></div>
+      </header>
+      <aside class="lu-card">
+        <div class="wallet" title="Your medals"></div>
+        <div id="luDaily" class="lu-daily"></div>
+      </aside>
+      <div id="luStage" class="lu-stage"></div>
+      <footer class="lu-bottom">
+        <div class="lu-left">
+          <button id="changeRunner" class="btn small ghost" type="button">‹ Change runner</button>
+          <button id="luLeave" class="btn small ghost" type="button">Leave</button>
+          <div class="emote-row lu-emotes" aria-label="Send an emote"></div>
+        </div>
+        <div class="lu-right">
+          <div id="luStatus" class="lu-status"></div>
+          <button id="luGo" class="btn big go" type="button">Ready ✓</button>
+        </div>
+      </footer>
     </section>
 
     <!-- RACE HUD -->

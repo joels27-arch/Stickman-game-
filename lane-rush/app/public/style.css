@@ -635,3 +635,50 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .spot-dots i.taken { background: rgba(255, 80, 80, 0.5); }
 @media (max-width: 480px) { .spot-dots { display: none; } .spot-side { height: 40%; } }
 @media (prefers-reduced-motion: reduce) { .spot-hero { animation: none; } }
+
+/* ── line-up (Fortnite-style pedestals) ── */
+.screen.lineup { padding: 0; display: none; }
+.screen.lineup.show { display: block; }
+.lineup { position: fixed; inset: 0; z-index: 5; overflow: hidden; background: radial-gradient(ellipse 75% 60% at 50% 32%, #23314a 0%, #0c111b 62%, #07090e 100%); }
+.lu-arena { position: absolute; inset: 0; pointer-events: none; }
+.lu-grid { position: absolute; left: -10%; right: -10%; bottom: 0; height: 38%; background: repeating-linear-gradient(90deg, rgba(182, 247, 42, 0.08) 0 1px, transparent 1px 80px), repeating-linear-gradient(0deg, rgba(182, 247, 42, 0.08) 0 1px, transparent 1px 40px); transform: perspective(420px) rotateX(62deg); transform-origin: bottom; }
+.lu-beams { position: absolute; inset: 0; background: conic-gradient(from 180deg at 50% -10%, transparent 0deg 160deg, rgba(182, 247, 42, 0.1) 168deg, transparent 176deg 184deg, rgba(182, 247, 42, 0.1) 192deg, transparent 200deg); }
+.lu-top { position: absolute; top: max(14px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; z-index: 3; }
+.lu-code, .lu-mode { background: rgba(12, 18, 28, 0.9); border: 1px solid rgba(255, 255, 255, 0.12); padding: 8px 12px; display: grid; gap: 2px; }
+.lu-code small, .lu-mode small { font-family: var(--display); font-weight: 800; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.lu-code b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 30px; letter-spacing: 0.16em; color: var(--lime); line-height: 1; }
+.lu-code .btn { margin-top: 4px; font-size: 13px; padding: 6px 10px; }
+.lu-mode { text-align: right; }
+.lu-mode b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 26px; text-transform: uppercase; line-height: 1; }
+.lu-mode span { font-family: var(--display); font-weight: 800; font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--lime); }
+.lu-card { position: absolute; top: max(130px, calc(env(safe-area-inset-top) + 120px)); left: max(16px, env(safe-area-inset-left)); width: min(280px, 40vw); display: grid; gap: 8px; z-index: 3; }
+.lu-daily { background: rgba(182, 247, 42, 0.12); border-left: 3px solid var(--lime); padding: 6px 10px; font-weight: 700; font-size: 13px; }
+.lu-stage { position: absolute; left: 0; right: 0; bottom: 120px; height: min(62vh, 520px); display: flex; justify-content: center; align-items: flex-end; gap: clamp(4px, 2vw, 28px); padding: 0 12px; z-index: 2; }
+.ped { position: relative; flex: 0 1 230px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; }
+.ped img { max-height: 76%; max-width: 100%; object-fit: contain; position: relative; z-index: 2; filter: drop-shadow(0 14px 20px rgba(0, 0, 0, 0.6)); animation: pedin 0.4s ease-out; }
+.ped.me img { max-height: 86%; }
+@keyframes pedin { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.ped .disc { width: 92%; height: 34px; margin-top: -18px; border-radius: 50%; background: radial-gradient(ellipse, rgba(182, 247, 42, 0.5), rgba(182, 247, 42, 0.05) 60%, transparent 72%); box-shadow: inset 0 0 0 3px rgba(182, 247, 42, 0.55); }
+.ped.me .disc { background: radial-gradient(ellipse, rgba(120, 220, 255, 0.75), rgba(120, 220, 255, 0.08) 62%, transparent 72%); box-shadow: inset 0 0 0 3px rgba(120, 220, 255, 0.85), 0 0 40px rgba(120, 220, 255, 0.55); }
+.ped .tag { display: grid; justify-items: center; gap: 3px; margin-bottom: 8px; text-align: center; z-index: 3; }
+.ped .tag b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: clamp(15px, 2.2vw, 22px); text-transform: uppercase; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.ped .tag span { font-family: var(--display); font-weight: 800; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; }
+.ped .tag .ok { color: var(--lime); }
+.ped .tag .no { color: #ff6b6b; }
+.ped.empty .ghost { height: 60%; aspect-ratio: 0.55; max-width: 90%; border: 2px dashed rgba(255, 255, 255, 0.18); border-radius: 50% 50% 8px 8px; display: grid; place-items: center; color: var(--muted); font-family: var(--display); font-weight: 800; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; padding: 6px; }
+.ped .emo { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); font-size: 54px; z-index: 5; animation: emofloat 2.2s ease-out forwards; }
+.lu-bottom { position: absolute; left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; z-index: 3; }
+.lu-left { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.lu-right { display: grid; justify-items: end; gap: 6px; width: min(320px, 50vw); }
+.lu-right .btn.big { width: 100%; }
+.lu-right .btn.big.waiting { background: #2a3324; color: var(--muted); box-shadow: none; }
+.lu-status { font-weight: 700; font-size: 14px; color: #dfe7d3; text-align: right; }
+.lu-emotes { display: flex; gap: 4px; }
+@media (max-width: 640px) {
+  .lu-card { display: none; }
+  .lu-stage { bottom: 150px; height: 52vh; }
+  .lu-bottom { flex-direction: column; align-items: stretch; }
+  .lu-right { width: 100%; justify-items: stretch; }
+  .lu-status { text-align: center; }
+  .lu-code .btn { display: none; }
+}

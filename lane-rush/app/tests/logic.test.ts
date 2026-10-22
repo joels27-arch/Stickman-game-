@@ -27,6 +27,8 @@ function lobbyOf(n: number): S {
   for (let i = 0; i < n; i++) {
     s = act(s, `p${i}`, { type: "hello", name: names[i], char: 0, create: i === 0, t: T0 + i });
   }
+  // everyone but the host has locked in their runner
+  for (let i = 1; i < n; i++) s = act(s, `p${i}`, { type: "ready", ready: true, t: T0 + 10 + i });
   return s;
 }
 
@@ -224,6 +226,7 @@ describe("obstacles and power-ups", () => {
     expect(reject(s, "p0", { type: "zap", t: s.startAt + 50_100 })).toBeTruthy();
     s = act(s, "p1", { type: "pos", d: L.TRACK_LEN, lane: 0, y: 0, act: "run", t: s.startAt + 51_000 });
     s = act(s, "p0", { type: "again", t: s.startAt + 60_000 });
+    s = act(s, "p1", { type: "ready", ready: true, t: s.startAt + 60_500 });
     s = act(s, "p0", { type: "start", t: s.startAt + 61_000 });
     expect(s.zaps).toEqual([]);
   });
@@ -573,5 +576,21 @@ describe("hit credit", () => {
     expect(reject(s, "p0", { type: "bowled", id: 1 })).toBeTruthy(); // can't bowl yourself
     const hits = (L.viewFor(s, "p1") as any).hits.map((h: any) => [h.kind, h.by, h.victim]);
     expect(hits).toEqual([["banana", "p0", "p1"], ["bowling", "p0", "p1"]]);
+  });
+});
+
+describe("ready check", () => {
+  it("lets the host start only once everyone else is ready, and a new pick un-readies you", () => {
+    let s: S = L.setup([]);
+    s = act(s, "p0", { type: "hello", name: "Ann", char: 0, create: true, t: T0 });
+    s = act(s, "p1", { type: "hello", name: "Bob", char: 1, t: T0 + 1 });
+    expect(reject(s, "p0", { type: "start", t: T0 + 2 })).toMatch(/Waiting for Bob/);
+    s = act(s, "p1", { type: "ready", ready: true, t: T0 + 3 });
+    expect((L.viewFor(s, "p0") as any).players[1].ready).toBe(true);
+    s = act(s, "p1", { type: "pick", char: 2, t: T0 + 4 });
+    expect(s.players.p1.ready).toBe(false);
+    s = act(s, "p1", { type: "ready", ready: true, t: T0 + 5 });
+    s = act(s, "p0", { type: "start", t: T0 + 6 });
+    expect(s.phase).toBe("countdown");
   });
 });

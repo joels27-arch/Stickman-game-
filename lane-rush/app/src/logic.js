@@ -628,10 +628,19 @@ export function validateAction(state, playerId, action) {
       if (!MAPS.includes(action.map)) return { ok: false, error: "bad map" };
       return { ok: true };
     }
+    case "ready": {
+      if (!me) return { ok: false, error: "join first" };
+      if (state.phase !== "lobby") return { ok: false, error: "not in the lobby" };
+      if (typeof action.ready !== "boolean") return { ok: false, error: "bad ready" };
+      return { ok: true };
+    }
     case "start": {
       if (state.phase !== "lobby") return { ok: false, error: "already started" };
       if (state.host !== playerId) return { ok: false, error: "Only the host can start" };
       if (present(state).length < 1) return { ok: false, error: "nobody to race" };
+      // everyone else has to have locked in their runner
+      const waiting = present(state).filter((id) => id !== playerId && !state.players[id].ready);
+      if (waiting.length) return { ok: false, error: `Waiting for ${waiting.map((id) => state.players[id].name).join(", ")} to get ready` };
       return { ok: true };
     }
     case "pos": {
@@ -745,6 +754,7 @@ export function applyAction(state0, playerId, action) {
           slot,
           gone: false,
           goneAt: null,
+          ready: false,
         });
         state.order.push(playerId);
       }
@@ -753,6 +763,10 @@ export function applyAction(state0, playerId, action) {
     }
     case "pick":
       me.char = action.char;
+      me.ready = false; // picked a new runner: lock in again
+      break;
+    case "ready":
+      me.ready = action.ready;
       break;
     case "country":
       me.country = cleanCountry(action.country);
@@ -865,6 +879,7 @@ export function applyAction(state0, playerId, action) {
       for (const id of ids(state)) if (state.players[id].gone) removePlayer(state, id);
       state.phase = "lobby";
       state.cup = null;
+      for (const id of ids(state)) state.players[id].ready = false;
       for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
       state.firstFinishAt = null;
       break;
@@ -991,6 +1006,7 @@ export function viewFor(state, playerId) {
         at: p.at ?? 0,
         finish: p.finish,
         hits: p.hits,
+        ready: Boolean(p.ready),
         outAt: p.outAt ?? null,
         gone: p.gone,
         left: p.left,

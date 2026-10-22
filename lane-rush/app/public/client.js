@@ -309,7 +309,7 @@ const sfx = (() => {
 
 // ── UI helpers ──────────────────────────────────────────────────────────────
 
-const screens = { home: $("#home"), lobby: $("#lobby"), results: $("#results"), shop: $("#shop") };
+const screens = { home: $("#home"), lobby: $("#lobby"), lineup: $("#lineup"), results: $("#results"), shop: $("#shop") };
 function showScreen(name) {
   for (const [k, el] of Object.entries(screens)) el.classList.toggle("show", k === name);
   $("#hud").classList.toggle("show", name === "race");
@@ -598,6 +598,7 @@ function onServerError(error) {
   }
   if (error === "box gone") return loseBox();
   if (["not racing", "race not over", "already started", "no banana", "no ball", "too soon"].includes(error)) return; // harmless races
+  if (error.startsWith("Waiting for")) return toast(error);
   toast(error);
 }
 
@@ -792,6 +793,7 @@ nameInput.addEventListener("keydown", (e) => e.key === "Enter" && (codeInput.val
 
 function leaveToHome(message = "") {
   game.mode = "home";
+  game.locked = false;
   renderDaily();
   game.solo = false;
   world.clearRace();
@@ -896,8 +898,6 @@ function renderLobby(v) {
 
   const isHost = v.host === playerId;
   const n = v.players.filter((p) => !p.gone).length;
-  $("#startBtn").style.display = isHost ? "" : "none";
-  $("#waitHost").style.display = isHost ? "none" : "block";
   const mode = MODES[Math.max(0, Math.min(n, 4) - 1)];
   const gm = v.mode || "survival";
   const modePick = $("#modePick");
@@ -933,8 +933,10 @@ function renderLobby(v) {
   // start fetching the map's 3D props while everyone is still in the lobby
   for (const key of gm === "tournament" ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
   const what = gm === "tournament" ? "tournament" : gm === "survival" && n < 2 ? "endless run" : `${GAME_MODE_INFO[gm].label} race`;
-  const start = $("#startBtn");
-  start.replaceChildren(el("span", { class: "flagico", text: GAME_MODE_INFO[gm].icon }), el("span", { text: `Start ${mode} ${what}` }), el("span", { class: "arrow", text: "→" }));
+  $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
+  renderLineup(v, { isHost, gm, mp, mode, what });
+  // once you've locked in your runner, the lobby is the line-up
+  if (game.mode === "lobby" && !screens.shop.classList.contains("show")) showScreen(game.locked ? "lineup" : "lobby");
   $("#lobbyCount").textContent = `${mode} · ${GAME_MODE_INFO[gm].label} · ${n}/4 players`;
   $("#readyCount").textContent = `👥 ${n}/4 players ready`;
   $("#lobbyMsg").textContent =
@@ -944,10 +946,86 @@ function renderLobby(v) {
   renderWallet();
 }
 
-$("#startBtn").addEventListener("click", () => {
+$("#lockBtn").addEventListener("click", () => {
   sfx.unlock();
-  act({ type: "start" });
+  game.locked = true;
+  act({ type: "ready", ready: true });
+  if (net.view) renderLobby(net.view);
 });
+$("#changeRunner").addEventListener("click", () => {
+  game.locked = false;
+  act({ type: "ready", ready: false });
+  if (net.view) renderLobby(net.view);
+});
+$("#luLeave").addEventListener("click", leaveLobby);
+$("#luCopy").addEventListener("click", () => $("#copyBtn").click());
+$("#luGo").addEventListener("click", () => {
+  sfx.unlock();
+  const v = net.view;
+  if (!v) return;
+  const me = v.players.find((p) => p.id === playerId);
+  if (v.host === playerId) act({ type: "start" });
+  else act({ type: "ready", ready: !me?.ready });
+});
+
+/**
+ * The line-up: every runner on a pedestal (yours in the middle, lit blue)
+ * with READY / NOT READY. Guests toggle Ready; the host's button becomes
+ * Start once everybody else is ready.
+ */
+function renderLineup(v, { isHost, gm, mp, mode, what }) {
+  $("#luCode").textContent = net.code;
+  $("#luMode").textContent = gm === "tournament" ? "Tournament" : gm === "survival" && v.players.length < 2 ? "Endless run" : GAME_MODE_INFO[gm].label;
+  $("#luMap").textContent = gm === "tournament" ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${mode}`;
+  const ch = dailyChallenge();
+  $("#luDaily").textContent = `⭐ Daily: ${ch.text}`;
+  const present = v.players.filter((p) => !p.gone);
+  const order = [...v.players];
+  // you stand in the middle, like a real lobby
+  const mine = order.findIndex((p) => p.id === playerId);
+  if (mine >= 0) {
+    const [me] = order.splice(mine, 1);
+    order.splice(Math.min(1, order.length), 0, me);
+  }
+  const stage = $("#luStage");
+  const peds = order.map((p) => {
+    const isMe = p.id === playerId;
+    const ok = p.ready || p.id === v.host;
+    const ped = el(
+      "div",
+      { class: `ped${isMe ? " me" : ""}`, style: `--team:${RUNNERS[p.char]?.color ?? "#666"}` },
+      el(
+        "div",
+        { class: "tag" },
+        el("b", { text: `${p.id === v.host ? "👑 " : ""}${withFlag(p.name, p.country)}` }),
+        el("span", { class: p.gone ? "no" : ok ? "ok" : "no", text: p.gone ? "Away" : p.id === v.host ? "Host" + (isMe ? " · You" : "") : ok ? "Ready" + (isMe ? " · You" : "") : "Not ready" + (isMe ? " · You" : "") }),
+      ),
+      el("img", { src: `/assets/full_${RUNNERS[p.char]?.file ?? "c0"}.webp`, alt: RUNNERS[p.char]?.name ?? "" }),
+      el("div", { class: "disc" }),
+    );
+    ped.dataset.id = p.id;
+    return ped;
+  });
+  for (let i = order.length; i < 4; i++) {
+    peds.push(el("div", { class: "ped empty" }, el("div", { class: "ghost", text: `Waiting… code ${net.code}` }), el("div", { class: "disc" })));
+  }
+  stage.replaceChildren(...peds);
+
+  const waiting = present.filter((p) => p.id !== v.host && !p.ready);
+  const go = $("#luGo");
+  const status = $("#luStatus");
+  const meP = v.players.find((p) => p.id === playerId);
+  go.classList.remove("waiting");
+  if (isHost) {
+    go.textContent = waiting.length ? "Waiting…" : `Start ${what} →`;
+    go.classList.toggle("waiting", waiting.length > 0);
+    status.textContent = waiting.length ? `Waiting for ${waiting.map((p) => p.name).join(", ")} to get ready` : present.length > 1 ? "Everyone's ready!" : "Start now, or share the code first";
+  } else {
+    go.textContent = meP?.ready ? "Not ready" : "Ready ✓";
+    go.classList.toggle("waiting", Boolean(meP?.ready));
+    status.textContent = meP?.ready ? (waiting.length ? `Waiting for ${waiting.map((p) => p.name).join(", ")}` : "Waiting for the host to start…") : "Press Ready when you're set";
+  }
+}
 $("#leaveBtn").addEventListener("click", leaveLobby);
 $("#leave2Btn").addEventListener("click", leaveLobby);
 $("#againBtn").addEventListener("click", () => act({ type: "again" }));
@@ -2949,7 +3027,7 @@ function showEmote(id, e) {
     if (r) world.emoteBubble(r, e);
     feed(`${e} ${nameOf(id)}`);
   } else {
-    const card = [...document.querySelectorAll("#slots .rcard")].find((c) => c.dataset.id === id);
+    const card = [...document.querySelectorAll("#slots .rcard, #luStage .ped")].find((c) => c.dataset.id === id);
     if (card) {
       const b = el("span", { class: "emo", text: e });
       card.append(b);
