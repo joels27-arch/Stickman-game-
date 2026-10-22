@@ -735,6 +735,7 @@ nameInput.addEventListener("keydown", (e) => e.key === "Enter" && (codeInput.val
 
 function leaveToHome(message = "") {
   game.mode = "home";
+  renderDaily();
   game.solo = false;
   world.clearRace();
   showScreen("home");
@@ -2361,6 +2362,9 @@ function enterRace(v) {
   game.lookBack = false;
   game.soloRun = isSurvival() && v.players.length === 1;
   game.bestBeaten = false;
+  game.bananasThrown = 0;
+  game.boxesGrabbed = 0;
+  game.lastHitD = 0;
   world.setBestMarker(game.soloRun ? personalBest() : 0);
   renderCombo();
   $("#feed").replaceChildren();
@@ -2714,6 +2718,8 @@ function stepMe(dt) {
     act({ type: "take", box: b.idx });
     world.burst(laneX(b.lane), 1.0, -b.z, ["#b06bff", "#ff6bd5", "#6be3ff", "#ffffff", "#ffd84a"], 70);
     me.lastBox = { idx: b.idx, kind: grabBox() };
+    game.boxesGrabbed = (game.boxesGrabbed ?? 0) + 1;
+    challenge("boxes6", game.boxesGrabbed);
   }
   // bowling balls rolling back down the track (not your own)
   const sn = serverNow();
@@ -2762,6 +2768,7 @@ function hit(kind) {
   if (me.power === "rocket" || me.power === "ghost") return;
   if (me.out) return;
   me.hits += 1;
+  game.lastHitD = me.d;
   me.combo = 0;
   renderCombo();
   if (isSurvival()) {
@@ -2800,9 +2807,11 @@ const ballRel = new Map(); // ball id -> where it was relative to you last frame
 function style(text, points) {
   me.combo += 1;
   me.bestCombo = Math.max(me.bestCombo, me.combo);
+  challenge("combo12", me.combo);
   const mult = Math.min(5, 1 + Math.floor(me.combo / 4)); // x2 from 4 in a row, up to x5
   const gained = points * mult;
   me.score += gained;
+  challenge("style1500", me.score);
   const pop = $("#stylePop");
   pop.replaceChildren(el("b", { text }), el("span", { text: `+${gained}` }));
   pop.classList.remove("show");
@@ -2884,12 +2893,78 @@ for (const box of document.querySelectorAll(".emote-row")) {
 }
 $("#emoteToggle").addEventListener("click", () => $("#emoteMenu").classList.toggle("show"));
 
+// ── daily challenge: one goal per day, a medal for finishing it ──
+
+const CHALLENGES = [
+  { id: "dist800", text: "Run 800 m in one endless run", goal: 800, reward: "silver" },
+  { id: "bananas3", text: "Throw 3 bananas in one race", goal: 3, reward: "bronze" },
+  { id: "combo12", text: "Reach a 12 combo", goal: 12, reward: "silver" },
+  { id: "survive90", text: "Survive 90 seconds in Survival", goal: 90, reward: "silver" },
+  { id: "style1500", text: "Score 1500 style points in one race", goal: 1500, reward: "gold" },
+  { id: "boxes6", text: "Grab 6 mystery boxes in one race", goal: 6, reward: "bronze" },
+  { id: "nohit400", text: "Run 400 m without getting hit", goal: 400, reward: "silver" },
+];
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+function dailyChallenge() {
+  const key = todayKey();
+  let h = 0;
+  for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return CHALLENGES[h % CHALLENGES.length];
+}
+function dailyState() {
+  try {
+    const s = JSON.parse(local.getItem("lr:daily") || "{}");
+    return s.day === todayKey() ? s : { day: todayKey(), best: 0, done: false };
+  } catch {
+    return { day: todayKey(), best: 0, done: false };
+  }
+}
+/** Report progress on today's challenge (only the matching id counts). */
+function challenge(id, value) {
+  const ch = dailyChallenge();
+  if (ch.id !== id) return;
+  const st = dailyState();
+  if (st.done || value <= st.best) return;
+  st.best = value;
+  if (value >= ch.goal) {
+    st.done = true;
+    const m = wallet.medals();
+    m[ch.reward] += 1;
+    wallet.save(m);
+    banner("CHALLENGE DONE!", 1600);
+    toast(`Daily challenge complete: +1 ${ch.reward} medal`);
+    sfx.finish();
+  }
+  local.setItem("lr:daily", JSON.stringify(st));
+  renderDaily();
+}
+function renderDaily() {
+  const ch = dailyChallenge();
+  const st = dailyState();
+  const box = $("#daily");
+  box.classList.toggle("done", st.done);
+  box.replaceChildren(
+    el("span", { class: "tag", text: "Daily challenge" }),
+    el("b", { text: ch.text }),
+    el("small", {}, el("img", { src: MEDAL_IMG[ch.reward], alt: "" }), el("span", { text: st.done ? "Done ✓ come back tomorrow" : `${Math.min(st.best, ch.goal)} / ${ch.goal} · reward: 1 ${ch.reward} medal` })),
+  );
+}
+renderDaily();
+
 // ── personal best (solo endless run) ──
 
 function personalBest() {
   return Number(local.getItem("lr:best")) || 0;
 }
 function checkBest() {
+  if (game.mode === "race" && !me.out && net.view && serverNow() > net.view.startAt) {
+    if (game.soloRun) challenge("dist800", Math.floor(me.d));
+    challenge("nohit400", Math.floor(me.d - (game.lastHitD ?? 0)));
+    if (isSurvival()) challenge("survive90", Math.floor((serverNow() - net.view.startAt) / 1000));
+  }
   if (!game.soloRun || game.bestBeaten) return;
   const best = personalBest();
   if (best > 50 && me.d > best) {
@@ -3020,6 +3095,8 @@ function useItem(lane = me.lane, dir = 1) {
   if (!me.items.length || !canControl() || me.stumbleT > 0) return;
   const kind = me.items.shift();
   if (kind === "banana") {
+    game.bananasThrown = (game.bananasThrown ?? 0) + 1;
+    challenge("bananas3", game.bananasThrown);
     const d = dir > 0 ? me.d + BANANA_AHEAD_M : me.d - BANANA_BEHIND_M;
     act({ type: "banana", lane, d: Math.round(d * 10) / 10 });
     sfx.lane();
@@ -3331,14 +3408,23 @@ function frame(now) {
     }
     const tx = laneX(fx) * 0.75;
     const back = game.lookBack && !me.out;
-    camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
+    // countdown: the camera swings round from in front of your runner to behind them
+    const toGo = net.view ? (net.view.startAt - serverNow()) / 1000 : 0;
+    if (toGo > 0.4 && game.mode === "race") {
+      const k = Math.min(1, (toGo - 0.4) / 3); // 1 → 0 as the gun nears
+      const ang = k * Math.PI;
+      camPos.set(laneX(fx) + Math.sin(ang) * 5.6, 3.0 - k * 1.2, fz + Math.cos(ang) * 5.6);
+    } else {
+      camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
+    }
     camera.position.copy(camPos);
     if (shake > 0) {
       shake = Math.max(0, shake - dt);
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
-    if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
+    if (toGo > 0.4 && game.mode === "race") camLook.set(laneX(fx), 1.0, fz - 2);
+    else if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
     else camLook.set(tx * 0.8, 1.0 + fy * 0.6, fz - 9);
     camera.lookAt(camLook);
     world.cull(back ? fd - 30 : fd);
