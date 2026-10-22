@@ -2665,6 +2665,19 @@ const world = (() => {
     if (big) g.scale.setScalar(1.5);
     return g;
   }
+  /** Scale an object so its biggest side is `size` metres, sitting on y = 0. */
+  function sizeTo(obj, size) {
+    const box = new THREE.Box3().setFromObject(obj);
+    const v = box.getSize(new THREE.Vector3());
+    const k = size / Math.max(v.x, v.y, v.z, 1e-3);
+    obj.scale.multiplyScalar(k);
+    const b2 = new THREE.Box3().setFromObject(obj);
+    const c = b2.getCenter(new THREE.Vector3());
+    obj.position.x -= c.x;
+    obj.position.z -= c.z;
+    obj.position.y -= b2.min.y;
+    return obj;
+  }
   function loadModeProp(name, size) {
     if (assets.props[name] !== undefined) return Promise.resolve(assets.props[name]);
     assets.props[name] = null;
@@ -2699,7 +2712,7 @@ const world = (() => {
       loadModeProp("brain", { width: 6.5, maxHeight: 6.5 }).then((m) => {
         if (!m || !brainObj || modeKind !== "chase") return;
         brainObj.remove(fallback);
-        const inner = m.clone();
+        const inner = sizeTo(m.clone(), 5.6);
         inner.rotation.y = Math.PI; // face the runners it's chasing
         const roll = new THREE.Group();
         const box = new THREE.Box3().setFromObject(inner);
@@ -2722,7 +2735,7 @@ const world = (() => {
       loadModeProp("bomb", { width: 0.95, maxHeight: 1.2 }).then((m) => {
         if (!m || !bombObj || modeKind !== "potato") return;
         bombObj.remove(spr);
-        bombObj.add(m.clone());
+        bombObj.add(sizeTo(m.clone(), 0.9));
       });
     }
   }
