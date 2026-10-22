@@ -40,22 +40,51 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  *   survival   — the main game: an endless run that keeps getting faster;
  *                everyone has 3 hearts, each hit costs one, and the last
  *                runner still going wins (alone: run as far as you can)
- *   sprint     — 700 m to the finish line; fastest time wins
- *   tournament — three races in a row (CUP_RACES); placings score CUP_POINTS
- *                and the most points after the last race wins
+ *   chase      — Brain Chase: a giant brain rolls after everyone and keeps
+ *                speeding up; caught = out, last one running wins
+ *   coinrush   — Coin Rush: 90 s, most coins wins; a hit spills your coins
+ *   potato     — Hot Potato: a bomb on a random fuse, passed on by bumping
+ *                into someone; it costs whoever holds it a heart (3 = out)
+ *   cup        — Party Cup: three different rounds of the above, in a random
+ *                order; placings score CUP_POINTS, most points wins
+ * Empty spots are filled with bots. (The old 700 m "sprint" race still runs
+ * if a kind is "sprint", but no mode starts one any more.)
  * `state.mode` is what the host picked; `state.kind` is the race being run.
  */
-export const GAME_MODES = ["survival", "sprint", "tournament"];
+export const GAME_MODES = ["survival", "chase", "coinrush", "potato", "cup"];
+/** The modes a single round can be (a Party Cup is three of these). All run on the endless course. */
+export const ROUND_KINDS = ["survival", "chase", "coinrush", "potato"];
+export const isEndless = (kind) => kind !== "sprint";
+/**
+ * Brain Chase: a giant brain rolls after everyone, starting this far behind
+ * the start line, at 9 m/s and +0.14 m/s every second (it overtakes the
+ * runners' own speed-up after a minute or so). Caught = out.
+ */
+export const CHASE_GAP_M = 35;
+export function brainDistance(s) {
+  const t = Math.max(0, s);
+  const tCap = (36 - 9) / 0.14; // top speed reached
+  if (t <= tCap) return -CHASE_GAP_M + 9 * t + 0.07 * t * t;
+  return -CHASE_GAP_M + 9 * tCap + 0.07 * tCap * tCap + 36 * (t - tCap);
+}
+/** Coin Rush: 90 seconds, most coins wins; a hit spills some of yours for others to grab. */
+export const COINRUSH_MS = 90000;
+export const COIN_SPILL = 5;
+export const LOOSE_MS = 15000;
+/** Hot Potato: the bomb blows after a random fuse; pass it by bumping into someone. */
+export const POTATO_FIRST_MS = 3000;
+export const POTATO_NEXT_MS = 2500;
+export const BOMB_PASS_M = 1.8;
 /** Quick reactions anyone can show above their runner. */
 export const EMOTES = ["👋", "😂", "🔥", "😱", "😎", "💪"];
 export const EMOTE_COOLDOWN_MS = 1200;
 /** In survival a heart floats over the track every so often: grab it to win back a lost heart. */
 export const HEART_EVERY_M = 420;
 
-/** Where you race. The host picks one; a tournament visits them in turn. */
+/** Where you race. The host picks one; a Party Cup visits them in turn. */
 export const MAPS = ["meadow", "farm", "beach"];
-/** A tournament is three races; each placing scores points, most points wins. */
-export const CUP_RACES = ["survival", "sprint", "survival"];
+/** A Party Cup is three rounds; each placing scores points, most points wins. */
+export const CUP_ROUNDS = 3;
 export const CUP_POINTS = [10, 5, 3, 1];
 /** Rank points are reported by each player's device (shown to friends in the lobby). */
 export const MAX_RP = 999999;
@@ -80,7 +109,7 @@ export function sprintSpeed(s) {
   return Math.min(SPRINT_MAX_SPEED, BASE_SPEED + 0.06 * Math.max(0, s));
 }
 export function runSpeed(kind, s) {
-  return kind === "survival" ? survivalSpeed(s) : sprintSpeed(s);
+  return isEndless(kind) ? survivalSpeed(s) : sprintSpeed(s);
 }
 
 /**
@@ -258,7 +287,7 @@ function rng(seed) {
 /** Expected running speed (m/s) at distance `d` of a survival run (v² = v0² + 2ad, capped). */
 export function speedAtDistance(kind, d) {
   const x = Math.max(0, d);
-  if (kind !== "survival") return Math.min(SPRINT_MAX_SPEED, Math.sqrt(BASE_SPEED * BASE_SPEED + 0.12 * x));
+  if (!isEndless(kind)) return Math.min(SPRINT_MAX_SPEED, Math.sqrt(BASE_SPEED * BASE_SPEED + 0.12 * x));
   // the same ramp as survivalSpeed, by distance: v² = v0² + 2·a·d per phase
   const D1 = 12 * 70 + 0.05 * 70 * 70; // metres run in the first 70 s
   if (x <= D1) return Math.sqrt(BASE_SPEED * BASE_SPEED + 0.2 * x);
@@ -467,7 +496,7 @@ function humans(state) {
 }
 
 function freshRunner(p) {
-  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, emoteAt: null, sc: 0, cb: 0, left: false, item: "", warp: 0 };
+  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, emoteAt: null, sc: 0, cb: 0, left: false, item: "", warp: 0, coins: 0, booms: 0 };
 }
 
 function pickHost(state) {
@@ -488,7 +517,14 @@ function removePlayer(state, id) {
 
 /** finished (by time) → still running (by distance) → left the race */
 export function standings(state) {
-  if (state.kind === "survival") {
+  if (state.kind === "coinrush") {
+    // most coins, then furthest
+    return ids(state)
+      .map((id) => state.players[id])
+      .sort((a, b) => (a.left !== b.left ? (a.left ? 1 : -1) : (b.coins ?? 0) - (a.coins ?? 0) || b.d - a.d))
+      .map((p) => p.id);
+  }
+  if (isEndless(state.kind)) {
     // still running (furthest first) → knocked out (last one out first) → left
     return ids(state)
       .map((id) => state.players[id])
@@ -516,7 +552,12 @@ export function standings(state) {
 function maybeEnd(state, t) {
   if (state.phase !== "race") return;
   const racing = ids(state).filter((id) => !state.players[id].left);
-  if (state.kind === "survival") {
+  if (state.kind === "coinrush") {
+    const anyHuman = racing.some((id) => !state.players[id].bot && !state.players[id].gone);
+    if (t >= state.startAt + COINRUSH_MS || !anyHuman) endRace(state, t);
+    return;
+  }
+  if (isEndless(state.kind)) {
     const alive = racing.filter((id) => {
       const p = state.players[id];
       return p.outAt === null && !p.gone;
@@ -545,6 +586,10 @@ function endRace(state, t) {
       const p = state.players[id];
       state.cup.points[id] = (state.cup.points[id] ?? 0) + (p.left ? 0 : CUP_POINTS[i] ?? 0);
     });
+    state.cup.places = state.cup.places ?? {};
+    standings(state).forEach((id, i) => {
+      state.cup.places[id] = [...(state.cup.places[id] ?? []), i + 1];
+    });
   }
 }
 
@@ -568,7 +613,7 @@ function startRace(state, t) {
   for (const id of ids(state)) if (state.players[id].gone) removePlayer(state, id);
   state.round += 1;
   state.seed = ((Math.floor(t) % 2147483647) ^ Math.imul(state.round, 2654435761)) >>> 0;
-  state.kind = state.cup ? CUP_RACES[state.cup.race - 1] : state.mode;
+  state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode;
   state.raceMap = state.cup ? MAPS[(MAPS.indexOf(state.map ?? "meadow") + state.cup.race - 1) % MAPS.length] : state.map ?? "meadow";
   state.phase = "countdown";
   state.startAt = t + COUNTDOWN_MS;
@@ -582,7 +627,122 @@ function startRace(state, t) {
   state.rematch = [];
   state.cloud = null;
   state.punches = [];
+  state.coinsTaken = [];
+  state.loose = [];
+  state.bomb = null;
+  state.blasts = [];
+  state.nextBombAt = state.kind === "potato" ? state.startAt + POTATO_FIRST_MS : null;
   for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
+}
+
+// ── the modes: brain chase, coin rush, hot potato, party cup ───────────────
+
+function knockOut(p, t) {
+  if (p.outAt !== null) return;
+  p.outAt = t;
+  p.act = "out";
+  p.pw = "";
+}
+/** Three different modes in a random order, decided when the cup starts. */
+function newCup(t) {
+  const r = rng(Math.floor(t) % 2147483647);
+  const pool = [...ROUND_KINDS];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return { race: 1, points: {}, races: pool.slice(0, CUP_ROUNDS) };
+}
+/** Coin Rush: lines of coins in the gaps between obstacle rows, in a lane that's open on both sides. */
+const coinCache = new Map();
+export function coinLines(course) {
+  const out = [];
+  const rows = course.rows;
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const a = rows[i];
+    const b = rows[i + 1];
+    const gap = b.z - a.z;
+    if (gap < 9) continue;
+    const open = [0, 1, 2, 3].filter((l) => !a.lanes[l] && !b.lanes[l]);
+    const lanes = open.length ? open : [0, 1, 2, 3].filter((l) => !b.lanes[l]);
+    if (!lanes.length) continue;
+    const lane = lanes[Math.floor(((a.z * 7.31) % 1) * lanes.length)] ?? lanes[0];
+    const n = gap > 16 ? 5 : 3;
+    const start = a.z + (gap - (n - 1) * 2) / 2;
+    for (let k = 0; k < n; k++) out.push({ z: Math.round((start + k * 2) * 10) / 10, lane, v: k === Math.floor(n / 2) && i % 7 === 3 ? 5 : 1 });
+  }
+  return out;
+}
+function coinsFor(state) {
+  const key = state.seed;
+  if (!coinCache.has(key)) {
+    if (coinCache.size > 6) coinCache.delete(coinCache.keys().next().value);
+    coinCache.set(key, coinLines(courseFor(state)));
+  }
+  return coinCache.get(key);
+}
+function spillCoins(state, p, t) {
+  const n = Math.min(p.coins ?? 0, COIN_SPILL);
+  if (!n) return;
+  p.coins -= n;
+  state.looseSeq = (state.looseSeq ?? 0) + 1;
+  state.loose = [...(state.loose ?? []), { id: state.looseSeq, d: Math.round((p.d + 3) * 10) / 10, lane: p.lane, n, at: t }].slice(-20);
+}
+function giveBomb(state, t, exclude = null) {
+  const alive = ids(state).map((x) => state.players[x]).filter((p) => racingNow(p) && p.id !== exclude);
+  const pool = alive.length ? alive : ids(state).map((x) => state.players[x]).filter((p) => racingNow(p));
+  if (!pool.length) return;
+  const r = rng((Math.floor(t) ^ state.seed) >>> 0);
+  const holder = pool[Math.floor(r() * pool.length)];
+  state.bombSeq = (state.bombSeq ?? 0) + 1;
+  state.bomb = { id: state.bombSeq, holder: holder.id, prev: null, at: t, until: t + 10000 + Math.floor(r() * 6000), passAt: t };
+}
+function stepMode(state, t) {
+  const elapsedS = (t - state.startAt) / 1000;
+  if (state.kind === "chase") {
+    const brain = brainDistance(elapsedS);
+    for (const id of ids(state)) {
+      const p = state.players[id];
+      if (p.left || p.outAt !== null) continue;
+      if (p.d <= brain) knockOut(p, t);
+    }
+  }
+  if (state.kind === "coinrush") state.loose = (state.loose ?? []).filter((c) => t - c.at < LOOSE_MS);
+  if (state.kind === "potato") {
+    const b = state.bomb;
+    if (!b) {
+      if (state.nextBombAt !== null && t >= state.nextBombAt) giveBomb(state, t);
+      return;
+    }
+    const holder = state.players[b.holder];
+    if (!racingNow(holder)) {
+      // the holder left or got knocked out some other way: hand it to someone else
+      giveBomb(state, t, b.holder);
+      return;
+    }
+    if (t >= b.until) {
+      holder.booms = (holder.booms ?? 0) + 1;
+      state.blastSeq = (state.blastSeq ?? 0) + 1;
+      state.blasts = [...(state.blasts ?? []), { id: state.blastSeq, holder: holder.id, d: holder.d, lane: holder.lane, at: t }].slice(-6);
+      if (holder.booms >= LIVES) knockOut(holder, t);
+      else {
+        holder.stunUntil = t + 1600;
+        if (holder.bot) holder.act = "stumble";
+      }
+      state.bomb = null;
+      state.nextBombAt = t + POTATO_NEXT_MS;
+      return;
+    }
+    if (t - b.passAt < 700) return;
+    const near = ids(state)
+      .map((x) => state.players[x])
+      .find((p) => p.id !== holder.id && racingNow(p) && p.lane === holder.lane && Math.abs(p.d - holder.d) < BOMB_PASS_M && !(p.id === b.prev && t - b.passAt < 1500));
+    if (near) {
+      b.prev = holder.id;
+      b.holder = near.id;
+      b.passAt = t;
+    }
+  }
 }
 
 // ── the trickier power-ups: mind swap, thundercloud, boxing glove ───────────
@@ -674,7 +834,7 @@ const BOT_ITEMS = ["banana", "lightning", "rocket", "shield", "freeze", "glue", 
 const STUN_MS = 1600; // fall + get up, like a real runner
 const courses = new Map();
 function courseFor(state) {
-  const len = state.kind === "survival" ? SURVIVAL_LEN : TRACK_LEN;
+  const len = isEndless(state.kind) ? SURVIVAL_LEN : TRACK_LEN;
   const key = `${state.seed}:${len}`;
   if (!courses.has(key)) {
     if (courses.size > 6) courses.delete(courses.keys().next().value);
@@ -745,17 +905,14 @@ function botHit(state, p, t) {
   p.stunUntil = t + STUN_MS;
   p.act = "stumble";
   p.y = 0;
-  if (state.kind === "survival" && p.hits >= LIVES) {
-    p.outAt = t;
-    p.act = "out";
-    p.pw = "";
-  }
+  if (state.kind === "coinrush") spillCoins(state, p, t);
+  if (state.kind === "survival" && p.hits >= LIVES) knockOut(p, t);
 }
 
 function stepBots(state, t) {
   if (t < state.startAt) return;
   const course = courseFor(state);
-  const survival = state.kind === "survival";
+  const survival = isEndless(state.kind);
   const len = survival ? SURVIVAL_LEN : TRACK_LEN;
   const elapsedS = (t - state.startAt) / 1000;
   const runners = ids(state).map((id) => state.players[id]);
@@ -786,6 +943,7 @@ function stepBots(state, t) {
       v = runSpeed(state.kind, elapsedS) * (0.97 + roll(state.seed, bi, 1) * 0.03);
       if ((p.rocketUntil ?? 0) > t) v += survival ? SURVIVAL_ROCKET : ROCKET_SPEED - BASE_SPEED;
       if ((p.slowUntil ?? 0) > t) v *= 0.55;
+      if (state.bomb?.holder === id) v *= 1.15; // the bomb holder runs a little faster, to catch someone
       if (p.act === "stumble") p.act = "run";
     }
     const d0 = p.d;
@@ -826,6 +984,33 @@ function stepBots(state, t) {
           break;
         }
       }
+    }
+    if (state.kind === "coinrush" && (p.stunUntil ?? 0) <= t) {
+      // drift toward the next coins ahead (if the lane next to us is clear right now)
+      const taken = new Set(state.coinsTaken ?? []);
+      const next = coinsFor(state).find((c, i) => c.z > d1 + 2 && c.z < d1 + 30 && !taken.has(i));
+      if (next && next.lane !== p.lane && roll(state.seed, bi, t / 400) < 0.6) {
+        const to = p.lane + Math.sign(next.lane - p.lane);
+        const blocked = course.rows.some((row) => row.z > d1 && row.z < d1 + 8 && row.lanes[to]);
+        if (!blocked) p.lane = to;
+      }
+    }
+    if (state.kind === "coinrush") {
+      coinsFor(state).forEach((c, i) => {
+        if (c.z <= d0 || c.z > d1 || c.lane !== p.lane || (state.coinsTaken ?? []).includes(i)) return;
+        state.coinsTaken = [...(state.coinsTaken ?? []), i];
+        p.coins = (p.coins ?? 0) + c.v;
+      });
+      for (const c of state.loose ?? []) {
+        if (c.d <= d0 - 1 || c.d > d1 + 1 || c.lane !== p.lane) continue;
+        state.loose = state.loose.filter((x) => x.id !== c.id);
+        p.coins = (p.coins ?? 0) + c.n;
+      }
+    }
+    if (state.bomb?.holder === id && (p.stunUntil ?? 0) <= t) {
+      // steer toward the nearest runner ahead to hand the bomb over
+      const target = runners.filter((o) => o.id !== id && racingNow(o) && o.d > p.d && o.d - p.d < 25).sort((a, b) => a.d - b.d)[0];
+      if (target && target.lane !== p.lane && roll(state.seed, bi, t / 700) < 0.5) p.lane += Math.sign(target.lane - p.lane);
     }
     // mystery boxes (first come, first served), bananas, bowling balls
     course.boxes.forEach((b, i) => {
@@ -1071,6 +1256,19 @@ export function validateAction(state, playerId, action) {
       if ((state.hitLog ?? []).some((h) => h.kind === "bowling" && h.victim === playerId && h.ref === action.id)) return { ok: false, error: "no ball" };
       return { ok: true };
     }
+    case "coin": {
+      if (!me) return { ok: false, error: "join first" };
+      if (state.phase !== "race" || state.kind !== "coinrush" || me.outAt !== null) return { ok: false, error: "not racing" };
+      if (action.loose !== undefined) {
+        if (!(state.loose ?? []).some((c) => c.id === action.loose)) return { ok: false, error: "coin gone" };
+        return { ok: true };
+      }
+      if (!intIn(action.i, 0, 99999)) return { ok: false, error: "bad coin" };
+      if ((state.coinsTaken ?? []).includes(action.i)) return { ok: false, error: "coin gone" };
+      const c = coinsFor(state)[action.i];
+      if (!c || Math.abs(c.z - me.d) > 2 * POS_SLACK_M + 4) return { ok: false, error: "bad coin" };
+      return { ok: true };
+    }
     case "take": {
       if (!me) return { ok: false, error: "join first" };
       if (state.phase !== "race") return { ok: false, error: "not racing" };
@@ -1086,7 +1284,7 @@ export function validateAction(state, playerId, action) {
     case "rematch": {
       if (!me || me.bot) return { ok: false, error: "join first" };
       if (state.phase !== "results") return { ok: false, error: "race not over" };
-      if (state.cup && state.cup.race < CUP_RACES.length) return { ok: false, error: "the cup isn't over" };
+      if (state.cup && state.cup.race < state.cup.races.length) return { ok: false, error: "the cup isn't over" };
       return { ok: true };
     }
     case "again": {
@@ -1097,7 +1295,7 @@ export function validateAction(state, playerId, action) {
     case "next": {
       if (state.phase !== "results") return { ok: false, error: "race not over" };
       if (state.host !== playerId) return { ok: false, error: "Only the host can start the next race" };
-      if (!state.cup || state.cup.race >= CUP_RACES.length) return { ok: false, error: "no next race" };
+      if (!state.cup || state.cup.race >= state.cup.races.length) return { ok: false, error: "no next race" };
       return { ok: true };
     }
     case "leave":
@@ -1160,7 +1358,7 @@ export function applyAction(state0, playerId, action) {
       state.map = action.map;
       break;
     case "start":
-      state.cup = state.mode === "tournament" ? { race: 1, points: {} } : null;
+      state.cup = state.mode === "cup" ? newCup(t) : null;
       state.botFill = action.bots !== false;
       if (state.botFill) fillBots(state);
       startRace(state, t);
@@ -1169,7 +1367,7 @@ export function applyAction(state0, playerId, action) {
       state.rematch = [...new Set([...(state.rematch ?? []), playerId])];
       const voters = present(state).filter((id) => !state.players[id].bot);
       if (voters.every((id) => state.rematch.includes(id))) {
-        state.cup = state.mode === "tournament" ? { race: 1, points: {} } : null;
+        state.cup = state.mode === "cup" ? newCup(t) : null;
         startRace(state, t);
       }
       break;
@@ -1189,7 +1387,7 @@ export function applyAction(state0, playerId, action) {
         break;
       }
       const elapsed = Math.max(0, t - state.startAt);
-      const survival = state.kind === "survival";
+      const survival = isEndless(state.kind);
       if (survival && me.outAt !== null) {
         me.lane = action.lane;
         break;
@@ -1201,7 +1399,11 @@ export function applyAction(state0, playerId, action) {
       me.lane = action.lane;
       me.y = Math.max(0, Math.min(action.y, 5));
       me.act = action.act;
-      if (action.hits !== undefined) me.hits = action.hits;
+      if (action.hits !== undefined) {
+        // Coin Rush: every new hit spills some of your coins on the track
+        if (state.kind === "coinrush" && action.hits > me.hits) spillCoins(state, me, t);
+        me.hits = action.hits;
+      }
       if (action.pw !== undefined) me.pw = action.pw;
       // when this position was true, and how fast they were going: lets every
       // screen place this runner where they are *now*, not where they were
@@ -1210,11 +1412,8 @@ export function applyAction(state0, playerId, action) {
       if (action.sc !== undefined) me.sc = action.sc;
       if (action.cb !== undefined) me.cb = Math.max(me.cb ?? 0, action.cb);
       if (survival) {
-        if (me.hits >= LIVES) {
-          me.outAt = t;
-          me.act = "out";
-          me.pw = "";
-        }
+        if (state.kind === "survival" && me.hits >= LIVES) knockOut(me, t);
+        if (state.kind === "chase" && me.d <= brainDistance(elapsed / 1000)) knockOut(me, t);
         maybeEnd(state, t);
         break;
       }
@@ -1261,6 +1460,16 @@ export function applyAction(state0, playerId, action) {
       me.emoteAt = t;
       state.emoteSeq = (state.emoteSeq ?? 0) + 1;
       state.emotes = [...(state.emotes ?? []), { id: state.emoteSeq, by: playerId, e: action.e, at: t }].slice(-8);
+      break;
+    case "coin":
+      if (action.loose !== undefined) {
+        const c = state.loose.find((x) => x.id === action.loose);
+        state.loose = state.loose.filter((x) => x.id !== action.loose);
+        me.coins = (me.coins ?? 0) + (c?.n ?? 1);
+      } else {
+        state.coinsTaken = [...(state.coinsTaken ?? []), action.i];
+        me.coins = (me.coins ?? 0) + (coinsFor(state)[action.i]?.v ?? 1);
+      }
       break;
     case "take":
       // mystery boxes are first come, first served
@@ -1317,6 +1526,7 @@ export function applyAction(state0, playerId, action) {
       if (state.phase === "race") {
         stepBots(state, t);
         stepCloud(state, t);
+        stepMode(state, t);
         state.bananas = (state.bananas ?? []).filter((b) => b.kind !== "glue" || t - b.at < GLUE_MS);
       }
       maybeEnd(state, t);
@@ -1344,7 +1554,7 @@ export function rewards(state) {
   if (state.phase !== "results") return {};
   if (state.cup) {
     // tournaments pay medals once, for the final table
-    if (state.cup.race < CUP_RACES.length) return {};
+    if (state.cup.race < state.cup.races.length) return {};
     const table = cupStandings(state);
     const paying = humans(state).length >= MIN_RACERS_FOR_MEDALS;
     const out = {};
@@ -1358,7 +1568,7 @@ export function rewards(state) {
   const out = {};
   order.forEach((id, i) => {
     const p = state.players[id];
-    const done = state.kind === "survival" ? true : p.finish !== null;
+    const done = isEndless(state.kind) ? true : p.finish !== null;
     const medal = paying && !p.left && done ? MEDALS[i] ?? null : null;
     out[id] = { place: i + 1, medal };
   });
@@ -1383,14 +1593,16 @@ export function viewFor(state, playerId) {
     cup: state.cup
       ? {
           race: state.cup.race,
-          races: CUP_RACES,
+          races: state.cup.races,
           points: state.cup.points,
           table: cupStandings(state),
         }
       : null,
     lives: LIVES,
     limitAt:
-      state.kind === "survival"
+      state.kind === "coinrush"
+        ? state.startAt + COINRUSH_MS
+        : isEndless(state.kind)
         ? state.startAt + SURVIVAL_LIMIT_MS
         : state.firstFinishAt !== null
         ? Math.min(state.startAt + RACE_LIMIT_MS, state.firstFinishAt + AFTER_FIRST_MS)
@@ -1406,6 +1618,8 @@ export function viewFor(state, playerId) {
         rp: p.rp ?? 0,
         bot: Boolean(p.bot),
         warp: p.warp ?? 0,
+        coins: p.coins ?? 0,
+        booms: p.booms ?? 0,
         slot: p.slot,
         d: Math.round(p.d * 100) / 100,
         lane: p.lane,
@@ -1434,6 +1648,10 @@ export function viewFor(state, playerId) {
     hits: state.hitLog ?? [],
     rematch: state.rematch ?? [],
     cloud: state.cloud ?? null,
+    coinsTaken: state.coinsTaken ?? [],
+    loose: state.loose ?? [],
+    bomb: state.bomb ?? null,
+    blasts: state.blasts ?? [],
     punches: state.punches ?? [],
     botFill: state.botFill !== false,
   };

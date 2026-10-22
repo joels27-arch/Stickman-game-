@@ -32,7 +32,6 @@ import {
   survivalSpeed,
   runSpeed,
   BANANA_BEHIND_M,
-  CUP_RACES,
   CUP_POINTS,
   MAPS,
   EMOTES,
@@ -49,6 +48,10 @@ import {
   glueLane2,
   PUNCH_RANGE_M,
   CLOUD_MS,
+  brainDistance,
+  coinLines,
+  COINRUSH_MS,
+  isEndless,
 } from "/logic.js";
 
 // ── constants ───────────────────────────────────────────────────────────────
@@ -90,10 +93,20 @@ const countryName = (code) => (COUNTRIES.find(([c]) => c === code) || [])[1] || 
 const MODES = ["Solo", "Duo", "Trio", "Squad"];
 const GAME_MODE_INFO = {
   survival: { label: "Survival", icon: "❤️", tag: "Main mode", text: "3 hearts each. Last runner standing wins. Alone it's an endless run." },
-  sprint: { label: "Sprint", icon: "🏁", tag: "1 minute", text: "700 m to the finish line. Fastest time wins." },
-  tournament: { label: "Tournament", icon: "🏆", tag: "3 races", text: `Survival, Sprint, Survival. ${CUP_POINTS.slice(0, 3).join(" / ")} points per place. Most points wins.` },
+  chase: { label: "Brain Chase", icon: "🧠", tag: "Run for it", text: "A giant brain rolls after you and keeps speeding up. Caught = out." },
+  coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins. Get hit and you spill coins for the others." },
+  potato: { label: "Hot Potato", icon: "💣", tag: "Pass it on", text: "Bump into someone to pass the bomb. Hold it when it blows: lose a heart." },
+  cup: { label: "Party Cup", icon: "🏆", tag: "3 rounds", text: `3 random modes on 3 maps. ${CUP_POINTS.join(" / ")} points per place.` },
 };
-const KIND_LABEL = { survival: "Survival", sprint: "Sprint" };
+const KIND_LABEL = { survival: "Survival", chase: "Brain Chase", coinrush: "Coin Rush", potato: "Hot Potato", sprint: "Sprint" };
+/** One line on how to win, shown during the countdown. */
+const KIND_RULE = {
+  survival: "3 hearts · last one standing wins",
+  chase: "Don't let the brain catch you!",
+  coinrush: "Grab the most coins in 90 s",
+  potato: "Bump someone to pass the bomb!",
+  sprint: "First to the finish line",
+};
 const MAP_INFO = {
   meadow: { label: "Meadow", text: "Trees, bushes and a picket fence" },
   farm: { label: "Farm", text: "Wheat fields, barns and windmills" },
@@ -879,6 +892,7 @@ function onState(msg) {
     renderLobby(v);
   } else if (v.phase === "countdown" || v.phase === "race") {
     if (game.mode !== "race" || game.round !== v.round) enterRace(v);
+    else modeView(v);
   } else if (v.phase === "results") {
     if (game.mode === "race") finishRaceView(v);
     else if (game.mode === "results") renderResults(v);
@@ -1172,8 +1186,8 @@ function renderLobby(v) {
     }),
   );
   // start fetching the map's 3D props while everyone is still in the lobby
-  for (const key of gm === "tournament" ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
-  const what = gm === "tournament" ? "tournament" : gm === "survival" && n < 2 && !botsOn() ? "endless run" : `${GAME_MODE_INFO[gm].label} race`;
+  for (const key of gm === "cup" ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
+  const what = gm === "cup" ? "Party Cup" : gm === "survival" && n < 2 && !botsOn() ? "endless run" : GAME_MODE_INFO[gm].label;
   $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
   renderLineup(v, { isHost, gm, mp, mode, what });
   // once you've locked in your runner, the lobby is the line-up
@@ -1215,8 +1229,8 @@ $("#luGo").addEventListener("click", () => {
  */
 function renderLineup(v, { isHost, gm, mp, mode, what }) {
   $("#luCode").textContent = net.code;
-  $("#luMode").textContent = gm === "tournament" ? "Tournament" : gm === "survival" && v.players.length < 2 && !botsOn() ? "Endless run" : GAME_MODE_INFO[gm].label;
-  $("#luMap").textContent = gm === "tournament" ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${botsOn() && v.players.length < 4 ? "with bots" : mode}`;
+  $("#luMode").textContent = gm === "cup" ? "Party Cup" : gm === "survival" && v.players.length < 2 && !botsOn() ? "Endless run" : GAME_MODE_INFO[gm].label;
+  $("#luMap").textContent = gm === "cup" ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${botsOn() && v.players.length < 4 ? "with bots" : mode}`;
   const qs = dailyChallenges();
   const qd = dailyState();
   $("#luDaily").textContent = `📋 Challenges ${qs.filter((q) => qd.done[q.id]).length}/${qs.length}`;
@@ -1326,7 +1340,13 @@ function renderResults(v) {
     const survival = v.kind === "survival";
     const detail = p.left
       ? "left the race"
-      : survival
+      : v.kind === "coinrush"
+        ? `🪙 ${p.coins ?? 0} coins · ${Math.round(p.d)} m`
+        : v.kind === "chase"
+          ? `${Math.round(p.d)} m · ${p.outAt != null ? "caught by the brain" : "escaped!"}`
+          : v.kind === "potato"
+            ? `${Math.round(p.d)} m · ${Math.max(0, LIVES - (p.booms ?? 0))} ❤️ left`
+            : survival
         ? `${Math.round(p.d)} m · ${Math.max(0, LIVES - p.hits)} ❤️ left`
         : p.finish !== null
           ? `${p.hits} bump${p.hits === 1 ? "" : "s"}`
@@ -1367,8 +1387,8 @@ function renderResults(v) {
   $("#resPlace").innerHTML = myPlace ? `${myPlace}<sup>${ordinal(myPlace)}</sup>` : "–";
   $("#resTitle").textContent = cupDone
     ? myPlace === 1
-      ? "Tournament champion!"
-      : `Tournament: ${PLACE[myPlace - 1] ?? myPlace}`
+      ? "Party Cup champion!"
+      : `Party Cup: ${PLACE[myPlace - 1] ?? myPlace}`
     : solo && v.kind === "survival"
       ? `You ran ${Math.round(v.players[0]?.d ?? 0)} m${Math.round(v.players[0]?.d ?? 0) >= personalBest() ? " · new record!" : ` · best ${personalBest()} m`}`
       : myPlace === 1
@@ -1419,7 +1439,7 @@ function renderResults(v) {
   if (hasNext) {
     $("#nextBtn").replaceChildren(
       el("span", { class: "flagico", text: "🏆" }),
-      el("span", { text: `Race ${cup.race + 1}: ${KIND_LABEL[cup.races[cup.race]]}` }),
+      el("span", { text: `Round ${cup.race + 1}: ${KIND_LABEL[cup.races[cup.race]]}` }),
       el("span", { class: "arrow", text: "→" }),
     );
   }
@@ -1444,7 +1464,7 @@ function renderCup(v) {
     );
   });
   box.append(
-    el("h4", { text: done ? "🏆 Final tournament table" : `🏆 Tournament · after race ${cup.race} of ${cup.races.length}` }),
+    el("h4", { text: done ? "🏆 Final Party Cup table" : `🏆 Party Cup · after round ${cup.race} of ${cup.races.length}` }),
     el("table", {}, el("thead", {}, el("tr", {}, el("th", { text: "#" }), el("th", { text: "Runner" }), el("th", { text: "Points" }))), el("tbody", {}, ...rows)),
   );
 }
@@ -2573,6 +2593,135 @@ const world = (() => {
     }
   }
 
+  // ── mode objects: the giant brain, coins, the bomb, explosions ──
+  let modeKind = "";
+  let brainObj = null;
+  let bombObj = null;
+  let coinList = [];
+  let looseMeshes = new Map();
+  const coinGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.1, 20);
+  const coinMat = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.75, roughness: 0.25, emissive: 0x6b4a00, emissiveIntensity: 0.35 });
+  const bigCoinMat = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.8, roughness: 0.2, emissive: 0x7a3300, emissiveIntensity: 0.5 });
+  function makeCoin(big) {
+    const m = new THREE.Mesh(coinGeo, big ? bigCoinMat : coinMat);
+    m.rotation.x = Math.PI / 2;
+    const g = new THREE.Group();
+    g.add(m);
+    if (big) g.scale.setScalar(1.5);
+    return g;
+  }
+  function loadModeProp(name, size) {
+    if (assets.props[name] !== undefined) return Promise.resolve(assets.props[name]);
+    assets.props[name] = null;
+    return loadGLB(`/assets/${name}.glb`)
+      .then((g) => (assets.props[name] = fitProp(g.scene, size)))
+      .catch(() => (assets.props[name] = null));
+  }
+  function setupMode(kind, course) {
+    modeKind = kind;
+    if (brainObj) scene.remove(brainObj);
+    if (bombObj) scene.remove(bombObj);
+    brainObj = null;
+    bombObj = null;
+    coinList = [];
+    looseMeshes = new Map();
+    if (kind === "coinrush") {
+      coinLines(course).forEach((c, i) => {
+        const obj = makeCoin(c.v > 1);
+        obj.position.set(laneX(c.lane), 1.0, -c.z);
+        raceGroup.add(obj);
+        const entry = { obj, z: c.z, lane: c.lane, v: c.v, i, got: false };
+        coinList.push(entry);
+        cullables.push({ obj, z: c.z, coin: entry });
+      });
+    }
+    if (kind === "chase") {
+      brainObj = new THREE.Group();
+      const fallback = new THREE.Mesh(new THREE.SphereGeometry(2.6, 32, 24), new THREE.MeshStandardMaterial({ color: 0xff8fb8, roughness: 0.6 }));
+      fallback.position.y = 2.6;
+      brainObj.add(fallback);
+      scene.add(brainObj);
+      loadModeProp("brain", { width: 6.5, maxHeight: 6.5 }).then((m) => {
+        if (!m || !brainObj || modeKind !== "chase") return;
+        brainObj.remove(fallback);
+        const inner = m.clone();
+        const roll = new THREE.Group();
+        // spin around the brain's own centre
+        const box = new THREE.Box3().setFromObject(inner);
+        const c = box.getCenter(new THREE.Vector3());
+        inner.position.sub(c);
+        roll.add(inner);
+        roll.position.y = c.y;
+        roll.name = "roll";
+        brainObj.add(roll);
+      });
+    }
+    if (kind === "potato") {
+      bombObj = new THREE.Group();
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex("💣"), depthTest: false, transparent: true }));
+      spr.scale.set(1.2, 1.2, 1);
+      spr.renderOrder = 12;
+      bombObj.add(spr);
+      bombObj.visible = false;
+      scene.add(bombObj);
+      loadModeProp("bomb", { width: 0.95, maxHeight: 1.2 }).then((m) => {
+        if (!m || !bombObj || modeKind !== "potato") return;
+        bombObj.remove(spr);
+        bombObj.add(m.clone());
+      });
+    }
+  }
+  function syncMode(v, posOf, sn) {
+    if (modeKind === "chase" && brainObj) {
+      const bd = brainDistance(Math.max(0, (sn - v.startAt) / 1000));
+      brainObj.position.set(0, 0, -bd);
+      const roll = brainObj.getObjectByName("roll");
+      if (roll) roll.rotation.x = -bd / 3.2;
+      else brainObj.children[0].rotation.x = -bd / 2.6;
+    }
+    if (modeKind === "coinrush") {
+      const k = performance.now() / 1000;
+      for (const c of coinList) if (!c.got && c.obj.visible) c.obj.rotation.y = k * 3 + c.z;
+      const live = new Set();
+      for (const l of v.loose || []) {
+        live.add(l.id);
+        if (looseMeshes.has(l.id)) continue;
+        const g = new THREE.Group();
+        for (let n = 0; n < Math.min(5, l.n); n++) {
+          const c = makeCoin(false);
+          c.position.set((n % 3 - 1) * 0.35, 0.25 + Math.floor(n / 3) * 0.3, (n % 2) * 0.3);
+          g.add(c);
+        }
+        g.position.set(laneX(l.lane), 0.4, -l.d);
+        raceGroup.add(g);
+        looseMeshes.set(l.id, g);
+      }
+      for (const [id, g] of looseMeshes) {
+        if (live.has(id)) {
+          g.rotation.y += 0.05;
+          continue;
+        }
+        raceGroup.remove(g);
+        looseMeshes.delete(id);
+      }
+    }
+    if (modeKind === "potato" && bombObj) {
+      const at = v.bomb ? posOf(v.bomb.holder) : null;
+      bombObj.visible = Boolean(at);
+      if (at) {
+        const k = performance.now() / 1000;
+        const left = (v.bomb.until - sn) / 1000;
+        const pulse = left < 3 ? 1 + Math.sin(k * 25) * 0.12 : 1 + Math.sin(k * 6) * 0.05;
+        bombObj.position.set(at.x, at.y + CHAR_H + 0.9, at.z);
+        bombObj.scale.setScalar(pulse);
+        bombObj.rotation.y = k * 2;
+      }
+    }
+  }
+  function explode(x, z) {
+    burst(x, 1.2, z, ["#ff9f1c", "#ff4d00", "#ffe066", "#333333"], 90);
+  }
+
   // the thundercloud: a dark storm sprite hovering over whoever holds it
   let cloudSpr = null;
   function syncCloud(cloud, posOf) {
@@ -2622,7 +2771,7 @@ const world = (() => {
     if (endless) moveScenery(d);
     for (const c of cullables) {
       const z = c.keep ? c.z + shift : c.z;
-      c.obj.visible = z > d - VIEW_BEHIND && z < d + VIEW_AHEAD + (c.wide ? 60 : 0) && !c.box?.taken;
+      c.obj.visible = z > d - VIEW_BEHIND && z < d + VIEW_AHEAD + (c.wide ? 60 : 0) && !c.box?.taken && !c.coin?.got;
     }
     for (const c of sceneryCull) {
       const z = c.z + shift;
@@ -2698,6 +2847,12 @@ const world = (() => {
     setEndless,
     syncBananas,
     syncCloud,
+    setupMode,
+    syncMode,
+    explode,
+    get coins() {
+      return coinList;
+    },
     syncBowls,
     burst,
     fireworks,
@@ -2731,7 +2886,9 @@ const world = (() => {
 // ── race state ──────────────────────────────────────────────────────────────
 
 const game = { mode: "home", round: -1, kind: "survival", len: TRACK_LEN };
-const isSurvival = () => game.kind === "survival";
+// every mode now runs on the endless course; only Survival uses obstacle hearts
+const isSurvival = () => isEndless(game.kind);
+const heartsFromHits = () => game.kind === "survival";
 
 const me = {
   d: 0,
@@ -2820,7 +2977,7 @@ function enterRace(v) {
   game.round = v.round;
   game.soloStarting = false;
   game.lookBack = false;
-  game.soloRun = isSurvival() && v.players.length === 1;
+  game.soloRun = v.kind === "survival" && v.players.length === 1;
   game.bestBeaten = false;
   game.bananasThrown = 0;
   game.kos = 0;
@@ -2908,8 +3065,18 @@ function enterRace(v) {
   $(".track-bar").classList.toggle("endless", isSurvival());
   renderHearts(false);
   const tag = $("#raceTag");
-  tag.classList.toggle("show", Boolean(v.cup));
-  if (v.cup) tag.textContent = `🏆 Race ${v.cup.race}/${v.cup.races.length} · ${KIND_LABEL[game.kind]} · ${MAP_INFO[map].label}`;
+  const info = GAME_MODE_INFO[game.kind] ?? GAME_MODE_INFO.survival;
+  tag.classList.add("show");
+  tag.replaceChildren(
+    el("b", { text: v.cup ? `🏆 Round ${v.cup.race}/${v.cup.races.length} · ${info.icon} ${KIND_LABEL[game.kind]}` : `${info.icon} ${KIND_LABEL[game.kind] ?? ""}` }),
+    el("small", { text: KIND_RULE[game.kind] ?? "" }),
+  );
+  setTimeout(() => game.round === v.round && tag.classList.add("small"), 7000);
+  tag.classList.remove("small");
+  world.setupMode(game.kind, race.course);
+  game.lastBlast = Math.max(0, ...(v.blasts || []).map((b) => b.id));
+  game.coinGot = new Set();
+  renderModeHud();
   const touch = matchMedia("(pointer: coarse)").matches;
   const hint = $("#controlsHint");
   hint.textContent = touch
@@ -2924,7 +3091,14 @@ function finishRaceView(v) {
   // brief celebration in 3D, then the results card
   game.mode = "results-pending";
   saveBest();
-  banner(isSurvival() ? (me.out ? "GAME OVER" : "LAST ONE STANDING!") : me.finished ? "FINISHED!" : "TIME UP!");
+  const won = v.standings?.[0] === playerId;
+  banner(
+    game.kind === "coinrush"
+      ? won ? "MOST COINS!" : "TIME UP!"
+      : isSurvival()
+        ? me.out && !won ? "GAME OVER" : "LAST ONE STANDING!"
+        : me.finished ? "FINISHED!" : "TIME UP!",
+  );
   // the last runner standing gets fireworks over their head
   if (isSurvival()) {
     const top = v.standings?.[0];
@@ -3112,6 +3286,7 @@ function stepMe(dt) {
   if (me.frozenT > 0) base *= 0.55;
   if (me.glueT > 0) base *= GLUE_SLOW;
   if (me.staggerT > 0) base *= 0.6;
+  if (net.view?.bomb?.holder === playerId) base *= 1.15; // catch someone and pass it on!
   const fast = base + (isSurvival() ? SURVIVAL_BOOST : BOOST_SPEED - BASE_SPEED);
   const rocket = isSurvival() ? base + SURVIVAL_ROCKET : ROCKET_SPEED;
   let target = me.power === "rocket" ? rocket : me.boostT > 0 ? fast : base;
@@ -3124,6 +3299,7 @@ function stepMe(dt) {
   const prevD = me.d;
   me.d += me.speed * dt;
 
+  modeTick(prevD, v);
   if (!isSurvival() && !me.finished && me.d >= TRACK_LEN) {
     me.finished = true;
     sfx.finish();
@@ -3173,7 +3349,7 @@ function stepMe(dt) {
   // survival: hearts floating over the track give back a lost heart
   for (const h of world.hearts) {
     if (h.taken || h.z < prevD - 0.8 || h.z > me.d + 0.8 || Math.abs(me.x - h.lane) > 0.6) continue;
-    if (!isSurvival() || me.hits <= 0) continue; // full health: leave it
+    if (!heartsFromHits() || me.hits <= 0) continue; // full health: leave it
     h.taken = true;
     me.hits -= 1;
     renderHearts(false);
@@ -3263,7 +3439,7 @@ function hit(kind) {
   game.lastHitD = me.d;
   me.combo = 0;
   renderCombo();
-  if (isSurvival()) {
+  if (heartsFromHits()) {
     renderHearts(true);
     if (me.hits >= LIVES) {
       knockOut();
@@ -4021,16 +4197,18 @@ $("#specNext").addEventListener("click", () => cycleSpectate(1));
 
 function renderHearts(pop) {
   const box = $("#hearts");
-  box.style.display = isSurvival() ? "" : "none";
-  if (!isSurvival()) return;
-  const left = Math.max(0, LIVES - me.hits);
+  const shown = game.kind === "survival" || game.kind === "potato";
+  box.style.display = shown ? "" : "none";
+  if (!shown) return;
+  const lost = game.kind === "potato" ? net.view?.players.find((p) => p.id === playerId)?.booms ?? 0 : me.hits;
+  const left = Math.max(0, LIVES - lost);
   box.replaceChildren(
     ...Array.from({ length: LIVES }, (_, i) => el("i", { class: i < left ? "" : `lost${pop && i === left ? " pop" : ""}`, text: "❤️" })),
   );
 }
 
 /** Third hit in survival: down for good, then watch whoever is still running. */
-function knockOut() {
+function knockOut(why = "") {
   me.out = true;
   saveBest();
   me.items = [];
@@ -4043,10 +4221,11 @@ function knockOut() {
   shake = 0.5;
   sfx.hit();
   if (navigator.vibrate) navigator.vibrate([80, 60, 120]);
-  banner("OUT!", 1600);
+  banner(why === "brain" ? "🧠 THE BRAIN GOT YOU!" : why === "bomb" ? "💥 KABOOM! OUT!" : "OUT!", 1600);
   sendPos(true);
   const hint = $("#controlsHint");
-  hint.textContent = TOUCH ? "No hearts left · tap ◀ ▶ to watch someone else" : "No hearts left · ← → to watch someone else";
+  const what = why === "brain" ? "Caught" : why === "bomb" ? "Blown up" : "No hearts left";
+  hint.textContent = TOUCH ? `${what} · tap ◀ ▶ to watch someone else` : `${what} · ← → to watch someone else`;
   hint.style.opacity = "1";
   game.spectating = null;
   game.shownSpectate = undefined;
@@ -4266,6 +4445,97 @@ function checkZaps() {
     me.invulnT = 0; // lightning gets through the after-hit blink
     hit("zap");
   }
+}
+
+// ── modes on your screen: the brain, coins, the bomb ──
+
+function myCoins() {
+  const server = net.view?.players.find((p) => p.id === playerId)?.coins ?? 0;
+  return Math.max(server, game.coinsShown ?? 0);
+}
+/** Per-frame: brain catch, coin pickups. */
+function modeTick(prevD, v) {
+  if (me.finished || me.out) return;
+  const elapsed = (serverNow() - v.startAt) / 1000;
+  if (game.kind === "chase" && elapsed > 0 && brainDistance(elapsed) >= me.d) {
+    knockOut("brain");
+    return;
+  }
+  if (game.kind === "coinrush") {
+    for (const c of world.coins) {
+      if (c.got || c.z < prevD - 0.8 || c.z > me.d + 0.8 || Math.abs(me.x - c.lane) > 0.6 || me.y > 2.2) continue;
+      c.got = true;
+      c.obj.visible = false;
+      game.coinsShown = myCoins() + c.v;
+      act({ type: "coin", i: c.i });
+      sfx.pickup();
+      if (c.v > 1) banner(`+${c.v} 🪙`, 600);
+    }
+    for (const c of v.loose || []) {
+      if (game.coinGot.has(`l${c.id}`) || c.d < prevD - 1 || c.d > me.d + 1 || Math.abs(me.x - c.lane) > 0.7) continue;
+      game.coinGot.add(`l${c.id}`);
+      game.coinsShown = myCoins() + c.n;
+      act({ type: "coin", loose: c.id });
+      sfx.pickup();
+      banner(`+${c.n} 🪙`, 600);
+    }
+  }
+  renderModeHud();
+}
+/** New state from the room: knockouts it decided, bomb blasts, coins someone else took. */
+function modeView(v) {
+  const mine = v.players.find((p) => p.id === playerId);
+  if (mine && mine.outAt != null && !me.out && game.mode === "race") knockOut(v.kind === "chase" ? "brain" : v.kind === "potato" ? "bomb" : "");
+  for (const b of v.blasts || []) {
+    if (b.id <= (game.lastBlast ?? 0)) continue;
+    game.lastBlast = b.id;
+    const at = b.holder === playerId ? -me.d : -(remote.map.get(b.holder)?.dispD ?? b.d);
+    world.explode(laneX(b.lane), at);
+    sfx.hit();
+    if (b.holder === playerId) {
+      shake = 0.6;
+      if (navigator.vibrate) navigator.vibrate([60, 40, 160]);
+      renderHearts(true);
+      if (!me.out) {
+        me.stumbleT = STUMBLE_S;
+        banner("💥 KABOOM! −1 ❤️", 1200);
+      }
+    } else feed(`💥 The bomb blew up on ${nameOf(b.holder)}!`);
+  }
+  if (game.kind === "coinrush") {
+    // coins someone else grabbed disappear for us too
+    const taken = new Set(v.coinsTaken || []);
+    for (const c of world.coins) if (taken.has(c.i) && !c.got) {
+      c.got = true;
+      c.obj.visible = false;
+    }
+    if (mine && (game.coinsShown ?? 0) > mine.coins + 12) game.coinsShown = mine.coins; // a pickup we lost the race for
+  }
+}
+function renderModeHud() {
+  const box = $("#modeHud");
+  const v = net.view;
+  if (!v || game.mode !== "race") {
+    box.hidden = true;
+    return;
+  }
+  if (game.kind === "chase") {
+    const gap = me.d - brainDistance((serverNow() - v.startAt) / 1000);
+    box.hidden = me.out;
+    box.className = `mode-hud chase${gap < 15 ? " danger" : ""}`;
+    box.textContent = `🧠 ${Math.max(0, Math.round(gap))} m behind you`;
+    $("#brainFx").classList.toggle("on", !me.out && gap < 15);
+  } else if (game.kind === "coinrush") {
+    box.hidden = false;
+    box.className = "mode-hud coins";
+    box.textContent = `🪙 ${myCoins()}`;
+  } else if (game.kind === "potato") {
+    const mineBomb = v.bomb?.holder === playerId;
+    box.hidden = !mineBomb || me.out;
+    box.className = "mode-hud bomb";
+    const left = v.bomb ? (v.bomb.until - serverNow()) / 1000 : 0;
+    box.textContent = left < 3.5 ? `💣 ${Math.max(0, left).toFixed(1)} s · PASS IT!` : "💣 You have the bomb! Bump into someone!";
+  } else box.hidden = true;
 }
 
 /** Mind swap moved us (our warp went up), or someone punched us. */
@@ -4545,6 +4815,10 @@ function frame(now) {
       return g ? g.position : null;
     });
     renderCloudHud();
+    if (net.view) world.syncMode(net.view, (id) => {
+      const g = id === playerId ? me.runner?.group : remote.map.get(id)?.runner?.group;
+      return g ? g.position : null;
+    }, serverNow());
     world.syncBowls(net.view?.bowls || [], serverNow());
     // feel the speed: wider view and speed lines on a rocket or boost
     const zoom = me.power === "rocket" ? 80 : me.boostT > 0 ? 70 : 62;
@@ -4611,7 +4885,12 @@ function updateHud() {
       const r = remote.map.get(p.id);
       return { id: p.id, d: r ? r.dispD : p.d, finish: p.finish, outAt: p.outAt };
     });
-  if (isSurvival()) {
+  if (game.kind === "coinrush") {
+    const coinsOf = (id) => (id === playerId ? myCoins() : net.view?.players.find((p) => p.id === id)?.coins ?? 0);
+    entries.sort((a, b) => coinsOf(b.id) - coinsOf(a.id) || b.d - a.d);
+    const left = Math.max(0, (v.startAt + COINRUSH_MS - sn) / 1000);
+    $("#distText").textContent = `🪙 ${myCoins()} · ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, "0")} left`;
+  } else if (isSurvival()) {
     // still running first (furthest ahead), then whoever lasted longest
     entries.sort((a, b) => (b.outAt ?? Infinity) - (a.outAt ?? Infinity) || b.d - a.d);
     const alive = entries.filter((e) => e.outAt === null).length;

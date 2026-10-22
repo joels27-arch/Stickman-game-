@@ -34,7 +34,12 @@ function lobbyOf(n: number): S {
 
 /** The old 700 m race (survival is the default mode now). */
 function sprint(s: S): S {
-  return act(s, "p0", { type: "mode", mode: "sprint" });
+  // no mode starts a sprint any more, but the finish-line race still works
+  return { ...s, mode: "sprint" };
+}
+/** Party Cups pick random rounds; tests pin them to plain survival rounds. */
+function pinCup(s: S, races = ["survival", "survival", "survival"]): S {
+  return { ...s, kind: races[s.cup.race - 1], cup: { ...s.cup, races } };
 }
 
 describe("lobby", () => {
@@ -325,39 +330,47 @@ describe("survival (3 hearts)", () => {
 
   it("ignores positions once you're out and lets nobody else pick the mode", () => {
     let s = survival(2);
-    expect(reject(lobbyOf(2), "p1", { type: "mode", mode: "sprint" })).toMatch(/host/);
+    expect(reject(lobbyOf(2), "p1", { type: "mode", mode: "chase" })).toMatch(/host/);
+    expect(reject(lobbyOf(2), "p0", { type: "mode", mode: "sprint" })).toBeTruthy();
     expect(reject(lobbyOf(2), "p0", { type: "mode", mode: "marathon" })).toBeTruthy();
     s = act(s, "p0", pos(50, s.startAt + 5000, 3));
     expect(s.phase).toBe("results");
   });
 });
 
-describe("tournament", () => {
+describe("party cup", () => {
   const pos = (d: number, t: number, hits = 0) => ({ type: "pos", d, lane: 0, y: 0, act: "run", hits, t });
 
-  it("runs three races, adds up points, and pays medals only for the final table", () => {
-    let s = act(lobbyOf(3), "p0", { type: "mode", mode: "tournament" });
+  it("plays three different random rounds", () => {
+    let s = act(lobbyOf(2), "p0", { type: "mode", mode: "cup" });
     s = act(s, "p0", { type: "start", bots: false, t: T0 });
+    expect(s.cup.races).toHaveLength(3);
+    expect(new Set(s.cup.races).size).toBe(3);
+    expect(s.cup.races.every((k: string) => L.ROUND_KINDS.includes(k))).toBe(true);
+    expect(s.kind).toBe(s.cup.races[0]);
+  });
+
+  it("adds up points over three rounds and pays medals only for the final table", () => {
+    let s = act(lobbyOf(3), "p0", { type: "mode", mode: "cup" });
+    s = pinCup(act(s, "p0", { type: "start", bots: false, t: T0 }));
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
-    // race 1 (survival): p2 wins, p0 second, p1 out first
-    expect(s.kind).toBe(L.CUP_RACES[0]);
+    // round 1: p2 wins, p0 second, p1 out first
     s = act(s, "p1", pos(40, s.startAt + 5000, 3));
     s = act(s, "p0", pos(90, s.startAt + 9000, 3));
     expect(s.phase).toBe("results");
     expect(s.cup.points).toEqual({ p2: 10, p0: 5, p1: 3 });
     expect(L.rewards(s)).toEqual({});
     expect(reject(s, "p1", { type: "next" })).toMatch(/host/);
+    expect(reject(s, "p0", { type: "rematch" })).toMatch(/cup/);
 
-    // race 2 (sprint): p0, p1, p2
+    // round 2: p0 wins
     s = act(s, "p0", { type: "next", t: s.endAt + 5000 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
-    expect(s.kind).toBe(L.CUP_RACES[1]);
-    s = act(s, "p0", pos(L.TRACK_LEN, s.startAt + 50_000));
-    s = act(s, "p1", pos(L.TRACK_LEN, s.startAt + 51_000));
-    s = act(s, "p2", pos(L.TRACK_LEN, s.startAt + 52_000));
+    s = act(s, "p2", pos(40, s.startAt + 5000, 3));
+    s = act(s, "p1", pos(60, s.startAt + 6000, 3));
     expect(s.cup.points).toEqual({ p2: 13, p0: 15, p1: 8 });
 
-    // race 3 (survival): p1 wins
+    // round 3: p1 wins
     s = act(s, "p0", { type: "next", t: s.endAt + 5000 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     s = act(s, "p2", pos(40, s.startAt + 5000, 3));
@@ -374,7 +387,7 @@ describe("tournament", () => {
     // back to the lobby clears the cup
     s = act(s, "p0", { type: "again", t: s.endAt + 5000 });
     expect(s.cup).toBeNull();
-    expect(s.mode).toBe("tournament");
+    expect(s.mode).toBe("cup");
   });
 });
 
@@ -518,22 +531,18 @@ describe("rounds get faster, boxes are first come first served", () => {
 });
 
 describe("maps", () => {
-  it("lets the host pick the map, and a tournament tours all of them", () => {
+  it("lets the host pick the map, and a Party Cup tours all of them", () => {
     let s = act(lobbyOf(2), "p0", { type: "map", map: "farm" });
     expect(reject(s, "p1", { type: "map", map: "beach" })).toMatch(/host/);
     expect(reject(s, "p0", { type: "map", map: "moon" })).toBeTruthy();
     let r = act(s, "p0", { type: "start", bots: false, t: T0 });
     expect((L.viewFor(r, "p1") as any).raceMap).toBe("farm");
-    s = act(s, "p0", { type: "mode", mode: "tournament" });
-    s = act(s, "p0", { type: "start", bots: false, t: T0 });
+    s = act(s, "p0", { type: "mode", mode: "cup" });
+    s = pinCup(act(s, "p0", { type: "start", bots: false, t: T0 }));
     const seen = [s.raceMap];
     for (let race = 2; race <= 3; race++) {
       s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
       s = act(s, "p1", { type: "pos", d: 10, lane: 1, y: 0, act: "run", hits: 3, t: s.startAt + 1000 });
-      if (s.kind === "sprint") {
-        s = act(s, "p0", { type: "pos", d: L.TRACK_LEN, lane: 0, y: 0, act: "run", t: s.startAt + 60_000 });
-        s = act(s, "p1", { type: "pos", d: L.TRACK_LEN, lane: 1, y: 0, act: "run", t: s.startAt + 61_000 });
-      }
       s = act(s, "p0", { type: "next", t: s.endAt + 1000 });
       seen.push(s.raceMap);
     }
@@ -662,7 +671,7 @@ describe("bots", () => {
 
   it("finish a sprint", () => {
     let s = lobbyOf(1);
-    s = act(s, "p0", { type: "mode", mode: "sprint" });
+    s = sprint(s);
     s = act(s, "p0", { type: "start", t: T0 + 50 });
     s = race(s, (x) => x.phase === "results");
     const bots = Object.values(s.players).filter((p: any) => p.bot) as any[];
@@ -752,5 +761,76 @@ describe("new power-ups", () => {
     expect(s.punches.at(-1)).toMatchObject({ by: "p0", target: "p1", dir: 1 });
     s = act(s, "p1", { type: "pos", d: 80, lane: 2, y: 0, act: "run", t: at(s, 6000) });
     expect(reject(s, "p0", { type: "punch", target: "p1" })).toBe("too far");
+  });
+});
+
+describe("new modes", () => {
+  function start(mode: string, n = 2): S {
+    let s = act(lobbyOf(n), "p0", { type: "mode", mode });
+    s = act(s, "p0", { type: "start", bots: false, t: T0 });
+    return L.applyAction(s, "SYS", { type: "tick", t: s.startAt + 5 });
+  }
+  const at = (s: S, ms: number) => s.startAt + ms;
+  const pos = (d: number, t: number, extra: Record<string, unknown> = {}) => ({ type: "pos", d, lane: 0, y: 0, act: "run", hits: 0, t, ...extra });
+
+  it("brain chase: the brain speeds up and catches whoever falls behind", () => {
+    expect(L.brainDistance(0)).toBe(-L.CHASE_GAP_M);
+    expect(L.brainDistance(60)).toBeGreaterThan(L.brainDistance(30) * 2);
+    let s = start("chase");
+    // p0 keeps up, p1 dawdles
+    s = act(s, "p0", pos(200, at(s, 15000)));
+    s = act(s, "p1", pos(60, at(s, 15000)));
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, 16000) });
+    expect(L.brainDistance(16)).toBeGreaterThan(60);
+    expect(s.players.p1.outAt).not.toBeNull();
+    expect(s.players.p0.outAt).toBeNull();
+    expect(s.phase).toBe("results");
+    expect(L.standings(s)[0]).toBe("p0");
+  });
+
+  it("coin rush: coins sit in open lanes, are first come first served, and hits spill them", () => {
+    let s = start("coinrush");
+    const coins = L.coinLines(L.buildCourse(s.seed, L.SURVIVAL_LEN));
+    expect(coins.length).toBeGreaterThan(50);
+    const c0 = coins[0]!;
+    s = act(s, "p0", pos(c0.z, at(s, 6000)));
+    s = act(s, "p0", { type: "coin", i: 0, t: at(s, 6000) });
+    expect(reject(s, "p1", { type: "coin", i: 0 })).toBe("coin gone");
+    for (let i = 1; i < 6; i++) {
+      s = act(s, "p0", pos(coins[i]!.z, at(s, 6000 + i * 200)));
+      s = act(s, "p0", { type: "coin", i, t: at(s, 6000 + i * 200) });
+    }
+    const had = s.players.p0.coins;
+    expect(had).toBeGreaterThanOrEqual(6);
+    s = act(s, "p0", pos(coins[5]!.z + 5, at(s, 8000), { hits: 1 }));
+    expect(s.players.p0.coins).toBe(had - L.COIN_SPILL);
+    expect(s.loose).toHaveLength(1);
+    s = act(s, "p1", { type: "coin", loose: s.loose[0].id, t: at(s, 8100) });
+    expect(s.players.p1.coins).toBe(L.COIN_SPILL);
+    // most coins wins when the clock runs out
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, L.COINRUSH_MS + 10) });
+    expect(s.phase).toBe("results");
+    expect(L.standings(s)[0]).toBe("p1");
+  });
+
+  it("hot potato: the bomb appears, passes on contact, and costs the holder a heart", () => {
+    let s = start("potato");
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, L.POTATO_FIRST_MS + 10) });
+    expect(s.bomb).not.toBeNull();
+    const first = s.bomb.holder;
+    const other = first === "p0" ? "p1" : "p0";
+    // run into the other runner: it passes
+    s = act(s, first, pos(50, at(s, 4000)));
+    s = act(s, other, pos(50.5, at(s, 4000)));
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, 4100) });
+    expect(s.bomb.holder).toBe(other);
+    // obstacle hits don't cost hearts in hot potato
+    s = act(s, other, pos(60, at(s, 4500), { hits: 2 }));
+    expect(s.players[other].outAt).toBeNull();
+    s = act(s, other, pos(90, at(s, 6000), { lane: 3 }));
+    s = L.applyAction(s, "SYS", { type: "tick", t: s.bomb.until + 1 });
+    expect(s.players[other].booms).toBe(1);
+    expect(s.blasts).toHaveLength(1);
+    expect(s.bomb).toBeNull();
   });
 });
