@@ -939,6 +939,9 @@ function renderLobby(v) {
   const n = v.players.filter((p) => !p.gone).length;
   const mode = MODES[Math.max(0, Math.min(n, 4) - 1)];
   const gm = v.mode || "survival";
+  // only the host chooses mode and map; invited friends just pick a runner
+  $("#hostPicks").hidden = !isHost;
+  $("#luModeBox").hidden = !isHost;
   const modePick = $("#modePick");
   modePick.replaceChildren(
     ...Object.entries(GAME_MODE_INFO).map(([key, info]) => {
@@ -3111,6 +3114,26 @@ const CHALLENGE_POOL = {
   ],
 };
 const CHALLENGE_COINS = { easy: 100, medium: 200, hard: 400 };
+const STAT_ICON = {
+  dist: "/assets/ui_shoe.webp",
+  boxes: "/assets/ui_box.webp",
+  bananas: "/assets/pw_banana.png",
+  combo: "/assets/ui_flame.webp",
+  nohit: "/assets/pw_shield.png",
+  survive: "/assets/ui_watch.webp",
+  style: "/assets/ui_star.webp",
+};
+/** "05:12:33" until local midnight, when the day's rewards reset. */
+function untilMidnight() {
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const t = Math.max(0, Math.floor((end - now) / 1000));
+  return [Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60].map((x) => String(x).padStart(2, "0")).join(":");
+}
+setInterval(() => {
+  if (!$("#questModal").hidden) $("#questReset").textContent = untilMidnight();
+  if (!$("#streakModal").hidden && streakState().claimedToday) $("#streakClaim").textContent = `Next reward in ${untilMidnight()}`;
+}, 1000);
 function dayKey(d = new Date()) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
@@ -3163,20 +3186,26 @@ function renderDaily() {
   const n = qs.filter((q) => st.done[q.id]).length;
   $("#questCount").textContent = `${n}/${qs.length}`;
   $("#questPill").classList.toggle("done", n === qs.length);
-  $("#questSub").textContent = n === qs.length ? "All done! New challenges tomorrow." : "New challenges every day. Each one pays coins.";
+  $("#questSub").textContent = n === qs.length ? "All done! Come back tomorrow." : `${n} of ${qs.length} done`;
+  $("#questReset").textContent = untilMidnight();
   $("#questList").replaceChildren(
     ...qs.map((q) => {
       const have = Math.min(st.best[q.id] ?? 0, q.goal);
       const done = Boolean(st.done[q.id]);
-      const bar = el("div", { class: "qbar" }, el("i", { style: `width:${Math.round((have / q.goal) * 100)}%` }));
+      const pct = Math.round((have / q.goal) * 100);
       return el(
         "div",
         { class: `quest ${q.tier}${done ? " done" : ""}` },
-        el("span", { class: "qtier", text: q.tier }),
-        el("b", { text: q.text }),
-        bar,
-        el("small", { text: done ? "Done ✓" : `${have} / ${q.goal}` }),
-        el("span", { class: "qreward" }, el("i", { class: "coin" }), el("b", { text: `+${q.coins}` })),
+        el("div", { class: "qicon" }, el("img", { src: STAT_ICON[q.stat], alt: "" })),
+        el(
+          "div",
+          { class: "qmain" },
+          el("span", { class: "qtier", text: q.tier }),
+          el("b", { text: q.text }),
+          el("div", { class: "qbar" }, el("i", { style: `width:${pct}%` }), el("span", { text: done ? "Complete!" : `${have} / ${q.goal}` })),
+        ),
+        el("div", { class: "qreward" }, el("img", { src: "/assets/ui_c1.webp", alt: "" }), el("b", { text: `+${q.coins}` })),
+        done ? el("span", { class: "qstamp", text: "Done ✓" }) : null,
       );
     }),
   );
@@ -3193,13 +3222,13 @@ renderDaily();
 // ── login streak: come back every day, day 7 pays big ──
 
 const STREAK_REWARDS = [
-  { coins: 50 },
-  { coins: 75 },
-  { coins: 100 },
-  { coins: 150 },
-  { coins: 200 },
-  { coins: 300 },
-  { coins: 750, medal: "gold" },
+  { coins: 50, img: "/assets/ui_c1.webp" },
+  { coins: 75, img: "/assets/ui_c1.webp" },
+  { coins: 100, img: "/assets/ui_c2.webp" },
+  { coins: 150, img: "/assets/ui_c2.webp" },
+  { coins: 200, img: "/assets/ui_c3.webp" },
+  { coins: 300, img: "/assets/ui_c3.webp" },
+  { coins: 750, medal: "gold", img: "/assets/ui_chest.webp" },
 ];
 function streakState() {
   let s = {};
@@ -3217,29 +3246,31 @@ function renderStreak() {
   $("#streakPill").querySelector(".dot").hidden = st.claimedToday;
   $("#streakPill").classList.toggle("ready", !st.claimedToday);
   $("#streakSub").textContent = st.claimedToday
-    ? "Claimed for today. Come back tomorrow to keep your streak!"
+    ? "See you tomorrow, keep it going!"
     : st.broken
-      ? "Your streak reset. Log in every day to reach the day 7 jackpot!"
-      : "Log in every day. Each day pays more, and day 7 is the jackpot!";
+      ? "Streak lost. Start again!"
+      : "Every day pays more. Day 7 is the jackpot!";
+  $("#streakCount").textContent = String(st.claimedToday ? st.day : st.next - 1);
   $("#streakGrid").replaceChildren(
     ...STREAK_REWARDS.map((r, i) => {
       const n = i + 1;
       const claimed = st.claimedToday ? n <= st.day : n < st.next;
-      const today = n === st.next;
+      const today = n === st.next && !st.claimedToday;
       return el(
         "div",
-        { class: `sday${claimed ? " claimed" : ""}${today ? " today" : ""}${n === 7 ? " jackpot" : ""}` },
-        el("small", { text: today ? "Today" : `Day ${n}` }),
-        n === 7 ? el("span", { class: "chest", text: "🎁" }) : el("i", { class: "coin big" }),
+        { class: `sday${claimed ? " claimed" : ""}${today ? " today" : ""}${n === 7 ? " jackpot" : ""}`, style: `--i:${i}` },
+        el("small", { text: today ? "Today" : n === 7 ? "Day 7 · Jackpot" : `Day ${n}` }),
+        el("div", { class: "sart" }, today ? el("i", { class: "rays" }) : null, el("img", { src: r.img, alt: "" })),
         el("b", { text: r.coins.toLocaleString() }),
-        r.medal ? el("em", { text: "+ gold medal" }) : null,
+        r.medal ? el("em", {}, el("img", { src: MEDAL_IMG.gold, alt: "" }), el("span", { text: "+ gold medal" })) : null,
         claimed ? el("span", { class: "tick", text: "✓" }) : null,
       );
     }),
   );
   const btn = $("#streakClaim");
   btn.disabled = st.claimedToday;
-  btn.textContent = st.claimedToday ? "Come back tomorrow" : `Claim ${STREAK_REWARDS[st.next - 1].coins} coins`;
+  btn.classList.toggle("off", st.claimedToday);
+  btn.textContent = st.claimedToday ? `Next reward in ${untilMidnight()}` : `Claim ${STREAK_REWARDS[st.next - 1].coins.toLocaleString()} coins`;
 }
 function claimStreak() {
   const st = streakState();

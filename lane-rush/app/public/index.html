@@ -57,8 +57,8 @@
       <div class="roster" id="homeRoster" hidden></div>
       <div class="home-dock">
         <div class="quest-row">
-          <button id="streakPill" class="pill streak" type="button"><span class="pi">🔥</span><span><b id="streakDay">Day 1</b><small>Daily reward</small></span><i class="dot" hidden></i></button>
-          <button id="questPill" class="pill quests" type="button"><span class="pi">📋</span><span><b id="questCount">0/3</b><small>Challenges</small></span></button>
+          <button id="streakPill" class="pill streak" type="button"><img class="pi" src="/assets/ui_flame.webp" alt="" /><span><b id="streakDay">Day 1</b><small>Daily reward</small></span><i class="dot" hidden></i></button>
+          <button id="questPill" class="pill quests" type="button"><img class="pi" src="/assets/ui_star.webp" alt="" /><span><b id="questCount">0/3</b><small>Challenges</small></span></button>
         </div>
         <div class="play-card">
           <button id="soloBtn" class="btn big go"><span class="flagico">❤️</span> Play solo <span class="arrow">→</span></button>
@@ -97,10 +97,12 @@
           </div>
           <div id="slots" class="slots"></div>
           <div class="emote-row lobby-emotes" aria-label="Send an emote"></div>
-          <h3 class="pick-title">Game mode</h3>
-          <div id="modePick" class="mode-pick"></div>
-          <h3 class="pick-title">Map</h3>
-          <div id="mapPick" class="map-pick"></div>
+          <div id="hostPicks" class="host-picks">
+            <h3 class="pick-title">Game mode</h3>
+            <div id="modePick" class="mode-pick"></div>
+            <h3 class="pick-title">Map</h3>
+            <div id="mapPick" class="map-pick"></div>
+          </div>
           <h3 class="pick-title">Choose your runner</h3>
           <div id="lobbySpot" class="spotlight"></div>
           <div id="picker" class="picker"></div>
@@ -125,7 +127,7 @@
       </div>
       <header class="lu-top">
         <div class="lu-code"><small>Lobby code</small><b id="luCode">----</b><button id="luCopy" class="btn small blue" type="button">Copy invite</button></div>
-        <div class="lu-mode"><small>Game mode</small><b id="luMode">Survival</b><span id="luMap">Meadow</span></div>
+        <div class="lu-mode" id="luModeBox"><small>Game mode</small><b id="luMode">Survival</b><span id="luMap">Meadow</span></div>
       </header>
       <aside class="lu-card">
         <div class="wallet" title="Your medals"></div>
@@ -214,26 +216,24 @@
     </div>
 
     <!-- DAILY REWARD: 7-day login streak -->
-    <div id="streakModal" class="modal" hidden>
-      <div class="sheet streak-sheet" role="dialog" aria-modal="true" aria-labelledby="streakTitle">
-        <header class="sheet-head">
-          <h2 id="streakTitle">Daily reward</h2>
-          <button id="streakClose" class="btn small ghost" type="button">Close</button>
-        </header>
-        <p id="streakSub" class="sheet-sub"></p>
+    <div id="streakModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet streak-sheet" role="dialog" aria-modal="true" aria-labelledby="streakTitle">
+        <div class="ribbon"><h2 id="streakTitle">Daily reward</h2></div>
+        <button id="streakClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div class="gsub"><span class="streak-badge"><img src="/assets/ui_flame.webp" alt="" /><b id="streakCount">0</b><small>day streak</small></span><p id="streakSub"></p></div>
         <div id="streakGrid" class="streak-grid"></div>
-        <button id="streakClaim" class="btn big go" type="button">Claim</button>
+        <button id="streakClaim" class="gbtn" type="button">Claim</button>
       </div>
     </div>
 
     <!-- DAILY CHALLENGES: three a day, coins for each -->
-    <div id="questModal" class="modal" hidden>
-      <div class="sheet quest-sheet" role="dialog" aria-modal="true" aria-labelledby="questTitle">
-        <header class="sheet-head">
-          <h2 id="questTitle">Daily challenges</h2>
-          <button id="questClose" class="btn small ghost" type="button">Close</button>
-        </header>
-        <p id="questSub" class="sheet-sub"></p>
+    <div id="questModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet quest-sheet" role="dialog" aria-modal="true" aria-labelledby="questTitle">
+        <div class="ribbon pink"><h2 id="questTitle">Daily challenges</h2></div>
+        <button id="questClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div class="gsub"><span class="reset-badge"><img src="/assets/ui_watch.webp" alt="" /><span>New in <b id="questReset">--:--:--</b></span></span><p id="questSub"></p></div>
         <div id="questList" class="quest-list"></div>
       </div>
     </div>
