@@ -6,11 +6,11 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <title>Lane Rush — 4-player party race</title>
-    <meta property="og:title" content="Lane Rush" />
+    <title>Brain Run — 4-player party race</title>
+    <meta property="og:title" content="Brain Run" />
     <meta
       property="og:description"
-      content="A cartoon 4-player running race. Make a lobby, share the code, then jump, slide and dodge your way to the finish line."
+      content="A cartoon 4-player running game. 3 hearts each, power-ups, last runner standing wins. Play solo or share a lobby code with friends."
     />
     <meta property="og:image" content="/assets/cover.jpg" />
     <meta name="theme-color" content="#0b0f0c" />
@@ -40,34 +40,32 @@
         <header class="strip top"><span class="runner-ico">🏃</span><span>4 players</span><i>/</i><span>4 lanes</span><i>/</i><span>1 victory</span></header>
         <div class="panel home-panel">
           <div class="brand">
-            <h1 class="logo"><span class="w1">LANE</span><span class="w2">RUSH</span></h1>
+            <h1 class="logo"><span class="w1">BRAIN</span><span class="w2">RUN</span></h1>
             <p class="tag">4-player racing<br />meadow track</p>
           </div>
           <div class="topbar">
             <div class="wallet" title="Your medals"></div>
-            <button class="btn small gold shopBtn" type="button">Shop</button>
+            <div class="topbar-btns">
+              <button id="settingsBtn" class="btn small ghost" type="button">⚙ Settings</button>
+              <button class="btn small gold shopBtn" type="button">Shop</button>
+            </div>
           </div>
           <div class="roster" id="homeRoster"></div>
-          <div class="form-grid">
-            <label class="field">
-              <span>Your name</span>
-              <input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Speedy" />
-            </label>
-            <label class="field">
-              <span>Country you cheer for</span>
-              <select id="countrySel" class="countrySel"></select>
-            </label>
-          </div>
-          <button id="createBtn" class="btn big go"><span class="flagico">🏁</span> Create lobby <span class="arrow">→</span></button>
-          <div class="or"><span>or join a friend</span></div>
+          <label class="field">
+            <span>Your name</span>
+            <input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Speedy" />
+          </label>
+          <button id="soloBtn" class="btn big go"><span class="flagico">❤️</span> Play solo <span class="arrow">→</span></button>
+          <button id="createBtn" class="btn big blue"><span class="flagico">👥</span> Create lobby <span class="arrow">→</span></button>
+          <div class="or"><span>Join lobby</span></div>
           <div class="join-row">
             <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" />
-            <button id="joinBtn" class="btn big blue">Join</button>
+            <button id="joinBtn" class="btn big ghost">Join</button>
           </div>
           <p id="homeMsg" class="msg" role="alert"></p>
           <p class="hint" id="loadHint">Loading 3D runners…</p>
         </div>
-        <footer class="strip bottom"><b class="mini-logo">LANE<em>RUSH</em></b><i>|</i><span>Live</span><i>/</i><span>4-player racing</span><i>/</i><span>Meadow track</span></footer>
+        <footer class="strip bottom"><b class="mini-logo">BRAIN<em>RUN</em></b><i>|</i><span>Live</span><i>/</i><span>4-player racing</span><i>/</i><span>Meadow track</span></footer>
       </div>
     </section>
 
@@ -78,7 +76,7 @@
         <div class="panel lobby-panel">
           <div class="lobby-head">
             <div class="brand small-brand">
-              <h1 class="logo"><span class="w1">LANE</span><span class="w2">RUSH</span></h1>
+              <h1 class="logo"><span class="w1">BRAIN</span><span class="w2">RUN</span></h1>
             </div>
             <div class="code-box">
               <div class="label">Lobby code</div>
@@ -87,12 +85,11 @@
               <div id="copyMsg" class="small"></div>
             </div>
           </div>
-          <div id="slots" class="slots"></div>
           <div class="topbar">
             <div class="wallet" title="Your medals"></div>
-            <select id="lobbyCountry" class="countrySel" aria-label="Country you cheer for"></select>
-            <button class="btn small gold shopBtn" type="button">Shop</button>
+            <button class="country-chip" type="button" aria-label="Country you cheer for"></button>
           </div>
+          <div id="slots" class="slots"></div>
           <h3 class="pick-title">Game mode</h3>
           <div id="modePick" class="mode-pick"></div>
           <h3 class="pick-title">Choose your runner</h3>
@@ -120,7 +117,9 @@
       <div id="countdown" class="countdown"></div>
       <div id="banner" class="banner"></div>
       <div id="zapFlash" class="zap-flash"></div>
-      <div id="powerSlot" class="power-slot"><img src="/assets/pw_shield.png" alt="" /><div><b>Shield</b><span class="bar"><i></i></span></div></div>
+      <button id="powerSlot" class="power-slot" type="button" aria-label="Use power-up"><img src="/assets/pw_shield.png" alt="" /><div><b>Shield</b><span class="bar"><i></i></span><span class="use"></span></div></button>
+      <div id="throwLanes" class="throw-lanes" aria-label="Throw the banana into lane"><span>Throw 🍌 into lane</span><div><button type="button" data-lane="0">1</button><button type="button" data-lane="1">2</button><button type="button" data-lane="2">3</button><button type="button" data-lane="3">4</button></div></div>
+      <button id="lookBtn" class="look-btn" type="button" aria-label="Hold to look back">👀<small>Look back</small></button>
       <div id="powerToast" class="power-toast"></div>
       <div id="controlsHint" class="controls-hint"></div>
       <div id="netWarn" class="net-warn">Reconnecting…</div>
@@ -149,6 +148,18 @@
         </div>
       </div>
     </section>
+
+    <!-- COUNTRY / SETTINGS -->
+    <div id="countryModal" class="modal" hidden>
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="countryTitle">
+        <header class="sheet-head">
+          <h2 id="countryTitle">Country you cheer for</h2>
+          <button id="countryClose" class="btn small ghost" type="button">Done</button>
+        </header>
+        <input id="countrySearch" class="search" placeholder="Search countries" autocomplete="off" />
+        <div id="flagGrid" class="flag-grid"></div>
+      </div>
+    </div>
 
     <!-- SHOP -->
     <section id="shop" class="screen">

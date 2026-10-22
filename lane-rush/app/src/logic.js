@@ -1,5 +1,5 @@
 /**
- * LANE RUSH — the rules. Pure functions over JSON state.
+ * BRAIN RUN — the rules. Pure functions over JSON state.
  *
  * How the race works:
  *   - One player creates a lobby (the room code), up to three more join with
@@ -19,7 +19,7 @@
  * same constants for its physics.
  */
 
-export const meta = { game: "Lane Rush", minPlayers: 1, maxPlayers: 4 };
+export const meta = { game: "Brain Run", minPlayers: 1, maxPlayers: 4 };
 
 // ── shared tuning (client physics reads these too) ──────────────────────────
 
@@ -60,14 +60,18 @@ export function survivalSpeed(s) {
 
 /**
  * Power-ups come out of mystery boxes on the course. The client rolls which
- * one you get; only the lightning bolt needs the server (it trips everyone
- * ahead of you, so it is relayed as a "zap").
+ * one you get.
  *   shield    — the next hit (obstacle or zap) just pops the bubble
  *   rocket    — fly over everything at boost speed for a few seconds
  *   ghost     — run straight through obstacles for a few seconds
  *   lightning — everyone ahead of you falls over (unless shielded)
+ *   banana    — thrown forward into a lane you pick; whoever runs onto it slips
+ * You hold one power-up at a time and use it when you want (boxes are
+ * ignored while you hold or use one). Zaps and bananas go through the server.
  */
-export const POWERS = ["shield", "rocket", "ghost", "lightning"];
+export const POWERS = ["shield", "rocket", "ghost", "lightning", "banana"];
+export const BANANA_AHEAD_M = 28; // a thrown banana lands this far in front of you
+export const BANANA_COOLDOWN_MS = 1200;
 export const ZAP_COOLDOWN_MS = 3000;
 export const ROLLER_SPEED = 6; // m/s a barrel rolls toward you once it's triggered
 export const ROLLER_TRIGGER_M = 34; // a barrel starts rolling when you're this close
@@ -117,72 +121,172 @@ function rng(seed) {
   };
 }
 
+/** Expected running speed (m/s) at distance `d` of a survival run (v² = v0² + 2ad, capped). */
+function speedAtDistance(d) {
+  return Math.min(SURVIVAL_MAX_SPEED, Math.sqrt(BASE_SPEED * BASE_SPEED + 0.2 * d));
+}
+
 /**
- * The course for a seed: rows of obstacles across the four lanes, plus boost
- * pads and mystery boxes. Obstacle kinds:
- *   hurdle — low barrier (hurdle or hay bale): JUMP over it
- *   gate   — high beam (barrier or log arch): SLIDE / DUCK under it
- *   crate  — tall block (crates, a cow or a tyre stack): change LANE around it
- *   roller — a barrel that rolls at you once you get close: JUMP it or dodge
- * Every row leaves at least two lanes free of crates. `looks[lane]` picks the
- * visual variant; it never changes how an obstacle is cleared.
+ * Obstacle patterns. Each returns one or more rows (lanes left→right) and is
+ * only offered once the run is hard enough (`from`, 0..1). Every row keeps at
+ * least one lane that can be passed (empty, or a hurdle/gate you can clear),
+ * so there is always a way through.
+ *   H hurdle → jump · G gate → slide · C crate → change lane · R barrel → jump/dodge
+ */
+const PATTERNS = {
+  // one obstacle in an otherwise open row: learn the moves
+  single: { from: 0, weight: (k) => 3 * (1 - k) + 0.3, rows: (r) => [placeOne(r, r() < 0.5 ? "hurdle" : "gate")] },
+  // a full wall of the same thing: jump it or slide under it
+  hurdleWall: { from: 0, weight: () => 1.1, rows: () => [["hurdle", "hurdle", "hurdle", "hurdle"]] },
+  gateWall: { from: 0, weight: () => 1.1, rows: () => [["gate", "gate", "gate", "gate"]] },
+  // two blocks, the open side has something to jump or duck
+  split: {
+    from: 0,
+    weight: () => 2,
+    rows: (r) => {
+      const lanes = [0, 1, 2, 3].map(() => pickFrom(r, [null, "hurdle", "gate"]));
+      for (const i of shuffled(r).slice(0, 2)) lanes[i] = "crate";
+      return [lanes];
+    },
+  },
+  // every lane has a hurdle or a gate: read the row and pick jump or slide
+  mixedWall: {
+    from: 0.15,
+    weight: (k) => 0.5 + 1.5 * k,
+    rows: (r) => {
+      const lanes = [0, 1, 2, 3].map(() => (r() < 0.5 ? "hurdle" : "gate"));
+      if (lanes.every((x) => x === lanes[0])) lanes[Math.floor(r() * 4)] = lanes[0] === "hurdle" ? "gate" : "hurdle";
+      return [lanes];
+    },
+  },
+  // barrels roll at you; the lanes next to them are free
+  barrels: {
+    from: 0,
+    weight: (k) => 0.8 + 0.6 * k,
+    lead: 16, // the barrel needs open track in front of it to roll on
+    tail: 10,
+    rows: (r) => {
+      const lanes = [null, null, null, null];
+      const a = Math.floor(r() * 4);
+      lanes[a] = "roller";
+      if (r() < 0.5) lanes[(a + 2) % 4] = "roller";
+      return [lanes];
+    },
+  },
+  // slalom: three blocks per row and the gap moves one lane each row
+  slalom: {
+    from: 0.3,
+    weight: (k) => 1.6 * k,
+    rows: (r) => {
+      let open = Math.floor(r() * 4);
+      const dir = open === 0 ? 1 : open === 3 ? -1 : r() < 0.5 ? -1 : 1;
+      const out = [];
+      const n = 2 + Math.floor(r() * 2);
+      for (let i = 0; i < n; i++) {
+        const lanes = ["crate", "crate", "crate", "crate"];
+        lanes[open] = null;
+        out.push(lanes);
+        const next = open + dir;
+        open = next < 0 || next > 3 ? open - dir : next;
+      }
+      return out;
+    },
+  },
+  // jump, then slide straight away
+  combo: {
+    from: 0.4,
+    weight: (k) => k,
+    rows: (r) => (r() < 0.5 ? [["hurdle", "hurdle", "hurdle", "hurdle"], ["gate", "gate", "gate", "gate"]] : [["gate", "gate", "gate", "gate"], ["hurdle", "hurdle", "hurdle", "hurdle"]]),
+  },
+  // a breather: no obstacles, a mystery box and a boost pad
+  breather: { from: 0.1, weight: () => 0.6, rows: () => [], rest: true },
+};
+
+function pickFrom(r, arr) {
+  return arr[Math.floor(r() * arr.length)];
+}
+// Fisher–Yates, not sort(): sort order with a random comparator differs
+// between browser engines, and every client must build the same course.
+function shuffled(r) {
+  const order = [0, 1, 2, 3];
+  for (let i = 3; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+function placeOne(r, kind) {
+  const lanes = [null, null, null, null];
+  lanes[Math.floor(r() * 4)] = kind;
+  return lanes;
+}
+
+/**
+ * The course for a seed: a run of obstacle patterns, boost pads and mystery
+ * boxes. Difficulty grows with distance (easy patterns fade out, slaloms and
+ * combos come in), and the space between rows is a reaction-time budget at
+ * the speed you'll be running there, so rows never come faster than you can
+ * react. The same pattern never comes twice in a row. `looks[lane]` picks the
+ * visual variant of each obstacle; it never changes how it's cleared.
  */
 export function buildCourse(seed, len = TRACK_LEN) {
   const r = rng(seed);
   // looks and boxes use their own stream, so they don't reshuffle the layout
   const r2 = rng((seed ^ 0x9e3779b9) >>> 0);
-  const pick = (arr) => arr[Math.floor(r() * arr.length)];
+  const endless = len > TRACK_LEN;
   const rows = [];
   const boosts = [];
   const boxes = [];
   let z = 45;
+  let last = "";
+  let sinceBox = 0;
+  const addBox = (bz) => {
+    const first = Math.floor(r2() * 4);
+    boxes.push({ z: Math.round(bz * 10) / 10, lane: first });
+    if (r2() < 0.45) boxes.push({ z: Math.round(bz * 10) / 10, lane: (first + 1 + Math.floor(r2() * 3)) % 4 });
+    sinceBox = 0;
+  };
   while (z < len - 40) {
-    const roll = r();
-    let lanes;
-    if (roll < 0.17) {
-      lanes = ["hurdle", "hurdle", "hurdle", "hurdle"];
-    } else if (roll < 0.32) {
-      lanes = ["gate", "gate", "gate", "gate"];
-    } else if (roll < 0.62) {
-      lanes = [null, null, null, null].map(() => pick([null, null, "hurdle", "gate"]));
-      const crates = 1 + Math.floor(r() * 2);
-      // Fisher–Yates, not sort(): sort order with a random comparator differs
-      // between browser engines, and every client must build the same course.
-      const order = [0, 1, 2, 3];
-      for (let i = 3; i > 0; i--) {
-        const j = Math.floor(r() * (i + 1));
-        [order[i], order[j]] = [order[j], order[i]];
+    // 0 → 1 over the first 1.6 km (a sprint stays in the gentle half)
+    const k = Math.min(1, z / 1600);
+    const speed = endless ? speedAtDistance(z) : BASE_SPEED;
+    // seconds you get between rows: 1.3 s at the start, down to 0.9 s
+    const step = speed * (1.3 - 0.4 * k);
+
+    const names = Object.keys(PATTERNS).filter((n) => n !== last && k >= PATTERNS[n].from && !(n === "barrels" && z < 90));
+    let total = 0;
+    for (const n of names) total += PATTERNS[n].weight(k);
+    let roll = r() * total;
+    let name = names[names.length - 1];
+    for (const n of names) {
+      roll -= PATTERNS[n].weight(k);
+      if (roll <= 0) {
+        name = n;
+        break;
       }
-      for (let i = 0; i < crates; i++) lanes[order[i]] = "crate";
-    } else if (roll < 0.74 && z > 90) {
-      // one or two barrels with free lanes beside them
-      lanes = [null, null, null, null];
-      const a = Math.floor(r() * 4);
-      lanes[a] = "roller";
-      if (r() < 0.5) lanes[(a + 2) % 4] = "roller";
-    } else {
-      let crates = 0;
-      lanes = [0, 1, 2, 3].map(() => {
-        const k = pick(["hurdle", "gate", "crate", null]);
-        if (k === "crate" && crates >= 2) return "hurdle";
-        if (k === "crate") crates++;
-        return k;
-      });
-      if (lanes.every((k) => k === null)) lanes[Math.floor(r() * 4)] = "hurdle";
     }
-    const looks = lanes.map((k) => (k ? Math.floor(r2() * LOOKS[k]) : 0));
-    rows.push({ z: Math.round(z * 10) / 10, lanes, looks });
-    // barrels roll toward you, so leave them a longer runway
-    const gap = (lanes.includes("roller") ? 26 : 15) + r() * 9;
-    if (r() < 0.4) {
-      boosts.push({ z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) });
+    const pat = PATTERNS[name];
+    last = name;
+
+    if (pat.rest) {
+      addBox(z + step * 0.3);
+      boosts.push({ z: Math.round((z + step * 0.8) * 10) / 10, lane: Math.floor(r() * 4) });
+      z += step * 1.6;
+      continue;
     }
-    if (r2() < 0.34 && z > 60) {
-      const bz = Math.round((z + gap * 0.62) * 10) / 10;
-      const first = Math.floor(r2() * 4);
-      boxes.push({ z: bz, lane: first });
-      if (r2() < 0.5) boxes.push({ z: bz, lane: (first + 1 + Math.floor(r2() * 3)) % 4 });
-    }
+    z += pat.lead ?? 0;
+    const out = pat.rows(r);
+    out.forEach((lanes, i) => {
+      if (z >= len - 40) return;
+      const looks = lanes.map((kind) => (kind ? Math.floor(r2() * LOOKS[kind]) : 0));
+      rows.push({ z: Math.round(z * 10) / 10, lanes, looks });
+      if (i < out.length - 1) z += step;
+    });
+    // room to land and line up for the next pattern (more slack early on)
+    const gap = step * (1.15 + r() * 0.5 * (1 - k)) + (pat.tail ?? 0);
+    sinceBox += 1;
+    if (r() < 0.3) boosts.push({ z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) });
+    else if (z > 60 && (sinceBox >= 4 || r2() < 0.22)) addBox(z + gap * 0.55);
     z += gap;
   }
   return { rows, boosts, boxes, len };
@@ -213,7 +317,7 @@ function present(state) {
 }
 
 function freshRunner(p) {
-  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, left: false };
+  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, left: false };
 }
 
 function pickHost(state) {
@@ -312,6 +416,7 @@ function startRace(state, t) {
   state.endAt = 0;
   state.firstFinishAt = null;
   state.zaps = [];
+  state.bananas = [];
   for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
 }
 
@@ -334,6 +439,8 @@ export function setup() {
     cup: null,
     zaps: [],
     zapSeq: 0,
+    bananas: [],
+    bananaSeq: 0,
   };
 }
 
@@ -397,6 +504,20 @@ export function validateAction(state, playerId, action) {
       if (me.finish !== null || me.left || me.outAt !== null) return { ok: false, error: "not racing" };
       const t = num(action.t) ? action.t : state.now;
       if (me.zapAt !== null && t - me.zapAt < ZAP_COOLDOWN_MS) return { ok: false, error: "too soon" };
+      return { ok: true };
+    }
+    case "banana": {
+      if (!me) return { ok: false, error: "join first" };
+      if (state.phase !== "race" || me.finish !== null || me.left || me.outAt !== null) return { ok: false, error: "not racing" };
+      if (!intIn(action.lane, 0, LANES - 1) || !num(action.d)) return { ok: false, error: "bad banana" };
+      if (action.d < me.d - POS_SLACK_M || action.d > me.d + BANANA_AHEAD_M + 2 * POS_SLACK_M) return { ok: false, error: "bad banana" };
+      const t = num(action.t) ? action.t : state.now;
+      if (me.bananaAt !== null && t - me.bananaAt < BANANA_COOLDOWN_MS) return { ok: false, error: "too soon" };
+      return { ok: true };
+    }
+    case "slip": {
+      if (!me) return { ok: false, error: "join first" };
+      if (!(state.bananas ?? []).some((b) => b.id === action.id)) return { ok: false, error: "no banana" };
       return { ok: true };
     }
     case "again": {
@@ -517,6 +638,16 @@ export function applyAction(state0, playerId, action) {
       state.zaps = [...(state.zaps ?? []), { id: state.zapSeq, by: playerId, d: me.d, at: t }].slice(-6);
       break;
     }
+    case "banana": {
+      me.bananaAt = t;
+      state.bananaSeq = (state.bananaSeq ?? 0) + 1;
+      state.bananas = [...(state.bananas ?? []), { id: state.bananaSeq, by: playerId, lane: action.lane, d: Math.round(action.d * 10) / 10, at: t }].slice(-16);
+      break;
+    }
+    case "slip":
+      // someone ran onto it: it's gone for everyone
+      state.bananas = state.bananas.filter((b) => b.id !== action.id);
+      break;
     case "again": {
       for (const id of ids(state)) if (state.players[id].gone) removePlayer(state, id);
       state.phase = "lobby";
@@ -649,6 +780,7 @@ export function viewFor(state, playerId) {
     standings: standings(state),
     rewards: rewards(state),
     zaps: state.zaps ?? [],
+    bananas: state.bananas ?? [],
   };
 }
 

@@ -1,5 +1,5 @@
 /**
- * LANE RUSH — browser client.
+ * BRAIN RUN — browser client.
  *
  *   net     WebSocket to /ws/<CODE>, join + hello, reconnect, clock sync
  *   ui      home / lobby / HUD / results screens (DOM)
@@ -32,6 +32,7 @@ import {
   survivalSpeed,
   CUP_RACES,
   CUP_POINTS,
+  BANANA_AHEAD_M,
   ROLLER_SPEED,
   ROLLER_TRIGGER_M,
 } from "/logic.js";
@@ -83,7 +84,9 @@ const POWER_INFO = {
   rocket: { label: "Rocket", hint: "Fly over everything" },
   ghost: { label: "Ghost", hint: "Run through obstacles" },
   lightning: { label: "Lightning", hint: "Everyone ahead falls over" },
+  banana: { label: "Banana", hint: "Throw it into a lane ahead" },
 };
+const TOUCH = matchMedia("(pointer: coarse)").matches;
 const BOOST_S = 1.6;
 const LANE_SWITCH_SPEED = 9; // lanes per second
 const SEND_MS = 100;
@@ -433,17 +436,51 @@ function myCountry() {
   return COUNTRIES.some(([code]) => code === c) ? c : "";
 }
 
-// country pickers (home + lobby)
-for (const sel of document.querySelectorAll(".countrySel")) {
-  sel.append(el("option", { value: "", text: "🌍 No country" }));
-  for (const [code, name] of COUNTRIES) sel.append(el("option", { value: code, text: `${flagOf(code)} ${name}` }));
-  sel.value = myCountry();
-  sel.addEventListener("change", () => {
-    local.setItem("lr:country", sel.value);
-    for (const other of document.querySelectorAll(".countrySel")) other.value = sel.value;
-    if (net.view?.joined) act({ type: "country", country: sel.value });
-  });
+// country picker: a sheet of flag tiles (lobby chip + home settings)
+const countryModal = $("#countryModal");
+function setCountry(code) {
+  local.setItem("lr:country", code);
+  renderCountryChips();
+  renderFlagGrid();
+  if (net.view?.joined) act({ type: "country", country: code });
 }
+function renderCountryChips() {
+  const c = myCountry();
+  for (const chip of document.querySelectorAll(".country-chip")) {
+    chip.replaceChildren(el("span", { class: "fl", text: c ? flagOf(c) : "🌍" }), el("span", { text: c ? countryName(c) : "Pick your country" }), el("span", { class: "car", text: "▾" }));
+  }
+}
+function renderFlagGrid() {
+  const q = $("#countrySearch").value.trim().toLowerCase();
+  const cur = myCountry();
+  const tiles = [["", "No country"], ...COUNTRIES]
+    .filter(([code, name]) => !q || name.toLowerCase().includes(q) || code.toLowerCase() === q)
+    .map(([code, name]) => {
+      const b = el("button", { class: `flag-tile${code === cur ? " on" : ""}`, type: "button" }, el("span", { class: "fl", text: code ? flagOf(code) : "🌍" }), el("span", { class: "nm", text: name }));
+      b.addEventListener("click", () => {
+        setCountry(code);
+        closeCountry();
+      });
+      return b;
+    });
+  $("#flagGrid").replaceChildren(...tiles);
+}
+function openCountry(title) {
+  $("#countryTitle").textContent = title;
+  $("#countrySearch").value = "";
+  renderFlagGrid();
+  countryModal.hidden = false;
+}
+function closeCountry() {
+  countryModal.hidden = true;
+}
+$("#countrySearch").addEventListener("input", renderFlagGrid);
+$("#countryClose").addEventListener("click", closeCountry);
+countryModal.addEventListener("click", (e) => e.target === countryModal && closeCountry());
+window.addEventListener("keydown", (e) => e.key === "Escape" && !countryModal.hidden && closeCountry());
+for (const chip of document.querySelectorAll(".country-chip")) chip.addEventListener("click", () => openCountry("Country you cheer for"));
+$("#settingsBtn").addEventListener("click", () => openCountry("Settings · your country"));
+renderCountryChips();
 
 // ── shop ───────────────────────────────────────────────────────────────────
 let shopReturn = "home";
@@ -512,7 +549,7 @@ function onServerError(error) {
     sendHello();
     return;
   }
-  if (["not racing", "race not over", "already started"].includes(error)) return; // harmless races
+  if (["not racing", "race not over", "already started", "no banana", "too soon"].includes(error)) return; // harmless races
   toast(error);
 }
 
@@ -543,6 +580,15 @@ function onState(msg) {
   for (const p of v.players) remote.ingest(p, v);
 
   if (v.phase === "lobby") {
+    if (game.solo && v.host === playerId) {
+      // solo: skip the lobby and go straight into the run
+      if (!game.soloStarting) {
+        game.soloStarting = true;
+        if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
+        act({ type: "start" });
+      }
+      return;
+    }
     if (game.mode !== "lobby") enterLobby();
     renderLobby(v);
   } else if (v.phase === "countdown" || v.phase === "race") {
@@ -572,14 +618,24 @@ function requireName() {
   return n;
 }
 
+// Play solo: a private room that starts an endless survival run straight away
+$("#soloBtn").addEventListener("click", () => {
+  sfx.unlock();
+  if (!requireName()) return;
+  game.solo = true;
+  game.soloStarting = false;
+  connect(newCode(), true);
+});
 $("#createBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
+  game.solo = false;
   connect(newCode(), true);
 });
 $("#joinBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
+  game.solo = false;
   const code = codeInput.value.trim().toUpperCase();
   if (code.length !== 4) {
     $("#homeMsg").textContent = "Lobby codes have 4 characters";
@@ -593,6 +649,7 @@ nameInput.addEventListener("keydown", (e) => e.key === "Enter" && (codeInput.val
 
 function leaveToHome(message = "") {
   game.mode = "home";
+  game.solo = false;
   world.clearRace();
   showScreen("home");
   $("#homeMsg").textContent = message;
@@ -638,8 +695,7 @@ function renderLobby(v) {
         "div",
         { class: "info" },
         el("span", { class: "nm", text: p.name }),
-        el("span", { class: "cty", text: cty }),
-        el("div", { class: "ready" }, el("span", { text: p.gone ? "Away" : "Ready" }), el("span", { class: `toggle${p.gone ? "" : " on"}` })),
+        el("span", { class: "cty", text: p.gone ? "Away…" : cty }),
       ),
     );
     if (p.id === v.host) card.append(el("span", { class: "crown", text: "👑" }));
@@ -682,6 +738,7 @@ function renderLobby(v) {
       if (free !== undefined) act({ type: "pick", char: free });
     }
     if ((me.country || "") !== myCountry()) act({ type: "country", country: myCountry() });
+    renderCountryChips();
   }
 
   const isHost = v.host === playerId;
@@ -727,10 +784,10 @@ $("#againBtn").addEventListener("click", () => act({ type: "again" }));
 $("#nextBtn").addEventListener("click", () => act({ type: "next" }));
 $("#copyBtn").addEventListener("click", async () => {
   const url = `${location.origin}/?join=${net.code}`;
-  const text = `Race me in Lane Rush! Code ${net.code} → ${url}`;
+  const text = `Race me in Brain Run! Code ${net.code} → ${url}`;
   try {
     if (navigator.share && matchMedia("(pointer: coarse)").matches) {
-      await navigator.share({ title: "Lane Rush", text, url });
+      await navigator.share({ title: "Brain Run", text, url });
     } else {
       await navigator.clipboard.writeText(url);
       $("#copyMsg").textContent = "Link copied!";
@@ -1277,6 +1334,7 @@ const world = (() => {
       loadGLB("/assets/tires.glb").then((g) => (assets.props.crate2 = fitProp(g.scene, { width: 1.4, maxHeight: 2.5 }))),
       loadGLB("/assets/barrel.glb").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
       loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
+      loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))),
       loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
       loadGLB("/assets/tree_oak.glb").then((g) => (assets.props.oak = fitProp(g.scene, { height: 6.5 }))),
       loadGLB("/assets/tree_pine.glb").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
@@ -1553,7 +1611,35 @@ const world = (() => {
     return course;
   }
 
+  // thrown bananas: they drop out of the sky onto their lane, and vanish once someone slips
+  const bananaMeshes = new Map(); // id -> {obj, born}
+  function syncBananas(list, gone) {
+    const live = new Set();
+    const now = performance.now();
+    for (const b of list) {
+      if (gone.has(b.id)) continue;
+      live.add(b.id);
+      let m = bananaMeshes.get(b.id);
+      if (!m) {
+        const obj = assets.props.banana.clone();
+        obj.position.set(laneX(b.lane), 3, -b.d);
+        raceGroup.add(obj);
+        m = { obj, born: now };
+        bananaMeshes.set(b.id, m);
+      }
+      const age = (now - m.born) / 1000;
+      m.obj.position.y = Math.max(0.02, 3 * (1 - (age / 0.45) ** 2));
+      m.obj.rotation.y = age < 0.45 ? age * 14 : m.obj.rotation.y;
+    }
+    for (const [id, m] of bananaMeshes) {
+      if (live.has(id)) continue;
+      raceGroup.remove(m.obj);
+      bananaMeshes.delete(id);
+    }
+  }
+
   function clearCourse() {
+    bananaMeshes.clear();
     for (const c of raceGroup.children.slice()) raceGroup.remove(c);
     cullables = cullables.filter((c) => c.keep);
     rollers = [];
@@ -1640,6 +1726,7 @@ const world = (() => {
     cull,
     tick,
     setEndless,
+    syncBananas,
     animateCourse,
     get rollers() {
       return rollers;
@@ -1677,6 +1764,7 @@ const me = {
   stumbleT: 0,
   invulnT: 0,
   boostT: 0,
+  item: "", // power-up you're holding, waiting to be used
   power: "", // active timed power: shield | rocket | ghost
   powerT: 0,
   speed: 0,
@@ -1739,6 +1827,9 @@ function enterRace(v) {
   game.pendingRace = false;
   game.mode = "race";
   game.round = v.round;
+  game.soloStarting = false;
+  game.lookBack = false;
+  slipped.clear();
   game.kind = v.kind || "sprint";
   game.len = isSurvival() ? SURVIVAL_LEN : TRACK_LEN;
   world.hideShowcase();
@@ -1758,6 +1849,7 @@ function enterRace(v) {
     stumbleT: 0,
     invulnT: 0,
     boostT: 0,
+    item: "",
     power: "",
     powerT: 0,
     speed: 0,
@@ -1802,8 +1894,8 @@ function enterRace(v) {
   const touch = matchMedia("(pointer: coarse)").matches;
   const hint = $("#controlsHint");
   hint.textContent = touch
-    ? "Swipe ↑ jump · ↓ slide · ← → switch lane · grab ? boxes"
-    : "↑ / Space jump · ↓ slide · ← → switch lane · grab ? boxes";
+    ? "Swipe ↑ jump · ↓ slide · ← → lane · tap a power-up to use it"
+    : "↑ jump · ↓ slide · ← → lane · E use power-up · hold C to look back";
   hint.style.opacity = "1";
   setTimeout(() => (hint.style.opacity = "0"), 6000);
   $("#banner").classList.remove("show");
@@ -1870,9 +1962,27 @@ window.addEventListener("keydown", (e) => {
   else if (k === "ArrowRight" || k === "d" || k === "D") input("right");
   else if (k === "ArrowUp" || k === "w" || k === "W" || k === " ") input("jump");
   else if (k === "ArrowDown" || k === "s" || k === "S") input("slide");
+  else if (k === "e" || k === "E" || k === "Enter" || k === "Shift") useItem();
+  else if (k >= "1" && k <= "4") useItem(me.item === "banana" ? Number(k) - 1 : me.lane);
+  else if (k === "c" || k === "C" || k === "b" || k === "B") game.lookBack = canControl() || game.mode === "race";
   else return;
   e.preventDefault();
 });
+window.addEventListener("keyup", (e) => {
+  if ("cCbB".includes(e.key)) game.lookBack = false;
+});
+{
+  const lb = $("#lookBtn");
+  const on = (e) => {
+    e.preventDefault();
+    game.lookBack = true;
+  };
+  const off = () => (game.lookBack = false);
+  lb.addEventListener("pointerdown", on);
+  lb.addEventListener("pointerup", off);
+  lb.addEventListener("pointerleave", off);
+  lb.addEventListener("pointercancel", off);
+}
 
 {
   let sx = 0;
@@ -2004,8 +2114,18 @@ function stepMe(dt) {
   for (const b of world.boxes) {
     if (b.taken || b.z < prevD - 0.8 || b.z > me.d + 0.8) continue;
     if (Math.abs(me.x - b.lane) > 0.6 || me.y > 2.4) continue;
+    if (me.item || me.power) continue; // one power-up at a time: the box stays for someone else
     b.taken = true;
     grabBox();
+  }
+  // bananas on the track (yours too!)
+  for (const b of net.view?.bananas || []) {
+    if (untouchable || slipped.has(b.id)) continue;
+    if (b.d < prevD - 0.6 || b.d > me.d + 0.6) continue;
+    if (Math.abs(me.x - b.lane) > 0.55 || me.y > 0.5) continue;
+    slipped.add(b.id);
+    act({ type: "slip", id: b.id });
+    hit("banana");
   }
   for (const b of course.boosts) {
     if (b.z < prevD - 1 || b.z > me.d + 1) continue;
@@ -2050,9 +2170,12 @@ function hit(kind) {
     crate: "Dodge! ← →",
     roller: "Jump the barrel! ↑",
     zap: "ZAPPED! ⚡",
+    banana: "Slipped on a banana! 🍌",
   }[kind] || "Ouch!";
   banner(hintText, 900);
 }
+
+const slipped = new Set(); // banana ids you've already run onto
 
 // ── survival hearts ──
 
@@ -2069,6 +2192,7 @@ function renderHearts(pop) {
 /** Third hit in survival: down for good, then watch whoever is still running. */
 function knockOut() {
   me.out = true;
+  me.item = "";
   me.power = "";
   me.powerT = 0;
   me.boostT = 0;
@@ -2110,6 +2234,7 @@ function rollPower() {
     ghost: 2,
     rocket: 1 + back * 3,
     lightning: racers > 1 && place > 1 ? 0.5 + back * 3 : 0,
+    banana: racers > 1 ? 2 : 0, // it stays on the track until someone slips on it
   };
   let total = 0;
   for (const k of POWERS) total += weights[k];
@@ -2121,23 +2246,43 @@ function rollPower() {
   return "shield";
 }
 
+/** A mystery box goes into your slot; nothing happens until you use it. */
 function grabBox(kind = rollPower()) {
   sfx.pickup();
+  me.item = kind;
+  showPowerToast(kind, TOUCH ? "Tap the power-up to use it" : kind === "banana" ? "1-4 picks the lane · E throws into yours" : "Press E to use it");
+  renderPower();
+}
+
+/** Use what you're holding. `lane` only matters for the banana. */
+function useItem(lane = me.lane) {
+  if (!me.item || !canControl() || me.stumbleT > 0) return;
+  const kind = me.item;
+  me.item = "";
+  if (kind === "banana") {
+    act({ type: "banana", lane, d: Math.round((me.d + BANANA_AHEAD_M) * 10) / 10 });
+    sfx.lane();
+    renderPower();
+    return;
+  }
+  activatePower(kind);
+}
+
+function activatePower(kind) {
   if (kind === "lightning") {
     act({ type: "zap" });
     sfx.zap();
     flash();
-    showPowerToast("lightning");
+    banner("⚡ ZAP! ⚡", 900);
+    renderPower();
     return;
   }
-  if (me.power === "rocket" && kind !== "rocket") me.vy = 0;
   me.power = kind;
   me.powerT = POWER_S[kind];
   if (kind === "rocket") {
     me.slideT = 0;
     sfx.rocket();
   }
-  showPowerToast(kind);
   renderPower();
 }
 
@@ -2176,11 +2321,11 @@ function flash() {
   f.classList.add("on");
 }
 
-function showPowerToast(kind) {
+function showPowerToast(kind, how = "") {
   const t = $("#powerToast");
   t.replaceChildren(
     el("img", { src: `/assets/pw_${kind}.png`, alt: "" }),
-    el("div", {}, el("b", {}, POWER_INFO[kind].label), el("span", {}, POWER_INFO[kind].hint)),
+    el("div", {}, el("b", {}, POWER_INFO[kind].label), el("span", {}, POWER_INFO[kind].hint), how ? el("small", {}, how) : null),
   );
   t.classList.remove("show");
   void t.offsetWidth;
@@ -2189,13 +2334,25 @@ function showPowerToast(kind) {
 
 function renderPower() {
   const slot = $("#powerSlot");
-  if (!me.power) {
+  const kind = me.item || me.power;
+  $("#throwLanes").classList.toggle("show", me.item === "banana");
+  slot.classList.toggle("held", Boolean(me.item));
+  if (!kind) {
     slot.classList.remove("show");
     return;
   }
   slot.classList.add("show");
-  slot.querySelector("img").src = `/assets/pw_${me.power}.png`;
-  slot.querySelector("b").textContent = POWER_INFO[me.power].label;
+  slot.querySelector("img").src = `/assets/pw_${kind}.png`;
+  slot.querySelector("b").textContent = POWER_INFO[kind].label;
+  slot.querySelector(".use").textContent = me.item ? (TOUCH ? "Tap to use" : kind === "banana" ? "E / 1-4 to throw" : "E to use") : "";
+  if (me.item) slot.querySelector(".bar i").style.width = "100%";
+}
+$("#powerSlot").addEventListener("click", () => useItem());
+for (const b of document.querySelectorAll("#throwLanes button")) {
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    useItem(Number(b.dataset.lane));
+  });
 }
 
 function currentAct() {
@@ -2292,7 +2449,7 @@ function frame(now) {
       me.runner.group.position.set(laneX(me.x), me.y, zMe);
       me.runner.group.visible = !(me.invulnT > 0 && me.stumbleT <= 0 && !me.power && Math.floor(now / 90) % 2 === 0);
       animateRunner(me.runner, currentAct(), me.speed, dt, me.power);
-      if (me.power) $("#powerSlot i").style.width = `${(me.powerT / POWER_S[me.power]) * 100}%`;
+      if (me.power && !me.item) $("#powerSlot .bar i").style.width = `${(me.powerT / POWER_S[me.power]) * 100}%`;
     }
 
     for (const r of remote.map.values()) {
@@ -2329,16 +2486,19 @@ function frame(now) {
       }
     }
     const tx = laneX(fx) * 0.75;
-    camPos.lerp(new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : 6)));
+    const back = game.lookBack && !me.out;
+    camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     camera.position.copy(camPos);
     if (shake > 0) {
       shake = Math.max(0, shake - dt);
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
-    camLook.set(tx * 0.8, 1.0 + fy * 0.6, fz - 9);
+    if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
+    else camLook.set(tx * 0.8, 1.0 + fy * 0.6, fz - 9);
     camera.lookAt(camLook);
-    world.cull(fd);
+    world.cull(back ? fd - 30 : fd);
+    world.syncBananas(net.view?.bananas || [], slipped);
     updateHud();
   } else {
     // menus: slow fly-over of the meadow with your runner idling
@@ -2426,12 +2586,13 @@ function updateHud() {
 
 const createBtn = $("#createBtn");
 const joinBtn = $("#joinBtn");
-createBtn.disabled = joinBtn.disabled = true;
+const soloBtn = $("#soloBtn");
+createBtn.disabled = joinBtn.disabled = soloBtn.disabled = true;
 world
   .load((f) => ($("#loadHint").textContent = `Loading 3D runners… ${Math.round(f * 100)}%`))
   .then(() => {
     $("#loadHint").textContent = "";
-    createBtn.disabled = joinBtn.disabled = false;
+    createBtn.disabled = joinBtn.disabled = soloBtn.disabled = false;
     world.buildScenery();
     world.setShowcase(preferredChar());
     if (net.view?.phase === "lobby") renderLobby(net.view);

@@ -1,6 +1,6 @@
 /**
  * Types for `logic.js` — the six contract exports the room calls, plus the
- * Lane Rush extras (shared tuning, the course builder, and `wakeAfter`, which
+ * Brain Run extras (shared tuning, the course builder, and `wakeAfter`, which
  * tells the room when to tick).
  *
  * Every function must be PURE: same inputs → same outputs, no `Date.now()`, no
@@ -48,6 +48,8 @@ export const AFTER_FIRST_MS: number;
 export const LOBBY_GRACE_MS: number;
 export const CHARACTERS: number;
 export const POWERS: string[];
+export const BANANA_AHEAD_M: number;
+export const BANANA_COOLDOWN_MS: number;
 export const GAME_MODES: string[];
 export const CUP_RACES: string[];
 export const CUP_POINTS: number[];

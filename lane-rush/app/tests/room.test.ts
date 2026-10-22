@@ -1,5 +1,5 @@
 /**
- * The Lane Rush room, through real WebSockets in workerd: create a lobby,
+ * The Brain Run room, through real WebSockets in workerd: create a lobby,
  * join it by code, start, race, and the room wiping itself when empty.
  */
 

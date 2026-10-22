@@ -1,5 +1,5 @@
 /**
- * `Room` — one Lane Rush lobby, as a Durable Object. The room code IS the
+ * `Room` — one Brain Run lobby, as a Durable Object. The room code IS the
  * room name (`/ws/<CODE>`), so one code = one lobby anywhere in the world.
  *
  * This is the TRUSTED half of the game: sockets, the clock, persistence. Every

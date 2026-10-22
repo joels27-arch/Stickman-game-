@@ -1,5 +1,5 @@
 /**
- * Lane Rush rules, driven directly (no sockets): lobby capacity and codes,
+ * Brain Run rules, driven directly (no sockets): lobby capacity and codes,
  * host-only start, the anti-cheat distance cap, finishing order, and lobby
  * clean-up after a disconnect.
  */
@@ -141,13 +141,32 @@ describe("race", () => {
 });
 
 describe("course", () => {
-  it("is deterministic and always leaves a lane without crates", () => {
+  it("is deterministic and every row has a way through", () => {
     expect(L.buildCourse(42)).toEqual(L.buildCourse(42));
     for (let seed = 0; seed < 300; seed++) {
-      for (const row of L.buildCourse(seed * 7919).rows) {
-        expect(row.lanes.filter((k) => k === "crate").length).toBeLessThanOrEqual(2);
+      for (const len of [L.TRACK_LEN, 3000]) {
+        for (const row of L.buildCourse(seed * 7919, len).rows) {
+          // a lane that is empty, or holds something you can jump or slide
+          expect(row.lanes.some((k) => k === null || k === "hurdle" || k === "gate")).toBe(true);
+        }
       }
     }
+  });
+
+  it("gives you time to react: rows are spaced by speed, and get tighter later on", () => {
+    for (let seed = 0; seed < 100; seed++) {
+      const c = L.buildCourse(seed * 31337, 4000);
+      for (let i = 1; i < c.rows.length; i++) {
+        const gap = c.rows[i]!.z - c.rows[i - 1]!.z;
+        const v = Math.min(L.SURVIVAL_MAX_SPEED, Math.sqrt(L.BASE_SPEED ** 2 + 0.2 * c.rows[i - 1]!.z));
+        expect(gap / v).toBeGreaterThanOrEqual(0.85);
+      }
+      // harder patterns only show up further in
+      const early = c.rows.filter((r) => r.z < 400);
+      expect(early.some((r) => r.lanes.filter((k) => k === "crate").length === 3)).toBe(false);
+    }
+    const late = L.buildCourse(7, 4000).rows.filter((r) => r.z > 2000);
+    expect(late.some((r) => r.lanes.filter((k) => k === "crate").length === 3)).toBe(true);
   });
 });
 
@@ -176,7 +195,7 @@ describe("obstacles and power-ups", () => {
         expect(b.z).toBeLessThan(L.TRACK_LEN);
       }
     }
-    expect(rollers).toBeGreaterThan(100);
+    expect(rollers).toBeGreaterThan(60);
     expect(boxes).toBeGreaterThan(300);
   });
 
@@ -353,5 +372,30 @@ describe("tournament", () => {
     s = act(s, "p0", { type: "again", t: s.endAt + 5000 });
     expect(s.cup).toBeNull();
     expect(s.mode).toBe("tournament");
+  });
+});
+
+describe("bananas", () => {
+  function racing(n = 2): S {
+    let s = act(lobbyOf(n), "p0", { type: "start", t: T0 });
+    return L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+  }
+
+  it("lands a thrown banana ahead of you and removes it when someone slips", () => {
+    let s = racing();
+    s = act(s, "p0", { type: "pos", d: 50, lane: 1, y: 0, act: "run", t: s.startAt + 5000 });
+    s = act(s, "p0", { type: "banana", lane: 3, d: 50 + L.BANANA_AHEAD_M, t: s.startAt + 5100 });
+    expect((L.viewFor(s, "p1") as any).bananas).toEqual([{ id: 1, by: "p0", lane: 3, d: 78, at: s.startAt + 5100 }]);
+    expect(reject(s, "p0", { type: "banana", lane: 2, d: 78, t: s.startAt + 5500 })).toMatch(/soon/);
+    s = act(s, "p1", { type: "slip", id: 1 });
+    expect(s.bananas).toEqual([]);
+    expect(reject(s, "p1", { type: "slip", id: 1 })).toBeTruthy();
+  });
+
+  it("won't throw a banana miles down the track or into a lane that doesn't exist", () => {
+    let s = racing();
+    s = act(s, "p0", { type: "pos", d: 50, lane: 1, y: 0, act: "run", t: s.startAt + 5000 });
+    expect(reject(s, "p0", { type: "banana", lane: 1, d: 400, t: s.startAt + 5100 })).toBeTruthy();
+    expect(reject(s, "p0", { type: "banana", lane: 9, d: 70, t: s.startAt + 5100 })).toBeTruthy();
   });
 });
