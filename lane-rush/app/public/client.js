@@ -1270,8 +1270,8 @@ const world = (() => {
   }
 
   function ballStandIn() {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.38, 20, 14), new THREE.MeshPhongMaterial({ color: "#6b2fd6", shininess: 90 }));
-    m.position.y = 0.38;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.375, 20, 14), new THREE.MeshPhongMaterial({ color: "#6b2fd6", shininess: 90 }));
+    m.position.y = 0.375;
     const g = new THREE.Group();
     g.add(m);
     return g;
@@ -1288,12 +1288,16 @@ const world = (() => {
       live.add(b.id);
       let m = ballMeshes.get(b.id);
       if (!m) {
-        m = assets.props.bowlingBall.clone();
+        // spin around the ball's centre, not its base
+        const ball = assets.props.bowlingBall.clone();
+        ball.position.y = -0.375;
+        m = new THREE.Group();
+        m.add(ball);
         raceGroup.add(m);
         ballMeshes.set(b.id, m);
       }
-      m.position.set(laneX(b.lane), 0, -d);
-      m.rotation.x = (BOWL_SPEED * age) / 0.38; // rolling toward the runners behind
+      m.position.set(laneX(b.lane), 0.375, -d);
+      m.rotation.x = (BOWL_SPEED * age) / 0.375; // rolling toward the runners behind
     }
     for (const [id, m] of ballMeshes) {
       if (live.has(id)) continue;
