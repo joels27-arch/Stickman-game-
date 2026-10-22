@@ -548,3 +548,11 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .look-btn small { font-size: 13px; color: var(--lime); }
 .look-btn kbd { font-family: var(--display); font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
 @media (pointer: coarse) { .look-btn kbd { display: none; } }
+
+/* spectating after you're out */
+.spectate { position: absolute; left: 50%; bottom: max(70px, calc(env(safe-area-inset-bottom) + 56px)); transform: translateX(-50%); display: none; align-items: center; gap: 10px; padding: 6px; background: var(--panel); border: 1px solid var(--lime); pointer-events: auto; }
+.spectate.show { display: flex; }
+.spectate button { appearance: none; width: 48px; height: 48px; border: 0; background: var(--lime); color: var(--lime-ink); font-size: 22px; cursor: pointer; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+.spectate div { display: grid; justify-items: center; min-width: 150px; }
+.spectate small { font-family: var(--display); font-weight: 800; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.spectate b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 22px; text-transform: uppercase; color: #fff; }

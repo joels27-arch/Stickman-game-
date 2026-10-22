@@ -433,3 +433,52 @@ describe("keeping screens in sync", () => {
     expect(reject(s, "p1", { type: "pos", d: 37, lane: 1, y: 0, act: "run", v: 900 })).toMatch(/speed/);
   });
 });
+
+describe("power-up odds", () => {
+  const sum = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a + b, 0);
+
+  it("always adds up to 100%", () => {
+    for (let alive = 1; alive <= 4; alive++) {
+      for (let rank = 1; rank <= alive; rank++) {
+        for (const gap of [0, 20, 80, 300]) {
+          for (const last of ["", ...L.POWERS]) expect(sum(L.powerOdds({ rank, alive, gapToLeader: gap, last }))).toBeCloseTo(100, 6);
+        }
+      }
+    }
+  });
+
+  it("gives the leader defence and the last runner the catch-up items", () => {
+    const lead = L.powerOdds({ rank: 1, alive: 4, gapToLeader: 0 });
+    const last = L.powerOdds({ rank: 4, alive: 4, gapToLeader: 120 });
+    expect(lead.lightning).toBe(0);
+    expect(lead.rocket).toBe(0);
+    expect(lead.shield! + lead.banana!).toBe(60);
+    expect(last.bowling).toBe(0); // nobody behind to roll it at
+    expect(last.rocket! + last.lightning! + last.freeze!).toBeGreaterThan(70);
+  });
+
+  it("treats a close second more like a leader than someone far behind", () => {
+    const close = L.powerOdds({ rank: 2, alive: 3, gapToLeader: 2 });
+    const far = L.powerOdds({ rank: 2, alive: 3, gapToLeader: 100 });
+    expect(close.rocket).toBeLessThan(far.rocket!);
+    expect(close.shield).toBeGreaterThan(far.shield!);
+  });
+
+  it("only counts runners still in the race, and never repeats your last item", () => {
+    // 2 of 4 knocked out: 2nd of the 2 left is last place, so no bowling
+    expect(L.powerOdds({ rank: 2, alive: 2, gapToLeader: 40 }).bowling).toBe(0);
+    expect(L.powerOdds({ rank: 1, alive: 3, last: "shield" }).shield).toBe(0);
+    const solo = L.powerOdds({ rank: 1, alive: 1 });
+    expect([solo.lightning, solo.bowling, solo.freeze]).toEqual([0, 0, 0]);
+  });
+
+  it("picks items in proportion to the odds", () => {
+    const odds = L.powerOdds({ rank: 3, alive: 4, gapToLeader: 40 });
+    const counts: Record<string, number> = {};
+    for (let i = 0; i < 10000; i++) {
+      const k = L.pickPower(odds, (i + 0.5) / 10000);
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    for (const k of L.POWERS) expect((counts[k] ?? 0) / 100).toBeCloseTo(odds[k]!, 0);
+  });
+});

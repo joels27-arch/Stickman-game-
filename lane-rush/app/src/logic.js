@@ -71,11 +71,93 @@ export function survivalSpeed(s) {
  *   bowling   — rolled BACKWARDS down a lane you pick; knocks over whoever is
  *               behind you in that lane (jump it!)
  *   freeze    — everyone else runs slowly for a few seconds (unless shielded)
- *   spring    — spring shoes: huge jumps for a few seconds, even over crates
  * You hold one power-up at a time and use it when you want (boxes are
  * ignored while you hold or use one). Zaps and bananas go through the server.
  */
-export const POWERS = ["shield", "rocket", "ghost", "lightning", "banana", "bowling", "freeze", "spring"];
+export const POWERS = ["shield", "rocket", "ghost", "lightning", "banana", "bowling", "freeze"];
+
+/**
+ * Mystery-box odds, in percent. Each item has a chance for the leader and a
+ * chance for the runner in last place; everyone in between is blended by
+ * their `standing` (0 = leading … 1 = last). Leaders get mostly defence,
+ * runners at the back get the big catch-up items. Each column adds up to 100.
+ *
+ *              leader  last
+ *   shield       30      5
+ *   banana       30     10
+ *   ghost        15     10
+ *   bowling      20      5    (rolls back: needs someone behind you)
+ *   freeze        5     25
+ *   rocket        0     25
+ *   lightning     0     20    (hits runners ahead: needs someone ahead)
+ *
+ * Alone there's nobody to attack, so it's shield 30 · banana 25 · ghost 25 ·
+ * rocket 20.
+ */
+const ODDS = {
+  shield: [30, 5],
+  banana: [30, 10],
+  ghost: [15, 10],
+  bowling: [20, 5],
+  freeze: [5, 25],
+  rocket: [0, 25],
+  lightning: [0, 20],
+};
+const SOLO_ODDS = { shield: 30, banana: 25, ghost: 25, rocket: 20 };
+/** How far behind the leader (metres) counts as "as far back as it gets". */
+const GAP_FULL_M = 80;
+
+/**
+ * Your standing for the odds, 0 (leading) … 1 (last). Half comes from your
+ * rank among the runners still in the race (knocked-out runners don't
+ * count), half from how far behind the leader you are, so a close second
+ * gets leader-ish items and someone 80 m back gets the full catch-up set.
+ */
+export function standingFor(rank, alive, gapToLeader) {
+  if (alive <= 1 || rank <= 1) return 0;
+  const byRank = (rank - 1) / (alive - 1);
+  const byGap = Math.min(1, Math.max(0, gapToLeader) / GAP_FULL_M);
+  return 0.5 * byRank + 0.5 * byGap;
+}
+
+/**
+ * Percent chance of each power-up for a runner at `rank` (1 = leading) of
+ * `alive` runners, `gapToLeader` metres behind the first. `last` is the item
+ * you got last time: you never get the same one twice in a row. Items that
+ * would be useless right now (lightning in 1st, bowling in last) are left
+ * out, and the rest scaled back up to 100.
+ */
+export function powerOdds({ rank, alive, gapToLeader = 0, last = "" }) {
+  let w;
+  if (alive <= 1) {
+    w = { ...SOLO_ODDS };
+  } else {
+    const t = standingFor(rank, alive, gapToLeader);
+    w = {};
+    for (const [k, [lead, back]] of Object.entries(ODDS)) w[k] = lead + (back - lead) * t;
+    if (rank <= 1) w.lightning = 0;
+    if (rank >= alive) w.bowling = 0;
+  }
+  if (last && w[last] !== undefined) w[last] = 0;
+  const total = Object.values(w).reduce((a, b) => a + b, 0);
+  const out = {};
+  for (const k of POWERS) out[k] = total > 0 ? ((w[k] ?? 0) * 100) / total : 0;
+  return out;
+}
+
+/** Turn odds into an item with a random number in [0, 1). */
+export function pickPower(odds, roll) {
+  let left = roll * 100;
+  for (const k of POWERS) {
+    if (odds[k] <= 0) continue;
+    left -= odds[k];
+    if (left < 0) return k;
+  }
+  return POWERS.filter((k) => odds[k] > 0).pop() ?? "shield";
+}
+
+/** The power-up everyone starts a race with: defensive or neutral, same odds for all. */
+export const START_POWERS = ["shield", "banana", "ghost"];
 /** Powers relayed to everyone through the server as a "zap" (an area effect). */
 export const ZAP_KINDS = ["lightning", "freeze"];
 export const BOWL_SPEED = 24; // m/s the ball rolls back down the track
@@ -116,7 +198,7 @@ const SPEED_CAP = ROCKET_SPEED + 1.5;
 const SURVIVAL_SPEED_CAP = SURVIVAL_MAX_SPEED + SURVIVAL_ROCKET + 1.5;
 const POS_SLACK_M = 6;
 const ACTS = ["run", "jump", "slide", "stumble", "idle", "out"];
-const POWER_STATES = ["", "shield", "rocket", "ghost", "spring"];
+const POWER_STATES = ["", "shield", "rocket", "ghost"];
 
 // ── course ──────────────────────────────────────────────────────────────────
 

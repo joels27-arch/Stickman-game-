@@ -37,6 +37,9 @@ import {
   BOWL_RANGE_M,
   ROCKET_SPEED,
   SURVIVAL_ROCKET,
+  powerOdds,
+  pickPower,
+  START_POWERS,
   ROLLER_SPEED,
   ROLLER_TRIGGER_M,
 } from "/logic.js";
@@ -98,9 +101,8 @@ const INVULN_S = STUMBLE_S + 0.9;
 const FALL_CLIP = [0.15, 1.3];
 const GETUP_CLIP = [1.9, 6.1];
 // power-ups (seconds)
-const POWER_S = { shield: 9, rocket: 3.2, ghost: 4.5, spring: 6 };
+const POWER_S = { shield: 9, rocket: 3.2, ghost: 4.5 };
 const FREEZE_S = 3; // how long a freeze slows you
-const SPRING_JUMP = 1.5; // spring shoes jump this much harder: high enough to clear crates
 const ROCKET_Y = 2.1;
 const POWER_INFO = {
   shield: { label: "Shield", hint: "Blocks the next hit" },
@@ -110,7 +112,6 @@ const POWER_INFO = {
   banana: { label: "Banana", hint: "Throw it into a lane ahead" },
   bowling: { label: "Bowling ball", hint: "Roll it back at whoever is behind you" },
   freeze: { label: "Freeze", hint: "Everyone else slows down" },
-  spring: { label: "Spring shoes", hint: "Huge jumps, even over crates" },
 };
 const TOUCH = matchMedia("(pointer: coarse)").matches;
 const BOOST_S = 1.6;
@@ -2012,6 +2013,10 @@ function enterRace(v) {
   game.round = v.round;
   game.soloStarting = false;
   game.lookBack = false;
+  game.spectating = null;
+  game.shownSpectate = undefined;
+  $("#spectate").classList.remove("show");
+  me.lastItem = "";
   slipped.clear();
   bowled.clear();
   game.kind = v.kind || "sprint";
@@ -2034,7 +2039,7 @@ function enterRace(v) {
     invulnT: 0,
     boostT: 0,
     // everyone starts each race holding a random power-up
-    item: mine?.outAt != null || mine?.finish != null ? "" : startingItem(v),
+    item: mine?.outAt != null || mine?.finish != null ? "" : startingItem(),
     frozenT: 0,
     power: "",
     powerT: 0,
@@ -2113,6 +2118,7 @@ function canControl() {
 }
 
 function input(kind) {
+  if (me.out && game.mode === "race" && (kind === "left" || kind === "right")) return cycleSpectate(kind === "left" ? -1 : 1);
   if (!canControl()) return;
   if (me.stumbleT > 0) return; // knocked over — wait until you're back up
   if (kind === "left" || kind === "right") {
@@ -2124,7 +2130,7 @@ function input(kind) {
   } else if (kind === "jump") {
     if (me.power === "rocket") return;
     if (me.y <= 0.001 && me.stumbleT <= 0) {
-      me.vy = JUMP_V * (me.power === "spring" ? SPRING_JUMP : 1);
+      me.vy = JUMP_V;
       me.y = 0.001;
       me.slideT = 0;
       sfx.jump();
@@ -2294,7 +2300,7 @@ function stepMe(dt) {
       const half = kind === "crate" ? 0.58 : 0.62;
       if (Math.abs(me.x - lane) > half) continue;
       const clear =
-        (kind === "hurdle" && me.y > 0.62) || (kind === "gate" && me.slideT > 0) || (kind === "crate" && me.y > 2.7);
+        (kind === "hurdle" && me.y > 0.62) || (kind === "gate" && me.slideT > 0);
       if (!clear) hit(kind);
     }
   }
@@ -2386,6 +2392,41 @@ function hit(kind) {
 const slipped = new Set(); // banana ids you've already run onto
 const bowled = new Set(); // bowling balls that already got you
 
+// ── spectating (out of hearts) ──
+
+/** Runners you can watch: still in the race, leader first. */
+function watchable() {
+  return [...remote.map.values()].filter((r) => r.runner && !r.p.left && r.p.outAt == null).sort((a, b) => b.dispD - a.dispD);
+}
+/** Who the camera follows: your pick, or the leader if you haven't picked (or they're out). */
+function spectateTarget() {
+  const list = watchable();
+  let t = list.find((r) => r.p.id === game.spectating) || list[0] || null;
+  const id = t?.p.id ?? null;
+  if (id !== game.shownSpectate || list.length !== game.shownCount) {
+    game.shownSpectate = id;
+    game.shownCount = list.length;
+    game.spectating = id;
+    renderSpectate(t, list.length);
+  }
+  return t;
+}
+function cycleSpectate(step) {
+  const list = watchable();
+  if (!list.length) return;
+  const i = Math.max(0, list.findIndex((r) => r.p.id === game.spectating));
+  game.spectating = list[(i + step + list.length) % list.length].p.id;
+}
+function renderSpectate(t, n) {
+  const bar = $("#spectate");
+  bar.classList.toggle("show", Boolean(me.out && t));
+  if (!t) return;
+  $("#spectateName").textContent = withFlag(t.p.name, t.p.country);
+  $("#spectateCount").textContent = n > 1 ? `${n} still running` : "last one running";
+}
+$("#specPrev").addEventListener("click", () => cycleSpectate(-1));
+$("#specNext").addEventListener("click", () => cycleSpectate(1));
+
 // ── survival hearts ──
 
 function renderHearts(pop) {
@@ -2414,48 +2455,30 @@ function knockOut() {
   banner("OUT!", 1600);
   sendPos(true);
   const hint = $("#controlsHint");
-  hint.textContent = "No hearts left · watching the others";
+  hint.textContent = TOUCH ? "No hearts left · tap ◀ ▶ to watch someone else" : "No hearts left · ← → to watch someone else";
   hint.style.opacity = "1";
+  game.spectating = null;
+  game.shownSpectate = undefined;
 }
 
 // ── power-ups ──
 
-function currentPlace() {
-  const v = net.view;
-  if (!v) return 1;
-  let ahead = 0;
-  for (const p of v.players) {
-    if (p.id === playerId || p.left || p.outAt != null) continue;
-    const r = remote.map.get(p.id);
-    if (p.finish !== null || (r ? r.dispD : p.d) > me.d) ahead += 1;
-  }
-  return ahead + 1;
-}
-
 /** Leaders mostly get defence, the back of the pack gets the big stuff. */
+/**
+ * What a mystery box gives you: the odds table in logic.js (powerOdds),
+ * using your rank among runners still in the race and your gap to the leader.
+ */
 function rollPower() {
   const v = net.view;
-  const racers = v ? v.players.filter((p) => !p.left).length : 1;
-  const place = currentPlace();
-  const back = racers > 1 ? (place - 1) / (racers - 1) : 0.5; // 0 = leading, 1 = last
-  const weights = {
-    shield: 3 - back * 1.5,
-    ghost: 2,
-    rocket: 1 + back * 3,
-    lightning: racers > 1 && place > 1 ? 0.5 + back * 3 : 0,
-    banana: racers > 1 ? 2 : 1, // it stays on the track until someone slips on it (alone: mind your own!)
-    bowling: racers > 1 && place < racers ? 1 + (1 - back) * 2 : 0, // only useful with someone behind you
-    freeze: racers > 1 ? 1 + back * 2 : 0,
-    spring: 1.5,
-  };
-  let total = 0;
-  for (const k of POWERS) total += weights[k];
-  let roll = Math.random() * total;
-  for (const k of POWERS) {
-    roll -= weights[k];
-    if (roll <= 0) return k;
-  }
-  return "shield";
+  const field = (v?.players || [])
+    .filter((p) => !p.left && p.outAt == null && p.finish == null)
+    .map((p) => (p.id === playerId ? me.d : remote.map.get(p.id)?.dispD ?? p.d));
+  if (!field.length) field.push(me.d);
+  const rank = 1 + field.filter((d) => d > me.d + 0.01).length;
+  const gap = Math.max(...field) - me.d;
+  const kind = pickPower(powerOdds({ rank, alive: field.length, gapToLeader: gap, last: me.lastItem }), Math.random());
+  me.lastItem = kind;
+  return kind;
 }
 
 /** A mystery box goes into your slot; nothing happens until you use it. */
@@ -2560,11 +2583,11 @@ function frost() {
   f.classList.add("on");
 }
 
-/** The power-up everyone starts with: anything that's useful right now. */
-function startingItem(v) {
-  const racers = v.players.filter((p) => !p.left).length;
-  const pool = racers > 1 ? ["shield", "rocket", "ghost", "banana", "bowling", "freeze", "spring", "lightning"] : ["shield", "rocket", "ghost", "spring", "banana"];
-  return pool[Math.floor(Math.random() * pool.length)];
+/** The power-up everyone starts with: one of the neutral ones, same odds for everybody. */
+function startingItem() {
+  const kind = START_POWERS[Math.floor(Math.random() * START_POWERS.length)];
+  me.lastItem = kind;
+  return kind;
 }
 
 function flash() {
@@ -2738,16 +2761,12 @@ function frame(now) {
     let fz = zMe;
     let fd = me.d;
     if (me.out) {
-      const lead = [...remote.map.values()].filter((r) => r.runner && !r.p.left && r.p.outAt == null).sort((a, b) => b.dispD - a.dispD)[0];
-      if (lead) {
-        fx = lead.dispX / LANE_W + (LANES - 1) / 2;
-        fy = lead.dispY;
-        fz = -lead.dispD;
-        fd = lead.dispD;
-        if (game.spectating !== lead.p.id) {
-          game.spectating = lead.p.id;
-          $("#controlsHint").textContent = `No hearts left · watching ${lead.p.name}`;
-        }
+      const watch = spectateTarget();
+      if (watch) {
+        fx = watch.dispX / LANE_W + (LANES - 1) / 2;
+        fy = watch.dispY;
+        fz = -watch.dispD;
+        fd = watch.dispD;
       }
     }
     const tx = laneX(fx) * 0.75;
