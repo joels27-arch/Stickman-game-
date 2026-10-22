@@ -1330,7 +1330,7 @@ function banner(text, ms = 1400) {
 
 let modelsReady = false;
 function setMenuBusy(busy, note, isErr = false) {
-  const live = !!roomApi && modelsReady && !busy;
+  const live = modelsReady && !busy;
   $("#createBtn").disabled = !live;
   $("#joinBtn").disabled = !live;
   $("#soloBtn").disabled = !modelsReady || busy;
@@ -1376,10 +1376,16 @@ function needName() {
   nameInput.focus();
   return true;
 }
-$("#createBtn").addEventListener("click", () => { sfx.unlock(); if (!needName()) enterRoom(newCode(), true); });
+const NO_ROOM = "Live lobbies aren't available on this screen. To race friends, everyone must be signed in to Claude, and the host must invite each friend by name or email with the page's Share button. People who open a public link can only practice alone.";
+function needRoom() {
+  if (roomApi) return false;
+  setMenuBusy(false, NO_ROOM, true);
+  return true;
+}
+$("#createBtn").addEventListener("click", () => { sfx.unlock(); if (!needName() && !needRoom()) enterRoom(newCode(), true); });
 $("#joinBtn").addEventListener("click", () => {
   sfx.unlock();
-  if (needName()) return;
+  if (needName() || needRoom()) return;
   const code = codeInput.value.trim().toUpperCase();
   if (code.length !== 4) { setMenuBusy(false, "Lobby codes have 4 characters.", true); codeInput.focus(); return; }
   enterRoom(code, false);
@@ -1542,7 +1548,7 @@ loadAll((f) => ($("#createBtn").textContent = `Loading 3D models… ${Math.round
 (window.claude?.use ? window.claude.use("room") : Promise.resolve(null)).then((api) => {
   roomApi = api;
   if (!api) {
-    setMenuBusy(false, "Live lobbies work when this page is open in Claude and you're signed in. You can still practice alone.");
+    setMenuBusy(false, NO_ROOM, true);
     return;
   }
   setMenuBusy(false, "");
