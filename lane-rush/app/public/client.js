@@ -242,8 +242,9 @@ function toast(text) {
   toastTimer = setTimeout(() => el.classList.remove("show"), 2600);
 }
 
+/** Higgsfield character-select portrait (upper body, posed) for runner i. */
 function portrait(i) {
-  return `/assets/${RUNNERS[i]?.pic ?? `p${i}`}.png`;
+  return `/assets/pp${i}.webp`;
 }
 
 function el(tag, attrs = {}, ...kids) {
