@@ -55,13 +55,13 @@ const CHAR_H = 1.55; // runner height in metres
 const JUMP_V = 8.6;
 const GRAVITY = 26;
 const SLIDE_S = 0.75;
-// hitting something: fall flat on your face, then get back up
+// hitting something: knocked over onto your back, then get back up
 const FALL_S = 0.6;
 const GETUP_S = 1.0;
 const STUMBLE_S = FALL_S + GETUP_S;
 const INVULN_S = STUMBLE_S + 0.9;
 // [start, end] seconds cut from the Higgsfield clips (the rest is wind-up / standing still)
-const FALL_CLIP = [0.35, 1.75];
+const FALL_CLIP = [0.15, 1.3];
 const GETUP_CLIP = [1.9, 6.1];
 // power-ups (seconds)
 const POWER_S = { shield: 9, rocket: 3.2, ghost: 4.5 };
@@ -1707,7 +1707,7 @@ function canControl() {
 
 function input(kind) {
   if (!canControl()) return;
-  if (me.stumbleT > 0) return; // flat on your face — wait until you're back up
+  if (me.stumbleT > 0) return; // knocked over — wait until you're back up
   if (kind === "left" || kind === "right") {
     const next = clamp(me.lane + (kind === "left" ? -1 : 1), 0, LANES - 1);
     if (next !== me.lane) {
@@ -2062,11 +2062,11 @@ function animateRunner(r, a, speed, dt, pw = "") {
   r.setPower(pw);
   if (pw === "rocket") r.fx.flame.scale.setScalar(0.85 + Math.random() * 0.35);
   if (pw === "shield") r.fx.bubble.rotation.y += dt * 1.5;
-  // hit something: face-plant, then get back up
+  // hit something: fall over backwards, then get back up
   if (a === "stumble") {
     r.fallT += dt;
     if (r.fallT < FALL_S) r.play("fall", 0.06, r.clipDuration("fall") / FALL_S);
-    else r.play("getup", 0.1, r.clipDuration("getup") / GETUP_S);
+    else r.play("getup", 0.2, r.clipDuration("getup") / GETUP_S);
     r.pivot.rotation.z = 0;
     r.mixer.update(dt);
     return;
