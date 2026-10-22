@@ -1359,7 +1359,7 @@ const world = (() => {
           ? [
               loadGLB("/assets/barn.glb").then((g) => (P.barn = fitProp(g.scene, { height: 7.5 }))),
               loadGLB("/assets/windmill.glb").then((g) => (P.windmill = fitProp(g.scene, { height: 13 }))),
-              loadGLB("/assets/wheat.glb").then((g) => (P.wheat = fitProp(g.scene, { width: 4.0, maxHeight: 1.7 }))),
+              loadGLB("/assets/wheat.glb").then((g) => (P.wheat = fitProp(g.scene, { width: 6.8, maxHeight: 1.8 }))),
               loadGLB("/assets/tractor.glb").then((g) => (P.tractor = fitProp(g.scene, { width: 3.6 }))),
               loadGLB("/assets/sunflowers.glb").then((g) => (P.sunflowers = fitProp(g.scene, { height: 2.4 }))),
               loadGLB("/assets/farm_tile.glb").then((g) => (P.farmTileNext = fitTile(g.scene))),
@@ -1872,10 +1872,11 @@ const world = (() => {
       }
     } else if (map === "farm") {
       // wheat right up to the fences, sunflowers along them, a farmyard further out
-      for (let z = -60; z < TRACK_LEN + 160; z += 3.8) {
+      // (big blocks, few of them: keeps the polygon count phone-friendly)
+      for (let z = -60; z < TRACK_LEN + 160; z += 6.6) {
         for (const side of [-1, 1]) {
-          for (let k = 0; k < 3; k++) add(P.wheat, side * (edge + 3 + k * 3.8 + r() * 0.6), MEADOW_Y, z + r() * 0.8, 0.95 + r() * 0.2, Math.floor(r() * 4) * (Math.PI / 2));
-          if (r() < 0.35) add(P.sunflowers, side * (edge + 1.0), MEADOW_Y, z + r() * 2, 0.8 + r() * 0.4, r() * Math.PI * 2);
+          for (let k = 0; k < 2; k++) add(P.wheat, side * (edge + 4.6 + k * 6.6), MEADOW_Y, z + r() * 0.6, 1.0 + r() * 0.1, Math.floor(r() * 4) * (Math.PI / 2));
+          if (r() < 0.22) add(P.sunflowers, side * (edge + 1.0), MEADOW_Y, z + r() * 3, 0.8 + r() * 0.4, r() * Math.PI * 2);
         }
       }
       let side = 1;
