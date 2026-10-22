@@ -461,3 +461,37 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .zap-flash.on { animation: zapflash 0.5s ease-out; }
 @keyframes zapflash { 0% { opacity: 1; } 30% { opacity: 0.2; } 45% { opacity: 0.8; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .zap-flash.on { animation-duration: 0.01s; } }
+
+/* game modes */
+.mode-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.mode-card { appearance: none; text-align: left; display: grid; gap: 2px; padding: 10px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14); color: var(--text); font-family: var(--body); cursor: pointer; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+.mode-card b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 20px; text-transform: uppercase; }
+.mode-card span { font-size: 13px; color: var(--muted); line-height: 1.25; }
+.mode-card em { font-style: normal; font-family: var(--display); font-weight: 800; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lime); }
+.mode-card.on { background: var(--lime); border-color: var(--lime); color: var(--lime-ink); }
+.mode-card.on span, .mode-card.on em { color: var(--lime-ink); }
+.mode-card:disabled { cursor: default; }
+.mode-card:not(.on):disabled { opacity: 0.55; }
+@media (max-width: 560px) { .mode-pick { grid-template-columns: 1fr; } }
+
+/* survival HUD */
+.hearts { position: absolute; top: max(64px, calc(env(safe-area-inset-top) + 58px)); left: max(14px, env(safe-area-inset-left)); display: flex; gap: 4px; font-size: 30px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
+.hearts i { font-style: normal; transition: transform 200ms, opacity 200ms; }
+.hearts i.lost { opacity: 0.35; filter: grayscale(1); transform: scale(0.85); }
+.hearts i.pop { animation: heartpop 0.5s ease-out; }
+@keyframes heartpop { 0% { transform: scale(1.6); } 100% { transform: scale(0.85); } }
+.dist-text { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 20px; color: #fff; text-transform: uppercase; letter-spacing: 0.04em; }
+.track-bar.endless #dots, .track-bar.endless .flag { display: none; }
+.track-bar.endless .dist-text { display: flex; }
+.race-tag { position: absolute; top: max(64px, calc(env(safe-area-inset-top) + 58px)); right: max(14px, env(safe-area-inset-right)); font-family: var(--display); font-style: italic; font-weight: 900; font-size: 16px; text-transform: uppercase; background: var(--panel); border: 1px solid var(--lime); color: var(--lime); padding: 4px 12px; display: none; }
+.race-tag.show { display: block; }
+
+/* tournament table */
+.cup { display: none; margin-top: 4px; }
+.cup.show { display: block; }
+.cup h4 { margin: 6px 0; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 20px; text-transform: uppercase; color: var(--lime); }
+.cup table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.cup th, .cup td { padding: 5px 8px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.cup th { font-family: var(--display); font-weight: 800; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.cup td.pts { font-family: var(--display); font-weight: 900; font-size: 20px; color: var(--lime); text-align: right; }
+.cup tr.me td { background: rgba(182, 247, 42, 0.08); }

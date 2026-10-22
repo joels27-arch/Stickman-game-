@@ -93,6 +93,8 @@
             <select id="lobbyCountry" class="countrySel" aria-label="Country you cheer for"></select>
             <button class="btn small gold shopBtn" type="button">Shop</button>
           </div>
+          <h3 class="pick-title">Game mode</h3>
+          <div id="modePick" class="mode-pick"></div>
           <h3 class="pick-title">Choose your runner</h3>
           <div id="picker" class="picker"></div>
           <div class="lobby-actions">
@@ -110,9 +112,11 @@
     <section id="hud" class="hud">
       <div class="hud-top">
         <div id="place" class="place">1<sup>st</sup></div>
-        <div class="track-bar"><div id="dots"></div><div class="flag">🏁</div></div>
+        <div class="track-bar"><div id="dots"></div><div class="flag">🏁</div><div id="distText" class="dist-text"></div></div>
         <div id="timer" class="timer">0.0</div>
       </div>
+      <div id="hearts" class="hearts"></div>
+      <div id="raceTag" class="race-tag"></div>
       <div id="countdown" class="countdown"></div>
       <div id="banner" class="banner"></div>
       <div id="zapFlash" class="zap-flash"></div>
@@ -135,8 +139,10 @@
             </div>
           </div>
           <ol id="podium" class="podium"></ol>
+          <div id="cupBox" class="cup"></div>
           <div class="lobby-actions">
             <button id="leave2Btn" class="btn small ghost">Leave</button>
+            <button id="nextBtn" class="btn big go"><span class="flagico">🏆</span> Next race <span class="arrow">→</span></button>
             <button id="againBtn" class="btn big go"><span class="flagico">🏁</span> Play again <span class="arrow">→</span></button>
             <div id="waitHost2" class="wait">Waiting for the host…</div>
           </div>

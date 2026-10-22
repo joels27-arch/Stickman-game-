@@ -26,6 +26,12 @@ import {
   MEDAL_WORTH,
   MIN_RACERS_FOR_MEDALS,
   POWERS,
+  LIVES,
+  SURVIVAL_LEN,
+  SURVIVAL_BOOST,
+  survivalSpeed,
+  CUP_RACES,
+  CUP_POINTS,
   ROLLER_SPEED,
   ROLLER_TRIGGER_M,
 } from "/logic.js";
@@ -50,6 +56,12 @@ const flagOf = (code) => (code && code.length === 2 ? String.fromCodePoint(...[.
 const withFlag = (name, code) => (code ? `${flagOf(code)} ${name}` : name);
 const countryName = (code) => (COUNTRIES.find(([c]) => c === code) || [])[1] || "";
 const MODES = ["Solo", "Duo", "Trio", "Squad"];
+const GAME_MODE_INFO = {
+  survival: { label: "Survival", icon: "❤️", tag: "Main mode", text: "3 hearts each. Last runner standing wins. Alone it's an endless run." },
+  sprint: { label: "Sprint", icon: "🏁", tag: "1 minute", text: "700 m to the finish line. Fastest time wins." },
+  tournament: { label: "Tournament", icon: "🏆", tag: "3 races", text: `Survival, Sprint, Survival. ${CUP_POINTS.slice(0, 3).join(" / ")} points per place. Most points wins.` },
+};
+const KIND_LABEL = { survival: "Survival", sprint: "Sprint" };
 const LANE_W = 2.0; // metres between lane centres
 const CHAR_H = 1.55; // runner height in metres
 const JUMP_V = 8.6;
@@ -677,12 +689,29 @@ function renderLobby(v) {
   $("#startBtn").style.display = isHost ? "" : "none";
   $("#waitHost").style.display = isHost ? "none" : "block";
   const mode = MODES[Math.max(0, Math.min(n, 4) - 1)];
+  const gm = v.mode || "survival";
+  const modePick = $("#modePick");
+  modePick.replaceChildren(
+    ...Object.entries(GAME_MODE_INFO).map(([key, info]) => {
+      const b = el(
+        "button",
+        { class: `mode-card${gm === key ? " on" : ""}`, type: "button" },
+        el("em", { text: info.tag }),
+        el("b", { text: `${info.icon} ${key === "survival" && n < 2 ? "Endless run" : info.label}` }),
+        el("span", { text: key === "survival" && n < 2 ? "Alone: 3 hearts, see how far you get. With friends: last one standing." : info.text }),
+      );
+      b.disabled = !isHost;
+      b.addEventListener("click", () => gm !== key && act({ type: "mode", mode: key }));
+      return b;
+    }),
+  );
+  const what = gm === "tournament" ? "tournament" : gm === "survival" && n < 2 ? "endless run" : `${GAME_MODE_INFO[gm].label} race`;
   const start = $("#startBtn");
-  start.replaceChildren(el("span", { class: "flagico", text: "🏁" }), el("span", { text: `Start ${mode} race` }), el("span", { class: "arrow", text: "→" }));
-  $("#lobbyCount").textContent = `${mode} · ${n}/4 players`;
+  start.replaceChildren(el("span", { class: "flagico", text: GAME_MODE_INFO[gm].icon }), el("span", { text: `Start ${mode} ${what}` }), el("span", { class: "arrow", text: "→" }));
+  $("#lobbyCount").textContent = `${mode} · ${GAME_MODE_INFO[gm].label} · ${n}/4 players`;
   $("#readyCount").textContent = `👥 ${n}/4 players ready`;
   $("#lobbyMsg").textContent =
-    isHost && n < 2 ? "Race solo for practice, or share the code: duo, trio or a full squad of 4. Medals need 2+ players." : "";
+    isHost && n < 2 ? "Play alone for practice, or share the code: duo, trio or a full squad of 4. Medals need 2+ players." : "";
   world.setShowcase(me?.char ?? 0);
   if (world.ready) for (const p of v.players) world.ensureChar(p.char).catch(() => {});
   renderWallet();
@@ -695,6 +724,7 @@ $("#startBtn").addEventListener("click", () => {
 $("#leaveBtn").addEventListener("click", leaveLobby);
 $("#leave2Btn").addEventListener("click", leaveLobby);
 $("#againBtn").addEventListener("click", () => act({ type: "again" }));
+$("#nextBtn").addEventListener("click", () => act({ type: "next" }));
 $("#copyBtn").addEventListener("click", async () => {
   const url = `${location.origin}/?join=${net.code}`;
   const text = `Race me in Lane Rush! Code ${net.code} → ${url}`;
@@ -734,11 +764,23 @@ function renderResults(v) {
     const p = byId.get(id);
     if (!p) return;
     const rw = rewards[id];
+    const survival = v.kind === "survival";
     const detail = p.left
       ? "left the race"
+      : survival
+        ? `${Math.round(p.d)} m · ${Math.max(0, LIVES - p.hits)} ❤️ left`
+        : p.finish !== null
+          ? `${p.hits} bump${p.hits === 1 ? "" : "s"}`
+          : `${Math.round(p.d)} m of ${TRACK_LEN} m`;
+    const time = survival
+      ? p.outAt !== null
+        ? `out ${fmtTime(p.outAt - v.startAt)}`
+        : p.left
+          ? "–"
+          : "Survived"
       : p.finish !== null
-        ? `${p.hits} bump${p.hits === 1 ? "" : "s"}`
-        : `${Math.round(p.d)} m of ${TRACK_LEN} m`;
+        ? fmtTime(p.finish)
+        : "DNF";
     const earn = rw?.medal
       ? el("span", { class: "earn" }, el("img", { src: MEDAL_IMG[rw.medal], alt: `${rw.medal} medal` }))
       : el("span", { class: "earn", text: "" });
@@ -749,23 +791,40 @@ function renderResults(v) {
         el("span", { class: `pl p${Math.min(i + 1, 4)}`, text: PLACE[i] ?? `${i + 1}th` }),
         el("img", { src: portrait(p.char), alt: "" }),
         el("span", { class: "who", text: withFlag(p.name, p.country) + (p.id === playerId ? " (you)" : "") }, el("small", { text: detail })),
-        el("span", { class: "tm", text: p.finish !== null ? fmtTime(p.finish) : "DNF" }),
+        el("span", { class: "tm", text: time }),
         earn,
       ),
     );
   });
 
   // your place, and your coins (paid once per race)
-  const myPlace = v.standings.indexOf(playerId) + 1;
+  const cup = v.cup;
+  const cupDone = cup && cup.race >= cup.races.length;
+  const order = cupDone ? cup.table : v.standings;
+  const myPlace = order.indexOf(playerId) + 1;
   const mine = rewards[playerId];
+  const solo = v.players.length < 2;
   $("#resPlace").innerHTML = myPlace ? `${myPlace}<sup>${ordinal(myPlace)}</sup>` : "–";
-  $("#resTitle").textContent = myPlace === 1 ? "You win!" : myPlace ? `You finished ${PLACE[myPlace - 1] ?? myPlace}` : "Race results";
+  $("#resTitle").textContent = cupDone
+    ? myPlace === 1
+      ? "Tournament champion!"
+      : `Tournament: ${PLACE[myPlace - 1] ?? myPlace}`
+    : solo && v.kind === "survival"
+      ? `You ran ${Math.round(v.players[0]?.d ?? 0)} m`
+      : myPlace === 1
+        ? "You win!"
+        : myPlace
+          ? `You finished ${PLACE[myPlace - 1] ?? myPlace}`
+          : "Race results";
+  renderCup(v);
   const reward = $("#resReward");
   reward.replaceChildren();
   if (mine?.medal) {
     const fresh = wallet.claim(`${v.startAt}:${playerId}`, mine.medal);
     reward.append(el("img", { src: MEDAL_IMG[mine.medal], alt: "" }), el("span", { text: `+1 ${mine.medal} medal` }));
     if (fresh) sfx.boost();
+  } else if (cup && !cupDone) {
+    reward.append(el("span", { class: "nomedal", text: `+${CUP_POINTS[v.standings.indexOf(playerId)] ?? 0} points · medals are paid after race ${cup.races.length}` }));
   } else if (myPlace) {
     reward.append(el("span", {
       class: "nomedal",
@@ -775,8 +834,41 @@ function renderResults(v) {
   renderWallet();
 
   const isHost = v.host === playerId;
-  $("#againBtn").style.display = isHost ? "" : "none";
+  const hasNext = cup && !cupDone;
+  $("#nextBtn").style.display = isHost && hasNext ? "" : "none";
+  $("#againBtn").style.display = isHost && !hasNext ? "" : "none";
   $("#waitHost2").style.display = isHost ? "none" : "block";
+  if (hasNext) {
+    $("#nextBtn").replaceChildren(
+      el("span", { class: "flagico", text: "🏆" }),
+      el("span", { text: `Race ${cup.race + 1}: ${KIND_LABEL[cup.races[cup.race]]}` }),
+      el("span", { class: "arrow", text: "→" }),
+    );
+  }
+}
+
+function renderCup(v) {
+  const box = $("#cupBox");
+  const cup = v.cup;
+  box.classList.toggle("show", Boolean(cup));
+  box.replaceChildren();
+  if (!cup) return;
+  const done = cup.race >= cup.races.length;
+  const byId = new Map(v.players.map((p) => [p.id, p]));
+  const rows = cup.table.map((id, i) => {
+    const p = byId.get(id);
+    return el(
+      "tr",
+      { class: id === playerId ? "me" : "" },
+      el("td", { text: PLACE[i] ?? `${i + 1}th` }),
+      el("td", { text: p ? withFlag(p.name, p.country) : "?" }),
+      el("td", { class: "pts", text: String(cup.points[id] ?? 0) }),
+    );
+  });
+  box.append(
+    el("h4", { text: done ? "🏆 Final tournament table" : `🏆 Tournament · after race ${cup.race} of ${cup.races.length}` }),
+    el("table", {}, el("thead", {}, el("tr", {}, el("th", { text: "#" }), el("th", { text: "Runner" }), el("th", { text: "Points" }))), el("tbody", {}, ...rows)),
+  );
 }
 
 // ── world (three.js) ────────────────────────────────────────────────────────
@@ -857,6 +949,14 @@ const world = (() => {
   // Meadow far below the raised turf track; the track itself is Higgsfield 3D
   // ground tiles (built once the models load, see buildScenery).
   const MEADOW_Y = -0.9;
+  // Everything that lines the track lives in groups that hop forward in
+  // SHIFT_STEP jumps in endless (survival) runs, so the meadow never ends.
+  const SHIFT_STEP = 500;
+  let shift = 0;
+  const trackGroup = new THREE.Group();
+  scene.add(trackGroup);
+  const finishGroup = new THREE.Group();
+  scene.add(finishGroup);
   const grassTex = texLoader.load("/assets/grass.jpg");
   grassTex.colorSpace = THREE.SRGBColorSpace;
   grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
@@ -866,7 +966,7 @@ const world = (() => {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, GROUND_LEN), new THREE.MeshLambertMaterial({ map: grassTex }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(0, MEADOW_Y, -TRACK_LEN / 2);
-  scene.add(ground);
+  trackGroup.add(ground);
 
   // flat stand-in for the track until the 3D tiles are loaded
   const TRACK_W = LANES * LANE_W + 1.6;
@@ -877,7 +977,7 @@ const world = (() => {
   const flatTrack = new THREE.Mesh(new THREE.PlaneGeometry(TRACK_W, GROUND_LEN), new THREE.MeshLambertMaterial({ map: trackTex, color: "#d9ffb8" }));
   flatTrack.rotation.x = -Math.PI / 2;
   flatTrack.position.set(0, 0, -TRACK_LEN / 2);
-  scene.add(flatTrack);
+  trackGroup.add(flatTrack);
 
   const chalk = new THREE.MeshBasicMaterial({ color: "#ffffff", fog: true });
   for (let i = 0; i <= LANES; i++) {
@@ -885,7 +985,7 @@ const world = (() => {
     const line = new THREE.Mesh(new THREE.PlaneGeometry(w, TRACK_LEN + 200), chalk);
     line.rotation.x = -Math.PI / 2;
     line.position.set((i - LANES / 2) * LANE_W, 0.06, -TRACK_LEN / 2 - 40);
-    scene.add(line);
+    trackGroup.add(line);
   }
 
   // start & finish lines
@@ -912,7 +1012,7 @@ const world = (() => {
     );
     m.rotation.x = -Math.PI / 2;
     m.position.set(0, 0.07, -z);
-    scene.add(m);
+    (checker ? finishGroup : scene).add(m);
   }
   stripe(0, false);
   stripe(TRACK_LEN, true);
@@ -955,7 +1055,7 @@ const world = (() => {
     banner.position.set(0, 4.3, 0);
     arch.add(banner);
     arch.position.z = -TRACK_LEN;
-    scene.add(arch);
+    finishGroup.add(arch);
   }
 
   // boost pad texture (code-drawn chevrons)
@@ -1402,9 +1502,9 @@ const world = (() => {
     }
   }
 
-  function buildCourseObjects(seed) {
+  function buildCourseObjects(seed, len) {
     clearCourse();
-    const course = buildCourse(seed);
+    const course = buildCourse(seed, len);
     rollers = [];
     boxes = [];
     for (const row of course.rows) {
@@ -1460,9 +1560,24 @@ const world = (() => {
     boxes = [];
   }
 
+  /** Endless runs: no finish line, and the scenery follows you forward. */
+  function setEndless(on) {
+    finishGroup.visible = !on;
+    endless = on;
+    moveScenery(0);
+  }
+  let endless = false;
+  function moveScenery(d) {
+    shift = endless ? Math.max(0, Math.floor((d - 100) / SHIFT_STEP)) * SHIFT_STEP : 0;
+    trackGroup.position.z = -shift;
+    if (scenery) scenery.position.z = -shift;
+  }
+
   function cull(d) {
+    if (endless) moveScenery(d);
     for (const c of cullables) {
-      c.obj.visible = c.z > d - VIEW_BEHIND && c.z < d + VIEW_AHEAD + (c.wide ? 60 : 0) && !c.box?.taken;
+      const z = c.keep ? c.z + shift : c.z;
+      c.obj.visible = z > d - VIEW_BEHIND && z < d + VIEW_AHEAD + (c.wide ? 60 : 0) && !c.box?.taken;
     }
     for (const r of rollers) r.obj.visible = r.z > d - VIEW_BEHIND && r.z < d + VIEW_AHEAD;
   }
@@ -1524,6 +1639,7 @@ const world = (() => {
     buildScenery,
     cull,
     tick,
+    setEndless,
     animateCourse,
     get rollers() {
       return rollers;
@@ -1548,7 +1664,8 @@ const world = (() => {
 
 // ── race state ──────────────────────────────────────────────────────────────
 
-const game = { mode: "home", round: -1 };
+const game = { mode: "home", round: -1, kind: "survival", len: TRACK_LEN };
+const isSurvival = () => game.kind === "survival";
 
 const me = {
   d: 0,
@@ -1565,6 +1682,7 @@ const me = {
   speed: 0,
   hits: 0,
   finished: false,
+  out: false, // survival: no hearts left
   act: "idle",
   runner: null,
   lastZap: 0,
@@ -1584,7 +1702,7 @@ const remote = {
     }
     if (p.d !== r.lastD) {
       const dt = (now - r.lastAt) / 1000;
-      if (dt > 0.02) r.vel = clamp((p.d - r.lastD) / dt, 0, BOOST_SPEED + 2);
+      if (dt > 0.02) r.vel = clamp((p.d - r.lastD) / dt, 0, 26);
       r.lastD = p.d;
       r.lastAt = now;
     }
@@ -1621,10 +1739,13 @@ function enterRace(v) {
   game.pendingRace = false;
   game.mode = "race";
   game.round = v.round;
+  game.kind = v.kind || "sprint";
+  game.len = isSurvival() ? SURVIVAL_LEN : TRACK_LEN;
   world.hideShowcase();
   world.buildScenery();
+  world.setEndless(isSurvival());
   remote.clear();
-  race.course = world.buildCourseObjects(v.seed);
+  race.course = world.buildCourseObjects(v.seed, game.len);
   showScreen("race");
 
   const mine = v.players.find((p) => p.id === playerId);
@@ -1642,6 +1763,7 @@ function enterRace(v) {
     speed: 0,
     hits: mine?.hits ?? 0,
     finished: mine?.finish != null,
+    out: mine?.outAt != null,
     act: "idle",
     lastSent: 0,
     sentAct: "",
@@ -1671,6 +1793,12 @@ function enterRace(v) {
   }
 
   lastCount = null;
+  game.spectating = null;
+  $(".track-bar").classList.toggle("endless", isSurvival());
+  renderHearts(false);
+  const tag = $("#raceTag");
+  tag.classList.toggle("show", Boolean(v.cup));
+  if (v.cup) tag.textContent = `🏆 Race ${v.cup.race}/${v.cup.races.length} · ${KIND_LABEL[game.kind]}`;
   const touch = matchMedia("(pointer: coarse)").matches;
   const hint = $("#controlsHint");
   hint.textContent = touch
@@ -1684,7 +1812,7 @@ function enterRace(v) {
 function finishRaceView(v) {
   // brief celebration in 3D, then the results card
   game.mode = "results-pending";
-  banner(me.finished ? "FINISHED!" : "TIME UP!");
+  banner(isSurvival() ? (me.out ? "GAME OVER" : "LAST ONE STANDING!") : me.finished ? "FINISHED!" : "TIME UP!");
   setTimeout(() => {
     if (game.mode === "results-pending") showResults(net.view ?? v);
   }, 1600);
@@ -1703,7 +1831,7 @@ function banner(text, ms = 1400) {
 
 function canControl() {
   const v = net.view;
-  return game.mode === "race" && v && serverNow() >= v.startAt && !me.finished;
+  return game.mode === "race" && v && serverNow() >= v.startAt && !me.finished && !me.out;
 }
 
 function input(kind) {
@@ -1827,22 +1955,25 @@ function stepMe(dt) {
   }
 
   // speed
-  let target = me.boostT > 0 || me.power === "rocket" ? BOOST_SPEED : BASE_SPEED;
+  const base = isSurvival() ? survivalSpeed((serverNow() - v.startAt) / 1000) : BASE_SPEED;
+  const fast = isSurvival() ? base + SURVIVAL_BOOST : BOOST_SPEED;
+  let target = me.boostT > 0 || me.power === "rocket" ? fast : base;
   // sliding along the grass while falling, then stopped while getting up
   if (me.stumbleT > 0) target = me.stumbleT > GETUP_S ? 3 : 0;
   if (me.finished) target = me.d > TRACK_LEN + 14 ? 0 : 6;
+  if (me.out) target = 0;
   const accel = me.stumbleT > 0 ? 30 : 14;
   me.speed += clamp(target - me.speed, -accel * dt, accel * dt);
   const prevD = me.d;
   me.d += me.speed * dt;
 
-  if (!me.finished && me.d >= TRACK_LEN) {
+  if (!isSurvival() && !me.finished && me.d >= TRACK_LEN) {
     me.finished = true;
     sfx.finish();
     banner("FINISH!", 1800);
     sendPos(true);
   }
-  if (me.finished) return;
+  if (me.finished || me.out) return;
 
   // collisions (swept over this step's distance)
   const course = race.course;
@@ -1896,7 +2027,15 @@ function hit(kind) {
     return;
   }
   if (me.power === "rocket" || me.power === "ghost") return;
+  if (me.out) return;
   me.hits += 1;
+  if (isSurvival()) {
+    renderHearts(true);
+    if (me.hits >= LIVES) {
+      knockOut();
+      return;
+    }
+  }
   me.stumbleT = STUMBLE_S;
   me.invulnT = INVULN_S;
   me.boostT = 0;
@@ -1915,6 +2054,37 @@ function hit(kind) {
   banner(hintText, 900);
 }
 
+// ── survival hearts ──
+
+function renderHearts(pop) {
+  const box = $("#hearts");
+  box.style.display = isSurvival() ? "" : "none";
+  if (!isSurvival()) return;
+  const left = Math.max(0, LIVES - me.hits);
+  box.replaceChildren(
+    ...Array.from({ length: LIVES }, (_, i) => el("i", { class: i < left ? "" : `lost${pop && i === left ? " pop" : ""}`, text: "❤️" })),
+  );
+}
+
+/** Third hit in survival: down for good, then watch whoever is still running. */
+function knockOut() {
+  me.out = true;
+  me.power = "";
+  me.powerT = 0;
+  me.boostT = 0;
+  me.slideT = 0;
+  me.vy = 0;
+  renderPower();
+  shake = 0.5;
+  sfx.hit();
+  if (navigator.vibrate) navigator.vibrate([80, 60, 120]);
+  banner("OUT!", 1600);
+  sendPos(true);
+  const hint = $("#controlsHint");
+  hint.textContent = "No hearts left · watching the others";
+  hint.style.opacity = "1";
+}
+
 // ── power-ups ──
 
 function currentPlace() {
@@ -1922,7 +2092,7 @@ function currentPlace() {
   if (!v) return 1;
   let ahead = 0;
   for (const p of v.players) {
-    if (p.id === playerId || p.left) continue;
+    if (p.id === playerId || p.left || p.outAt != null) continue;
     const r = remote.map.get(p.id);
     if (p.finish !== null || (r ? r.dispD : p.d) > me.d) ahead += 1;
   }
@@ -1991,7 +2161,7 @@ function checkZaps() {
     if (z.by === playerId) continue;
     flash();
     sfx.zap();
-    if (me.finished || me.d <= z.d) continue;
+    if (me.finished || me.out || me.d <= z.d) continue;
     if (me.power === "rocket") continue;
     if (me.power === "ghost") endPower();
     me.invulnT = 0; // lightning gets through the after-hit blink
@@ -2030,6 +2200,7 @@ function renderPower() {
 
 function currentAct() {
   if (net.view && serverNow() < net.view.startAt) return "idle";
+  if (me.out) return "out";
   if (me.finished && me.speed < 0.5) return "cheer";
   if (me.stumbleT > 0) return "stumble";
   if (me.power === "rocket") return "run";
@@ -2047,7 +2218,7 @@ function sendPos(force = false) {
   me.sentPw = me.power;
   act({
     type: "pos",
-    d: Math.round(Math.min(me.d, TRACK_LEN) * 100) / 100,
+    d: Math.round(Math.min(me.d, game.len) * 100) / 100,
     lane: me.lane,
     y: Math.round(me.y * 100) / 100,
     act: a,
@@ -2061,6 +2232,13 @@ function animateRunner(r, a, speed, dt, pw = "") {
   r.setPower(pw);
   if (pw === "rocket") r.fx.flame.scale.setScalar(0.85 + Math.random() * 0.35);
   if (pw === "shield") r.fx.bubble.rotation.y += dt * 1.5;
+  // out of hearts: fall over and stay down
+  if (a === "out") {
+    r.play("fall", 0.06, r.clipDuration("fall") / FALL_S);
+    r.pivot.rotation.set(0, Math.PI, 0);
+    r.mixer.update(dt);
+    return;
+  }
   // hit something: fall over backwards, then get back up
   if (a === "stumble") {
     r.fallT += dt;
@@ -2104,7 +2282,7 @@ function frame(now) {
     const steps = Math.ceil(dt / (1 / 120));
     const v = net.view;
     const raceT = v && serverNow() >= v.startAt ? (serverNow() - v.startAt) / 1000 : null;
-    world.animateCourse(me.d, raceT, dt);
+    world.animateCourse(me.out ? Math.max(me.d, ...[...remote.map.values()].map((r) => r.dispD)) : me.d, raceT, dt);
     checkZaps();
     for (let i = 0; i < steps; i++) stepMe(dt / steps);
     if (game.mode === "race") sendPos(false);
@@ -2121,28 +2299,46 @@ function frame(now) {
       if (!r.runner) continue;
       const p = r.p;
       const age = (performance.now() - r.lastAt) / 1000;
-      const target = Math.min(TRACK_LEN, r.lastD + r.vel * Math.min(age, 0.5));
+      const target = Math.min(game.len, p.act === "out" ? r.lastD : r.lastD + r.vel * Math.min(age, 0.5));
       r.dispD += (target - r.dispD) * Math.min(1, dt * 8);
       r.dispX += (laneX(p.lane) - r.dispX) * Math.min(1, dt * 12);
       r.dispY += (p.y - r.dispY) * Math.min(1, dt * 18);
       r.runner.group.position.set(r.dispX, r.dispY, -r.dispD);
       r.runner.group.visible = !p.left;
-      const ra = p.finish !== null && r.dispD > TRACK_LEN - 1 ? "cheer" : p.gone ? "idle" : p.act;
+      const ra = !isSurvival() && p.finish !== null && r.dispD > TRACK_LEN - 1 ? "cheer" : p.gone && p.act !== "out" ? "idle" : p.act;
       animateRunner(r.runner, ra, r.vel || BASE_SPEED, dt, p.left || p.finish !== null ? "" : p.pw || "");
     }
 
-    // camera: behind and above the player, looking down the track
-    const tx = laneX(me.x) * 0.75;
-    camPos.lerp(new THREE.Vector3(tx, 3.0 + me.y * 0.75, zMe + 5.6), Math.min(1, dt * 6));
+    // camera: behind and above the player, looking down the track (once
+    // you're out of a survival race, it follows the leader instead)
+    let fx = me.x;
+    let fy = me.y;
+    let fz = zMe;
+    let fd = me.d;
+    if (me.out) {
+      const lead = [...remote.map.values()].filter((r) => r.runner && !r.p.left && r.p.outAt == null).sort((a, b) => b.dispD - a.dispD)[0];
+      if (lead) {
+        fx = lead.dispX / LANE_W + (LANES - 1) / 2;
+        fy = lead.dispY;
+        fz = -lead.dispD;
+        fd = lead.dispD;
+        if (game.spectating !== lead.p.id) {
+          game.spectating = lead.p.id;
+          $("#controlsHint").textContent = `No hearts left · watching ${lead.p.name}`;
+        }
+      }
+    }
+    const tx = laneX(fx) * 0.75;
+    camPos.lerp(new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : 6)));
     camera.position.copy(camPos);
     if (shake > 0) {
       shake = Math.max(0, shake - dt);
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
-    camLook.set(tx * 0.8, 1.0 + me.y * 0.6, zMe - 9);
+    camLook.set(tx * 0.8, 1.0 + fy * 0.6, fz - 9);
     camera.lookAt(camLook);
-    world.cull(me.d);
+    world.cull(fd);
     updateHud();
   } else {
     // menus: slow fly-over of the meadow with your runner idling
@@ -2195,16 +2391,25 @@ function updateHud() {
   const entries = v.players
     .filter((p) => !p.left)
     .map((p) => {
-      if (p.id === playerId) return { id: p.id, d: Math.min(me.d, TRACK_LEN), finish: p.finish ?? (me.finished ? 1e9 - 1 : null) };
+      if (p.id === playerId) {
+        return { id: p.id, d: Math.min(me.d, game.len), finish: p.finish ?? (me.finished ? 1e9 - 1 : null), outAt: me.out ? p.outAt ?? sn : null };
+      }
       const r = remote.map.get(p.id);
-      return { id: p.id, d: r ? r.dispD : p.d, finish: p.finish };
+      return { id: p.id, d: r ? r.dispD : p.d, finish: p.finish, outAt: p.outAt };
     });
-  entries.sort((a, b) => {
-    if (a.finish !== null && b.finish !== null) return a.finish - b.finish;
-    if (a.finish !== null) return -1;
-    if (b.finish !== null) return 1;
-    return b.d - a.d;
-  });
+  if (isSurvival()) {
+    // still running first (furthest ahead), then whoever lasted longest
+    entries.sort((a, b) => (b.outAt ?? Infinity) - (a.outAt ?? Infinity) || b.d - a.d);
+    const alive = entries.filter((e) => e.outAt === null).length;
+    $("#distText").textContent = `${Math.round(Math.min(me.d, game.len))} m${entries.length > 1 ? ` · ${alive} still running` : ""}`;
+  } else {
+    entries.sort((a, b) => {
+      if (a.finish !== null && b.finish !== null) return a.finish - b.finish;
+      if (a.finish !== null) return -1;
+      if (b.finish !== null) return 1;
+      return b.d - a.d;
+    });
+  }
   const place = entries.findIndex((e) => e.id === playerId) + 1 || 1;
   $("#place").innerHTML = `${place}<sup>${ordinal(place)}</sup>`;
 
@@ -2238,7 +2443,7 @@ world
 
 // test hooks for the local dev server only (headless browser checks)
 if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
-  window.__laneRush = { me, hit, grabBox };
+  window.__laneRush = { me, hit, grabBox, game };
 }
 
 requestAnimationFrame(frame);

@@ -35,6 +35,30 @@ export const LOBBY_GRACE_MS = 10000; // a dropped lobby player keeps their spot 
 export const CHARACTERS = 8; // 4 starters + 4 shop skins
 
 /**
+ * Ways to play (the lobby host picks one):
+ *   survival   — the main game: an endless run that keeps getting faster;
+ *                everyone has 3 hearts, each hit costs one, and the last
+ *                runner still going wins (alone: run as far as you can)
+ *   sprint     — 700 m to the finish line; fastest time wins
+ *   tournament — three races in a row (CUP_RACES); placings score CUP_POINTS
+ *                and the most points after the last race wins
+ * `state.mode` is what the host picked; `state.kind` is the race being run.
+ */
+export const GAME_MODES = ["survival", "sprint", "tournament"];
+/** A tournament is three races; each placing scores points, most points wins. */
+export const CUP_RACES = ["survival", "sprint", "survival"];
+export const CUP_POINTS = [10, 5, 3, 1];
+export const LIVES = 3;
+export const SURVIVAL_LEN = 9000; // metres of course generated; nobody lasts this long
+export const SURVIVAL_LIMIT_MS = 10 * 60 * 1000;
+export const SURVIVAL_MAX_SPEED = 19; // the ramp tops out here…
+export const SURVIVAL_BOOST = 5; // …and a boost adds this on top
+/** Running speed (m/s) in survival after `s` seconds: starts like sprint, then ramps. */
+export function survivalSpeed(s) {
+  return Math.min(SURVIVAL_MAX_SPEED, BASE_SPEED + Math.max(0, s) * 0.1);
+}
+
+/**
  * Power-ups come out of mystery boxes on the course. The client rolls which
  * one you get; only the lightning bolt needs the server (it trips everyone
  * ahead of you, so it is relayed as a "zap").
@@ -75,8 +99,9 @@ export const MIN_RACERS_FOR_MEDALS = 2;
 
 /** Fastest anyone can legitimately be, plus slack for network jitter. */
 const SPEED_CAP = BOOST_SPEED + 1.5;
+const SURVIVAL_SPEED_CAP = SURVIVAL_MAX_SPEED + SURVIVAL_BOOST + 1.5;
 const POS_SLACK_M = 6;
-const ACTS = ["run", "jump", "slide", "stumble", "idle"];
+const ACTS = ["run", "jump", "slide", "stumble", "idle", "out"];
 const POWER_STATES = ["", "shield", "rocket", "ghost"];
 
 // ── course ──────────────────────────────────────────────────────────────────
@@ -102,7 +127,7 @@ function rng(seed) {
  * Every row leaves at least two lanes free of crates. `looks[lane]` picks the
  * visual variant; it never changes how an obstacle is cleared.
  */
-export function buildCourse(seed) {
+export function buildCourse(seed, len = TRACK_LEN) {
   const r = rng(seed);
   // looks and boxes use their own stream, so they don't reshuffle the layout
   const r2 = rng((seed ^ 0x9e3779b9) >>> 0);
@@ -111,7 +136,7 @@ export function buildCourse(seed) {
   const boosts = [];
   const boxes = [];
   let z = 45;
-  while (z < TRACK_LEN - 40) {
+  while (z < len - 40) {
     const roll = r();
     let lanes;
     if (roll < 0.17) {
@@ -160,7 +185,7 @@ export function buildCourse(seed) {
     }
     z += gap;
   }
-  return { rows, boosts, boxes, len: TRACK_LEN };
+  return { rows, boosts, boxes, len };
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -188,7 +213,7 @@ function present(state) {
 }
 
 function freshRunner(p) {
-  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, zapAt: null, left: false };
+  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, left: false };
 }
 
 function pickHost(state) {
@@ -209,6 +234,19 @@ function removePlayer(state, id) {
 
 /** finished (by time) → still running (by distance) → left the race */
 export function standings(state) {
+  if (state.kind === "survival") {
+    // still running (furthest first) → knocked out (last one out first) → left
+    return ids(state)
+      .map((id) => state.players[id])
+      .sort((a, b) => {
+        if (a.left !== b.left) return a.left ? 1 : -1;
+        const ao = a.outAt ?? Infinity;
+        const bo = b.outAt ?? Infinity;
+        if (ao !== bo) return bo - ao;
+        return b.d - a.d;
+      })
+      .map((p) => p.id);
+  }
   return ids(state)
     .map((id) => state.players[id])
     .sort((a, b) => {
@@ -224,16 +262,57 @@ export function standings(state) {
 function maybeEnd(state, t) {
   if (state.phase !== "race") return;
   const racing = ids(state).filter((id) => !state.players[id].left);
+  if (state.kind === "survival") {
+    const alive = racing.filter((id) => {
+      const p = state.players[id];
+      return p.outAt === null && !p.gone;
+    });
+    // with friends: last one standing wins; alone: run until your hearts run out
+    const over = racing.length >= 2 ? alive.length <= 1 : alive.length === 0;
+    if (over || t >= state.startAt + SURVIVAL_LIMIT_MS) endRace(state, t);
+    return;
+  }
   const stillRunning = racing.filter((id) => {
     const p = state.players[id];
     return p.finish === null && !p.gone;
   });
   const timeUp = t >= state.startAt + RACE_LIMIT_MS;
   const graceUp = state.firstFinishAt !== null && t >= state.firstFinishAt + AFTER_FIRST_MS;
-  if (stillRunning.length === 0 || timeUp || graceUp) {
-    state.phase = "results";
-    state.endAt = t;
+  if (stillRunning.length === 0 || timeUp || graceUp) endRace(state, t);
+}
+
+function endRace(state, t) {
+  state.phase = "results";
+  state.endAt = t;
+  if (state.cup) {
+    standings(state).forEach((id, i) => {
+      const p = state.players[id];
+      state.cup.points[id] = (state.cup.points[id] ?? 0) + (p.left ? 0 : CUP_POINTS[i] ?? 0);
+    });
   }
+}
+
+/** Tournament table: most points first; ties go to whoever placed better in the latest race. */
+export function cupStandings(state) {
+  if (!state.cup) return [];
+  const last = standings(state);
+  return ids(state)
+    .slice()
+    .sort((a, b) => (state.cup.points[b] ?? 0) - (state.cup.points[a] ?? 0) || last.indexOf(a) - last.indexOf(b));
+}
+
+function startRace(state, t) {
+  // evict anyone who dropped out before the gun
+  for (const id of ids(state)) if (state.players[id].gone) removePlayer(state, id);
+  state.round += 1;
+  state.seed = ((Math.floor(t) % 2147483647) ^ Math.imul(state.round, 2654435761)) >>> 0;
+  state.kind = state.cup ? CUP_RACES[state.cup.race - 1] : state.mode;
+  state.phase = "countdown";
+  state.startAt = t + COUNTDOWN_MS;
+  state.endAt = 0;
+  state.firstFinishAt = null;
+  state.zaps = [];
+  for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
 }
 
 // ── the contract ────────────────────────────────────────────────────────────
@@ -250,6 +329,9 @@ export function setup() {
     startAt: 0,
     endAt: 0,
     firstFinishAt: null,
+    mode: "survival",
+    kind: "survival",
+    cup: null,
     zaps: [],
     zapSeq: 0,
   };
@@ -287,6 +369,12 @@ export function validateAction(state, playerId, action) {
       if (action.country !== "" && !COUNTRY_CODES.has(action.country)) return { ok: false, error: "bad country" };
       return { ok: true };
     }
+    case "mode": {
+      if (state.phase !== "lobby") return { ok: false, error: "can only change mode in the lobby" };
+      if (state.host !== playerId) return { ok: false, error: "Only the host can pick the mode" };
+      if (!GAME_MODES.includes(action.mode)) return { ok: false, error: "bad mode" };
+      return { ok: true };
+    }
     case "start": {
       if (state.phase !== "lobby") return { ok: false, error: "already started" };
       if (state.host !== playerId) return { ok: false, error: "Only the host can start" };
@@ -306,7 +394,7 @@ export function validateAction(state, playerId, action) {
     case "zap": {
       if (!me) return { ok: false, error: "join first" };
       if (state.phase !== "race") return { ok: false, error: "not racing" };
-      if (me.finish !== null || me.left) return { ok: false, error: "not racing" };
+      if (me.finish !== null || me.left || me.outAt !== null) return { ok: false, error: "not racing" };
       const t = num(action.t) ? action.t : state.now;
       if (me.zapAt !== null && t - me.zapAt < ZAP_COOLDOWN_MS) return { ok: false, error: "too soon" };
       return { ok: true };
@@ -314,6 +402,12 @@ export function validateAction(state, playerId, action) {
     case "again": {
       if (state.phase !== "results") return { ok: false, error: "race not over" };
       if (state.host !== playerId) return { ok: false, error: "Only the host can restart" };
+      return { ok: true };
+    }
+    case "next": {
+      if (state.phase !== "results") return { ok: false, error: "race not over" };
+      if (state.host !== playerId) return { ok: false, error: "Only the host can start the next race" };
+      if (!state.cup || state.cup.race >= CUP_RACES.length) return { ok: false, error: "no next race" };
       return { ok: true };
     }
     case "leave":
@@ -362,19 +456,17 @@ export function applyAction(state0, playerId, action) {
     case "country":
       me.country = cleanCountry(action.country);
       break;
-    case "start": {
-      // evict anyone who dropped out of the lobby before the gun
-      for (const id of ids(state)) if (state.players[id].gone) removePlayer(state, id);
-      state.round += 1;
-      state.seed = ((Math.floor(t) % 2147483647) ^ Math.imul(state.round, 2654435761)) >>> 0;
-      state.phase = "countdown";
-      state.startAt = t + COUNTDOWN_MS;
-      state.endAt = 0;
-      state.firstFinishAt = null;
-      state.zaps = [];
-      for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
+    case "mode":
+      state.mode = action.mode;
       break;
-    }
+    case "start":
+      state.cup = state.mode === "tournament" ? { race: 1, points: {} } : null;
+      startRace(state, t);
+      break;
+    case "next":
+      state.cup.race += 1;
+      startRace(state, t);
+      break;
     case "pos": {
       // The gun may have gone before the room's tick got here.
       if (state.phase === "countdown" && t >= state.startAt) {
@@ -386,13 +478,28 @@ export function applyAction(state0, playerId, action) {
         break;
       }
       const elapsed = Math.max(0, t - state.startAt);
-      const maxD = (SPEED_CAP * elapsed) / 1000 + POS_SLACK_M;
-      me.d = Math.max(me.d, Math.min(action.d, maxD, TRACK_LEN));
+      const survival = state.kind === "survival";
+      if (survival && me.outAt !== null) {
+        me.lane = action.lane;
+        break;
+      }
+      const cap = survival ? SURVIVAL_SPEED_CAP : SPEED_CAP;
+      const maxD = (cap * elapsed) / 1000 + POS_SLACK_M;
+      me.d = Math.max(me.d, Math.min(action.d, maxD, survival ? SURVIVAL_LEN : TRACK_LEN));
       me.lane = action.lane;
       me.y = Math.max(0, Math.min(action.y, 5));
       me.act = action.act;
       if (action.hits !== undefined) me.hits = action.hits;
       if (action.pw !== undefined) me.pw = action.pw;
+      if (survival) {
+        if (me.hits >= LIVES) {
+          me.outAt = t;
+          me.act = "out";
+          me.pw = "";
+        }
+        maybeEnd(state, t);
+        break;
+      }
       if (me.d >= TRACK_LEN) {
         me.finish = Math.max(1, Math.round(elapsed));
         me.act = "idle";
@@ -413,6 +520,7 @@ export function applyAction(state0, playerId, action) {
     case "again": {
       for (const id of ids(state)) if (state.players[id].gone) removePlayer(state, id);
       state.phase = "lobby";
+      state.cup = null;
       for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
       state.firstFinishAt = null;
       break;
@@ -466,12 +574,24 @@ export function isGameOver() {
 /** Place and medal (or null) for each runner in this race, keyed by player id. */
 export function rewards(state) {
   if (state.phase !== "results") return {};
+  if (state.cup) {
+    // tournaments pay medals once, for the final table
+    if (state.cup.race < CUP_RACES.length) return {};
+    const table = cupStandings(state);
+    const paying = table.length >= MIN_RACERS_FOR_MEDALS;
+    const out = {};
+    table.forEach((id, i) => {
+      out[id] = { place: i + 1, medal: paying && !state.players[id].left ? MEDALS[i] ?? null : null };
+    });
+    return out;
+  }
   const order = standings(state);
   const paying = order.length >= MIN_RACERS_FOR_MEDALS;
   const out = {};
   order.forEach((id, i) => {
     const p = state.players[id];
-    const medal = paying && !p.left && p.finish !== null ? MEDALS[i] ?? null : null;
+    const done = state.kind === "survival" ? true : p.finish !== null;
+    const medal = paying && !p.left && done ? MEDALS[i] ?? null : null;
     out[id] = { place: i + 1, medal };
   });
   return out;
@@ -488,8 +608,21 @@ export function viewFor(state, playerId) {
     startAt: state.startAt,
     endAt: state.endAt,
     firstFinishAt: state.firstFinishAt,
+    mode: state.mode ?? "survival",
+    kind: state.kind ?? "survival",
+    cup: state.cup
+      ? {
+          race: state.cup.race,
+          races: CUP_RACES,
+          points: state.cup.points,
+          table: cupStandings(state),
+        }
+      : null,
+    lives: LIVES,
     limitAt:
-      state.firstFinishAt !== null
+      state.kind === "survival"
+        ? state.startAt + SURVIVAL_LIMIT_MS
+        : state.firstFinishAt !== null
         ? Math.min(state.startAt + RACE_LIMIT_MS, state.firstFinishAt + AFTER_FIRST_MS)
         : state.startAt + RACE_LIMIT_MS,
     now: state.now,
@@ -508,6 +641,7 @@ export function viewFor(state, playerId) {
         pw: p.pw || "",
         finish: p.finish,
         hits: p.hits,
+        outAt: p.outAt ?? null,
         gone: p.gone,
         left: p.left,
       };

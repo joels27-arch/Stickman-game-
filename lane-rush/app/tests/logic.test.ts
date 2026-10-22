@@ -30,6 +30,11 @@ function lobbyOf(n: number): S {
   return s;
 }
 
+/** The old 700 m race (survival is the default mode now). */
+function sprint(s: S): S {
+  return act(s, "p0", { type: "mode", mode: "sprint" });
+}
+
 describe("lobby", () => {
   it("needs an existing lobby to join, and a free code to create", () => {
     const empty = L.setup([]);
@@ -75,7 +80,7 @@ describe("lobby", () => {
 
 describe("race", () => {
   function racing(n = 2): S {
-    let s = act(lobbyOf(n), "p0", { type: "start", t: T0 });
+    let s = act(sprint(lobbyOf(n)), "p0", { type: "start", t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     expect(s.phase).toBe("race");
     return s;
@@ -91,7 +96,7 @@ describe("race", () => {
   });
 
   it("starts the race on the first position after the gun even before the tick", () => {
-    let s = act(lobbyOf(1), "p0", { type: "start", t: T0 });
+    let s = act(sprint(lobbyOf(1)), "p0", { type: "start", t: T0 });
     s = act(s, "p0", pos(3, s.startAt + 300));
     expect(s.phase).toBe("race");
     expect(s.players.p0.d).toBe(3);
@@ -176,7 +181,7 @@ describe("obstacles and power-ups", () => {
   });
 
   function racing(n = 2): S {
-    let s = act(lobbyOf(n), "p0", { type: "start", t: T0 });
+    let s = act(sprint(lobbyOf(n)), "p0", { type: "start", t: T0 });
     return L.applyAction(s, "__system", { type: "tick", t: s.startAt });
   }
 
@@ -216,7 +221,7 @@ describe("medals and countries", () => {
   const pos = (d: number, t: number) => ({ type: "pos", d, lane: 0, y: 0, act: "run", t });
 
   it("gives gold, silver and bronze to the podium and nothing to 4th", () => {
-    let s: S = act(lobbyOf(4), "p0", { type: "start", t: T0 });
+    let s: S = act(sprint(lobbyOf(4)), "p0", { type: "start", t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     s = act(s, "p2", pos(L.TRACK_LEN, s.startAt + 50_000));
     s = act(s, "p0", pos(L.TRACK_LEN, s.startAt + 51_000));
@@ -231,7 +236,7 @@ describe("medals and countries", () => {
   });
 
   it("gives no medal for not finishing, or for racing alone", () => {
-    let s: S = act(lobbyOf(2), "p0", { type: "start", t: T0 });
+    let s: S = act(sprint(lobbyOf(2)), "p0", { type: "start", t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     s = act(s, "p1", pos(L.TRACK_LEN, s.startAt + 50_000));
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt + 50_000 + L.AFTER_FIRST_MS });
@@ -239,7 +244,7 @@ describe("medals and countries", () => {
     expect(r.p1.medal).toBe("gold");
     expect(r.p0).toEqual({ place: 2, medal: null });
 
-    let solo: S = act(lobbyOf(1), "p0", { type: "start", t: T0 });
+    let solo: S = act(sprint(lobbyOf(1)), "p0", { type: "start", t: T0 });
     solo = act(solo, "p0", pos(L.TRACK_LEN, solo.startAt + 50_000));
     expect((L.viewFor(solo, "p0") as S).rewards.p0).toEqual({ place: 1, medal: null });
   });
@@ -251,5 +256,102 @@ describe("medals and countries", () => {
     expect(reject(s, "a", { type: "country", country: "XX" })).toBe("bad country");
     s = act(s, "a", { type: "country", country: "BR", t: T0 });
     expect(s.players.a.country).toBe("BR");
+  });
+});
+
+describe("survival (3 hearts)", () => {
+  const pos = (d: number, t: number, hits = 0) => ({ type: "pos", d, lane: 0, y: 0, act: "run", hits, t });
+  function survival(n: number): S {
+    let s = act(lobbyOf(n), "p0", { type: "start", t: T0 });
+    expect(s.kind).toBe("survival");
+    return L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+  }
+
+  it("is the default and has no finish line", () => {
+    let s = survival(2);
+    s = act(s, "p0", pos(800, s.startAt + 60_000));
+    expect(s.players.p0.d).toBe(800);
+    expect(s.players.p0.finish).toBeNull();
+    expect(s.phase).toBe("race");
+  });
+
+  it("knocks you out on the third hit and ends when one runner is left", () => {
+    let s = survival(3);
+    s = act(s, "p1", pos(100, s.startAt + 10_000, 2));
+    expect(s.players.p1.outAt).toBeNull();
+    s = act(s, "p1", pos(110, s.startAt + 11_000, 3));
+    expect(s.players.p1.outAt).toBe(s.startAt + 11_000);
+    expect(s.phase).toBe("race");
+    s = act(s, "p2", pos(300, s.startAt + 25_000, 3));
+    expect(s.phase).toBe("results");
+    // last one standing wins, then whoever lasted longer
+    expect(L.standings(s)).toEqual(["p0", "p2", "p1"]);
+    const r = L.rewards(s);
+    expect(r.p0.medal).toBe("gold");
+    expect(r.p2.medal).toBe("silver");
+    expect(r.p1.medal).toBe("bronze");
+  });
+
+  it("runs alone until your hearts are gone (endless run)", () => {
+    let s = survival(1);
+    s = act(s, "p0", pos(900, s.startAt + 60_000, 2));
+    expect(s.phase).toBe("race");
+    s = act(s, "p0", pos(950, s.startAt + 63_000, 3));
+    expect(s.phase).toBe("results");
+    expect(L.rewards(s).p0.medal).toBeNull();
+  });
+
+  it("ignores positions once you're out and lets nobody else pick the mode", () => {
+    let s = survival(2);
+    expect(reject(lobbyOf(2), "p1", { type: "mode", mode: "sprint" })).toMatch(/host/);
+    expect(reject(lobbyOf(2), "p0", { type: "mode", mode: "marathon" })).toBeTruthy();
+    s = act(s, "p0", pos(50, s.startAt + 5000, 3));
+    expect(s.phase).toBe("results");
+  });
+});
+
+describe("tournament", () => {
+  const pos = (d: number, t: number, hits = 0) => ({ type: "pos", d, lane: 0, y: 0, act: "run", hits, t });
+
+  it("runs three races, adds up points, and pays medals only for the final table", () => {
+    let s = act(lobbyOf(3), "p0", { type: "mode", mode: "tournament" });
+    s = act(s, "p0", { type: "start", t: T0 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    // race 1 (survival): p2 wins, p0 second, p1 out first
+    expect(s.kind).toBe(L.CUP_RACES[0]);
+    s = act(s, "p1", pos(40, s.startAt + 5000, 3));
+    s = act(s, "p0", pos(90, s.startAt + 9000, 3));
+    expect(s.phase).toBe("results");
+    expect(s.cup.points).toEqual({ p2: 10, p0: 5, p1: 3 });
+    expect(L.rewards(s)).toEqual({});
+    expect(reject(s, "p1", { type: "next" })).toMatch(/host/);
+
+    // race 2 (sprint): p0, p1, p2
+    s = act(s, "p0", { type: "next", t: s.endAt + 5000 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    expect(s.kind).toBe(L.CUP_RACES[1]);
+    s = act(s, "p0", pos(L.TRACK_LEN, s.startAt + 50_000));
+    s = act(s, "p1", pos(L.TRACK_LEN, s.startAt + 51_000));
+    s = act(s, "p2", pos(L.TRACK_LEN, s.startAt + 52_000));
+    expect(s.cup.points).toEqual({ p2: 13, p0: 15, p1: 8 });
+
+    // race 3 (survival): p1 wins
+    s = act(s, "p0", { type: "next", t: s.endAt + 5000 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    s = act(s, "p2", pos(40, s.startAt + 5000, 3));
+    s = act(s, "p0", pos(60, s.startAt + 6000, 3));
+    expect(s.cup.points).toEqual({ p2: 16, p0: 20, p1: 18 });
+    expect(L.cupStandings(s)).toEqual(["p0", "p1", "p2"]);
+    expect(reject(s, "p0", { type: "next" })).toBeTruthy();
+    const r = L.rewards(s);
+    expect([r.p0.medal, r.p1.medal, r.p2.medal]).toEqual(["gold", "silver", "bronze"]);
+    const view = L.viewFor(s, "p1") as any;
+    expect(view.cup.race).toBe(3);
+    expect(view.cup.table).toEqual(["p0", "p1", "p2"]);
+
+    // back to the lobby clears the cup
+    s = act(s, "p0", { type: "again", t: s.endAt + 5000 });
+    expect(s.cup).toBeNull();
+    expect(s.mode).toBe("tournament");
   });
 });

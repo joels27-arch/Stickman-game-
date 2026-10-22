@@ -30,7 +30,7 @@ export function wakeAfter(state: unknown): number | null;
 
 export function standings(state: unknown): string[];
 
-export function buildCourse(seed: number): {
+export function buildCourse(seed: number, len?: number): {
   rows: { z: number; lanes: (string | null)[]; looks: number[] }[];
   boosts: { z: number; lane: number }[];
   boxes: { z: number; lane: number }[];
@@ -48,6 +48,16 @@ export const AFTER_FIRST_MS: number;
 export const LOBBY_GRACE_MS: number;
 export const CHARACTERS: number;
 export const POWERS: string[];
+export const GAME_MODES: string[];
+export const CUP_RACES: string[];
+export const CUP_POINTS: number[];
+export function cupStandings(state: unknown): string[];
+export const LIVES: number;
+export const SURVIVAL_LEN: number;
+export const SURVIVAL_LIMIT_MS: number;
+export const SURVIVAL_MAX_SPEED: number;
+export const SURVIVAL_BOOST: number;
+export function survivalSpeed(seconds: number): number;
 export const ZAP_COOLDOWN_MS: number;
 export const ROLLER_SPEED: number;
 export const ROLLER_TRIGGER_M: number;
