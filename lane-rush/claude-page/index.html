@@ -1,0 +1,1073 @@
+<title>Lane Rush</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+/* Layout: one full-bleed 3D canvas; menus float over it as chunky toy-box cards. */
+:root {
+  color-scheme: light;
+  --ink: #23314d;
+  --cream: #fffaf0;
+  --sky: #8fd3ff;
+  --go: #4cd964;
+  --go-dark: #23a03a;
+  --blue: #3fa9ff;
+  --blue-dark: #1f74d6;
+  --gold: #ffcf3a;
+  --red: #ff5a4e;
+  --muted: #5b6784;
+  --display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Nunito", ui-rounded, system-ui, -apple-system, sans-serif;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--sky);
+  color: var(--ink);
+  font-family: var(--body);
+  -webkit-user-select: none;
+  user-select: none;
+}
+#scene { position: fixed; inset: 0; width: 100vw; height: 100%; display: block; touch-action: none; }
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  overflow-y: auto;
+  z-index: 5;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.04), rgba(20, 60, 120, 0.32));
+}
+.panel {
+  width: min(560px, 100%);
+  margin: auto;
+  background: var(--cream);
+  border: 5px solid var(--ink);
+  border-radius: 28px;
+  padding: 20px 20px 18px;
+  box-shadow: 0 10px 0 var(--ink), 0 22px 40px rgba(0, 0, 0, 0.25);
+  display: grid;
+  gap: 12px;
+}
+.logo {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(44px, 12vw, 72px);
+  line-height: 0.9;
+  margin: 0;
+  text-align: center;
+  color: var(--gold);
+  -webkit-text-stroke: 3px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 6px 0 var(--ink);
+  text-wrap: balance;
+}
+.logo span { color: var(--go); }
+.tag { text-align: center; margin: 0; font-weight: 800; color: var(--muted); }
+.label { font-weight: 900; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+.picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.card {
+  border: 4px solid var(--ink);
+  border-radius: 16px;
+  background: #fff;
+  padding: 4px 2px 6px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  transition: transform 100ms ease;
+}
+.card img { width: 100%; aspect-ratio: 1; object-fit: contain; display: block; max-width: 100%; }
+.card b { display: block; font-family: var(--display); font-weight: 400; font-size: 17px; }
+.card[aria-pressed="true"] { box-shadow: 0 0 0 4px var(--gold); transform: translateY(-3px); }
+.card:focus-visible, .btn:focus-visible, .seg button:focus-visible { outline: 3px solid var(--blue-dark); outline-offset: 3px; }
+
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 4px solid var(--ink); border-radius: 16px; overflow: hidden; }
+.seg button { font: 800 16px var(--body); color: var(--ink); background: #fff; border: 0; padding: 9px 4px; cursor: pointer; }
+.seg button + button { border-left: 3px solid var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--gold); }
+
+.btn {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 26px;
+  padding: 12px 22px;
+  width: 100%;
+  border: 4px solid var(--ink);
+  border-radius: 18px;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(#6ff07f, var(--go-dark));
+  box-shadow: 0 6px 0 var(--ink);
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+.btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
+.btn:disabled { filter: grayscale(0.8); opacity: 0.7; cursor: default; }
+.btn.blue { background: linear-gradient(#7cc8ff, var(--blue-dark)); }
+.btn.small { font-size: 18px; padding: 8px 14px; }
+.row { display: flex; gap: 10px; }
+.row > * { flex: 1; min-width: 0; }
+
+.keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 13px; font-weight: 800; text-align: center; color: var(--muted); }
+.keys div { background: #eef3fb; border-radius: 12px; padding: 8px 4px; }
+.keys strong { display: block; color: var(--ink); font-size: 15px; }
+.note { text-align: center; font-size: 13px; font-weight: 800; color: var(--muted); margin: 0; min-height: 1.2em; }
+.note.err { color: #c8362b; }
+
+/* HUD */
+.hud { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+.hud-top {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.big {
+  font-family: var(--display);
+  color: #fff;
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+#place { font-size: 46px; min-width: 88px; }
+#place sup { font-size: 22px; }
+#timer { font-size: 30px; min-width: 76px; text-align: right; }
+.track-bar { position: relative; flex: 1; min-width: 0; height: 18px; border: 4px solid var(--ink); border-radius: 12px; background: linear-gradient(#bff59a, #71cf4c); }
+.track-bar .flag { position: absolute; right: -10px; top: -16px; font-size: 26px; }
+.dot { position: absolute; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 3px solid var(--ink); }
+.dot.me { width: 28px; height: 28px; margin: -14px 0 0 -14px; z-index: 2; box-shadow: 0 0 0 3px #fff; }
+#countdown { position: absolute; top: 32%; left: 0; right: 0; text-align: center; font-size: clamp(90px, 24vw, 170px); color: var(--gold); -webkit-text-stroke: 5px var(--ink); text-shadow: 0 10px 0 var(--ink); }
+#countdown.pop { animation: pop 0.45s ease-out; }
+@keyframes pop { 0% { transform: scale(1.8); opacity: 0; } 60% { transform: scale(0.92); opacity: 1; } 100% { transform: scale(1); } }
+#banner { position: absolute; top: 21%; left: 0; right: 0; text-align: center; font-size: clamp(34px, 8vw, 60px); opacity: 0; transition: opacity 200ms; }
+#banner.show { opacity: 1; }
+#hint {
+  position: absolute;
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  text-align: center;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 0 var(--ink), 0 0 6px rgba(0, 0, 0, 0.4);
+  transition: opacity 600ms;
+}
+#quit { pointer-events: auto; position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: auto; font-size: 15px; padding: 6px 12px; background: #fff; color: var(--ink); box-shadow: 0 4px 0 var(--ink); }
+
+/* results */
+.title { font-family: var(--display); font-weight: 400; font-size: 38px; text-align: center; margin: 0; }
+.podium { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.podium li { display: grid; grid-template-columns: 46px 60px minmax(0, 1fr) auto; align-items: center; gap: 10px; border: 4px solid var(--ink); border-radius: 18px; background: #fff; padding: 4px 12px 4px 6px; }
+.podium li.me { background: #fff2bf; }
+.podium .pl { font-family: var(--display); font-size: 28px; text-align: center; }
+.podium img { width: 60px; height: 60px; object-fit: contain; }
+.podium .who { font-weight: 900; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.podium .who small { display: block; font-size: 12px; color: var(--muted); }
+.podium .tm { font-family: var(--display); font-size: 22px; font-variant-numeric: tabular-nums; }
+
+@media (max-height: 560px) {
+  .panel { padding: 14px; gap: 8px; }
+  .card img { aspect-ratio: 1.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #countdown.pop { animation: none; }
+  .card, .btn { transition: none; }
+}
+</style>
+
+<canvas id="scene"></canvas>
+
+<section id="menu" class="screen">
+  <div class="panel">
+    <h1 class="logo">LANE <span>RUSH</span></h1>
+    <p class="tag">Race the gang across the meadow. First to the finish wins.</p>
+    <div class="label">Your runner</div>
+    <div id="picker" class="picker"></div>
+    <div class="label">Opponents</div>
+    <div id="level" class="seg" role="group" aria-label="Opponent skill">
+      <button type="button" id="lvl-easy" data-level="easy">Easy</button>
+      <button type="button" id="lvl-normal" data-level="normal">Normal</button>
+      <button type="button" id="lvl-hard" data-level="hard">Hard</button>
+    </div>
+    <div class="keys">
+      <div><strong>↑ / Space</strong>jump hurdles</div>
+      <div><strong>↓</strong>slide under gates</div>
+      <div><strong>← →</strong>dodge crates</div>
+    </div>
+    <button id="startBtn" class="btn" type="button" disabled>Loading 3D models…</button>
+    <p id="menuNote" class="note"></p>
+  </div>
+</section>
+
+<section id="hud" class="hud" hidden>
+  <div class="hud-top">
+    <div id="place" class="big">1<sup>st</sup></div>
+    <div class="track-bar"><div id="dots"></div><div class="flag">🏁</div></div>
+    <div id="timer" class="big">0.0</div>
+  </div>
+  <div id="countdown" class="big"></div>
+  <div id="banner" class="big"></div>
+  <div id="hint">↑ / Space jump · ↓ slide · ← → switch lane · blue arrows = boost</div>
+  <button id="quit" class="btn small" type="button">Quit race</button>
+</section>
+
+<section id="results" class="screen" hidden>
+  <div class="panel">
+    <h2 class="title" id="resTitle">Race results</h2>
+    <ol id="podium" class="podium"></ol>
+    <p id="best" class="note"></p>
+    <div class="row">
+      <button id="menuBtn" class="btn small blue" type="button">Change runner</button>
+      <button id="againBtn" class="btn small" type="button">Race again</button>
+    </div>
+  </div>
+</section>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/SkeletonUtils.js";
+
+// ── rules & tuning (same as the online game) ───────────────────────────────
+const TRACK_LEN = 700, LANES = 4, BASE_SPEED = 12, BOOST_SPEED = 18;
+const COUNTDOWN_MS = 3500, RACE_LIMIT_MS = 90000, AFTER_FIRST_MS = 15000;
+const LANE_W = 2.0, CHAR_H = 1.55, JUMP_V = 8.6, GRAVITY = 26, SLIDE_S = 0.75;
+const STUMBLE_S = 0.8, INVULN_S = 1.4, BOOST_S = 1.6, LANE_SWITCH_SPEED = 9;
+const VIEW_AHEAD = 120, VIEW_BEHIND = 20;
+const RUNNERS = [
+  { name: "Rex", color: "#ef4a3c", blurb: "barbarian" },
+  { name: "Bolt", color: "#2f7df6", blurb: "goggles kid" },
+  { name: "Ivy", color: "#2fbf55", blurb: "speedy" },
+  { name: "Gizmo", color: "#f5b921", blurb: "robot" },
+];
+const LEVELS = {
+  easy: { skill: [0.62, 0.72], react: [2.4, 6.2] },
+  normal: { skill: [0.8, 0.9], react: [3.0, 5.4] },
+  hard: { skill: [0.93, 0.985], react: [3.3, 4.9] },
+};
+
+const $ = (s) => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const laneX = (lane) => (lane - (LANES - 1) / 2) * LANE_W;
+const ordinal = (n) => (n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th");
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage blocked */ } },
+};
+
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Rows of obstacles across the four lanes, plus boost pads (same generator as online). */
+function buildCourse(seed) {
+  const r = rng(seed);
+  const pick = (arr) => arr[Math.floor(r() * arr.length)];
+  const rows = [], boosts = [];
+  let z = 45;
+  while (z < TRACK_LEN - 40) {
+    const roll = r();
+    let lanes;
+    if (roll < 0.2) lanes = ["hurdle", "hurdle", "hurdle", "hurdle"];
+    else if (roll < 0.38) lanes = ["gate", "gate", "gate", "gate"];
+    else if (roll < 0.7) {
+      lanes = [null, null, null, null].map(() => pick([null, null, "hurdle", "gate"]));
+      const crates = 1 + Math.floor(r() * 2);
+      const order = [0, 1, 2, 3];
+      for (let i = 3; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+      for (let i = 0; i < crates; i++) lanes[order[i]] = "crate";
+    } else {
+      let crates = 0;
+      lanes = [0, 1, 2, 3].map(() => {
+        const k = pick(["hurdle", "gate", "crate", null]);
+        if (k === "crate" && crates >= 2) return "hurdle";
+        if (k === "crate") crates++;
+        return k;
+      });
+      if (lanes.every((k) => k === null)) lanes[Math.floor(r() * 4)] = "hurdle";
+    }
+    rows.push({ z: Math.round(z * 10) / 10, lanes });
+    const gap = 15 + r() * 9;
+    if (r() < 0.4) boosts.push({ z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) });
+    z += gap;
+  }
+  return { rows, boosts };
+}
+
+// ── sound: tiny WebAudio synth ─────────────────────────────────────────────
+const sfx = (() => {
+  let ctx = null;
+  const ensure = () => {
+    try {
+      if (!ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; ctx = new AC(); }
+      if (ctx.state === "suspended") ctx.resume();
+    } catch { return null; }
+    return ctx;
+  };
+  function tone(freq, dur, type = "square", vol = 0.12, slide = 0) {
+    const c = ensure(); if (!c) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, c.currentTime);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), c.currentTime + dur);
+    g.gain.setValueAtTime(vol, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+    o.connect(g).connect(c.destination);
+    o.start(); o.stop(c.currentTime + dur + 0.02);
+  }
+  return {
+    unlock: ensure,
+    beep: () => tone(520, 0.18, "square", 0.1),
+    go: () => tone(880, 0.4, "square", 0.12),
+    jump: () => tone(300, 0.2, "triangle", 0.15, 500),
+    slide: () => tone(240, 0.22, "sawtooth", 0.05, -120),
+    hit: () => tone(140, 0.35, "sawtooth", 0.18, -90),
+    boost: () => tone(400, 0.35, "triangle", 0.14, 900),
+    lane: () => tone(660, 0.06, "triangle", 0.06),
+    finish: () => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.22, "square", 0.1), i * 110)),
+  };
+})();
+
+// ── three.js world ─────────────────────────────────────────────────────────
+const canvas = $("#scene");
+let renderer = null;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+} catch {
+  $("#menuNote").textContent = "This browser can't show 3D (WebGL is turned off).";
+  $("#menuNote").classList.add("err");
+}
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 400);
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer?.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.fov = w / h < 0.8 ? 78 : 62;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+resize();
+
+scene.background = new THREE.Color("#8fd3ff");
+scene.fog = new THREE.Fog("#cdeeff", 55, 150);
+scene.add(new THREE.HemisphereLight("#e6f6ff", "#5fae3a", 1.35));
+const sun = new THREE.DirectionalLight("#fff4d6", 1.6);
+sun.position.set(-6, 14, 8);
+scene.add(sun);
+
+const texLoader = new THREE.TextureLoader();
+texLoader.load("assets/sky.jpg", (t) => { t.colorSpace = THREE.SRGBColorSpace; scene.background = t; });
+function grass(repeatX, repeatY) {
+  const t = texLoader.load("assets/grass.jpg");
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  t.repeat.set(repeatX, repeatY);
+  return t;
+}
+const GROUND_LEN = TRACK_LEN + 260;
+{
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, GROUND_LEN), new THREE.MeshLambertMaterial({ map: grass(18, GROUND_LEN / 5) }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.z = -GROUND_LEN / 2 + 60;
+  scene.add(ground);
+  const tw = LANES * LANE_W + 1;
+  const track = new THREE.Mesh(new THREE.PlaneGeometry(tw, GROUND_LEN), new THREE.MeshLambertMaterial({ map: grass(tw / 3, GROUND_LEN / 3), color: "#d9ffb8" }));
+  track.rotation.x = -Math.PI / 2;
+  track.position.set(0, 0.01, ground.position.z);
+  scene.add(track);
+  const chalk = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+  for (let i = 0; i <= LANES; i++) {
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(i === 0 || i === LANES ? 0.16 : 0.09, GROUND_LEN), chalk);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set((i - LANES / 2) * LANE_W, 0.02, ground.position.z);
+    scene.add(line);
+  }
+}
+function canvasTex(w, h, draw) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  draw(c.getContext("2d"));
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function stripe(z, checker) {
+  const t = canvasTex(256, 32, (g) => {
+    g.fillStyle = "#fff"; g.fillRect(0, 0, 256, 32);
+    if (checker) for (let x = 0; x < 16; x++) for (let y = 0; y < 2; y++) if ((x + y) % 2) { g.fillStyle = "#111"; g.fillRect(x * 16, y * 16, 16, 16); }
+  });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(LANES * LANE_W, checker ? 1.2 : 0.3), new THREE.MeshBasicMaterial({ map: t }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(0, 0.03, -z);
+  scene.add(m);
+}
+stripe(0, false);
+stripe(TRACK_LEN, true);
+{
+  const arch = new THREE.Group();
+  const postMat = new THREE.MeshLambertMaterial({ color: "#ff5a4e" });
+  const ballMat = new THREE.MeshLambertMaterial({ color: "#ffcf3a" });
+  for (const s of [-1, 1]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 5, 12), postMat);
+    post.position.set(s * (LANES * LANE_W / 2 + 0.6), 2.5, 0);
+    arch.add(post);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), ballMat);
+    ball.position.set(post.position.x, 5.2, 0);
+    arch.add(ball);
+  }
+  const t = canvasTex(1024, 160, (g) => {
+    g.fillStyle = "#ffcf3a"; g.fillRect(0, 0, 1024, 160);
+    g.fillStyle = "#23314d"; g.fillRect(0, 0, 1024, 14); g.fillRect(0, 146, 1024, 14);
+    g.font = "bold 108px 'Lilita One', 'Arial Black', sans-serif";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.lineWidth = 10; g.strokeStyle = "#23314d"; g.strokeText("FINISH", 512, 86);
+    g.fillStyle = "#fff"; g.fillText("FINISH", 512, 86);
+  });
+  const banner = new THREE.Mesh(new THREE.PlaneGeometry(LANES * LANE_W + 1.4, 1.3), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide }));
+  banner.position.y = 4.3;
+  arch.add(banner);
+  arch.position.z = -TRACK_LEN;
+  scene.add(arch);
+}
+const padTex = canvasTex(128, 256, (g) => {
+  g.fillStyle = "#1fd1ff"; g.fillRect(0, 0, 128, 256);
+  g.fillStyle = "#fff";
+  for (let i = 0; i < 3; i++) {
+    const y = 40 + i * 70;
+    g.beginPath(); g.moveTo(14, y + 40); g.lineTo(64, y); g.lineTo(114, y + 40); g.lineTo(114, y + 62); g.lineTo(64, y + 22); g.lineTo(14, y + 62); g.closePath(); g.fill();
+  }
+});
+const padMat = new THREE.MeshBasicMaterial({ map: padTex });
+const shadowMat = new THREE.MeshBasicMaterial({
+  map: canvasTex(64, 64, (g) => {
+    const grd = g.createRadialGradient(32, 32, 2, 32, 32, 30);
+    grd.addColorStop(0, "rgba(0,0,0,0.45)"); grd.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+  }),
+  transparent: true,
+  depthWrite: false,
+});
+
+// ── Higgsfield 3D models ───────────────────────────────────────────────────
+const loader = new GLTFLoader();
+const assets = { chars: [], props: {} };
+const loadGLB = (url) => new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
+
+/** Static prop: long side across the lane, centred, base on the ground. */
+function fitProp(root, { width, height, maxHeight }) {
+  const size = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
+  const holder = new THREE.Group(), inner = new THREE.Group();
+  inner.add(root); holder.add(inner);
+  if (size.z > size.x * 1.15) inner.rotation.y = Math.PI / 2;
+  holder.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(inner);
+  const s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+  inner.position.set(-c.x, -b.min.y, -c.z);
+  const k = width ? width / s.x : height / s.y;
+  holder.scale.setScalar(k);
+  if (maxHeight && s.y * k > maxHeight) holder.scale.y = maxHeight / s.y;
+  return holder;
+}
+
+function stripRootMotion(clip) {
+  for (const tr of clip.tracks) {
+    if (!/Hips\.position$/.test(tr.name)) continue;
+    const v = tr.values;
+    for (let i = 3; i < v.length; i += 3) { v[i] = v[0]; v[i + 2] = v[2]; }
+  }
+  return clip;
+}
+
+async function loadChar(i) {
+  const gltf = await loadGLB(`assets/c${i}.json`);
+  const clips = {};
+  for (const c of gltf.animations) clips[c.name.toLowerCase()] = stripRootMotion(c);
+  if (!clips.run) {
+    const run = gltf.animations.find((c) => /run/i.test(c.name));
+    if (run) clips.run = run;
+  }
+  gltf.scene.traverse((o) => { if (o.isMesh) o.frustumCulled = false; });
+  // measure the POSED skinned mesh; bind-pose bounds of skinned meshes are unreliable
+  const mixer = new THREE.AnimationMixer(gltf.scene);
+  const probe = clips.idle || clips.run;
+  if (probe) { mixer.clipAction(probe).play(); mixer.update(0); }
+  gltf.scene.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(gltf.scene, true);
+  mixer.stopAllAction();
+  mixer.uncacheRoot(gltf.scene);
+  return { scene: gltf.scene, clips, scale: CHAR_H / (box.max.y - box.min.y || 1), footY: box.min.y };
+}
+
+async function loadAll(onProgress) {
+  const jobs = [
+    ...[0, 1, 2, 3].map((i) => loadChar(i).then((c) => (assets.chars[i] = c))),
+    loadGLB("assets/hurdle.json").then((g) => (assets.props.hurdle = fitProp(g.scene, { width: 1.75, maxHeight: 0.75 }))),
+    loadGLB("assets/gate.json").then((g) => (assets.props.gate = fitProp(g.scene, { width: 1.9, maxHeight: 2.15 }))),
+    loadGLB("assets/crate.json").then((g) => (assets.props.crate = fitProp(g.scene, { width: 1.55 }))),
+    loadGLB("assets/tree.json").then((g) => (assets.props.tree = fitProp(g.scene, { height: 4.2 }))),
+  ];
+  let done = 0;
+  await Promise.all(jobs.map((j) => j.then(() => onProgress(++done / jobs.length))));
+}
+
+function nameTag(text, color) {
+  const t = canvasTex(256, 72, (g) => {
+    g.font = "900 38px Nunito, 'Arial Rounded MT Bold', sans-serif";
+    const w = Math.min(240, g.measureText(text).width + 36), x = (256 - w) / 2;
+    g.fillStyle = color; g.strokeStyle = "#23314d"; g.lineWidth = 6;
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, 8, w, 54, 18); else g.rect(x, 8, w, 54);
+    g.fill(); g.stroke();
+    g.fillStyle = "#fff"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(text, 128, 37, 220);
+  });
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false }));
+  s.scale.set(1.6, 0.45, 1);
+  s.renderOrder = 10;
+  s.position.y = CHAR_H + 0.3;
+  return s;
+}
+
+function makeModel(charIdx, tag) {
+  const a = assets.chars[charIdx];
+  const group = new THREE.Group();
+  const body = SkeletonUtils.clone(a.scene);
+  const pivot = new THREE.Group();
+  pivot.add(body);
+  body.position.y = -a.footY;
+  pivot.scale.setScalar(a.scale);
+  pivot.rotation.y = Math.PI; // models face +z; the race runs toward -z
+  group.add(pivot);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), shadowMat);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.04;
+  group.add(shadow);
+  if (tag) group.add(nameTag(RUNNERS[charIdx].name, RUNNERS[charIdx].color));
+  const mixer = new THREE.AnimationMixer(body);
+  const actions = {};
+  for (const [k, clip] of Object.entries(a.clips)) {
+    actions[k] = mixer.clipAction(clip);
+    if (k === "jump" || k === "slide") { actions[k].setLoop(THREE.LoopOnce, 1); actions[k].clampWhenFinished = true; }
+  }
+  let current = null;
+  return {
+    group, pivot, mixer, shadow,
+    play(name, fade = 0.15, timeScale = 1) {
+      const next = actions[name] || actions.run || Object.values(actions)[0];
+      if (!next) return;
+      if (current === next) { next.timeScale = timeScale; return; }
+      next.reset(); next.timeScale = timeScale; next.enabled = true; next.setEffectiveWeight(1);
+      next.fadeIn(fade).play();
+      if (current) current.fadeOut(fade);
+      current = next;
+    },
+    duration: (n) => actions[n]?.getClip().duration ?? 1,
+  };
+}
+
+// course objects (culled by distance)
+const raceGroup = new THREE.Group();
+scene.add(raceGroup);
+let cullables = [];
+let sceneryBuilt = false;
+function buildScenery() {
+  if (sceneryBuilt || !assets.props.tree) return;
+  sceneryBuilt = true;
+  let s = 12345;
+  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let z = -40; z < TRACK_LEN + 120; z += 7 + r() * 6) {
+    for (const side of [-1, 1]) {
+      if (r() < 0.25) continue;
+      const t = assets.props.tree.clone();
+      t.scale.multiplyScalar(0.8 + r() * 0.6);
+      t.rotation.y = r() * Math.PI * 2;
+      t.position.set(side * (LANES * LANE_W * 0.5 + 3 + r() * 12), 0, -z);
+      scene.add(t);
+      cullables.push({ obj: t, z, keep: true });
+    }
+  }
+}
+function buildCourseObjects(course) {
+  for (const c of raceGroup.children.slice()) raceGroup.remove(c);
+  cullables = cullables.filter((c) => c.keep);
+  for (const row of course.rows) {
+    row.lanes.forEach((kind, lane) => {
+      if (!kind) return;
+      const o = assets.props[kind].clone();
+      o.position.set(laneX(lane), 0, -row.z);
+      if (kind === "crate") o.rotation.y = (((row.z * 7 + lane) % 3) - 1) * 0.12;
+      raceGroup.add(o);
+      cullables.push({ obj: o, z: row.z });
+    });
+  }
+  for (const b of course.boosts) {
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.6), padMat);
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.set(laneX(b.lane), 0.035, -b.z);
+    raceGroup.add(pad);
+    cullables.push({ obj: pad, z: b.z });
+  }
+}
+function cull(d) {
+  for (const c of cullables) c.obj.visible = c.z > d - VIEW_BEHIND && c.z < d + VIEW_AHEAD;
+}
+
+// ── runners: one physics model for you and the computer players ────────────
+class Runner {
+  constructor(charIdx, lane, isPlayer, skill) {
+    Object.assign(this, {
+      char: charIdx, lane, x: lane, d: 0, y: 0, vy: 0, slideT: 0, stumbleT: 0, invulnT: 0, boostT: 0,
+      speed: 0, hits: 0, finish: null, isPlayer, skill: skill ?? 1, decided: -1, react: 4,
+    });
+    this.model = makeModel(charIdx, !isPlayer);
+    scene.add(this.model.group);
+  }
+  jump() {
+    if (this.y <= 0.001 && this.stumbleT <= 0 && this.finish === null) {
+      this.vy = JUMP_V; this.y = 0.001; this.slideT = 0;
+      if (this.isPlayer) sfx.jump();
+    }
+  }
+  slide() {
+    if (this.finish !== null) return;
+    if (this.y > 0.001) { this.vy = Math.min(this.vy, -16); this.slideT = SLIDE_S; }
+    else if (this.stumbleT <= 0) { this.slideT = SLIDE_S; if (this.isPlayer) sfx.slide(); }
+  }
+  shift(dir) {
+    if (this.finish !== null) return;
+    const next = clamp(this.lane + dir, 0, LANES - 1);
+    if (next !== this.lane) { this.lane = next; if (this.isPlayer) sfx.lane(); }
+  }
+  act() {
+    if (!race.started) return "idle";
+    if (this.finish !== null && this.speed < 0.5) return "cheer";
+    if (this.stumbleT > 0) return "stumble";
+    if (this.y > 0) return "jump";
+    if (this.slideT > 0) return "slide";
+    return "run";
+  }
+  step(dt, course, raceMs) {
+    const dx = this.lane - this.x, stepX = LANE_SWITCH_SPEED * dt;
+    this.x = Math.abs(dx) <= stepX ? this.lane : this.x + Math.sign(dx) * stepX;
+    if (this.y > 0 || this.vy > 0) {
+      this.vy -= GRAVITY * dt;
+      this.y += this.vy * dt;
+      if (this.y <= 0) { this.y = 0; this.vy = 0; }
+    }
+    if (this.y <= 0) this.slideT = Math.max(0, this.slideT - dt);
+    this.stumbleT = Math.max(0, this.stumbleT - dt);
+    this.invulnT = Math.max(0, this.invulnT - dt);
+    this.boostT = Math.max(0, this.boostT - dt);
+    if (!race.started) { this.speed = 0; return; }
+
+    let target = this.boostT > 0 ? BOOST_SPEED : BASE_SPEED;
+    if (this.stumbleT > 0) target = 3.5;
+    if (this.finish !== null) target = this.d > TRACK_LEN + 14 ? 0 : 6;
+    const accel = this.stumbleT > 0 ? 40 : 14;
+    this.speed += clamp(target - this.speed, -accel * dt, accel * dt);
+    const prevD = this.d;
+    this.d += this.speed * dt;
+
+    if (this.finish === null && this.d >= TRACK_LEN) {
+      this.finish = Math.max(1, Math.round(raceMs));
+      if (race.firstFinishAt === null) race.firstFinishAt = raceMs;
+      if (this.isPlayer) { sfx.finish(); banner("FINISH!", 1800); }
+    }
+    if (this.finish !== null) return;
+
+    for (const row of course.rows) {
+      if (row.z < prevD - 0.6 || row.z > this.d + 0.6) continue;
+      for (let lane = 0; lane < LANES; lane++) {
+        const kind = row.lanes[lane];
+        if (!kind) continue;
+        if (Math.abs(this.x - lane) > (kind === "crate" ? 0.58 : 0.62)) continue;
+        const clear = (kind === "hurdle" && this.y > 0.62) || (kind === "gate" && this.slideT > 0);
+        if (!clear) this.hit(kind);
+      }
+    }
+    for (const b of course.boosts) {
+      if (b.z < prevD - 1 || b.z > this.d + 1) continue;
+      if (Math.abs(this.x - b.lane) < 0.5 && this.y < 0.5 && this.boostT < BOOST_S - 0.2) {
+        this.boostT = BOOST_S;
+        if (this.isPlayer) { sfx.boost(); banner("BOOST!", 700); }
+      }
+    }
+  }
+  hit(kind) {
+    if (this.invulnT > 0) return;
+    this.hits += 1;
+    this.stumbleT = STUMBLE_S; this.invulnT = INVULN_S; this.boostT = 0; this.slideT = 0;
+    if (this.isPlayer) {
+      shake = 0.35;
+      sfx.hit();
+      banner(kind === "hurdle" ? "Jump! ↑" : kind === "gate" ? "Slide! ↓" : "Dodge! ← →", 800);
+    }
+  }
+  /** Computer player: look at the next row and react, with a skill-based chance to fumble. */
+  think(course, rand) {
+    if (!race.started || this.finish !== null || this.stumbleT > 0) return;
+    const idx = course.rows.findIndex((r) => r.z > this.d + 0.4);
+    if (idx < 0) return;
+    const row = course.rows[idx];
+    const dist = row.z - this.d;
+    const here = row.lanes[this.lane];
+    // crates: pick a free lane early
+    if (here === "crate" && dist < 11 && this.decided !== idx + 0.5) {
+      this.decided = idx + 0.5;
+      if (rand() < this.skill) {
+        const options = [this.lane - 1, this.lane + 1, this.lane - 2, this.lane + 2]
+          .filter((l) => l >= 0 && l < LANES && row.lanes[l] !== "crate");
+        const easy = options.find((l) => !row.lanes[l]) ?? options[0];
+        if (easy !== undefined) this.shift(Math.sign(easy - this.lane));
+      }
+      return;
+    }
+    if (here === "crate") {
+      // still lined up with the crate: keep moving toward a free lane
+      if (this.lane === Math.round(this.x)) {
+        const free = [0, 1, 2, 3].filter((l) => row.lanes[l] !== "crate").sort((a, b) => Math.abs(a - this.lane) - Math.abs(b - this.lane))[0];
+        if (free !== undefined && dist < 8 && rand() < this.skill * 0.6) this.shift(Math.sign(free - this.lane));
+      }
+      return;
+    }
+    if (this.decided === idx) return;
+    if (dist > this.react) return;
+    this.decided = idx;
+    this.react = this.reactRange[0] + rand() * (this.reactRange[1] - this.reactRange[0]);
+    if (rand() > this.skill) return; // fumble: run straight into it
+    if (here === "hurdle") this.jump();
+    else if (here === "gate") this.slide();
+  }
+  animate(dt) {
+    const m = this.model;
+    m.group.position.set(laneX(this.x), this.y, -this.d);
+    const a = this.act();
+    if (a === "jump") m.play("jump", 0.08, (m.duration("jump") / 0.75) * 0.9);
+    else if (a === "slide") m.play("slide", 0.08, m.duration("slide") / SLIDE_S);
+    else if (a === "cheer") m.play("cheer", 0.25);
+    else if (a === "idle") m.play("idle", 0.25);
+    else m.play("run", 0.12, clamp(this.speed / BASE_SPEED, 0.45, 1.45));
+    m.pivot.rotation.z = a === "stumble" ? Math.sin(performance.now() / 45) * 0.35 : 0;
+    m.pivot.rotation.x = a === "stumble" ? 0.25 : 0;
+    m.shadow.position.y = 0.04 - this.y;
+    if (this.isPlayer) m.group.visible = !(this.invulnT > 0 && this.stumbleT <= 0 && Math.floor(performance.now() / 90) % 2 === 0);
+    m.mixer.update(dt);
+  }
+  remove() { scene.remove(this.model.group); }
+}
+
+// ── race ───────────────────────────────────────────────────────────────────
+const race = { active: false, started: false, course: null, runners: [], me: null, t0: 0, firstFinishAt: null, ended: false, rand: Math.random };
+let choice = { char: Number(store.get("lr:char")) || 0, level: store.get("lr:level") || "normal" };
+if (!(choice.char >= 0 && choice.char < 4)) choice.char = 0;
+if (!LEVELS[choice.level]) choice.level = "normal";
+let shake = 0;
+let lastCount = null;
+
+function startRace() {
+  sfx.unlock();
+  clearRace();
+  hideShowcase();
+  const seed = (Math.random() * 2 ** 31) >>> 0;
+  race.course = buildCourse(seed);
+  race.rand = rng(seed ^ 0x9e3779b9);
+  buildCourseObjects(race.course);
+  const lv = LEVELS[choice.level];
+  const others = [0, 1, 2, 3].filter((c) => c !== choice.char);
+  const lanes = [1, 0, 2, 3];
+  race.me = new Runner(choice.char, lanes[0], true);
+  race.runners = [race.me];
+  others.forEach((c, i) => {
+    const r = new Runner(c, lanes[i + 1], false, lv.skill[0] + race.rand() * (lv.skill[1] - lv.skill[0]));
+    r.reactRange = lv.react;
+    r.react = lv.react[0] + race.rand() * (lv.react[1] - lv.react[0]);
+    race.runners.push(r);
+  });
+  race.t0 = performance.now() + COUNTDOWN_MS;
+  race.active = true;
+  race.started = false;
+  race.ended = false;
+  race.firstFinishAt = null;
+  lastCount = null;
+
+  $("#dots").replaceChildren(...race.runners.map((r) => {
+    const d = document.createElement("div");
+    d.className = `dot${r.isPlayer ? " me" : ""}`;
+    d.style.background = RUNNERS[r.char].color;
+    return d;
+  }));
+  show("hud");
+  const hint = $("#hint");
+  hint.style.opacity = "1";
+  setTimeout(() => (hint.style.opacity = "0"), 6000);
+  canvas.focus?.();
+}
+
+function clearRace() {
+  for (const r of race.runners) r.remove();
+  race.runners = [];
+  race.me = null;
+  race.active = false;
+}
+
+function standings() {
+  return race.runners.slice().sort((a, b) => {
+    if (a.finish !== null && b.finish !== null) return a.finish - b.finish;
+    if (a.finish !== null) return -1;
+    if (b.finish !== null) return 1;
+    return b.d - a.d;
+  });
+}
+
+function endRace() {
+  race.ended = true;
+  const me = race.me;
+  const order = standings();
+  const place = order.indexOf(me) + 1;
+  $("#resTitle").textContent = me.finish === null ? "Time's up!" : place === 1 ? "You win!" : `You came ${place}${ordinal(place)}`;
+  const list = $("#podium");
+  list.replaceChildren();
+  order.forEach((r, i) => {
+    const li = document.createElement("li");
+    if (r.isPlayer) li.className = "me";
+    const pl = document.createElement("span"); pl.className = "pl"; pl.textContent = ["🥇", "🥈", "🥉", "4"][i];
+    const img = document.createElement("img"); img.src = `assets/p${r.char}.png`; img.alt = "";
+    const who = document.createElement("span"); who.className = "who"; who.textContent = r.isPlayer ? `${RUNNERS[r.char].name} (you)` : RUNNERS[r.char].name;
+    const small = document.createElement("small");
+    small.textContent = r.finish !== null ? `${r.hits} bump${r.hits === 1 ? "" : "s"}` : `${Math.round(r.d)} m of ${TRACK_LEN} m`;
+    who.append(small);
+    const tm = document.createElement("span"); tm.className = "tm"; tm.textContent = r.finish !== null ? `${(r.finish / 1000).toFixed(2)}s` : "DNF";
+    li.append(pl, img, who, tm);
+    list.append(li);
+  });
+  let bestText = "";
+  if (me.finish !== null) {
+    const key = `lr:best:${choice.level}`;
+    const prev = Number(store.get(key)) || 0;
+    if (!prev || me.finish < prev) { store.set(key, String(me.finish)); bestText = prev ? `New best on ${choice.level}!` : `Best time on ${choice.level}: ${(me.finish / 1000).toFixed(2)}s`; }
+    else bestText = `Your best on ${choice.level}: ${(prev / 1000).toFixed(2)}s`;
+  }
+  $("#best").textContent = bestText;
+  setTimeout(() => { if (race.ended) show("results"); }, 1500);
+  banner(me.finish === null ? "TIME UP!" : "FINISHED!", 1400);
+}
+
+// ── input ──────────────────────────────────────────────────────────────────
+function input(kind) {
+  const me = race.me;
+  if (!race.active || !race.started || !me || me.finish !== null) return;
+  if (kind === "left") me.shift(-1);
+  else if (kind === "right") me.shift(1);
+  else if (kind === "jump") me.jump();
+  else if (kind === "slide") me.slide();
+}
+window.addEventListener("keydown", (e) => {
+  if (!race.active) return;
+  const k = e.key;
+  if (k === "ArrowLeft" || k === "a" || k === "A") input("left");
+  else if (k === "ArrowRight" || k === "d" || k === "D") input("right");
+  else if (k === "ArrowUp" || k === "w" || k === "W" || k === " ") input("jump");
+  else if (k === "ArrowDown" || k === "s" || k === "S") input("slide");
+  else return;
+  e.preventDefault();
+});
+{
+  let sx = 0, sy = 0, used = false, tracking = false;
+  canvas.addEventListener("touchstart", (e) => { const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; used = false; tracking = true; sfx.unlock(); }, { passive: true });
+  canvas.addEventListener("touchmove", (e) => {
+    if (!tracking || used) return;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 28) return;
+    used = true;
+    if (Math.abs(dx) > Math.abs(dy)) input(dx < 0 ? "left" : "right"); else input(dy < 0 ? "jump" : "slide");
+  }, { passive: true });
+  canvas.addEventListener("touchend", () => { if (tracking && !used) input("jump"); tracking = false; }, { passive: true });
+  canvas.addEventListener("mousedown", () => input("jump"));
+}
+
+// ── UI ─────────────────────────────────────────────────────────────────────
+function show(name) {
+  $("#menu").hidden = name !== "menu";
+  $("#results").hidden = name !== "results";
+  $("#hud").hidden = name !== "hud";
+}
+let bannerTimer = 0;
+function banner(text, ms = 1400) {
+  const b = $("#banner");
+  b.textContent = text;
+  b.classList.add("show");
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => b.classList.remove("show"), ms);
+}
+
+const picker = $("#picker");
+RUNNERS.forEach((r, i) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.id = `pick-${i}`;
+  b.className = "card";
+  const img = document.createElement("img"); img.src = `assets/p${i}.png`; img.alt = "";
+  const name = document.createElement("b"); name.textContent = r.name; name.style.color = r.color;
+  b.append(img, name);
+  b.addEventListener("click", () => { choice.char = i; store.set("lr:char", String(i)); renderMenu(); });
+  picker.append(b);
+});
+for (const b of document.querySelectorAll("#level button")) {
+  b.addEventListener("click", () => { choice.level = b.dataset.level; store.set("lr:level", choice.level); renderMenu(); });
+}
+function renderMenu() {
+  [...picker.children].forEach((c, i) => c.setAttribute("aria-pressed", String(i === choice.char)));
+  for (const b of document.querySelectorAll("#level button")) b.setAttribute("aria-pressed", String(b.dataset.level === choice.level));
+  setShowcase(choice.char);
+}
+$("#startBtn").addEventListener("click", startRace);
+$("#againBtn").addEventListener("click", startRace);
+$("#menuBtn").addEventListener("click", () => { clearRace(); race.ended = false; show("menu"); renderMenu(); });
+$("#quit").addEventListener("click", () => { clearRace(); race.ended = false; show("menu"); renderMenu(); });
+
+// menu showcase: your runner idling on the start line
+let showcase = null;
+function setShowcase(charIdx) {
+  if (!assets.chars[charIdx]) return;
+  if (showcase?.char === charIdx) return;
+  hideShowcase();
+  const m = makeModel(charIdx, false);
+  m.group.position.set(0, 0, -3);
+  m.play("idle", 0);
+  scene.add(m.group);
+  showcase = { char: charIdx, m };
+}
+function hideShowcase() {
+  if (showcase) scene.remove(showcase.m.group);
+  showcase = null;
+}
+
+// ── frame loop ─────────────────────────────────────────────────────────────
+let last = performance.now();
+const camPos = new THREE.Vector3(0, 4, 8), camGoal = new THREE.Vector3(), camLook = new THREE.Vector3();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+
+  if (race.active && race.me) {
+    const raceMs = now - race.t0;
+    race.started = raceMs >= 0;
+    const steps = Math.ceil(dt / (1 / 120));
+    for (let i = 0; i < steps; i++) {
+      for (const r of race.runners) {
+        if (!r.isPlayer) r.think(race.course, race.rand);
+        r.step(dt / steps, race.course, raceMs);
+      }
+    }
+    for (const r of race.runners) r.animate(dt);
+
+    if (!race.ended) {
+      const me = race.me;
+      const allIn = race.runners.every((r) => r.finish !== null);
+      const graceUp = race.firstFinishAt !== null && raceMs >= race.firstFinishAt + AFTER_FIRST_MS && me.finish !== null;
+      const limit = raceMs >= RACE_LIMIT_MS || (race.firstFinishAt !== null && raceMs >= race.firstFinishAt + AFTER_FIRST_MS);
+      if (allIn || graceUp || limit) endRace();
+    }
+
+    const me = race.me;
+    const tx = laneX(me.x) * 0.75;
+    camGoal.set(tx, 3.0 + me.y * 0.35, -me.d + 5.6);
+    camPos.lerp(camGoal, Math.min(1, dt * 6));
+    camera.position.copy(camPos);
+    if (shake > 0) {
+      shake = Math.max(0, shake - dt);
+      camera.position.x += (Math.random() - 0.5) * shake * 0.6;
+      camera.position.y += (Math.random() - 0.5) * shake * 0.6;
+    }
+    camLook.set(tx * 0.8, 1.0, -me.d - 9);
+    camera.lookAt(camLook);
+    cull(me.d);
+    updateHud(raceMs);
+  } else {
+    const t = now / 1000;
+    camera.position.set(Math.sin(t * 0.15) * 1.2, 1.6, 1.4);
+    camera.lookAt(0, 0.9, -3);
+    if (showcase) {
+      showcase.m.pivot.rotation.y = 0.35 + Math.sin(t * 0.6) * 0.25;
+      showcase.m.mixer.update(dt);
+    }
+    cull(0);
+  }
+  renderer?.render(scene, camera);
+}
+
+function updateHud(raceMs) {
+  const cd = $("#countdown");
+  let label = "";
+  if (raceMs < -3000) label = "Ready?";
+  else if (raceMs < 0) label = String(Math.ceil(-raceMs / 1000));
+  else if (raceMs < 700) label = "GO!";
+  if (label !== lastCount) {
+    cd.textContent = label;
+    cd.classList.remove("pop");
+    void cd.offsetWidth;
+    if (label) cd.classList.add("pop");
+    if (label === "GO!") sfx.go(); else if (/^[123]$/.test(label)) sfx.beep();
+    lastCount = label;
+  }
+  const me = race.me;
+  const t = Math.max(0, raceMs);
+  $("#timer").textContent = race.firstFinishAt !== null && me.finish === null
+    ? `⏱${Math.max(0, Math.ceil((race.firstFinishAt + AFTER_FIRST_MS - raceMs) / 1000))}`
+    : ((me.finish ?? t) / 1000).toFixed(1);
+  const order = standings();
+  const place = order.indexOf(me) + 1;
+  $("#place").innerHTML = `${place}<sup>${ordinal(place)}</sup>`;
+  [...$("#dots").children].forEach((dot, i) => {
+    dot.style.left = `${clamp(race.runners[i].d / TRACK_LEN, 0, 1) * 100}%`;
+  });
+}
+
+// ── boot ───────────────────────────────────────────────────────────────────
+renderMenu();
+show("menu");
+requestAnimationFrame(frame);
+loadAll((f) => ($("#startBtn").textContent = `Loading 3D models… ${Math.round(f * 100)}%`))
+  .then(() => {
+    buildScenery();
+    renderMenu();
+    const b = $("#startBtn");
+    b.disabled = false;
+    b.textContent = "Start race";
+  })
+  .catch((err) => {
+    console.error(err);
+    $("#startBtn").textContent = "Couldn't load";
+    $("#menuNote").textContent = "The 3D models didn't load. Reload the page to try again.";
+    $("#menuNote").classList.add("err");
+  });
+</script>
