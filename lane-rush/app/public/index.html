@@ -121,7 +121,11 @@
       <div id="spectate" class="spectate"><button id="specPrev" type="button" aria-label="Watch the previous runner">◀</button><div><small>Watching</small><b id="spectateName"></b><small id="spectateCount"></small></div><button id="specNext" type="button" aria-label="Watch the next runner">▶</button></div>
       <div id="speedFx" class="speed-fx"></div>
       <button id="powerSlot" class="power-slot" type="button" aria-label="Use power-up"><img src="/assets/pw_shield.png" alt="" /><div><b>Shield</b><span class="bar"><i></i></span><span class="use"></span></div></button>
-      <div id="throwLanes" class="throw-lanes" aria-label="Throw the banana into lane"><span>Throw 🍌 into lane</span><div><button type="button" data-lane="0">1</button><button type="button" data-lane="1">2</button><button type="button" data-lane="2">3</button><button type="button" data-lane="3">4</button></div></div>
+      <div id="savedSlot" class="saved-slot" aria-label="Saved power-up"><img src="/assets/pw_shield.png" alt="" /><small>Saved</small></div>
+      <div id="throwLanes" class="throw-lanes" aria-label="Pick a lane and a direction">
+        <div class="row"><span>Ahead ▲</span><button type="button" data-lane="0" data-dir="1">1</button><button type="button" data-lane="1" data-dir="1">2</button><button type="button" data-lane="2" data-dir="1">3</button><button type="button" data-lane="3" data-dir="1">4</button></div>
+        <div class="row back"><span>Behind ▼</span><button type="button" data-lane="0" data-dir="-1">1</button><button type="button" data-lane="1" data-dir="-1">2</button><button type="button" data-lane="2" data-dir="-1">3</button><button type="button" data-lane="3" data-dir="-1">4</button></div>
+      </div>
       <button id="lookBtn" class="look-btn" type="button" aria-label="Hold to look back">👀<small>Look back</small><kbd>hold C</kbd></button>
       <div id="powerToast" class="power-toast"></div>
       <div id="controlsHint" class="controls-hint"></div>

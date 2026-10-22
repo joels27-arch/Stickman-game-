@@ -52,12 +52,25 @@ export const CUP_POINTS = [10, 5, 3, 1];
 export const LIVES = 3;
 export const SURVIVAL_LEN = 9000; // metres of course generated; nobody lasts this long
 export const SURVIVAL_LIMIT_MS = 10 * 60 * 1000;
-export const SURVIVAL_MAX_SPEED = 19; // the ramp tops out here…
+export const SURVIVAL_MAX_SPEED = 24; // the ramp tops out here (after ~3 minutes)…
 export const SURVIVAL_BOOST = 5; // …and a boost adds this on top
 export const SURVIVAL_ROCKET = 10; // a rocket adds this on top of your running speed
-/** Running speed (m/s) in survival after `s` seconds: starts like sprint, then ramps. */
+/**
+ * The longer a round goes, the faster everybody runs.
+ *   survival: +0.1 m/s every second for 70 s (12 → 19), then +0.04 m/s per
+ *             second up to 24 m/s (around the 3-minute mark)
+ *   sprint:   +0.06 m/s every second, up to 16 m/s at the finish
+ */
+export const SPRINT_MAX_SPEED = 16;
 export function survivalSpeed(s) {
-  return Math.min(SURVIVAL_MAX_SPEED, BASE_SPEED + Math.max(0, s) * 0.1);
+  const t = Math.max(0, s);
+  return Math.min(SURVIVAL_MAX_SPEED, BASE_SPEED + 0.1 * Math.min(t, 70) + 0.04 * Math.max(0, t - 70));
+}
+export function sprintSpeed(s) {
+  return Math.min(SPRINT_MAX_SPEED, BASE_SPEED + 0.06 * Math.max(0, s));
+}
+export function runSpeed(kind, s) {
+  return kind === "survival" ? survivalSpeed(s) : sprintSpeed(s);
 }
 
 /**
@@ -67,9 +80,10 @@ export function survivalSpeed(s) {
  *   rocket    — fly over everything at boost speed for a few seconds
  *   ghost     — run straight through obstacles for a few seconds
  *   lightning — everyone ahead of you falls over (unless shielded)
- *   banana    — thrown forward into a lane you pick; whoever runs onto it slips
- *   bowling   — rolled BACKWARDS down a lane you pick; knocks over whoever is
- *               behind you in that lane (jump it!)
+ *   banana    — thrown ahead or dropped behind, into a lane you pick; whoever
+ *               runs onto it slips
+ *   bowling   — rolled ahead or back down a lane you pick; knocks over whoever
+ *               it reaches in that lane (jump it!)
  *   freeze    — everyone else runs slowly for a few seconds (unless shielded)
  * You hold one power-up at a time and use it when you want (boxes are
  * ignored while you hold or use one). Zaps and bananas go through the server.
@@ -160,9 +174,10 @@ export function pickPower(odds, roll) {
 export const START_POWERS = ["shield", "banana", "ghost"];
 /** Powers relayed to everyone through the server as a "zap" (an area effect). */
 export const ZAP_KINDS = ["lightning", "freeze"];
-export const BOWL_SPEED = 24; // m/s the ball rolls back down the track
+export const BOWL_SPEED = 30; // m/s the ball rolls (faster than anyone runs, either way)
 export const BOWL_RANGE_M = 90; // …and how far before it's gone
-export const BANANA_AHEAD_M = 28; // a thrown banana lands this far in front of you
+export const BANANA_AHEAD_M = 28; // a thrown banana lands this far in front of you…
+export const BANANA_BEHIND_M = 5; // …or a dropped one this far behind
 export const BANANA_COOLDOWN_MS = 1200;
 export const ZAP_COOLDOWN_MS = 3000;
 export const ROLLER_SPEED = 6; // m/s a barrel rolls toward you once it's triggered
@@ -179,7 +194,8 @@ export const COUNTRIES = [
   ["GR", "Greece"], ["UA", "Ukraine"], ["BR", "Brazil"], ["AR", "Argentina"],
   ["MX", "Mexico"], ["CA", "Canada"], ["JP", "Japan"], ["KR", "South Korea"],
   ["CN", "China"], ["IN", "India"], ["AU", "Australia"], ["ZA", "South Africa"],
-  ["NG", "Nigeria"], ["EG", "Egypt"],
+  ["NG", "Nigeria"], ["EG", "Egypt"], ["IR", "Iran"], ["CO", "Colombia"],
+  ["PE", "Peru"],
 ];
 const COUNTRY_CODES = new Set(COUNTRIES.map(([c]) => c));
 
@@ -214,8 +230,13 @@ function rng(seed) {
 }
 
 /** Expected running speed (m/s) at distance `d` of a survival run (v² = v0² + 2ad, capped). */
-function speedAtDistance(d) {
-  return Math.min(SURVIVAL_MAX_SPEED, Math.sqrt(BASE_SPEED * BASE_SPEED + 0.2 * d));
+export function speedAtDistance(kind, d) {
+  const x = Math.max(0, d);
+  if (kind !== "survival") return Math.min(SPRINT_MAX_SPEED, Math.sqrt(BASE_SPEED * BASE_SPEED + 0.12 * x));
+  // the same ramp as survivalSpeed, by distance: v² = v0² + 2·a·d per phase
+  const D1 = 12 * 70 + 0.05 * 70 * 70; // metres run in the first 70 s
+  if (x <= D1) return Math.sqrt(BASE_SPEED * BASE_SPEED + 0.2 * x);
+  return Math.min(SURVIVAL_MAX_SPEED, Math.sqrt(19 * 19 + 0.08 * (x - D1)));
 }
 
 /**
@@ -340,8 +361,9 @@ export function buildCourse(seed, len = TRACK_LEN) {
   };
   while (z < len - 40) {
     // 0 → 1 over the first 1.6 km (a sprint stays in the gentle half)
-    const k = Math.min(1, z / 1600);
-    const speed = endless ? speedAtDistance(z) : BASE_SPEED;
+    // difficulty keeps climbing over the first 2.5 km of a survival run
+    const k = Math.min(1, z / (endless ? 2500 : 1600));
+    const speed = speedAtDistance(endless ? "survival" : "sprint", z);
     // seconds you get between rows: 1.3 s at the start, down to 0.9 s
     const step = speed * (1.3 - 0.4 * k);
 
@@ -510,6 +532,7 @@ function startRace(state, t) {
   state.zaps = [];
   state.bananas = [];
   state.bowls = [];
+  state.taken = [];
   for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
 }
 
@@ -606,6 +629,7 @@ export function validateAction(state, playerId, action) {
       if (state.phase !== "race" || me.finish !== null || me.left || me.outAt !== null) return { ok: false, error: "not racing" };
       if (!intIn(action.lane, 0, LANES - 1) || !num(action.d)) return { ok: false, error: "bad bowl" };
       if (Math.abs(action.d - me.d) > 2 * POS_SLACK_M) return { ok: false, error: "bad bowl" };
+      if (action.dir !== 1 && action.dir !== -1) return { ok: false, error: "bad bowl" };
       const t = num(action.t) ? action.t : state.now;
       if (me.bananaAt !== null && t - me.bananaAt < BANANA_COOLDOWN_MS) return { ok: false, error: "too soon" };
       return { ok: true };
@@ -614,9 +638,16 @@ export function validateAction(state, playerId, action) {
       if (!me) return { ok: false, error: "join first" };
       if (state.phase !== "race" || me.finish !== null || me.left || me.outAt !== null) return { ok: false, error: "not racing" };
       if (!intIn(action.lane, 0, LANES - 1) || !num(action.d)) return { ok: false, error: "bad banana" };
-      if (action.d < me.d - POS_SLACK_M || action.d > me.d + BANANA_AHEAD_M + 2 * POS_SLACK_M) return { ok: false, error: "bad banana" };
+      if (action.d < me.d - BANANA_BEHIND_M - 2 * POS_SLACK_M || action.d > me.d + BANANA_AHEAD_M + 2 * POS_SLACK_M) return { ok: false, error: "bad banana" };
       const t = num(action.t) ? action.t : state.now;
       if (me.bananaAt !== null && t - me.bananaAt < BANANA_COOLDOWN_MS) return { ok: false, error: "too soon" };
+      return { ok: true };
+    }
+    case "take": {
+      if (!me) return { ok: false, error: "join first" };
+      if (state.phase !== "race") return { ok: false, error: "not racing" };
+      if (!intIn(action.box, 0, 9999)) return { ok: false, error: "bad box" };
+      if ((state.taken ?? []).includes(action.box)) return { ok: false, error: "box gone" };
       return { ok: true };
     }
     case "slip": {
@@ -753,12 +784,16 @@ export function applyAction(state0, playerId, action) {
       break;
     }
     case "bowl": {
-      // a ball rolling back from `d` at BOWL_SPEED; every client checks it against its own runner
+      // a ball rolling from `d` at BOWL_SPEED in `dir` (+1 ahead, -1 back); every client checks it against its own runner
       me.bananaAt = t;
       state.bowlSeq = (state.bowlSeq ?? 0) + 1;
-      state.bowls = [...(state.bowls ?? []), { id: state.bowlSeq, by: playerId, lane: action.lane, d: Math.round(action.d * 10) / 10, at: t }].slice(-8);
+      state.bowls = [...(state.bowls ?? []), { id: state.bowlSeq, by: playerId, lane: action.lane, d: Math.round(action.d * 10) / 10, dir: action.dir, at: t }].slice(-8);
       break;
     }
+    case "take":
+      // mystery boxes are first come, first served
+      state.taken = [...(state.taken ?? []), action.box];
+      break;
     case "slip":
       // someone ran onto it: it's gone for everyone
       state.bananas = state.bananas.filter((b) => b.id !== action.id);
@@ -899,6 +934,7 @@ export function viewFor(state, playerId) {
     zaps: state.zaps ?? [],
     bananas: state.bananas ?? [],
     bowls: state.bowls ?? [],
+    taken: state.taken ?? [],
   };
 }
 

@@ -556,3 +556,17 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .spectate div { display: grid; justify-items: center; min-width: 150px; }
 .spectate small { font-family: var(--display); font-weight: 800; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 .spectate b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 22px; text-transform: uppercase; color: #fff; }
+
+/* second (saved) power-up slot */
+.saved-slot { position: absolute; left: max(14px, env(safe-area-inset-left)); bottom: max(124px, calc(env(safe-area-inset-bottom) + 110px)); display: none; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; background: var(--panel); border: 1px dashed rgba(182, 247, 42, 0.6); pointer-events: none; }
+.saved-slot.show { display: flex; }
+.saved-slot img { width: 34px; height: 34px; object-fit: contain; }
+.saved-slot small { font-family: var(--display); font-weight: 800; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+/* ahead / behind lane picker */
+.throw-lanes .row { display: flex; align-items: center; gap: 6px; }
+.throw-lanes .row > span { width: 72px; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 13px; text-transform: uppercase; color: #fff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7); }
+.throw-lanes .row.back button { border-color: #ffb21f; color: #ffb21f; }
+.throw-lanes button { width: 46px; height: 40px; font-size: 20px; }
+/* icon flying into the slot after a pickup */
+.fly-icon { position: fixed; z-index: 40; width: 64px; height: 64px; transform: translate(-50%, -50%) scale(1.3); transition: left 0.6s cubic-bezier(0.5, 0, 0.3, 1), top 0.6s cubic-bezier(0.5, 0, 0.3, 1), transform 0.6s; pointer-events: none; filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.8)); }
+@media (prefers-reduced-motion: reduce) { .fly-icon { transition: none; } }

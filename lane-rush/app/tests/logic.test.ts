@@ -158,7 +158,7 @@ describe("course", () => {
       const c = L.buildCourse(seed * 31337, 4000);
       for (let i = 1; i < c.rows.length; i++) {
         const gap = c.rows[i]!.z - c.rows[i - 1]!.z;
-        const v = Math.min(L.SURVIVAL_MAX_SPEED, Math.sqrt(L.BASE_SPEED ** 2 + 0.2 * c.rows[i - 1]!.z));
+        const v = L.speedAtDistance("survival", c.rows[i - 1]!.z);
         expect(gap / v).toBeGreaterThanOrEqual(0.85);
       }
       // harder patterns only show up further in
@@ -409,10 +409,11 @@ describe("bowling and freeze", () => {
   it("rolls a bowling ball back from where you are", () => {
     let s = racing();
     s = act(s, "p0", { type: "pos", d: 120, lane: 2, y: 0, act: "run", t: s.startAt + 9000 });
-    s = act(s, "p0", { type: "bowl", lane: 0, d: 120, t: s.startAt + 9100 });
-    expect((L.viewFor(s, "p1") as any).bowls).toEqual([{ id: 1, by: "p0", lane: 0, d: 120, at: s.startAt + 9100 }]);
-    expect(reject(s, "p0", { type: "bowl", lane: 0, d: 120, t: s.startAt + 9300 })).toMatch(/soon/);
-    expect(reject(s, "p1", { type: "bowl", lane: 1, d: 500, t: s.startAt + 9300 })).toBeTruthy();
+    s = act(s, "p0", { type: "bowl", lane: 0, d: 120, dir: -1, t: s.startAt + 9100 });
+    expect((L.viewFor(s, "p1") as any).bowls).toEqual([{ id: 1, by: "p0", lane: 0, d: 120, dir: -1, at: s.startAt + 9100 }]);
+    expect(reject(s, "p0", { type: "bowl", lane: 0, d: 120, dir: 1, t: s.startAt + 9300 })).toMatch(/soon/);
+    expect(reject(s, "p1", { type: "bowl", lane: 1, d: 500, dir: 1, t: s.startAt + 9300 })).toBeTruthy();
+    expect(reject(s, "p1", { type: "bowl", lane: 1, d: 0, dir: 2, t: s.startAt + 9300 })).toBeTruthy();
   });
 
   it("relays freeze as its own kind of zap", () => {
@@ -480,5 +481,33 @@ describe("power-up odds", () => {
       counts[k] = (counts[k] ?? 0) + 1;
     }
     for (const k of L.POWERS) expect((counts[k] ?? 0) / 100).toBeCloseTo(odds[k]!, 0);
+  });
+});
+
+describe("rounds get faster, boxes are first come first served", () => {
+  it("speeds everybody up the longer the round lasts", () => {
+    expect(L.survivalSpeed(0)).toBe(L.BASE_SPEED);
+    expect(L.survivalSpeed(70)).toBeCloseTo(19);
+    expect(L.survivalSpeed(130)).toBeCloseTo(21.4);
+    expect(L.survivalSpeed(600)).toBe(L.SURVIVAL_MAX_SPEED);
+    expect(L.sprintSpeed(0)).toBe(L.BASE_SPEED);
+    expect(L.sprintSpeed(30)).toBeCloseTo(13.8);
+    expect(L.sprintSpeed(120)).toBe(L.SPRINT_MAX_SPEED);
+    // the course is spaced for the speed you'll actually be running there
+    expect(L.speedAtDistance("survival", 1085)).toBeCloseTo(19);
+    expect(L.speedAtDistance("survival", 50000)).toBe(L.SURVIVAL_MAX_SPEED);
+  });
+
+  it("gives a mystery box to whoever reaches it first", () => {
+    let s = act(lobbyOf(2), "p0", { type: "start", t: T0 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    s = act(s, "p1", { type: "take", box: 3 });
+    expect((L.viewFor(s, "p0") as any).taken).toEqual([3]);
+    expect(reject(s, "p0", { type: "take", box: 3 })).toMatch(/gone/);
+  });
+
+  it("knows Iran, Colombia, Peru and India", () => {
+    const codes = L.COUNTRIES.map(([c]) => c);
+    for (const c of ["IR", "CO", "PE", "IN"]) expect(codes).toContain(c);
   });
 });

@@ -30,6 +30,8 @@ import {
   SURVIVAL_LEN,
   SURVIVAL_BOOST,
   survivalSpeed,
+  runSpeed,
+  BANANA_BEHIND_M,
   CUP_RACES,
   CUP_POINTS,
   BANANA_AHEAD_M,
@@ -587,6 +589,7 @@ function onServerError(error) {
     sendHello();
     return;
   }
+  if (error === "box gone") return loseBox();
   if (["not racing", "race not over", "already started", "no banana", "too soon"].includes(error)) return; // harmless races
   toast(error);
 }
@@ -1284,8 +1287,9 @@ const world = (() => {
     const live = new Set();
     for (const b of list) {
       const age = (nowMs - b.at) / 1000;
-      const d = b.d - BOWL_SPEED * age;
-      if (age < 0 || b.d - d > BOWL_RANGE_M) continue;
+      const dir = b.dir ?? -1;
+      const d = b.d + dir * BOWL_SPEED * age;
+      if (age < 0 || Math.abs(d - b.d) > BOWL_RANGE_M) continue;
       live.add(b.id);
       let m = ballMeshes.get(b.id);
       if (!m) {
@@ -1298,7 +1302,7 @@ const world = (() => {
         ballMeshes.set(b.id, m);
       }
       m.position.set(laneX(b.lane), 0.375, -d);
-      m.rotation.x = (BOWL_SPEED * age) / 0.375; // rolling toward the runners behind
+      m.rotation.x = (-dir * BOWL_SPEED * age) / 0.375; // rolling the way it's going
     }
     for (const [id, m] of ballMeshes) {
       if (live.has(id)) continue;
@@ -1725,7 +1729,93 @@ const world = (() => {
     }
   }
 
+  // ── particles: box pickups, fireworks, confetti ──
+  const particles = []; // {points, vel, life, max, gravity, drag}
+  const dotTex = (() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 32;
+    const g = c.getContext("2d");
+    const grd = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grd.addColorStop(0, "rgba(255,255,255,1)");
+    grd.addColorStop(0.4, "rgba(255,255,255,0.8)");
+    grd.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 32, 32);
+    return new THREE.CanvasTexture(c);
+  })();
+  function spray(x, y, z, colors, n, { speed = 6, life = 1, gravity = 9, size = 0.35, drag = 1.2, up = 0 } = {}) {
+    const pos = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    const vel = new Float32Array(n * 3);
+    const c = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      pos.set([x, y, z], i * 3);
+      // random direction on a sphere
+      const u = Math.random() * 2 - 1;
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(1 - u * u);
+      const v = speed * (0.6 + Math.random() * 0.4);
+      vel.set([r * Math.cos(a) * v, u * v + up, r * Math.sin(a) * v], i * 3);
+      c.set(colors[i % colors.length]);
+      col.set([c.r, c.g, c.b], i * 3);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    const mat = new THREE.PointsMaterial({ size, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    const points = new THREE.Points(geo, mat);
+    points.frustumCulled = false;
+    scene.add(points);
+    particles.push({ points, vel, life, max: life, gravity, drag });
+  }
+  /** A pickup: a quick sparkle pop where the box was. */
+  function burst(x, y, z, colors, n = 60) {
+    spray(x, y, z, colors, n, { speed: 5, life: 0.7, gravity: 4, size: 0.28 });
+  }
+  const FW_COLORS = [["#ff4d6d", "#ffd84a"], ["#4dd2ff", "#ffffff"], ["#b6f72a", "#ffe14d"], ["#c77dff", "#ff7bd5"], ["#ff9f1c", "#ffffff"]];
+  /** Fireworks over a spot on the track (z), plus a shower of confetti. */
+  function fireworks(z) {
+    for (let i = 0; i < 14; i++) {
+      setTimeout(() => {
+        const x = (Math.random() - 0.5) * 16;
+        const y = 9 + Math.random() * 7;
+        const zz = z - 2 - Math.random() * 10;
+        spray(x, y, zz, FW_COLORS[i % FW_COLORS.length], 110, { speed: 9, life: 1.6, gravity: 3, size: 0.55, drag: 1.6 });
+        sfx.pop();
+      }, i * 260 + Math.random() * 120);
+    }
+    const confetti = ["#ff4d6d", "#ffd84a", "#4dd2ff", "#b6f72a", "#c77dff", "#ffffff"];
+    for (const side of [-1, 1]) spray(side * 5.5, 6, z, confetti, 160, { speed: 6, life: 3, gravity: 3.5, size: 0.3, drag: 0.7, up: 4 });
+  }
+  function stepParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        scene.remove(p.points);
+        p.points.geometry.dispose();
+        p.points.material.dispose();
+        particles.splice(i, 1);
+        continue;
+      }
+      const pos = p.points.geometry.attributes.position;
+      const a = pos.array;
+      const k = Math.exp(-p.drag * dt);
+      for (let j = 0; j < a.length; j += 3) {
+        p.vel[j] *= k;
+        p.vel[j + 2] *= k;
+        p.vel[j + 1] = p.vel[j + 1] * k - p.gravity * dt;
+        a[j] += p.vel[j] * dt;
+        a[j + 1] += p.vel[j + 1] * dt;
+        a[j + 2] += p.vel[j + 2] * dt;
+      }
+      pos.needsUpdate = true;
+      p.points.material.opacity = Math.min(1, (p.life / p.max) * 2);
+    }
+  }
+
   function tick(camZ, dt) {
+    stepParticles(dt);
     skyGroup.position.z = camZ;
     clouds.position.z = camZ;
     for (const c of clouds.children) {
@@ -1769,7 +1859,7 @@ const world = (() => {
       holder.add(o);
       holder.position.set(laneX(b.lane), 1.0, -b.z);
       raceGroup.add(holder);
-      boxes.push({ obj: holder, lane: b.lane, z: b.z, taken: false });
+      boxes.push({ obj: holder, lane: b.lane, z: b.z, taken: false, idx: boxes.length });
       cullables.push({ obj: holder, z: b.z, box: boxes[boxes.length - 1] });
     }
     for (const b of course.boosts) {
@@ -1864,7 +1954,9 @@ const world = (() => {
       }
     }
     const t = performance.now() / 1000;
+    const gone = net.view?.taken;
     for (const b of boxes) {
+      if (!b.taken && gone?.includes(b.idx)) b.taken = true; // somebody else got it
       if (b.taken) continue;
       b.obj.rotation.y = t * 1.6 + b.z;
       b.obj.position.y = 1.0 + Math.sin(t * 3 + b.z) * 0.12;
@@ -1910,6 +2002,8 @@ const world = (() => {
     setEndless,
     syncBananas,
     syncBowls,
+    burst,
+    fireworks,
     animateCourse,
     get rollers() {
       return rollers;
@@ -1947,7 +2041,7 @@ const me = {
   stumbleT: 0,
   invulnT: 0,
   boostT: 0,
-  item: "", // power-up you're holding, waiting to be used
+  items: [], // power-ups you're holding: [next, saved] (two at most)
   frozenT: 0, // slowed by someone's freeze
   power: "", // active timed power: shield | rocket | ghost
   powerT: 0,
@@ -2019,6 +2113,8 @@ function enterRace(v) {
   me.lastItem = "";
   slipped.clear();
   bowled.clear();
+  ballRel.clear();
+  game.cheered = new Set();
   game.kind = v.kind || "sprint";
   game.len = isSurvival() ? SURVIVAL_LEN : TRACK_LEN;
   world.hideShowcase();
@@ -2039,7 +2135,7 @@ function enterRace(v) {
     invulnT: 0,
     boostT: 0,
     // everyone starts each race holding a random power-up
-    item: mine?.outAt != null || mine?.finish != null ? "" : startingItem(),
+    items: mine?.outAt != null || mine?.finish != null ? [] : [startingItem()],
     frozenT: 0,
     power: "",
     powerT: 0,
@@ -2096,6 +2192,12 @@ function finishRaceView(v) {
   // brief celebration in 3D, then the results card
   game.mode = "results-pending";
   banner(isSurvival() ? (me.out ? "GAME OVER" : "LAST ONE STANDING!") : me.finished ? "FINISHED!" : "TIME UP!");
+  // the last runner standing gets fireworks over their head
+  if (isSurvival()) {
+    const top = v.standings?.[0];
+    const z = top === playerId ? -me.d : -(remote.map.get(top)?.dispD ?? me.d);
+    world.fireworks(z - 14);
+  }
   setTimeout(() => {
     if (game.mode === "results-pending") showResults(net.view ?? v);
   }, 1600);
@@ -2161,8 +2263,9 @@ window.addEventListener("keydown", (e) => {
   else if (k === "ArrowRight" || k === "d" || k === "D") input("right");
   else if (k === "ArrowUp" || k === "w" || k === "W" || k === " ") input("jump");
   else if (k === "ArrowDown" || k === "s" || k === "S") input("slide");
-  else if (k === "e" || k === "E" || k === "Enter" || k === "Shift") useItem();
-  else if (k >= "1" && k <= "4") useItem(me.item === "banana" || me.item === "bowling" ? Number(k) - 1 : me.lane);
+  else if (k === "e" || k === "E" || k === "Enter") useItem(me.lane, 1);
+  else if (k === "q" || k === "Q") useItem(me.lane, -1);
+  else if (/^Digit[1-4]$/.test(e.code)) useItem(Number(e.code.slice(5)) - 1, e.shiftKey ? -1 : 1);
   else if (k === "c" || k === "C" || k === "b" || k === "B") game.lookBack = canControl() || game.mode === "race";
   else return;
   e.preventDefault();
@@ -2265,9 +2368,10 @@ function stepMe(dt) {
   }
 
   // speed
-  let base = isSurvival() ? survivalSpeed((serverNow() - v.startAt) / 1000) : BASE_SPEED;
+  // everyone speeds up the longer the round lasts (same clock for all)
+  let base = runSpeed(game.kind, (serverNow() - v.startAt) / 1000);
   if (me.frozenT > 0) base *= 0.55;
-  const fast = isSurvival() ? base + SURVIVAL_BOOST : BOOST_SPEED;
+  const fast = base + (isSurvival() ? SURVIVAL_BOOST : BOOST_SPEED - BASE_SPEED);
   const rocket = isSurvival() ? base + SURVIVAL_ROCKET : ROCKET_SPEED;
   let target = me.power === "rocket" ? rocket : me.boostT > 0 ? fast : base;
   // sliding along the grass while falling, then stopped while getting up
@@ -2283,6 +2387,7 @@ function stepMe(dt) {
     me.finished = true;
     sfx.finish();
     banner("FINISH!", 1800);
+    world.fireworks(-TRACK_LEN);
     sendPos(true);
   }
   if (me.finished || me.out) return;
@@ -2316,18 +2421,25 @@ function stepMe(dt) {
   for (const b of world.boxes) {
     if (b.taken || b.z < prevD - 0.8 || b.z > me.d + 0.8) continue;
     if (Math.abs(me.x - b.lane) > 0.6 || me.y > 2.4) continue;
-    if (me.item || me.power) continue; // one power-up at a time: the box stays for someone else
+    if (me.items.length + (me.power ? 1 : 0) >= 2) continue; // hands full: the box stays for someone else
     b.taken = true;
-    grabBox();
+    act({ type: "take", box: b.idx });
+    world.burst(laneX(b.lane), 1.0, -b.z, ["#b06bff", "#ff6bd5", "#6be3ff", "#ffffff", "#ffd84a"], 70);
+    me.lastBox = { idx: b.idx, kind: grabBox() };
   }
   // bowling balls rolling back down the track (not your own)
   const sn = serverNow();
   for (const b of net.view?.bowls || []) {
-    if (b.by === playerId || bowled.has(b.id) || untouchable) continue;
+    if (b.by === playerId || bowled.has(b.id)) continue;
     const age = (sn - b.at) / 1000;
-    const bd = b.d - BOWL_SPEED * age;
-    if (age < 0 || b.d - bd > BOWL_RANGE_M) continue;
-    if (Math.abs(bd - me.d) > 0.9 || Math.abs(me.x - b.lane) > 0.6 || me.y > 0.8) continue;
+    const bd = b.d + (b.dir ?? -1) * BOWL_SPEED * age;
+    if (age < 0 || Math.abs(bd - b.d) > BOWL_RANGE_M) continue;
+    // swept: did the ball pass you since last frame (it's faster than you either way)?
+    const rel = bd - me.d;
+    const prev = ballRel.get(b.id);
+    ballRel.set(b.id, rel);
+    const passed = Math.abs(rel) < 0.9 || (prev !== undefined && Math.sign(prev) !== Math.sign(rel));
+    if (untouchable || !passed || Math.abs(me.x - b.lane) > 0.6 || me.y > 0.8) continue;
     bowled.add(b.id);
     hit("bowling");
   }
@@ -2391,6 +2503,7 @@ function hit(kind) {
 
 const slipped = new Set(); // banana ids you've already run onto
 const bowled = new Set(); // bowling balls that already got you
+const ballRel = new Map(); // ball id -> where it was relative to you last frame
 
 // ── spectating (out of hearts) ──
 
@@ -2442,7 +2555,7 @@ function renderHearts(pop) {
 /** Third hit in survival: down for good, then watch whoever is still running. */
 function knockOut() {
   me.out = true;
-  me.item = "";
+  me.items = [];
   me.power = "";
   me.powerT = 0;
   me.boostT = 0;
@@ -2481,33 +2594,65 @@ function rollPower() {
   return kind;
 }
 
-/** A mystery box goes into your slot; nothing happens until you use it. */
+/** A mystery box goes into your slots; nothing happens until you use it. */
 function grabBox(kind = rollPower()) {
   sfx.pickup();
-  me.item = kind;
-  showPowerToast(kind, TOUCH ? "Tap the power-up to use it" : kind === "banana" || kind === "bowling" ? "1-4 picks the lane · E uses yours" : "Press E to use it");
+  me.items.push(kind);
+  flyToSlot(kind);
+  const aims = kind === "banana" || kind === "bowling";
+  showPowerToast(kind, me.items.length > 1 || me.power ? "Saved for later" : TOUCH ? "Tap the power-up to use it" : aims ? "E ahead · Q behind · 1-4 picks a lane" : "Press E to use it");
+  renderPower();
+  return kind;
+}
+
+/** Someone else reached the box first: hand back what we optimistically took. */
+function loseBox() {
+  const lb = me.lastBox;
+  me.lastBox = null;
+  if (!lb) return;
+  const i = me.items.lastIndexOf(lb.kind);
+  if (i >= 0) me.items.splice(i, 1);
+  toast("Someone grabbed that box first!");
   renderPower();
 }
 
-/** Use what you're holding. `lane` only matters for the banana. */
-function useItem(lane = me.lane) {
-  if (!me.item || !canControl() || me.stumbleT > 0) return;
-  const kind = me.item;
-  me.item = "";
+/** Use your next power-up. `lane`/`dir` only matter for the banana and the bowling ball. */
+function useItem(lane = me.lane, dir = 1) {
+  if (!me.items.length || !canControl() || me.stumbleT > 0) return;
+  const kind = me.items.shift();
   if (kind === "banana") {
-    act({ type: "banana", lane, d: Math.round((me.d + BANANA_AHEAD_M) * 10) / 10 });
+    const d = dir > 0 ? me.d + BANANA_AHEAD_M : me.d - BANANA_BEHIND_M;
+    act({ type: "banana", lane, d: Math.round(d * 10) / 10 });
     sfx.lane();
     renderPower();
     return;
   }
   if (kind === "bowling") {
-    act({ type: "bowl", lane, d: Math.round(me.d * 10) / 10 });
+    act({ type: "bowl", lane, d: Math.round(me.d * 10) / 10, dir });
     sfx.roll();
-    banner("🎳 BOWLED!", 800);
+    banner(dir > 0 ? "🎳 BOWLED AHEAD!" : "🎳 BOWLED BACK!", 800);
     renderPower();
     return;
   }
   activatePower(kind);
+}
+
+/** The power-up icon flies from your runner into its slot. */
+function flyToSlot(kind) {
+  const slot = $(me.items.length > 1 || me.power ? "#savedSlot" : "#powerSlot");
+  const img = el("img", { class: "fly-icon", src: `/assets/pw_${kind}.png`, alt: "" });
+  document.body.append(img);
+  const to = slot.getBoundingClientRect();
+  const tx = to.width ? to.left + to.width / 2 : 60;
+  const ty = to.height ? to.top + to.height / 2 : innerHeight - 90;
+  img.style.left = `${innerWidth / 2}px`;
+  img.style.top = `${innerHeight * 0.55}px`;
+  requestAnimationFrame(() => {
+    img.style.left = `${tx}px`;
+    img.style.top = `${ty}px`;
+    img.style.transform = "translate(-50%, -50%) scale(0.5)";
+  });
+  setTimeout(() => img.remove(), 700);
 }
 
 function activatePower(kind) {
@@ -2608,28 +2753,37 @@ function showPowerToast(kind, how = "") {
   t.classList.add("show");
 }
 
+/**
+ * Two slots: the big one shows what's running (with its timer) or what you'll
+ * use next; the small one is the power-up you're saving for later.
+ */
 function renderPower() {
   const slot = $("#powerSlot");
-  const kind = me.item || me.power;
-  const aims = me.item === "banana" || me.item === "bowling";
+  const saved = $("#savedSlot");
+  const main = me.power || me.items[0] || "";
+  const next = me.power ? me.items[0] : me.items[1];
+  const held = !me.power && Boolean(me.items[0]);
+  const aims = held && (me.items[0] === "banana" || me.items[0] === "bowling");
   $("#throwLanes").classList.toggle("show", aims);
-  $("#throwLanes > span").textContent = me.item === "bowling" ? "Roll 🎳 back down lane" : "Throw 🍌 into lane";
-  slot.classList.toggle("held", Boolean(me.item));
-  if (!kind) {
+  if (aims) $("#throwLanes").dataset.kind = me.items[0];
+  slot.classList.toggle("held", held);
+  saved.classList.toggle("show", Boolean(next));
+  if (next) saved.querySelector("img").src = `/assets/pw_${next}.png`;
+  if (!main) {
     slot.classList.remove("show");
     return;
   }
   slot.classList.add("show");
-  slot.querySelector("img").src = `/assets/pw_${kind}.png`;
-  slot.querySelector("b").textContent = POWER_INFO[kind].label;
-  slot.querySelector(".use").textContent = me.item ? (TOUCH ? "Tap to use" : aims ? "E / 1-4 to throw" : "E to use") : "";
-  if (me.item) slot.querySelector(".bar i").style.width = "100%";
+  slot.querySelector("img").src = `/assets/pw_${main}.png`;
+  slot.querySelector("b").textContent = POWER_INFO[main].label;
+  slot.querySelector(".use").textContent = held ? (TOUCH ? "Tap to use" : aims ? "E ahead · Q behind" : "E to use") : "";
+  if (held) slot.querySelector(".bar i").style.width = "100%";
 }
 $("#powerSlot").addEventListener("click", () => useItem());
 for (const b of document.querySelectorAll("#throwLanes button")) {
   b.addEventListener("click", (e) => {
     e.stopPropagation();
-    useItem(Number(b.dataset.lane));
+    useItem(Number(b.dataset.lane), Number(b.dataset.dir));
   });
 }
 
@@ -2731,7 +2885,7 @@ function frame(now) {
       me.runner.group.position.set(laneX(me.x), me.y, zMe);
       me.runner.group.visible = !(me.invulnT > 0 && me.stumbleT <= 0 && !me.power && Math.floor(now / 90) % 2 === 0);
       animateRunner(me.runner, currentAct(), me.speed, dt, me.power);
-      if (me.power && !me.item) $("#powerSlot .bar i").style.width = `${(me.powerT / POWER_S[me.power]) * 100}%`;
+      if (me.power) $("#powerSlot .bar i").style.width = `${(me.powerT / POWER_S[me.power]) * 100}%`;
     }
 
     for (const r of remote.map.values()) {
@@ -2751,6 +2905,10 @@ function frame(now) {
       r.runner.group.position.set(r.dispX, r.dispY, -r.dispD);
       r.runner.group.visible = !p.left;
       const ra = !isSurvival() && p.finish !== null && r.dispD > TRACK_LEN - 1 ? "cheer" : p.gone && p.act !== "out" ? "idle" : p.act;
+      if (!isSurvival() && p.finish !== null && game.cheered && !game.cheered.has(p.id)) {
+        game.cheered.add(p.id);
+        world.fireworks(-TRACK_LEN);
+      }
       animateRunner(r.runner, ra, r.vel || BASE_SPEED, dt, p.left || p.finish !== null ? "" : p.pw || "");
     }
 
