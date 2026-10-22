@@ -1260,7 +1260,7 @@ const world = (() => {
   }
 
   /** Boost pad: flat on the track, its long side (the arrows) running down the lane. */
-  const PAD_TURN = Math.PI / 2; // which way the model's arrows point once laid along the lane
+  const PAD_TURN = -Math.PI / 2; // turns the model so its chevrons point down the track (toward -z)
   function fitPad(root) {
     const holder = fitProp(root, { width: 2.4, maxHeight: 0.14 });
     holder.rotation.y = PAD_TURN;
