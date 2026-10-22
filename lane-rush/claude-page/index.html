@@ -185,6 +185,43 @@ body {
   #countdown.pop { animation: none; }
   .card, .btn { transition: none; }
 }
+
+/* menu & lobby additions */
+.field { display: grid; gap: 4px; }
+input[type="text"], #nameInput, #codeInput {
+  width: 100%;
+  min-width: 0;
+  font: 800 19px var(--body);
+  color: var(--ink);
+  padding: 10px 12px;
+  border: 4px solid var(--ink);
+  border-radius: 16px;
+  background: #fff;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+#nameInput:focus, #codeInput:focus { border-color: var(--blue-dark); }
+.join-row { display: flex; gap: 10px; }
+#codeInput { flex: 1.2; text-transform: uppercase; letter-spacing: 8px; text-align: center; font-family: var(--display); font-weight: 400; font-size: 26px; }
+.join-row .btn { flex: 1; width: auto; }
+.btn.ghost { background: #fff; color: var(--ink); }
+.lobby-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.code { font-family: var(--display); font-size: clamp(42px, 11vw, 60px); letter-spacing: 10px; line-height: 1; color: var(--blue-dark); -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; }
+.share { margin: 0; max-width: 30ch; font-weight: 800; font-size: 14px; color: var(--muted); min-width: 0; }
+.slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.slot { position: relative; border: 4px solid var(--ink); border-radius: 16px; background: #e9eef7; aspect-ratio: 3 / 4; max-width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; overflow: hidden; padding-bottom: 4px; }
+.slot img { position: absolute; inset: 6px 0 24px; width: 100%; height: calc(100% - 30px); object-fit: contain; }
+.slot .nm { position: relative; z-index: 1; font-weight: 900; font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 5px; background: rgba(255, 255, 255, 0.88); border-radius: 8px; }
+.slot.empty { border-style: dashed; justify-content: center; color: var(--muted); }
+.slot.empty .nm { background: none; }
+.slot .crown { position: absolute; top: 2px; left: 6px; font-size: 18px; z-index: 2; }
+.slot .you { position: absolute; top: 4px; right: 6px; font-size: 11px; font-weight: 900; background: var(--ink); color: #fff; border-radius: 6px; padding: 1px 5px; z-index: 2; }
+.card.taken { opacity: 0.4; cursor: not-allowed; }
+.card small { display: block; font-size: 11px; font-weight: 800; color: var(--muted); min-height: 1.2em; }
+.host-opts { display: grid; gap: 8px; }
+.check { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: 15px; }
+.check input { width: 20px; height: 20px; accent-color: var(--go-dark); }
 </style>
 
 <canvas id="scene"></canvas>
@@ -192,22 +229,48 @@ body {
 <section id="menu" class="screen">
   <div class="panel">
     <h1 class="logo">LANE <span>RUSH</span></h1>
-    <p class="tag">Race the gang across the meadow. First to the finish wins.</p>
+    <p class="tag">Race up to three friends across the meadow. First to the finish wins.</p>
+    <label class="field" for="nameInput">
+      <span class="label">Your name</span>
+      <input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Speedy">
+    </label>
     <div class="label">Your runner</div>
     <div id="picker" class="picker"></div>
-    <div class="label">Opponents</div>
-    <div id="level" class="seg" role="group" aria-label="Opponent skill">
-      <button type="button" id="lvl-easy" data-level="easy">Easy</button>
-      <button type="button" id="lvl-normal" data-level="normal">Normal</button>
-      <button type="button" id="lvl-hard" data-level="hard">Hard</button>
+    <button id="createBtn" class="btn" type="button" disabled>Loading 3D models…</button>
+    <div class="join-row">
+      <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Lobby code">
+      <button id="joinBtn" class="btn blue" type="button" disabled>Join</button>
     </div>
-    <div class="keys">
-      <div><strong>↑ / Space</strong>jump hurdles</div>
-      <div><strong>↓</strong>slide under gates</div>
-      <div><strong>← →</strong>dodge crates</div>
-    </div>
-    <button id="startBtn" class="btn" type="button" disabled>Loading 3D models…</button>
+    <button id="soloBtn" class="btn small ghost" type="button" disabled>Practice alone vs computer</button>
     <p id="menuNote" class="note"></p>
+  </div>
+</section>
+
+<section id="lobby" class="screen" hidden>
+  <div class="panel">
+    <div class="lobby-head">
+      <div>
+        <div class="label">Lobby code</div>
+        <div id="lobbyCode" class="code">----</div>
+      </div>
+      <p class="share">Friends open this page in Claude, type the code and press <b>Join</b>.</p>
+    </div>
+    <div id="slots" class="slots"></div>
+    <div class="label">Your runner</div>
+    <div id="lobbyPicker" class="picker"></div>
+    <div id="hostOpts" class="host-opts">
+      <label class="check"><input type="checkbox" id="fillBots" checked> Fill empty spots with computer runners</label>
+      <div id="lobbyLevel" class="seg" role="group" aria-label="Computer runner skill">
+        <button type="button" data-level="easy">Easy</button>
+        <button type="button" data-level="normal">Normal</button>
+        <button type="button" data-level="hard">Hard</button>
+      </div>
+    </div>
+    <div class="row">
+      <button id="leaveBtn" class="btn small ghost" type="button">Leave</button>
+      <button id="startBtn" class="btn" type="button">Start race</button>
+    </div>
+    <p id="lobbyNote" class="note"></p>
   </div>
 </section>
 
@@ -220,7 +283,7 @@ body {
   <div id="countdown" class="big"></div>
   <div id="banner" class="big"></div>
   <div id="hint">↑ / Space jump · ↓ slide · ← → switch lane · blue arrows = boost</div>
-  <button id="quit" class="btn small" type="button">Quit race</button>
+  <button id="quit" class="btn small" type="button">Leave race</button>
 </section>
 
 <section id="results" class="screen" hidden>
@@ -229,9 +292,11 @@ body {
     <ol id="podium" class="podium"></ol>
     <p id="best" class="note"></p>
     <div class="row">
-      <button id="menuBtn" class="btn small blue" type="button">Change runner</button>
+      <button id="menuBtn" class="btn small ghost" type="button">Leave</button>
+      <button id="lobbyBtn" class="btn small blue" type="button">Back to lobby</button>
       <button id="againBtn" class="btn small" type="button">Race again</button>
     </div>
+    <p id="resNote" class="note"></p>
   </div>
 </section>
 
@@ -605,7 +670,7 @@ function makeModel(charIdx, tag) {
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.04;
   group.add(shadow);
-  if (tag) group.add(nameTag(RUNNERS[charIdx].name, RUNNERS[charIdx].color));
+  if (tag) group.add(nameTag(typeof tag === "string" ? tag : RUNNERS[charIdx].name, RUNNERS[charIdx].color));
   const mixer = new THREE.AnimationMixer(body);
   const actions = {};
   for (const [k, clip] of Object.entries(a.clips)) {
@@ -675,31 +740,30 @@ function cull(d) {
   for (const c of cullables) c.obj.visible = c.z > d - VIEW_BEHIND && c.z < d + VIEW_AHEAD;
 }
 
-// ── runners: one physics model for you and the computer players ────────────
+// ── runner physics: you, and computer runners on the host's page ───────────
 class Runner {
-  constructor(charIdx, lane, isPlayer, skill) {
+  constructor(lane, isMe, skill = 1, reactRange = [3, 5]) {
     Object.assign(this, {
-      char: charIdx, lane, x: lane, d: 0, y: 0, vy: 0, slideT: 0, stumbleT: 0, invulnT: 0, boostT: 0,
-      speed: 0, hits: 0, finish: null, isPlayer, skill: skill ?? 1, decided: -1, react: 4,
+      lane, x: lane, d: 0, y: 0, vy: 0, slideT: 0, stumbleT: 0, invulnT: 0, boostT: 0,
+      speed: 0, hits: 0, finish: null, isMe, skill, reactRange, decided: -1,
+      react: reactRange[0] + Math.random() * (reactRange[1] - reactRange[0]),
     });
-    this.model = makeModel(charIdx, !isPlayer);
-    scene.add(this.model.group);
   }
   jump() {
     if (this.y <= 0.001 && this.stumbleT <= 0 && this.finish === null) {
       this.vy = JUMP_V; this.y = 0.001; this.slideT = 0;
-      if (this.isPlayer) sfx.jump();
+      if (this.isMe) sfx.jump();
     }
   }
   slide() {
     if (this.finish !== null) return;
     if (this.y > 0.001) { this.vy = Math.min(this.vy, -16); this.slideT = SLIDE_S; }
-    else if (this.stumbleT <= 0) { this.slideT = SLIDE_S; if (this.isPlayer) sfx.slide(); }
+    else if (this.stumbleT <= 0) { this.slideT = SLIDE_S; if (this.isMe) sfx.slide(); }
   }
   shift(dir) {
     if (this.finish !== null) return;
     const next = clamp(this.lane + dir, 0, LANES - 1);
-    if (next !== this.lane) { this.lane = next; if (this.isPlayer) sfx.lane(); }
+    if (next !== this.lane) { this.lane = next; if (this.isMe) sfx.lane(); }
   }
   act() {
     if (!race.started) return "idle";
@@ -733,8 +797,7 @@ class Runner {
 
     if (this.finish === null && this.d >= TRACK_LEN) {
       this.finish = Math.max(1, Math.round(raceMs));
-      if (race.firstFinishAt === null) race.firstFinishAt = raceMs;
-      if (this.isPlayer) { sfx.finish(); banner("FINISH!", 1800); }
+      if (this.isMe) { sfx.finish(); banner("FINISH!", 1800); }
     }
     if (this.finish !== null) return;
 
@@ -752,7 +815,7 @@ class Runner {
       if (b.z < prevD - 1 || b.z > this.d + 1) continue;
       if (Math.abs(this.x - b.lane) < 0.5 && this.y < 0.5 && this.boostT < BOOST_S - 0.2) {
         this.boostT = BOOST_S;
-        if (this.isPlayer) { sfx.boost(); banner("BOOST!", 700); }
+        if (this.isMe) { sfx.boost(); banner("BOOST!", 700); }
       }
     }
   }
@@ -760,13 +823,13 @@ class Runner {
     if (this.invulnT > 0) return;
     this.hits += 1;
     this.stumbleT = STUMBLE_S; this.invulnT = INVULN_S; this.boostT = 0; this.slideT = 0;
-    if (this.isPlayer) {
+    if (this.isMe) {
       shake = 0.35;
       sfx.hit();
       banner(kind === "hurdle" ? "Jump! ↑" : kind === "gate" ? "Slide! ↓" : "Dodge! ← →", 800);
     }
   }
-  /** Computer player: look at the next row and react, with a skill-based chance to fumble. */
+  /** Computer runner: look at the next row and react, with a skill-based chance to fumble. */
   think(course, rand) {
     if (!race.started || this.finish !== null || this.stumbleT > 0) return;
     const idx = course.rows.findIndex((r) => r.z > this.d + 0.4);
@@ -774,145 +837,448 @@ class Runner {
     const row = course.rows[idx];
     const dist = row.z - this.d;
     const here = row.lanes[this.lane];
-    // crates: pick a free lane early
-    if (here === "crate" && dist < 11 && this.decided !== idx + 0.5) {
-      this.decided = idx + 0.5;
-      if (rand() < this.skill) {
-        const options = [this.lane - 1, this.lane + 1, this.lane - 2, this.lane + 2]
-          .filter((l) => l >= 0 && l < LANES && row.lanes[l] !== "crate");
-        const easy = options.find((l) => !row.lanes[l]) ?? options[0];
-        if (easy !== undefined) this.shift(Math.sign(easy - this.lane));
-      }
-      return;
-    }
     if (here === "crate") {
-      // still lined up with the crate: keep moving toward a free lane
-      if (this.lane === Math.round(this.x)) {
+      if (dist < 11 && this.decided !== idx + 0.5) {
+        this.decided = idx + 0.5;
+        if (rand() < this.skill) {
+          const free = [0, 1, 2, 3].filter((l) => row.lanes[l] !== "crate")
+            .sort((a, b) => Math.abs(a - this.lane) - Math.abs(b - this.lane) || (row.lanes[a] ? 1 : 0) - (row.lanes[b] ? 1 : 0))[0];
+          if (free !== undefined) this.shift(Math.sign(free - this.lane));
+        }
+      } else if (dist < 8 && this.lane === Math.round(this.x) && rand() < this.skill * 0.05) {
         const free = [0, 1, 2, 3].filter((l) => row.lanes[l] !== "crate").sort((a, b) => Math.abs(a - this.lane) - Math.abs(b - this.lane))[0];
-        if (free !== undefined && dist < 8 && rand() < this.skill * 0.6) this.shift(Math.sign(free - this.lane));
+        if (free !== undefined) this.shift(Math.sign(free - this.lane));
       }
       return;
     }
-    if (this.decided === idx) return;
-    if (dist > this.react) return;
+    if (this.decided === idx || dist > this.react) return;
     this.decided = idx;
     this.react = this.reactRange[0] + rand() * (this.reactRange[1] - this.reactRange[0]);
     if (rand() > this.skill) return; // fumble: run straight into it
     if (here === "hurdle") this.jump();
     else if (here === "gate") this.slide();
   }
-  animate(dt) {
-    const m = this.model;
-    m.group.position.set(laneX(this.x), this.y, -this.d);
-    const a = this.act();
-    if (a === "jump") m.play("jump", 0.08, (m.duration("jump") / 0.75) * 0.9);
-    else if (a === "slide") m.play("slide", 0.08, m.duration("slide") / SLIDE_S);
-    else if (a === "cheer") m.play("cheer", 0.25);
-    else if (a === "idle") m.play("idle", 0.25);
-    else m.play("run", 0.12, clamp(this.speed / BASE_SPEED, 0.45, 1.45));
-    m.pivot.rotation.z = a === "stumble" ? Math.sin(performance.now() / 45) * 0.35 : 0;
-    m.pivot.rotation.x = a === "stumble" ? 0.25 : 0;
-    m.shadow.position.y = 0.04 - this.y;
-    if (this.isPlayer) m.group.visible = !(this.invulnT > 0 && this.stumbleT <= 0 && Math.floor(performance.now() / 90) % 2 === 0);
-    m.mixer.update(dt);
-  }
-  remove() { scene.remove(this.model.group); }
 }
 
-// ── race ───────────────────────────────────────────────────────────────────
-const race = { active: false, started: false, course: null, runners: [], me: null, t0: 0, firstFinishAt: null, ended: false, rand: Math.random };
-let choice = { char: Number(store.get("lr:char")) || 0, level: store.get("lr:level") || "normal" };
+function animateModel(m, s, dt, blink) {
+  m.group.position.set(laneX(s.x), s.y, -s.d);
+  const a = s.act;
+  if (a === "jump") m.play("jump", 0.08, (m.duration("jump") / 0.75) * 0.9);
+  else if (a === "slide") m.play("slide", 0.08, m.duration("slide") / SLIDE_S);
+  else if (a === "cheer") m.play("cheer", 0.25);
+  else if (a === "idle") m.play("idle", 0.25);
+  else m.play("run", 0.12, clamp((s.speed || BASE_SPEED) / BASE_SPEED, 0.45, 1.45));
+  m.pivot.rotation.z = a === "stumble" ? Math.sin(performance.now() / 45) * 0.35 : 0;
+  m.pivot.rotation.x = a === "stumble" ? 0.25 : 0;
+  m.shadow.position.y = 0.04 - s.y;
+  m.group.visible = !s.left && !blink;
+  m.mixer.update(dt);
+}
+
+// ── session: solo practice, or a live lobby through the `room` capability ──
+const ACTS = ["idle", "run", "jump", "slide", "stumble", "cheer"];
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const num = (v, d = 0) => (typeof v === "number" && Number.isFinite(v) ? v : d);
+const cleanText = (s, max) => String(s ?? "").replace(/[\u0000-\u001f\u007f-\u009f­​-‏‪-‮⁠-⁯﻿<>]/g, "").trim().slice(0, max);
+
+let roomApi = null;
+const session = { kind: null, nr: null, code: "", lastRound: 0, game: null, pres: {}, lastPub: 0, lastAct: "" };
+const race = { active: false, started: false, round: 0, course: null, racers: [], me: null, t0: 0, firstFinishAt: null, ended: false, rand: Math.random };
+let choice = { char: Number(store.get("lr:char")) || 0, level: store.get("lr:level") || "normal", fill: store.get("lr:fill") !== "0" };
 if (!(choice.char >= 0 && choice.char < 4)) choice.char = 0;
 if (!LEVELS[choice.level]) choice.level = "normal";
+let mode = "menu";
 let shake = 0;
 let lastCount = null;
 
-function startRace() {
+function pub(patch) {
+  Object.assign(session.pres, patch);
+  for (const k of Object.keys(patch)) if (patch[k] === null) delete session.pres[k];
+  session.nr?.presence(patch).catch(() => {});
+}
+
+/** People in this lobby, oldest first (the first one is the host). */
+function humans() {
+  if (!session.nr) return [];
+  let list = session.nr.peers().filter((p) => p.kind === "viewer");
+  list = list.map((p) => (p.sameTab ? { ...p, presence: { ...p.presence, ...session.pres } } : p));
+  if (!list.some((p) => p.sameTab)) list.push({ peer: "me", sameTab: true, isMe: true, kind: "viewer", presence: session.pres });
+  return list
+    .filter((p) => p.presence && typeof p.presence.n === "string")
+    .sort((a, b) => num(a.presence.t) - num(b.presence.t) || (a.peer < b.peer ? -1 : 1));
+}
+const hostPeer = () => humans()[0] || null;
+const amHost = () => session.kind === "solo" || hostPeer()?.sameTab === true;
+
+/** Who races: the first four people, each with a distinct runner, plus computer runners. */
+function lineup(game) {
+  const used = new Set();
+  const out = [];
+  const people = session.kind === "solo" ? [{ sameTab: true, peer: "me", presence: { n: myName(), c: choice.char } }] : humans().slice(0, 4);
+  for (const p of people) {
+    let c = num(p.presence.c, 0);
+    if (!(c >= 0 && c < 4) || used.has(c)) c = [0, 1, 2, 3].find((x) => !used.has(x));
+    used.add(c);
+    out.push({ kind: p.sameTab ? "me" : "remote", key: p.peer, name: cleanText(p.presence.n, 14) || RUNNERS[c].name, char: c });
+  }
+  if (game.fill) {
+    let k = 0;
+    for (const c of [0, 1, 2, 3]) {
+      if (used.has(c) || out.length >= 4) continue;
+      out.push({ kind: "bot", key: `bot${k}`, botIndex: k++, name: `${RUNNERS[c].name} (CPU)`, char: c });
+    }
+  }
+  return out;
+}
+
+function myName() {
+  return cleanText($("#nameInput").value, 14) || "Runner";
+}
+
+// ── race ───────────────────────────────────────────────────────────────────
+function beginRace(game) {
   sfx.unlock();
   clearRace();
   hideShowcase();
-  const seed = (Math.random() * 2 ** 31) >>> 0;
-  race.course = buildCourse(seed);
-  race.rand = rng(seed ^ 0x9e3779b9);
+  session.lastRound = game.round;
+  race.round = game.round;
+  race.course = buildCourse(game.seed);
+  race.rand = rng(game.seed ^ 0x9e3779b9);
   buildCourseObjects(race.course);
-  const lv = LEVELS[choice.level];
-  const others = [0, 1, 2, 3].filter((c) => c !== choice.char);
-  const lanes = [1, 0, 2, 3];
-  race.me = new Runner(choice.char, lanes[0], true);
-  race.runners = [race.me];
-  others.forEach((c, i) => {
-    const r = new Runner(c, lanes[i + 1], false, lv.skill[0] + race.rand() * (lv.skill[1] - lv.skill[0]));
-    r.reactRange = lv.react;
-    r.react = lv.react[0] + race.rand() * (lv.react[1] - lv.react[0]);
-    race.runners.push(r);
+  const lv = LEVELS[LEVELS[game.level] ? game.level : "normal"];
+  const iSimulate = amHost();
+  race.racers = lineup(game).map((r, lane) => {
+    const e = { ...r, lane, left: false, view: { d: 0, x: lane, y: 0, act: "idle", fin: null, hits: 0, speed: 0, left: false }, lastD: 0, lastAt: performance.now(), vel: 0 };
+    if (r.kind === "me") e.runner = new Runner(lane, true);
+    if (r.kind === "bot" && iSimulate) e.runner = new Runner(lane, false, lv.skill[0] + race.rand() * (lv.skill[1] - lv.skill[0]), lv.react);
+    e.model = makeModel(r.char, r.kind === "me" ? false : r.name);
+    scene.add(e.model.group);
+    return e;
   });
+  race.me = race.racers.find((r) => r.kind === "me")?.runner ?? null;
   race.t0 = performance.now() + COUNTDOWN_MS;
   race.active = true;
   race.started = false;
   race.ended = false;
   race.firstFinishAt = null;
   lastCount = null;
+  pub({ r: game.round, d: 0, l: race.racers.find((r) => r.kind === "me")?.lane ?? 0, y: 0, a: "idle", h: 0, f: null, b: null });
 
-  $("#dots").replaceChildren(...race.runners.map((r) => {
+  $("#dots").replaceChildren(...race.racers.map((r) => {
     const d = document.createElement("div");
-    d.className = `dot${r.isPlayer ? " me" : ""}`;
+    d.className = `dot${r.kind === "me" ? " me" : ""}`;
     d.style.background = RUNNERS[r.char].color;
     return d;
   }));
+  mode = "race";
   show("hud");
   const hint = $("#hint");
   hint.style.opacity = "1";
   setTimeout(() => (hint.style.opacity = "0"), 6000);
-  canvas.focus?.();
 }
 
 function clearRace() {
-  for (const r of race.runners) r.remove();
-  race.runners = [];
+  for (const r of race.racers) scene.remove(r.model.group);
+  race.racers = [];
   race.me = null;
   race.active = false;
 }
 
+function racerState(r) {
+  if (r.runner) {
+    const u = r.runner;
+    return { d: u.d, x: u.x, y: u.y, act: u.act(), fin: u.finish, hits: u.hits, speed: u.speed, left: false };
+  }
+  return r.view;
+}
+
 function standings() {
-  return race.runners.slice().sort((a, b) => {
-    if (a.finish !== null && b.finish !== null) return a.finish - b.finish;
-    if (a.finish !== null) return -1;
-    if (b.finish !== null) return 1;
-    return b.d - a.d;
+  return race.racers.slice().sort((a, b) => {
+    const A = racerState(a), B = racerState(b);
+    if (A.left !== B.left) return A.left ? 1 : -1;
+    if (A.fin !== null && B.fin !== null) return A.fin - B.fin;
+    if (A.fin !== null) return -1;
+    if (B.fin !== null) return 1;
+    return B.d - A.d;
   });
+}
+
+/** Pull other racers' latest state out of the room (people) and the host (computer runners). */
+function syncRemote(now) {
+  if (session.kind !== "room") return;
+  const people = new Map(humans().map((p) => [p.peer, p]));
+  const host = hostPeer();
+  for (const r of race.racers) {
+    if (r.runner) continue;
+    let src = null;
+    if (r.kind === "remote") {
+      const p = people.get(r.key);
+      if (!p) { r.view.left = true; continue; }
+      if (num(p.presence.r) === race.round) src = p.presence;
+    } else if (r.kind === "bot" && host && num(host.presence.r) === race.round && Array.isArray(host.presence.b)) {
+      src = host.presence.b[r.botIndex] || null;
+    }
+    if (!src) continue;
+    const d = clamp(num(src.d), 0, TRACK_LEN);
+    if (d !== r.lastD) {
+      const dt = (now - r.lastAt) / 1000;
+      if (dt > 0.02) r.vel = clamp((d - r.lastD) / dt, 0, BOOST_SPEED + 2);
+      r.lastD = d;
+      r.lastAt = now;
+    }
+    r.target = { lane: clamp(Math.round(num(src.l, r.lane)), 0, LANES - 1), y: clamp(num(src.y), 0, 5), act: ACTS.includes(src.a) ? src.a : "run" };
+    r.view.fin = typeof src.f === "number" && src.f > 0 ? src.f : null;
+    r.view.hits = clamp(Math.round(num(src.h)), 0, 999);
+  }
+}
+
+function stepRemoteViews(dt, now) {
+  for (const r of race.racers) {
+    if (r.runner || !r.target) continue;
+    const v = r.view;
+    const age = (now - r.lastAt) / 1000;
+    const target = Math.min(TRACK_LEN, r.lastD + r.vel * Math.min(age, 0.5));
+    v.d += (target - v.d) * Math.min(1, dt * 8);
+    v.x += (r.target.lane - v.x) * Math.min(1, dt * 12);
+    v.y += (r.target.y - v.y) * Math.min(1, dt * 18);
+    v.speed = r.vel || BASE_SPEED;
+    v.act = v.fin !== null && v.d > TRACK_LEN - 1 ? "cheer" : race.started ? r.target.act : "idle";
+  }
+}
+
+function publishMine(now, force) {
+  if (session.kind !== "room" || !race.me) return;
+  const me = race.me;
+  const a = me.act();
+  if (!force && now - session.lastPub < 66 && a === session.lastAct) return;
+  session.lastPub = now;
+  session.lastAct = a;
+  const patch = { r: race.round, d: Math.round(Math.min(me.d, TRACK_LEN) * 100) / 100, l: me.lane, y: Math.round(me.y * 100) / 100, a, h: me.hits, f: me.finish };
+  if (amHost()) {
+    patch.b = race.racers.filter((r) => r.kind === "bot" && r.runner).map((r) => {
+      const u = r.runner;
+      return { d: Math.round(Math.min(u.d, TRACK_LEN) * 100) / 100, l: u.lane, y: Math.round(u.y * 100) / 100, a: u.act(), h: u.hits, f: u.finish };
+    });
+  }
+  pub(patch);
 }
 
 function endRace() {
   race.ended = true;
-  const me = race.me;
   const order = standings();
-  const place = order.indexOf(me) + 1;
-  $("#resTitle").textContent = me.finish === null ? "Time's up!" : place === 1 ? "You win!" : `You came ${place}${ordinal(place)}`;
+  const meEntry = race.racers.find((r) => r.kind === "me");
+  const mine = meEntry ? racerState(meEntry) : null;
+  const place = meEntry ? order.indexOf(meEntry) + 1 : 0;
+  $("#resTitle").textContent = !mine ? "Race over" : mine.fin === null ? "Time's up!" : place === 1 ? "You win!" : `You came ${place}${ordinal(place)}`;
   const list = $("#podium");
   list.replaceChildren();
   order.forEach((r, i) => {
+    const s = racerState(r);
     const li = document.createElement("li");
-    if (r.isPlayer) li.className = "me";
-    const pl = document.createElement("span"); pl.className = "pl"; pl.textContent = ["🥇", "🥈", "🥉", "4"][i];
+    if (r.kind === "me") li.className = "me";
+    const pl = document.createElement("span"); pl.className = "pl"; pl.textContent = ["🥇", "🥈", "🥉", "4"][i] ?? String(i + 1);
     const img = document.createElement("img"); img.src = `assets/p${r.char}.png`; img.alt = "";
-    const who = document.createElement("span"); who.className = "who"; who.textContent = r.isPlayer ? `${RUNNERS[r.char].name} (you)` : RUNNERS[r.char].name;
+    const who = document.createElement("span"); who.className = "who"; who.textContent = r.kind === "me" ? `${r.name} (you)` : r.name;
     const small = document.createElement("small");
-    small.textContent = r.finish !== null ? `${r.hits} bump${r.hits === 1 ? "" : "s"}` : `${Math.round(r.d)} m of ${TRACK_LEN} m`;
+    small.textContent = s.left ? "left the race" : s.fin !== null ? `${RUNNERS[r.char].name} · ${s.hits} bump${s.hits === 1 ? "" : "s"}` : `${Math.round(s.d)} m of ${TRACK_LEN} m`;
     who.append(small);
-    const tm = document.createElement("span"); tm.className = "tm"; tm.textContent = r.finish !== null ? `${(r.finish / 1000).toFixed(2)}s` : "DNF";
+    const tm = document.createElement("span"); tm.className = "tm"; tm.textContent = s.fin !== null ? `${(s.fin / 1000).toFixed(2)}s` : "DNF";
     li.append(pl, img, who, tm);
     list.append(li);
   });
   let bestText = "";
-  if (me.finish !== null) {
-    const key = `lr:best:${choice.level}`;
+  if (mine && mine.fin !== null) {
+    const key = "lr:best";
     const prev = Number(store.get(key)) || 0;
-    if (!prev || me.finish < prev) { store.set(key, String(me.finish)); bestText = prev ? `New best on ${choice.level}!` : `Best time on ${choice.level}: ${(me.finish / 1000).toFixed(2)}s`; }
-    else bestText = `Your best on ${choice.level}: ${(prev / 1000).toFixed(2)}s`;
+    if (!prev || mine.fin < prev) { store.set(key, String(mine.fin)); bestText = prev ? "New personal best!" : `Personal best: ${(mine.fin / 1000).toFixed(2)}s`; }
+    else bestText = `Personal best: ${(prev / 1000).toFixed(2)}s`;
   }
   $("#best").textContent = bestText;
-  setTimeout(() => { if (race.ended) show("results"); }, 1500);
-  banner(me.finish === null ? "TIME UP!" : "FINISHED!", 1400);
+  banner(mine && mine.fin === null ? "TIME UP!" : "FINISHED!", 1400);
+  setTimeout(() => { if (race.ended && mode === "race") { mode = "results"; renderResultsButtons(); show("results"); } }, 1500);
+}
+
+function renderResultsButtons() {
+  const host = amHost();
+  $("#againBtn").hidden = !host;
+  $("#lobbyBtn").hidden = !(host && session.kind === "room");
+  $("#resNote").textContent = host ? "" : "Waiting for the host to start the next race…";
+}
+
+// ── lobby ──────────────────────────────────────────────────────────────────
+function newCode() {
+  const buf = new Uint32Array(4);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (v) => CODE_ALPHABET[v % CODE_ALPHABET.length]).join("");
+}
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function enterRoom(code, creating) {
+  if (!roomApi) return;
+  setMenuBusy(true, creating ? "Creating lobby…" : `Joining ${code}…`);
+  try {
+    const nr = await roomApi.join(`lr-${code.toLowerCase()}`);
+    session.kind = "room";
+    session.nr = nr;
+    session.code = code;
+    session.game = null;
+    session.pres = {};
+    pub({ t: Date.now(), n: myName(), c: choice.char });
+    const others = () => humans().filter((p) => !p.sameTab);
+    if (creating) {
+      await wait(1200);
+      if (others().some((p) => num(p.presence.t) < session.pres.t)) {
+        await leaveRoom(true);
+        return enterRoom(newCode(), true);
+      }
+    } else {
+      let found = false;
+      for (let i = 0; i < 30 && !found; i++) { await wait(100); found = others().length > 0; }
+      if (!found) {
+        await leaveRoom(true);
+        setMenuBusy(false, `No lobby “${code}” is open. Check the code and that your friend still has the lobby open.`, true);
+        return;
+      }
+      const ahead = humans().findIndex((p) => p.sameTab);
+      if (ahead >= 4) {
+        await leaveRoom(true);
+        setMenuBusy(false, "That lobby already has 4 runners.", true);
+        return;
+      }
+      session.lastRound = num(hostPeer()?.presence.g?.round);
+    }
+    setMenuBusy(false, "");
+    enterLobby();
+  } catch (err) {
+    console.error(err);
+    await leaveRoom(true);
+    setMenuBusy(false, "Couldn't open the live lobby. Try again in a moment.", true);
+  }
+}
+
+async function leaveRoom(silent) {
+  const nr = session.nr;
+  session.nr = null;
+  session.kind = null;
+  session.game = null;
+  if (nr) { try { await nr.leave(); } catch { /* already gone */ } }
+  if (!silent) toMenu();
+}
+
+function enterLobby() {
+  mode = "lobby";
+  clearRace();
+  buildCourseObjects({ rows: [], boosts: [] });
+  show("lobby");
+  lobbySig = "";
+  renderLobby();
+}
+
+let lobbySig = "";
+function renderLobby() {
+  const people = humans();
+  const host = amHost();
+  const meIdx = people.findIndex((p) => p.sameTab);
+  // two people on one runner: the later one moves to a free runner
+  const earlier = new Set(people.slice(0, Math.max(0, meIdx)).map((p) => num(p.presence.c)));
+  if (earlier.has(choice.char)) {
+    const free = [0, 1, 2, 3].find((c) => !earlier.has(c));
+    if (free !== undefined) { choice.char = free; pub({ c: free }); setShowcase(free); }
+  }
+  const hg = hostPeer()?.presence.g;
+  const racing = !host && hg && hg.phase === "race" && num(hg.round) <= session.lastRound && num(hostPeer()?.presence.r) === num(hg.round) && hostPeer()?.presence.f == null;
+  const sig = JSON.stringify([people.map((p) => [p.peer, p.presence.n, p.presence.c]), host, choice, racing]);
+  if (sig === lobbySig) return;
+  lobbySig = sig;
+
+  $("#lobbyCode").textContent = session.code;
+  const slots = $("#slots");
+  slots.replaceChildren();
+  for (let i = 0; i < 4; i++) {
+    const p = people[i];
+    const s = document.createElement("div");
+    const nm = document.createElement("span");
+    nm.className = "nm";
+    if (!p) {
+      s.className = "slot empty";
+      nm.textContent = choice.fill && host ? "Computer" : "Waiting…";
+      s.append(nm);
+    } else {
+      const c = num(p.presence.c);
+      s.className = "slot";
+      s.style.background = `${RUNNERS[c]?.color ?? "#888888"}33`;
+      const img = document.createElement("img"); img.src = `assets/p${c}.png`; img.alt = "";
+      nm.textContent = cleanText(p.presence.n, 14) || "Runner";
+      s.append(img, nm);
+      if (i === 0) { const cr = document.createElement("span"); cr.className = "crown"; cr.textContent = "👑"; s.append(cr); }
+      if (p.sameTab) { const y = document.createElement("span"); y.className = "you"; y.textContent = "YOU"; s.append(y); }
+    }
+    slots.append(s);
+  }
+  const watching = people.length - 4;
+
+  const picker = $("#lobbyPicker");
+  picker.replaceChildren();
+  RUNNERS.forEach((r, i) => {
+    const owner = people.find((p) => !p.sameTab && num(p.presence.c) === i);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `card${owner ? " taken" : ""}`;
+    b.setAttribute("aria-pressed", String(choice.char === i));
+    const img = document.createElement("img"); img.src = `assets/p${i}.png`; img.alt = "";
+    const name = document.createElement("b"); name.textContent = r.name; name.style.color = r.color;
+    const small = document.createElement("small"); small.textContent = choice.char === i ? "You" : owner ? cleanText(owner.presence.n, 14) : "";
+    b.append(img, name, small);
+    b.addEventListener("click", () => {
+      if (owner) return;
+      choice.char = i;
+      store.set("lr:char", String(i));
+      pub({ c: i });
+      setShowcase(i);
+      lobbySig = "";
+      renderLobby();
+    });
+    picker.append(b);
+  });
+
+  $("#hostOpts").hidden = !host;
+  $("#fillBots").checked = choice.fill;
+  for (const b of document.querySelectorAll("#lobbyLevel button")) b.setAttribute("aria-pressed", String(b.dataset.level === choice.level));
+  $("#startBtn").hidden = !host;
+  const n = Math.min(people.length, 4);
+  $("#startBtn").textContent = n >= 2 ? `Start race (${n} players)` : "Start race";
+  $("#lobbyNote").textContent = racing
+    ? "A race is running right now. You'll be in the next one."
+    : host
+      ? n < 2 ? "Share the code. Friends can join until you press Start." : watching > 0 ? `${watching} more watching (4 runners max).` : ""
+      : "Waiting for the host to start…";
+}
+
+function hostStart() {
+  const g = {
+    round: Math.max(session.lastRound, num(session.game?.round)) + 1,
+    seed: (Math.random() * 2 ** 31) >>> 0,
+    level: choice.level,
+    fill: session.kind === "solo" ? true : choice.fill,
+    phase: "race",
+  };
+  session.game = g;
+  if (session.kind === "room") pub({ g });
+  beginRace(g);
+}
+
+/** Non-hosts follow the host's game: start when a new round appears, return to the lobby with them. */
+function followHost() {
+  if (session.kind !== "room" || amHost()) return;
+  const g = hostPeer()?.presence.g;
+  if (!g || typeof g !== "object") return;
+  if (g.phase === "race" && num(g.round) > session.lastRound && Number.isFinite(g.seed)) {
+    const mine = humans().findIndex((p) => p.sameTab);
+    if (mine >= 0 && mine < 4) beginRace({ round: num(g.round), seed: num(g.seed), level: g.level, fill: !!g.fill });
+    else session.lastRound = num(g.round);
+  } else if (g.phase === "lobby" && mode === "results") {
+    enterLobby();
+  }
 }
 
 // ── input ──────────────────────────────────────────────────────────────────
@@ -925,7 +1291,7 @@ function input(kind) {
   else if (kind === "slide") me.slide();
 }
 window.addEventListener("keydown", (e) => {
-  if (!race.active) return;
+  if (!race.active || e.target instanceof HTMLInputElement) return;
   const k = e.key;
   if (k === "ArrowLeft" || k === "a" || k === "A") input("left");
   else if (k === "ArrowRight" || k === "d" || k === "D") input("right");
@@ -950,8 +1316,7 @@ window.addEventListener("keydown", (e) => {
 
 // ── UI ─────────────────────────────────────────────────────────────────────
 function show(name) {
-  $("#menu").hidden = name !== "menu";
-  $("#results").hidden = name !== "results";
+  for (const s of ["menu", "lobby", "results"]) $(`#${s}`).hidden = name !== s;
   $("#hud").hidden = name !== "hud";
 }
 let bannerTimer = 0;
@@ -961,6 +1326,26 @@ function banner(text, ms = 1400) {
   b.classList.add("show");
   clearTimeout(bannerTimer);
   bannerTimer = setTimeout(() => b.classList.remove("show"), ms);
+}
+
+let modelsReady = false;
+function setMenuBusy(busy, note, isErr = false) {
+  const live = !!roomApi && modelsReady && !busy;
+  $("#createBtn").disabled = !live;
+  $("#joinBtn").disabled = !live;
+  $("#soloBtn").disabled = !modelsReady || busy;
+  if (modelsReady) $("#createBtn").textContent = "Create lobby";
+  const n = $("#menuNote");
+  n.textContent = note ?? n.textContent;
+  n.classList.toggle("err", isErr);
+}
+
+function toMenu() {
+  clearRace();
+  buildCourseObjects({ rows: [], boosts: [] });
+  mode = "menu";
+  show("menu");
+  renderMenu();
 }
 
 const picker = $("#picker");
@@ -975,18 +1360,48 @@ RUNNERS.forEach((r, i) => {
   b.addEventListener("click", () => { choice.char = i; store.set("lr:char", String(i)); renderMenu(); });
   picker.append(b);
 });
-for (const b of document.querySelectorAll("#level button")) {
-  b.addEventListener("click", () => { choice.level = b.dataset.level; store.set("lr:level", choice.level); renderMenu(); });
-}
 function renderMenu() {
   [...picker.children].forEach((c, i) => c.setAttribute("aria-pressed", String(i === choice.char)));
-  for (const b of document.querySelectorAll("#level button")) b.setAttribute("aria-pressed", String(b.dataset.level === choice.level));
   setShowcase(choice.char);
 }
-$("#startBtn").addEventListener("click", startRace);
-$("#againBtn").addEventListener("click", startRace);
-$("#menuBtn").addEventListener("click", () => { clearRace(); race.ended = false; show("menu"); renderMenu(); });
-$("#quit").addEventListener("click", () => { clearRace(); race.ended = false; show("menu"); renderMenu(); });
+
+const nameInput = $("#nameInput");
+const codeInput = $("#codeInput");
+nameInput.value = store.get("lr:name") || "";
+nameInput.addEventListener("input", () => store.set("lr:name", nameInput.value));
+codeInput.addEventListener("input", () => { codeInput.value = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4); });
+function needName() {
+  if (cleanText(nameInput.value, 14)) return false;
+  setMenuBusy(false, "Type your name first.", true);
+  nameInput.focus();
+  return true;
+}
+$("#createBtn").addEventListener("click", () => { sfx.unlock(); if (!needName()) enterRoom(newCode(), true); });
+$("#joinBtn").addEventListener("click", () => {
+  sfx.unlock();
+  if (needName()) return;
+  const code = codeInput.value.trim().toUpperCase();
+  if (code.length !== 4) { setMenuBusy(false, "Lobby codes have 4 characters.", true); codeInput.focus(); return; }
+  enterRoom(code, false);
+});
+codeInput.addEventListener("keydown", (e) => e.key === "Enter" && $("#joinBtn").click());
+$("#soloBtn").addEventListener("click", () => { session.kind = "solo"; session.lastRound = 0; hostStart(); });
+
+$("#fillBots").addEventListener("change", (e) => { choice.fill = e.target.checked; store.set("lr:fill", choice.fill ? "1" : "0"); lobbySig = ""; renderLobby(); });
+for (const b of document.querySelectorAll("#lobbyLevel button")) {
+  b.addEventListener("click", () => { choice.level = b.dataset.level; store.set("lr:level", choice.level); lobbySig = ""; renderLobby(); });
+}
+$("#startBtn").addEventListener("click", () => { if (amHost()) hostStart(); });
+$("#leaveBtn").addEventListener("click", () => leaveRoom(false));
+$("#quit").addEventListener("click", () => (session.kind === "room" ? leaveRoom(false) : toMenu()));
+$("#menuBtn").addEventListener("click", () => (session.kind === "room" ? leaveRoom(false) : toMenu()));
+$("#againBtn").addEventListener("click", () => { if (amHost()) hostStart(); });
+$("#lobbyBtn").addEventListener("click", () => {
+  if (!amHost()) return;
+  session.game = { ...(session.game || { round: session.lastRound }), phase: "lobby" };
+  pub({ g: session.game });
+  enterLobby();
+});
 
 // menu showcase: your runner idling on the start line
 let showcase = null;
@@ -1007,35 +1422,51 @@ function hideShowcase() {
 
 // ── frame loop ─────────────────────────────────────────────────────────────
 let last = performance.now();
+let lastUiTick = 0;
 const camPos = new THREE.Vector3(0, 4, 8), camGoal = new THREE.Vector3(), camLook = new THREE.Vector3();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
 
-  if (race.active && race.me) {
+  if (now - lastUiTick > 200) {
+    lastUiTick = now;
+    if (mode === "lobby") { renderLobby(); followHost(); }
+    else if (mode === "results") { followHost(); renderResultsButtons(); }
+  }
+
+  if (race.active) {
     const raceMs = now - race.t0;
     race.started = raceMs >= 0;
+    syncRemote(now);
     const steps = Math.ceil(dt / (1 / 120));
     for (let i = 0; i < steps; i++) {
-      for (const r of race.runners) {
-        if (!r.isPlayer) r.think(race.course, race.rand);
-        r.step(dt / steps, race.course, raceMs);
+      for (const r of race.racers) {
+        if (!r.runner) continue;
+        if (r.kind === "bot") r.runner.think(race.course, race.rand);
+        r.runner.step(dt / steps, race.course, raceMs);
       }
     }
-    for (const r of race.runners) r.animate(dt);
+    stepRemoteViews(dt, now);
+    const meRunner = race.me;
+    for (const r of race.racers) {
+      const s = racerState(r);
+      const blink = r.kind === "me" && meRunner.invulnT > 0 && meRunner.stumbleT <= 0 && Math.floor(now / 90) % 2 === 0;
+      animateModel(r.model, s, dt, blink);
+      if (s.fin !== null && race.firstFinishAt === null) race.firstFinishAt = raceMs;
+    }
+    publishMine(now, false);
 
     if (!race.ended) {
-      const me = race.me;
-      const allIn = race.runners.every((r) => r.finish !== null);
-      const graceUp = race.firstFinishAt !== null && raceMs >= race.firstFinishAt + AFTER_FIRST_MS && me.finish !== null;
-      const limit = raceMs >= RACE_LIMIT_MS || (race.firstFinishAt !== null && raceMs >= race.firstFinishAt + AFTER_FIRST_MS);
-      if (allIn || graceUp || limit) endRace();
+      const live = race.racers.map(racerState).filter((s) => !s.left);
+      const allIn = live.length > 0 && live.every((s) => s.fin !== null);
+      const grace = race.firstFinishAt !== null && raceMs >= race.firstFinishAt + AFTER_FIRST_MS;
+      if (allIn || grace || raceMs >= RACE_LIMIT_MS) endRace();
     }
 
-    const me = race.me;
-    const tx = laneX(me.x) * 0.75;
-    camGoal.set(tx, 3.0 + me.y * 0.35, -me.d + 5.6);
+    const focus = meRunner ? { d: meRunner.d, x: meRunner.x, y: meRunner.y } : racerState(race.racers[0]);
+    const tx = laneX(focus.x) * 0.75;
+    camGoal.set(tx, 3.0 + focus.y * 0.35, -focus.d + 5.6);
     camPos.lerp(camGoal, Math.min(1, dt * 6));
     camera.position.copy(camPos);
     if (shake > 0) {
@@ -1043,9 +1474,9 @@ function frame(now) {
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
-    camLook.set(tx * 0.8, 1.0, -me.d - 9);
+    camLook.set(tx * 0.8, 1.0, -focus.d - 9);
     camera.lookAt(camLook);
-    cull(me.d);
+    cull(focus.d);
     updateHud(raceMs);
   } else {
     const t = now / 1000;
@@ -1074,16 +1505,19 @@ function updateHud(raceMs) {
     if (label === "GO!") sfx.go(); else if (/^[123]$/.test(label)) sfx.beep();
     lastCount = label;
   }
-  const me = race.me;
+  const meEntry = race.racers.find((r) => r.kind === "me");
+  const mine = meEntry ? racerState(meEntry) : null;
   const t = Math.max(0, raceMs);
-  $("#timer").textContent = race.firstFinishAt !== null && me.finish === null
+  $("#timer").textContent = race.firstFinishAt !== null && mine && mine.fin === null
     ? `⏱${Math.max(0, Math.ceil((race.firstFinishAt + AFTER_FIRST_MS - raceMs) / 1000))}`
-    : ((me.finish ?? t) / 1000).toFixed(1);
+    : (((mine && mine.fin) ?? t) / 1000).toFixed(1);
   const order = standings();
-  const place = order.indexOf(me) + 1;
+  const place = meEntry ? order.indexOf(meEntry) + 1 : 1;
   $("#place").innerHTML = `${place}<sup>${ordinal(place)}</sup>`;
   [...$("#dots").children].forEach((dot, i) => {
-    dot.style.left = `${clamp(race.runners[i].d / TRACK_LEN, 0, 1) * 100}%`;
+    const s = racerState(race.racers[i]);
+    dot.style.left = `${clamp(s.d / TRACK_LEN, 0, 1) * 100}%`;
+    dot.hidden = s.left;
   });
 }
 
@@ -1091,18 +1525,30 @@ function updateHud(raceMs) {
 renderMenu();
 show("menu");
 requestAnimationFrame(frame);
-loadAll((f) => ($("#startBtn").textContent = `Loading 3D models… ${Math.round(f * 100)}%`))
+loadAll((f) => ($("#createBtn").textContent = `Loading 3D models… ${Math.round(f * 100)}%`))
   .then(() => {
+    modelsReady = true;
     buildScenery();
     renderMenu();
-    const b = $("#startBtn");
-    b.disabled = false;
-    b.textContent = "Start race";
+    setMenuBusy(false, roomApi ? "" : $("#menuNote").textContent);
   })
   .catch((err) => {
     console.error(err);
-    $("#startBtn").textContent = "Couldn't load";
-    $("#menuNote").textContent = `The 3D models didn't load (${String(err?.message || err).slice(0, 120)}). Reload the page to try again.`;
-    $("#menuNote").classList.add("err");
+    $("#createBtn").textContent = "Couldn't load";
+    setMenuBusy(true, `The 3D models didn't load (${String(err?.message || err).slice(0, 120)}). Reload the page to try again.`, true);
   });
+
+// live lobbies light up when the room capability is available in this view
+(window.claude?.use ? window.claude.use("room") : Promise.resolve(null)).then((api) => {
+  roomApi = api;
+  if (!api) {
+    setMenuBusy(false, "Live lobbies work when this page is open in Claude and you're signed in. You can still practice alone.");
+    return;
+  }
+  setMenuBusy(false, "");
+  const params = new URLSearchParams(location.search);
+  const code = (location.hash.replace("#", "") || params.get("join") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+  if (code.length === 4) codeInput.value = code;
+}).catch(() => setMenuBusy(false, "Live lobbies aren't available here. You can still practice alone."));
+
 </script>
