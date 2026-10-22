@@ -28,6 +28,7 @@ export const LANES = 4;
 export const MAX_RUNNERS = 4;
 export const BASE_SPEED = 12; // m/s
 export const BOOST_SPEED = 18; // m/s while a boost pad is active
+export const ROCKET_SPEED = 25; // m/s riding a rocket in a sprint (about double running)
 export const COUNTDOWN_MS = 3500;
 export const RACE_LIMIT_MS = 90000; // hard cap on a race
 export const AFTER_FIRST_MS = 15000; // stragglers get this long after the winner
@@ -53,6 +54,7 @@ export const SURVIVAL_LEN = 9000; // metres of course generated; nobody lasts th
 export const SURVIVAL_LIMIT_MS = 10 * 60 * 1000;
 export const SURVIVAL_MAX_SPEED = 19; // the ramp tops out here…
 export const SURVIVAL_BOOST = 5; // …and a boost adds this on top
+export const SURVIVAL_ROCKET = 10; // a rocket adds this on top of your running speed
 /** Running speed (m/s) in survival after `s` seconds: starts like sprint, then ramps. */
 export function survivalSpeed(s) {
   return Math.min(SURVIVAL_MAX_SPEED, BASE_SPEED + Math.max(0, s) * 0.1);
@@ -66,10 +68,18 @@ export function survivalSpeed(s) {
  *   ghost     — run straight through obstacles for a few seconds
  *   lightning — everyone ahead of you falls over (unless shielded)
  *   banana    — thrown forward into a lane you pick; whoever runs onto it slips
+ *   bowling   — rolled BACKWARDS down a lane you pick; knocks over whoever is
+ *               behind you in that lane (jump it!)
+ *   freeze    — everyone else runs slowly for a few seconds (unless shielded)
+ *   spring    — spring shoes: huge jumps for a few seconds, even over crates
  * You hold one power-up at a time and use it when you want (boxes are
  * ignored while you hold or use one). Zaps and bananas go through the server.
  */
-export const POWERS = ["shield", "rocket", "ghost", "lightning", "banana"];
+export const POWERS = ["shield", "rocket", "ghost", "lightning", "banana", "bowling", "freeze", "spring"];
+/** Powers relayed to everyone through the server as a "zap" (an area effect). */
+export const ZAP_KINDS = ["lightning", "freeze"];
+export const BOWL_SPEED = 24; // m/s the ball rolls back down the track
+export const BOWL_RANGE_M = 90; // …and how far before it's gone
 export const BANANA_AHEAD_M = 28; // a thrown banana lands this far in front of you
 export const BANANA_COOLDOWN_MS = 1200;
 export const ZAP_COOLDOWN_MS = 3000;
@@ -102,11 +112,11 @@ export const MEDAL_WORTH = { gold: 10, silver: 5, bronze: 3 };
 export const MIN_RACERS_FOR_MEDALS = 2;
 
 /** Fastest anyone can legitimately be, plus slack for network jitter. */
-const SPEED_CAP = BOOST_SPEED + 1.5;
-const SURVIVAL_SPEED_CAP = SURVIVAL_MAX_SPEED + SURVIVAL_BOOST + 1.5;
+const SPEED_CAP = ROCKET_SPEED + 1.5;
+const SURVIVAL_SPEED_CAP = SURVIVAL_MAX_SPEED + SURVIVAL_ROCKET + 1.5;
 const POS_SLACK_M = 6;
 const ACTS = ["run", "jump", "slide", "stumble", "idle", "out"];
-const POWER_STATES = ["", "shield", "rocket", "ghost"];
+const POWER_STATES = ["", "shield", "rocket", "ghost", "spring"];
 
 // ── course ──────────────────────────────────────────────────────────────────
 
@@ -417,6 +427,7 @@ function startRace(state, t) {
   state.firstFinishAt = null;
   state.zaps = [];
   state.bananas = [];
+  state.bowls = [];
   for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
 }
 
@@ -504,6 +515,16 @@ export function validateAction(state, playerId, action) {
       if (me.finish !== null || me.left || me.outAt !== null) return { ok: false, error: "not racing" };
       const t = num(action.t) ? action.t : state.now;
       if (me.zapAt !== null && t - me.zapAt < ZAP_COOLDOWN_MS) return { ok: false, error: "too soon" };
+      if (action.kind !== undefined && !ZAP_KINDS.includes(action.kind)) return { ok: false, error: "bad zap" };
+      return { ok: true };
+    }
+    case "bowl": {
+      if (!me) return { ok: false, error: "join first" };
+      if (state.phase !== "race" || me.finish !== null || me.left || me.outAt !== null) return { ok: false, error: "not racing" };
+      if (!intIn(action.lane, 0, LANES - 1) || !num(action.d)) return { ok: false, error: "bad bowl" };
+      if (Math.abs(action.d - me.d) > 2 * POS_SLACK_M) return { ok: false, error: "bad bowl" };
+      const t = num(action.t) ? action.t : state.now;
+      if (me.bananaAt !== null && t - me.bananaAt < BANANA_COOLDOWN_MS) return { ok: false, error: "too soon" };
       return { ok: true };
     }
     case "banana": {
@@ -635,13 +656,20 @@ export function applyAction(state0, playerId, action) {
       // apply it to themselves when they see a zap they haven't seen yet
       me.zapAt = t;
       state.zapSeq = (state.zapSeq ?? 0) + 1;
-      state.zaps = [...(state.zaps ?? []), { id: state.zapSeq, by: playerId, d: me.d, at: t }].slice(-6);
+      state.zaps = [...(state.zaps ?? []), { id: state.zapSeq, by: playerId, d: me.d, at: t, kind: action.kind ?? "lightning" }].slice(-6);
       break;
     }
     case "banana": {
       me.bananaAt = t;
       state.bananaSeq = (state.bananaSeq ?? 0) + 1;
       state.bananas = [...(state.bananas ?? []), { id: state.bananaSeq, by: playerId, lane: action.lane, d: Math.round(action.d * 10) / 10, at: t }].slice(-16);
+      break;
+    }
+    case "bowl": {
+      // a ball rolling back from `d` at BOWL_SPEED; every client checks it against its own runner
+      me.bananaAt = t;
+      state.bowlSeq = (state.bowlSeq ?? 0) + 1;
+      state.bowls = [...(state.bowls ?? []), { id: state.bowlSeq, by: playerId, lane: action.lane, d: Math.round(action.d * 10) / 10, at: t }].slice(-8);
       break;
     }
     case "slip":
@@ -781,6 +809,7 @@ export function viewFor(state, playerId) {
     rewards: rewards(state),
     zaps: state.zaps ?? [],
     bananas: state.bananas ?? [],
+    bowls: state.bowls ?? [],
   };
 }
 

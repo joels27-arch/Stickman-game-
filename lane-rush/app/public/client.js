@@ -33,6 +33,10 @@ import {
   CUP_RACES,
   CUP_POINTS,
   BANANA_AHEAD_M,
+  BOWL_SPEED,
+  BOWL_RANGE_M,
+  ROCKET_SPEED,
+  SURVIVAL_ROCKET,
   ROLLER_SPEED,
   ROLLER_TRIGGER_M,
 } from "/logic.js";
@@ -44,13 +48,30 @@ const RUNNERS = [
   { name: "Bolt", color: "#2f7df6", file: "c1b", pic: "p1b" },
   { name: "Ivy", color: "#2fbf55", file: "c2" },
   { name: "Gizmo", color: "#f5b921", file: "c3" },
-  // shop skins
-  { name: "Pip", color: "#e0703a", file: "c4", price: { medal: "bronze", count: 6 } },
-  { name: "Kiko", color: "#7c4dff", file: "c5", price: { medal: "silver", count: 4 } },
-  { name: "Dino", color: "#14b8a6", file: "c6", price: { medal: "gold", count: 3 } },
-  { name: "Nova", color: "#8fa3bf", file: "c7", price: { medal: "gold", count: 6 } },
+  { name: "Pip", color: "#e0703a", file: "c4" },
+  { name: "Kiko", color: "#7c4dff", file: "c5" },
+  { name: "Dino", color: "#14b8a6", file: "c6" },
+  { name: "Nova", color: "#8fa3bf", file: "c7" },
 ];
-const STARTERS = 4;
+const STARTERS = RUNNERS.length; // every 3D runner is free to play
+
+/**
+ * Collectible characters: bought in the shop with medals. They don't have 3D
+ * models yet, so owning one shows it in your collection ("coming soon to the
+ * track") but you can't race with it.
+ */
+const COLLECTION = [
+  { id: "luna", name: "Luna", color: "#9b5cff", price: { medal: "bronze", count: 5 } },
+  { id: "toto", name: "Toto", color: "#f2f2f2", price: { medal: "bronze", count: 8 } },
+  { id: "blaze", name: "Blaze", color: "#ff4b2b", price: { medal: "silver", count: 3 } },
+  { id: "zara", name: "Zara", color: "#ff6fb5", price: { medal: "silver", count: 4 } },
+  { id: "jax", name: "Jax", color: "#c98a3c", price: { medal: "silver", count: 6 } },
+  { id: "leo", name: "Sir Leo", color: "#4c8dff", price: { medal: "gold", count: 2 } },
+  { id: "kai", name: "Kai", color: "#21c7d9", price: { medal: "gold", count: 3 } },
+  { id: "momo", name: "Momo", color: "#e9ecef", price: { medal: "gold", count: 4 } },
+  { id: "zed", name: "Zed", color: "#7be3b0", price: { medal: "gold", count: 5 } },
+  { id: "aria", name: "Aria", color: "#e03cff", price: { medal: "gold", count: 8 } },
+];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
 const medalText = (medal, n) => `${n} ${medal} medal${n === 1 ? "" : "s"}`;
 const flagOf = (code) => (code && code.length === 2 ? String.fromCodePoint(...[...code].map((c) => 127397 + c.charCodeAt(0))) : "");
@@ -77,7 +98,9 @@ const INVULN_S = STUMBLE_S + 0.9;
 const FALL_CLIP = [0.15, 1.3];
 const GETUP_CLIP = [1.9, 6.1];
 // power-ups (seconds)
-const POWER_S = { shield: 9, rocket: 3.2, ghost: 4.5 };
+const POWER_S = { shield: 9, rocket: 3.2, ghost: 4.5, spring: 6 };
+const FREEZE_S = 3; // how long a freeze slows you
+const SPRING_JUMP = 1.5; // spring shoes jump this much harder: high enough to clear crates
 const ROCKET_Y = 2.1;
 const POWER_INFO = {
   shield: { label: "Shield", hint: "Blocks the next hit" },
@@ -85,6 +108,9 @@ const POWER_INFO = {
   ghost: { label: "Ghost", hint: "Run through obstacles" },
   lightning: { label: "Lightning", hint: "Everyone ahead falls over" },
   banana: { label: "Banana", hint: "Throw it into a lane ahead" },
+  bowling: { label: "Bowling ball", hint: "Roll it back at whoever is behind you" },
+  freeze: { label: "Freeze", hint: "Everyone else slows down" },
+  spring: { label: "Spring shoes", hint: "Huge jumps, even over crates" },
 };
 const TOUCH = matchMedia("(pointer: coarse)").matches;
 const BOOST_S = 1.6;
@@ -132,7 +158,7 @@ const wallet = {
   owned() {
     try {
       const a = JSON.parse(local.getItem("lr:owned") || "[]");
-      return Array.isArray(a) ? a.filter((i) => Number.isInteger(i)) : [];
+      return Array.isArray(a) ? a.filter((i) => Number.isInteger(i) || typeof i === "string") : [];
     } catch {
       return [];
     }
@@ -160,13 +186,16 @@ const wallet = {
     }
     return missing > 0 ? null : spend;
   },
-  buy(i) {
-    const price = RUNNERS[i]?.price;
-    const spend = price && !this.owns(i) ? this.plan(price) : null;
+  /** Collection characters are owned by id. */
+  has(id) {
+    return this.owned().includes(id);
+  },
+  buy(item) {
+    const spend = item.price && !this.has(item.id) ? this.plan(item.price) : null;
     if (!spend) return false;
     const m = this.medals();
     for (const k of MEDALS) m[k] -= spend[k];
-    local.setItem("lr:owned", JSON.stringify([...this.owned(), i]));
+    local.setItem("lr:owned", JSON.stringify([...this.owned(), item.id]));
     this.save(m);
     return true;
   },
@@ -492,19 +521,16 @@ function openShop() {
 function renderShop() {
   const grid = $("#shopGrid");
   grid.replaceChildren();
-  RUNNERS.forEach((r, i) => {
-    if (i < STARTERS) return;
-    const owned = wallet.owns(i);
+  COLLECTION.forEach((r) => {
+    const owned = wallet.has(r.id);
     const spend = owned ? null : wallet.plan(r.price);
     const btn = el("button", { class: `btn ${owned ? "blue" : "go"}`, type: "button" });
     btn.textContent = owned ? "Owned ✓" : spend ? "Buy" : "Not enough medals";
     btn.disabled = owned || !spend;
     btn.addEventListener("click", () => {
-      if (wallet.buy(i)) {
+      if (wallet.buy(r)) {
         sfx.finish();
-        toast(`${r.name} unlocked! Pick them in the lobby.`);
-        local.setItem("lr:char", String(i));
-        if (net.view?.joined && net.view.phase === "lobby") act({ type: "pick", char: i });
+        toast(`${r.name} is in your collection! Racing with them is coming soon.`);
         renderShop();
       }
     });
@@ -513,7 +539,18 @@ function renderShop() {
       ? MEDALS.filter((k) => spend[k]).map((k) => medalText(k, spend[k])).join(" + ")
       : "";
     const note = el("small", { class: "pays", text: owned ? "" : paysWith && paysWith !== medalText(r.price.medal, r.price.count) ? `Pays with ${paysWith}` : "" });
-    grid.append(el("div", { class: `skin${owned ? " owned" : ""}` }, el("img", { class: "pic", src: portrait(i), alt: "" }), el("b", { text: r.name, style: `color:${r.color}` }), price, note, btn));
+    grid.append(
+      el(
+        "div",
+        { class: `skin${owned ? " owned" : ""}` },
+        el("span", { class: "soon", text: "Coming soon" }),
+        el("img", { class: "pic", src: `/assets/sc_${r.id}.webp`, alt: "" }),
+        el("b", { text: r.name, style: `color:${r.color}` }),
+        price,
+        note,
+        btn,
+      ),
+    );
   });
   renderWallet();
 }
@@ -1222,6 +1259,49 @@ const world = (() => {
     return root;
   }
 
+  /** Boost pad: flat on the track, its long side (the arrows) running down the lane. */
+  const PAD_TURN = Math.PI / 2; // which way the model's arrows point once laid along the lane
+  function fitPad(root) {
+    const holder = fitProp(root, { width: 2.4, maxHeight: 0.14 });
+    holder.rotation.y = PAD_TURN;
+    const g = new THREE.Group();
+    g.add(holder);
+    return g;
+  }
+
+  function ballStandIn() {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.38, 20, 14), new THREE.MeshPhongMaterial({ color: "#6b2fd6", shininess: 90 }));
+    m.position.y = 0.38;
+    const g = new THREE.Group();
+    g.add(m);
+    return g;
+  }
+
+  // bowling balls: computed from when and where they were rolled
+  const ballMeshes = new Map();
+  function syncBowls(list, nowMs) {
+    const live = new Set();
+    for (const b of list) {
+      const age = (nowMs - b.at) / 1000;
+      const d = b.d - BOWL_SPEED * age;
+      if (age < 0 || b.d - d > BOWL_RANGE_M) continue;
+      live.add(b.id);
+      let m = ballMeshes.get(b.id);
+      if (!m) {
+        m = assets.props.bowlingBall.clone();
+        raceGroup.add(m);
+        ballMeshes.set(b.id, m);
+      }
+      m.position.set(laneX(b.lane), 0, -d);
+      m.rotation.x = (BOWL_SPEED * age) / 0.38; // rolling toward the runners behind
+    }
+    for (const [id, m] of ballMeshes) {
+      if (live.has(id)) continue;
+      raceGroup.remove(m);
+      ballMeshes.delete(id);
+    }
+  }
+
   function bananaStandIn() {
     const m = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.1, 8, 16, Math.PI), new THREE.MeshLambertMaterial({ color: "#ffd21f" }));
     m.rotation.x = -Math.PI / 2;
@@ -1406,6 +1486,8 @@ const world = (() => {
       // nice-to-haves: the game still runs with stand-ins if one of these fails
       loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
       // gates are wide enough that their pillars stand outside the fences
+      loadGLB("/assets/boost_pad.glb").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
+      loadGLB("/assets/bowling_ball.glb").then((g) => (assets.props.bowlingBall = fitProp(g.scene, { width: 0.75 }))).catch(() => (assets.props.bowlingBall = ballStandIn())),
       loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8.5 }))).catch(() => {}),
       loadGLB("/assets/gate_start.glb").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8 }))).catch(() => {}),
       loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
@@ -1686,12 +1768,19 @@ const world = (() => {
       cullables.push({ obj: holder, z: b.z, box: boxes[boxes.length - 1] });
     }
     for (const b of course.boosts) {
-      const pad = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.5, 2.6),
-        new THREE.MeshBasicMaterial({ map: padTex, transparent: true, opacity: 0.95 }),
-      );
-      pad.rotation.x = -Math.PI / 2;
-      pad.position.set(laneX(b.lane), 0.075, -b.z);
+      let pad;
+      if (assets.props.boostPad) {
+        // Higgsfield 3D pad, arrows pointing down the track
+        pad = assets.props.boostPad.clone();
+        pad.position.set(laneX(b.lane), 0.02, -b.z);
+      } else {
+        pad = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.5, 2.6),
+          new THREE.MeshBasicMaterial({ map: padTex, transparent: true, opacity: 0.95 }),
+        );
+        pad.rotation.x = -Math.PI / 2;
+        pad.position.set(laneX(b.lane), 0.075, -b.z);
+      }
       raceGroup.add(pad);
       cullables.push({ obj: pad, z: b.z });
     }
@@ -1727,6 +1816,7 @@ const world = (() => {
 
   function clearCourse() {
     bananaMeshes.clear();
+    ballMeshes.clear();
     for (const c of raceGroup.children.slice()) raceGroup.remove(c);
     cullables = cullables.filter((c) => c.keep);
     rollers = [];
@@ -1814,6 +1904,7 @@ const world = (() => {
     tick,
     setEndless,
     syncBananas,
+    syncBowls,
     animateCourse,
     get rollers() {
       return rollers;
@@ -1852,6 +1943,7 @@ const me = {
   invulnT: 0,
   boostT: 0,
   item: "", // power-up you're holding, waiting to be used
+  frozenT: 0, // slowed by someone's freeze
   power: "", // active timed power: shield | rocket | ghost
   powerT: 0,
   speed: 0,
@@ -1917,6 +2009,7 @@ function enterRace(v) {
   game.soloStarting = false;
   game.lookBack = false;
   slipped.clear();
+  bowled.clear();
   game.kind = v.kind || "sprint";
   game.len = isSurvival() ? SURVIVAL_LEN : TRACK_LEN;
   world.hideShowcase();
@@ -1936,7 +2029,9 @@ function enterRace(v) {
     stumbleT: 0,
     invulnT: 0,
     boostT: 0,
-    item: "",
+    // everyone starts each race holding a random power-up
+    item: mine?.outAt != null || mine?.finish != null ? "" : startingItem(v),
+    frozenT: 0,
     power: "",
     powerT: 0,
     speed: 0,
@@ -2025,7 +2120,7 @@ function input(kind) {
   } else if (kind === "jump") {
     if (me.power === "rocket") return;
     if (me.y <= 0.001 && me.stumbleT <= 0) {
-      me.vy = JUMP_V;
+      me.vy = JUMP_V * (me.power === "spring" ? SPRING_JUMP : 1);
       me.y = 0.001;
       me.slideT = 0;
       sfx.jump();
@@ -2057,7 +2152,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "ArrowUp" || k === "w" || k === "W" || k === " ") input("jump");
   else if (k === "ArrowDown" || k === "s" || k === "S") input("slide");
   else if (k === "e" || k === "E" || k === "Enter" || k === "Shift") useItem();
-  else if (k >= "1" && k <= "4") useItem(me.item === "banana" ? Number(k) - 1 : me.lane);
+  else if (k >= "1" && k <= "4") useItem(me.item === "banana" || me.item === "bowling" ? Number(k) - 1 : me.lane);
   else if (k === "c" || k === "C" || k === "b" || k === "B") game.lookBack = canControl() || game.mode === "race";
   else return;
   e.preventDefault();
@@ -2148,6 +2243,7 @@ function stepMe(dt) {
   me.stumbleT = Math.max(0, me.stumbleT - dt);
   me.invulnT = Math.max(0, me.invulnT - dt);
   me.boostT = Math.max(0, me.boostT - dt);
+  me.frozenT = Math.max(0, me.frozenT - dt);
   if (me.power) {
     me.powerT = Math.max(0, me.powerT - dt);
     if (me.powerT <= 0) endPower();
@@ -2159,14 +2255,16 @@ function stepMe(dt) {
   }
 
   // speed
-  const base = isSurvival() ? survivalSpeed((serverNow() - v.startAt) / 1000) : BASE_SPEED;
+  let base = isSurvival() ? survivalSpeed((serverNow() - v.startAt) / 1000) : BASE_SPEED;
+  if (me.frozenT > 0) base *= 0.55;
   const fast = isSurvival() ? base + SURVIVAL_BOOST : BOOST_SPEED;
-  let target = me.boostT > 0 || me.power === "rocket" ? fast : base;
+  const rocket = isSurvival() ? base + SURVIVAL_ROCKET : ROCKET_SPEED;
+  let target = me.power === "rocket" ? rocket : me.boostT > 0 ? fast : base;
   // sliding along the grass while falling, then stopped while getting up
   if (me.stumbleT > 0) target = me.stumbleT > GETUP_S ? 3 : 0;
   if (me.finished) target = me.d > TRACK_LEN + 14 ? 0 : 6;
   if (me.out) target = 0;
-  const accel = me.stumbleT > 0 ? 30 : 14;
+  const accel = me.stumbleT > 0 ? 30 : me.power === "rocket" ? 40 : 14;
   me.speed += clamp(target - me.speed, -accel * dt, accel * dt);
   const prevD = me.d;
   me.d += me.speed * dt;
@@ -2192,7 +2290,7 @@ function stepMe(dt) {
       const half = kind === "crate" ? 0.58 : 0.62;
       if (Math.abs(me.x - lane) > half) continue;
       const clear =
-        (kind === "hurdle" && me.y > 0.62) || (kind === "gate" && me.slideT > 0);
+        (kind === "hurdle" && me.y > 0.62) || (kind === "gate" && me.slideT > 0) || (kind === "crate" && me.y > 2.7);
       if (!clear) hit(kind);
     }
   }
@@ -2211,6 +2309,17 @@ function stepMe(dt) {
     if (me.item || me.power) continue; // one power-up at a time: the box stays for someone else
     b.taken = true;
     grabBox();
+  }
+  // bowling balls rolling back down the track (not your own)
+  const sn = serverNow();
+  for (const b of net.view?.bowls || []) {
+    if (b.by === playerId || bowled.has(b.id) || untouchable) continue;
+    const age = (sn - b.at) / 1000;
+    const bd = b.d - BOWL_SPEED * age;
+    if (age < 0 || b.d - bd > BOWL_RANGE_M) continue;
+    if (Math.abs(bd - me.d) > 0.9 || Math.abs(me.x - b.lane) > 0.6 || me.y > 0.8) continue;
+    bowled.add(b.id);
+    hit("bowling");
   }
   // bananas on the track (yours too!)
   for (const b of net.view?.bananas || []) {
@@ -2265,11 +2374,13 @@ function hit(kind) {
     roller: "Jump the barrel! ↑",
     zap: "ZAPPED! ⚡",
     banana: "Slipped on a banana! 🍌",
+    bowling: "STRIKE! 🎳",
   }[kind] || "Ouch!";
   banner(hintText, 900);
 }
 
 const slipped = new Set(); // banana ids you've already run onto
+const bowled = new Set(); // bowling balls that already got you
 
 // ── survival hearts ──
 
@@ -2329,6 +2440,9 @@ function rollPower() {
     rocket: 1 + back * 3,
     lightning: racers > 1 && place > 1 ? 0.5 + back * 3 : 0,
     banana: racers > 1 ? 2 : 1, // it stays on the track until someone slips on it (alone: mind your own!)
+    bowling: racers > 1 && place < racers ? 1 + (1 - back) * 2 : 0, // only useful with someone behind you
+    freeze: racers > 1 ? 1 + back * 2 : 0,
+    spring: 1.5,
   };
   let total = 0;
   for (const k of POWERS) total += weights[k];
@@ -2344,7 +2458,7 @@ function rollPower() {
 function grabBox(kind = rollPower()) {
   sfx.pickup();
   me.item = kind;
-  showPowerToast(kind, TOUCH ? "Tap the power-up to use it" : kind === "banana" ? "1-4 picks the lane · E throws into yours" : "Press E to use it");
+  showPowerToast(kind, TOUCH ? "Tap the power-up to use it" : kind === "banana" || kind === "bowling" ? "1-4 picks the lane · E uses yours" : "Press E to use it");
   renderPower();
 }
 
@@ -2359,12 +2473,26 @@ function useItem(lane = me.lane) {
     renderPower();
     return;
   }
+  if (kind === "bowling") {
+    act({ type: "bowl", lane, d: Math.round(me.d * 10) / 10 });
+    sfx.roll();
+    banner("🎳 BOWLED!", 800);
+    renderPower();
+    return;
+  }
   activatePower(kind);
 }
 
 function activatePower(kind) {
+  if (kind === "freeze") {
+    act({ type: "zap", kind: "freeze" });
+    sfx.zap();
+    banner("❄️ FREEZE! ❄️", 900);
+    renderPower();
+    return;
+  }
   if (kind === "lightning") {
-    act({ type: "zap" });
+    act({ type: "zap", kind: "lightning" });
     sfx.zap();
     flash();
     banner("⚡ ZAP! ⚡", 900);
@@ -2398,6 +2526,19 @@ function checkZaps() {
     if (z.id <= me.lastZap) continue;
     me.lastZap = z.id;
     if (z.by === playerId) continue;
+    if (z.kind === "freeze") {
+      if (me.finished || me.out) continue;
+      if (me.power === "shield") {
+        endPower();
+        sfx.pop();
+        banner("SHIELD BLOCKED THE FREEZE", 900);
+        continue;
+      }
+      me.frozenT = FREEZE_S;
+      frost();
+      banner("❄️ FROZEN! ❄️", 1000);
+      continue;
+    }
     flash();
     sfx.zap();
     if (me.finished || me.out || me.d <= z.d) continue;
@@ -2406,6 +2547,20 @@ function checkZaps() {
     me.invulnT = 0; // lightning gets through the after-hit blink
     hit("zap");
   }
+}
+
+function frost() {
+  const f = $("#frostFx");
+  f.classList.remove("on");
+  void f.offsetWidth;
+  f.classList.add("on");
+}
+
+/** The power-up everyone starts with: anything that's useful right now. */
+function startingItem(v) {
+  const racers = v.players.filter((p) => !p.left).length;
+  const pool = racers > 1 ? ["shield", "rocket", "ghost", "banana", "bowling", "freeze", "spring", "lightning"] : ["shield", "rocket", "ghost", "spring", "banana"];
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function flash() {
@@ -2429,7 +2584,9 @@ function showPowerToast(kind, how = "") {
 function renderPower() {
   const slot = $("#powerSlot");
   const kind = me.item || me.power;
-  $("#throwLanes").classList.toggle("show", me.item === "banana");
+  const aims = me.item === "banana" || me.item === "bowling";
+  $("#throwLanes").classList.toggle("show", aims);
+  $("#throwLanes > span").textContent = me.item === "bowling" ? "Roll 🎳 back down lane" : "Throw 🍌 into lane";
   slot.classList.toggle("held", Boolean(me.item));
   if (!kind) {
     slot.classList.remove("show");
@@ -2438,7 +2595,7 @@ function renderPower() {
   slot.classList.add("show");
   slot.querySelector("img").src = `/assets/pw_${kind}.png`;
   slot.querySelector("b").textContent = POWER_INFO[kind].label;
-  slot.querySelector(".use").textContent = me.item ? (TOUCH ? "Tap to use" : kind === "banana" ? "E / 1-4 to throw" : "E to use") : "";
+  slot.querySelector(".use").textContent = me.item ? (TOUCH ? "Tap to use" : aims ? "E / 1-4 to throw" : "E to use") : "";
   if (me.item) slot.querySelector(".bar i").style.width = "100%";
 }
 $("#powerSlot").addEventListener("click", () => useItem());
@@ -2596,6 +2753,14 @@ function frame(now) {
     camera.lookAt(camLook);
     world.cull(back ? fd - 30 : fd);
     world.syncBananas(net.view?.bananas || [], slipped);
+    world.syncBowls(net.view?.bowls || [], serverNow());
+    // feel the speed: wider view and speed lines on a rocket or boost
+    const zoom = me.power === "rocket" ? 80 : me.boostT > 0 ? 70 : 62;
+    if (Math.abs(camera.fov - zoom) > 0.1) {
+      camera.fov += (zoom - camera.fov) * Math.min(1, dt * 5);
+      camera.updateProjectionMatrix();
+    }
+    $("#speedFx").classList.toggle("on", game.mode === "race" && (me.power === "rocket" || me.boostT > 0));
     updateHud();
   } else {
     // menus: slow fly-over of the meadow with your runner idling

@@ -90,7 +90,7 @@ describe("race", () => {
   it("caps distance to what is physically possible and never goes backwards", () => {
     let s = racing();
     s = act(s, "p0", pos(500, s.startAt + 1000));
-    expect(s.players.p0.d).toBeLessThan(30);
+    expect(s.players.p0.d).toBeLessThan(40);
     s = act(s, "p0", pos(5, s.startAt + 1500));
     expect(s.players.p0.d).toBeGreaterThan(5);
   });
@@ -209,7 +209,7 @@ describe("obstacles and power-ups", () => {
     s = act(s, "p1", { type: "pos", d: 40, lane: 1, y: 0, act: "run", t: s.startAt + 5000 });
     s = act(s, "p1", { type: "zap", t: s.startAt + 5100 });
     const view = L.viewFor(s, "p0") as any;
-    expect(view.zaps).toEqual([{ id: 1, by: "p1", d: 40, at: s.startAt + 5100 }]);
+    expect(view.zaps).toEqual([{ id: 1, by: "p1", d: 40, at: s.startAt + 5100, kind: "lightning" }]);
     expect(reject(s, "p1", { type: "zap", t: s.startAt + 6000 })).toMatch(/soon/);
     s = act(s, "p1", { type: "zap", t: s.startAt + 5100 + L.ZAP_COOLDOWN_MS });
     expect(s.zaps.map((z: any) => z.id)).toEqual([1, 2]);
@@ -397,5 +397,28 @@ describe("bananas", () => {
     s = act(s, "p0", { type: "pos", d: 50, lane: 1, y: 0, act: "run", t: s.startAt + 5000 });
     expect(reject(s, "p0", { type: "banana", lane: 1, d: 400, t: s.startAt + 5100 })).toBeTruthy();
     expect(reject(s, "p0", { type: "banana", lane: 9, d: 70, t: s.startAt + 5100 })).toBeTruthy();
+  });
+});
+
+describe("bowling and freeze", () => {
+  function racing(n = 2): S {
+    let s = act(lobbyOf(n), "p0", { type: "start", t: T0 });
+    return L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+  }
+
+  it("rolls a bowling ball back from where you are", () => {
+    let s = racing();
+    s = act(s, "p0", { type: "pos", d: 120, lane: 2, y: 0, act: "run", t: s.startAt + 9000 });
+    s = act(s, "p0", { type: "bowl", lane: 0, d: 120, t: s.startAt + 9100 });
+    expect((L.viewFor(s, "p1") as any).bowls).toEqual([{ id: 1, by: "p0", lane: 0, d: 120, at: s.startAt + 9100 }]);
+    expect(reject(s, "p0", { type: "bowl", lane: 0, d: 120, t: s.startAt + 9300 })).toMatch(/soon/);
+    expect(reject(s, "p1", { type: "bowl", lane: 1, d: 500, t: s.startAt + 9300 })).toBeTruthy();
+  });
+
+  it("relays freeze as its own kind of zap", () => {
+    let s = racing();
+    s = act(s, "p1", { type: "zap", kind: "freeze", t: s.startAt + 4000 });
+    expect(s.zaps[0].kind).toBe("freeze");
+    expect(reject(s, "p0", { type: "zap", kind: "nuke", t: s.startAt + 4000 })).toBeTruthy();
   });
 });

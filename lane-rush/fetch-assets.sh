@@ -6,8 +6,8 @@ cd "$(dirname "$0")/app/public"
 SITE="https://lane-rush-party.higgsfield.app"
 THREE="https://cdn.jsdelivr.net/npm/three@0.160.0"
 mkdir -p assets vendor/jsm/loaders vendor/jsm/utils
-for f in c0.glb c1b.glb c2.glb c3.glb hurdle2.glb hay.glb barrel.glb banana.glb gate_start.glb gate_finish.glb gate2.glb arch.glb crates.glb cow.glb tires.glb box.glb ground.glb tree_oak.glb tree_pine.glb tree_blossom.glb bush.glb rocks.glb fence.glb cloud.glb c4.glb c5.glb c6.glb c7.glb \
-         grass.jpg sky_pano.jpg cover.jpg icon.png pp0.webp pp1.webp pp2.webp pp3.webp pp4.webp pp5.webp pp6.webp pp7.webp medal_gold.png medal_silver.png medal_bronze.png pw_shield.png pw_rocket.png pw_ghost.png pw_lightning.png pw_banana.png; do
+for f in c0.glb c1b.glb c2.glb c3.glb hurdle2.glb hay.glb barrel.glb banana.glb bowling_ball.glb boost_pad.glb gate_start.glb gate_finish.glb gate2.glb arch.glb crates.glb cow.glb tires.glb box.glb ground.glb tree_oak.glb tree_pine.glb tree_blossom.glb bush.glb rocks.glb fence.glb cloud.glb c4.glb c5.glb c6.glb c7.glb \
+         grass.jpg sky_pano.jpg cover.jpg icon.png pp0.webp pp1.webp pp2.webp pp3.webp pp4.webp pp5.webp pp6.webp pp7.webp medal_gold.png medal_silver.png medal_bronze.png pw_shield.png pw_rocket.png pw_ghost.png pw_lightning.png pw_banana.png pw_bowling.png pw_freeze.png pw_spring.png sc_luna.webp sc_toto.webp sc_blaze.webp sc_zara.webp sc_jax.webp sc_leo.webp sc_kai.webp sc_momo.webp sc_zed.webp sc_aria.webp; do
   echo "assets/$f"
   curl -fsSL -o "assets/$f" "$SITE/assets/$f"
 done

@@ -409,7 +409,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 
 /* shop */
 .shop-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-.shop-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.shop-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .skin { border: 1px solid #2c3626; border-bottom: 3px solid var(--lime); background: #0e120e; padding: 10px 8px; display: grid; gap: 6px; justify-items: center; text-align: center; clip-path: polygon(0 0, 100% 0, 100% 92%, 92% 100%, 0 100%); }
 .skin img.pic { width: 100%; max-width: 150px; aspect-ratio: 1; object-fit: contain; }
 .skin b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 24px; text-transform: uppercase; }
@@ -532,3 +532,19 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .look-btn, .throw-lanes button { pointer-events: auto; }
 .solo-picker { grid-template-columns: repeat(4, minmax(0, 1fr)); overflow-y: auto; min-height: 0; }
 @media (max-width: 480px) { .solo-picker { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; } }
+.skin { position: relative; }
+.skin .soon { position: absolute; top: 8px; left: 8px; z-index: 2; background: var(--lime); color: var(--lime-ink); font-family: var(--display); font-style: italic; font-weight: 900; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; transform: skewX(-10deg); }
+
+/* freeze + speed effects */
+.frost-fx { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(160, 220, 255, 0) 45%, rgba(170, 225, 255, 0.55) 80%, rgba(220, 245, 255, 0.85) 100%); box-shadow: inset 0 0 80px rgba(190, 235, 255, 0.8); }
+.frost-fx.on { animation: frost 3s ease-out; }
+@keyframes frost { 0% { opacity: 0; } 10% { opacity: 1; } 75% { opacity: 0.9; } 100% { opacity: 0; } }
+.speed-fx { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 250ms; background: repeating-conic-gradient(from 0deg at 50% 45%, rgba(255, 255, 255, 0) 0deg 4deg, rgba(255, 255, 255, 0.22) 4deg 4.6deg); -webkit-mask-image: radial-gradient(ellipse at 50% 45%, transparent 38%, #000 75%); mask-image: radial-gradient(ellipse at 50% 45%, transparent 38%, #000 75%); }
+.speed-fx.on { opacity: 1; animation: speedlines 0.25s linear infinite; }
+@keyframes speedlines { 50% { transform: scale(1.04); } }
+@media (prefers-reduced-motion: reduce) { .speed-fx.on { animation: none; } .frost-fx.on { animation-duration: 0.01s; } }
+/* look back: easy to find on desktop too */
+.look-btn { padding: 10px 16px; font-size: 32px; border: 2px solid var(--lime); }
+.look-btn small { font-size: 13px; color: var(--lime); }
+.look-btn kbd { font-family: var(--display); font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+@media (pointer: coarse) { .look-btn kbd { display: none; } }
