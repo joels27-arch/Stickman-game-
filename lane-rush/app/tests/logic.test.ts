@@ -422,3 +422,14 @@ describe("bowling and freeze", () => {
     expect(reject(s, "p0", { type: "zap", kind: "nuke", t: s.startAt + 4000 })).toBeTruthy();
   });
 });
+
+describe("keeping screens in sync", () => {
+  it("tells everyone when a position was true and how fast that runner was going", () => {
+    let s = act(lobbyOf(2), "p0", { type: "start", t: T0 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    s = act(s, "p1", { type: "pos", d: 36, lane: 1, y: 0, act: "run", v: 12, t: s.startAt + 3000 });
+    const p1 = (L.viewFor(s, "p0") as any).players.find((p: any) => p.id === "p1");
+    expect(p1).toMatchObject({ d: 36, v: 12, at: s.startAt + 3000 });
+    expect(reject(s, "p1", { type: "pos", d: 37, lane: 1, y: 0, act: "run", v: 900 })).toMatch(/speed/);
+  });
+});

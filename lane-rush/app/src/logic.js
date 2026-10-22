@@ -507,6 +507,7 @@ export function validateAction(state, playerId, action) {
       if (!ACTS.includes(action.act)) return { ok: false, error: "bad act" };
       if (action.hits !== undefined && !intIn(action.hits, 0, 999)) return { ok: false, error: "bad hits" };
       if (action.pw !== undefined && !POWER_STATES.includes(action.pw)) return { ok: false, error: "bad power" };
+      if (action.v !== undefined && !(num(action.v) && action.v >= 0 && action.v <= 60)) return { ok: false, error: "bad speed" };
       return { ok: true };
     }
     case "zap": {
@@ -633,6 +634,10 @@ export function applyAction(state0, playerId, action) {
       me.act = action.act;
       if (action.hits !== undefined) me.hits = action.hits;
       if (action.pw !== undefined) me.pw = action.pw;
+      // when this position was true, and how fast they were going: lets every
+      // screen place this runner where they are *now*, not where they were
+      me.v = action.v ?? 0;
+      me.at = t;
       if (survival) {
         if (me.hits >= LIVES) {
           me.outAt = t;
@@ -798,6 +803,8 @@ export function viewFor(state, playerId) {
         y: Math.round(p.y * 100) / 100,
         act: p.act,
         pw: p.pw || "",
+        v: Math.round((p.v ?? 0) * 100) / 100,
+        at: p.at ?? 0,
         finish: p.finish,
         hits: p.hits,
         outAt: p.outAt ?? null,

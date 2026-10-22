@@ -2636,6 +2636,7 @@ function sendPos(force = false) {
     act: a,
     hits: me.hits,
     pw: me.power,
+    v: Math.round(me.speed * 100) / 100,
   });
 }
 
@@ -2713,9 +2714,15 @@ function frame(now) {
     for (const r of remote.map.values()) {
       if (!r.runner) continue;
       const p = r.p;
-      const age = (performance.now() - r.lastAt) / 1000;
-      const target = Math.min(game.len, p.act === "out" ? r.lastD : r.lastD + r.vel * Math.min(age, 0.5));
-      r.dispD += (target - r.dispD) * Math.min(1, dt * 8);
+      // Where they are right now: their last reported spot, moved on by their
+      // reported speed for the time since the server got it. Without this,
+      // everyone else trails a few metres behind on your screen (and you on theirs).
+      const ahead = p.at ? clamp((serverNow() - p.at) / 1000, 0, 0.6) : Math.min((performance.now() - r.lastAt) / 1000, 0.5);
+      const speed = p.at ? p.v ?? 0 : r.vel;
+      const target = Math.min(game.len, p.act === "out" ? p.d : p.d + speed * ahead);
+      // small differences are smoothed, big jumps (lag spikes) snap
+      const gap = target - r.dispD;
+      r.dispD = Math.abs(gap) > 6 ? target : r.dispD + gap * Math.min(1, dt * 14);
       r.dispX += (laneX(p.lane) - r.dispX) * Math.min(1, dt * 12);
       r.dispY += (p.y - r.dispY) * Math.min(1, dt * 18);
       r.runner.group.position.set(r.dispX, r.dispY, -r.dispD);
