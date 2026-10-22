@@ -289,10 +289,30 @@
           <div class="ribbon gold static"><h2>Shop</h2></div>
         </header>
         <div class="wallet shop-wallet" title="Your coins and medals"></div>
-        <p class="shop-note">Collect characters now · playable soon · all 8 runners are free</p>
+        <div class="gtabs shop-tabs" role="tablist">
+          <button id="tabChars" class="gtab on" type="button">Characters</button>
+          <button id="tabPacks" class="gtab" type="button">Packs <i class="newtag">New</i></button>
+        </div>
         <div id="shopGrid" class="shop-grid"></div>
+        <div id="packView" class="pack-view" hidden>
+          <div id="packRow" class="pack-row"></div>
+          <h3 class="album-title">Pack exclusives <small id="albumCount">0/5</small></h3>
+          <div id="packAlbum" class="pack-album"></div>
+          <p class="shop-note" id="packOdds"></p>
+        </div>
       </div>
     </section>
+
+    <!-- PACK OPENING -->
+    <div id="packOpen" class="pack-open" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="po-flash"></div>
+      <img id="poPack" class="po-pack" src="/assets/pack_brain.webp" alt="" />
+      <div id="poCard" class="po-card" hidden></div>
+      <p id="poHint" class="po-hint">Tap to open!</p>
+      <div id="poSummary" class="po-summary" hidden></div>
+      <button id="poDone" class="gbtn po-done" type="button" hidden>Collect</button>
+    </div>
 
     <div id="toast" class="toast"></div>
 

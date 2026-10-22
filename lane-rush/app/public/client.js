@@ -561,8 +561,18 @@ let shopReturn = "home";
 function openShop() {
   shopReturn = game.mode === "lobby" ? "lobby" : game.mode === "results" ? "results" : "home";
   renderShop();
+  shopTab(true);
   showScreen("shop");
 }
+function shopTab(chars) {
+  $("#tabChars").classList.toggle("on", chars);
+  $("#tabPacks").classList.toggle("on", !chars);
+  $("#shopGrid").hidden = !chars;
+  $("#packView").hidden = chars;
+  if (!chars) renderPacks();
+}
+$("#tabChars").addEventListener("click", () => shopTab(true));
+$("#tabPacks").addEventListener("click", () => shopTab(false));
 const RARITY = { bronze: "common", silver: "rare", gold: "epic" };
 function renderShop() {
   const grid = $("#shopGrid");
@@ -595,6 +605,188 @@ function renderShop() {
   );
   renderWallet();
 }
+
+// ── packs: open them for pack-only characters, medals and coins ──
+
+const PACK_CHARS = [
+  { id: "brainz", name: "Prof. Brainz", rarity: "legendary", dupe: 1500 },
+  { id: "frosty", name: "Frosty", rarity: "epic", dupe: 600 },
+  { id: "ra", name: "Pharaoh Ra", rarity: "epic", dupe: 600 },
+  { id: "fin", name: "Captain Fin", rarity: "rare", dupe: 300 },
+  { id: "mo", name: "Mecha Mo", rarity: "rare", dupe: 300 },
+];
+/** Chances per item slot. Normal slots, and the boosted last slot of a Mega Pack. */
+const PACK_ODDS = {
+  normal: { legendary: 0.005, epic: 0.03, rare: 0.08, gold: 0.02, silver: 0.06, bronze: 0.105 },
+  boosted: { legendary: 0.03, epic: 0.15, rare: 0.4, gold: 0.12, silver: 0.3, bronze: 0 },
+};
+const PACKS = [
+  { id: "brain", name: "Brain Pack", price: 600, slots: ["normal"], img: "/assets/pack_brain.webp", note: "1 item" },
+  { id: "mega", name: "Mega Pack", price: 1800, slots: ["normal", "normal", "boosted"], img: "/assets/pack_mega.webp", note: "3 items · last one boosted" },
+];
+const pct = (x) => `${Math.round(x * 1000) / 10}%`;
+function rollSlot(kind) {
+  const o = PACK_ODDS[kind];
+  let r = Math.random();
+  for (const rarity of ["legendary", "epic", "rare"]) {
+    if (r < o[rarity]) {
+      const pool = PACK_CHARS.filter((c) => c.rarity === rarity);
+      return { kind: "char", char: pool[Math.floor(Math.random() * pool.length)] };
+    }
+    r -= o[rarity];
+  }
+  for (const medal of ["gold", "silver", "bronze"]) {
+    if (r < o[medal]) return { kind: "medal", medal };
+    r -= o[medal];
+  }
+  return { kind: "coins", n: kind === "boosted" ? 600 : 150 + 25 * Math.floor(Math.random() * 13) };
+}
+function freePackLeft() {
+  return !local.getItem("lr:freePack");
+}
+/** Pay, roll and credit everything right away (so closing the animation can't lose items). */
+function buyPack(pack) {
+  const free = pack.id === "brain" && freePackLeft();
+  if (!free && wallet.coins() < pack.price) return null;
+  if (free) local.setItem("lr:freePack", "1");
+  else wallet.addCoins(-pack.price);
+  const items = pack.slots.map(rollSlot);
+  for (const it of items) {
+    if (it.kind === "char") {
+      if (wallet.has(it.char.id)) {
+        it.dupe = true;
+        wallet.addCoins(it.char.dupe);
+      } else local.setItem("lr:owned", JSON.stringify([...wallet.owned(), it.char.id]));
+    } else if (it.kind === "medal") {
+      const m = wallet.medals();
+      m[it.medal] += 1;
+      wallet.save(m);
+    } else wallet.addCoins(it.n);
+  }
+  stats.add("packs", 1);
+  return items;
+}
+function renderPacks() {
+  $("#packRow").replaceChildren(
+    ...PACKS.map((pk) => {
+      const free = pk.id === "brain" && freePackLeft();
+      const btn = el("button", { class: "sbuy", type: "button" }, ...(free ? [el("span", { text: "Free!" })] : [el("i", { class: "coin" }), el("span", { text: pk.price.toLocaleString() })]));
+      btn.disabled = !free && wallet.coins() < pk.price;
+      btn.addEventListener("click", () => {
+        const items = buyPack(pk);
+        if (items) openPackAnim(pk, items);
+      });
+      return el(
+        "div",
+        { class: `pack-card ${pk.id}` },
+        free ? el("span", { class: "freetag", text: "1 free" }) : null,
+        el("img", { class: "pack-img", src: pk.img, alt: "" }),
+        el("b", { text: pk.name }),
+        el("small", { text: pk.note }),
+        btn,
+      );
+    }),
+  );
+  const owned = PACK_CHARS.filter((c) => wallet.has(c.id)).length;
+  $("#albumCount").textContent = `${owned}/${PACK_CHARS.length}`;
+  $("#packAlbum").replaceChildren(
+    ...PACK_CHARS.map((c) => el(
+      "div",
+      { class: `acard ${c.rarity}${wallet.has(c.id) ? " got" : ""}` },
+      el("span", { class: "rar", text: c.rarity }),
+      el("img", { src: `/assets/pk_${c.id}.webp`, alt: "" }),
+      el("b", { text: wallet.has(c.id) ? c.name : "???" }),
+    )),
+  );
+  const n = PACK_ODDS.normal;
+  $("#packOdds").textContent = `Odds per item: legendary ${pct(n.legendary)} · epic ${pct(n.epic)} · rare ${pct(n.rare)} · medal ${pct(n.gold + n.silver + n.bronze)} · coins ${pct(1 - Object.values(n).reduce((a, b) => a + b, 0))}. Mega Pack's last item: legendary 3% · epic 15% · rare 40%. Duplicates turn into coins. Pack characters are collectibles for now.`;
+  renderWallet();
+}
+
+// the opening: shake → tap → flash → one card at a time
+const packOpen = $("#packOpen");
+let po = null;
+function openPackAnim(pack, items) {
+  po = { pack, items, i: -1, stage: "sealed" };
+  $("#poPack").src = pack.img;
+  $("#poPack").hidden = false;
+  $("#poPack").className = "po-pack shake";
+  $("#poCard").hidden = true;
+  $("#poSummary").hidden = true;
+  $("#poDone").hidden = true;
+  $("#poHint").hidden = false;
+  $("#poHint").textContent = "Tap to open!";
+  packOpen.hidden = false;
+  sfx.unlock();
+}
+function itemCard(it) {
+  if (it.kind === "char") {
+    return el(
+      "div",
+      { class: `pcard ${it.char.rarity}` },
+      el("span", { class: "rar", text: it.char.rarity }),
+      el("i", { class: "pglow" }),
+      el("img", { src: `/assets/pk_${it.char.id}.webp`, alt: "" }),
+      el("b", { text: it.char.name }),
+      el("small", { text: it.dupe ? `Duplicate → +${it.char.dupe} coins` : "NEW character!" }),
+    );
+  }
+  if (it.kind === "medal") {
+    return el("div", { class: `pcard medal ${it.medal}` }, el("span", { class: "rar", text: "medal" }), el("i", { class: "pglow" }), el("img", { src: MEDAL_IMG[it.medal], alt: "" }), el("b", { text: `${it.medal} medal` }), el("small", { text: "+1" }));
+  }
+  return el("div", { class: "pcard coins" }, el("span", { class: "rar", text: "coins" }), el("i", { class: "pglow" }), el("img", { src: it.n >= 400 ? "/assets/ui_c3.webp" : it.n >= 250 ? "/assets/ui_c2.webp" : "/assets/ui_c1.webp", alt: "" }), el("b", { text: `+${it.n} coins` }), el("small", { text: "" }));
+}
+function packStep() {
+  if (!po) return;
+  if (po.stage === "sealed") {
+    po.stage = "cards";
+    $("#poPack").className = "po-pack burst";
+    packOpen.classList.remove("flash");
+    void packOpen.offsetWidth;
+    packOpen.classList.add("flash");
+    sfx.boost();
+    setTimeout(() => {
+      $("#poPack").hidden = true;
+      packStep();
+    }, 520);
+    return;
+  }
+  if (po.stage !== "cards" || po.busy) return;
+  po.i += 1;
+  if (po.i >= po.items.length) {
+    po.stage = "done";
+    $("#poCard").hidden = true;
+    $("#poHint").hidden = true;
+    $("#poSummary").replaceChildren(...po.items.map((it) => itemCard(it)));
+    $("#poSummary").hidden = false;
+    $("#poDone").hidden = false;
+    return;
+  }
+  const it = po.items[po.i];
+  const card = itemCard(it);
+  card.classList.add("flip");
+  $("#poCard").replaceChildren(card);
+  $("#poCard").hidden = false;
+  $("#poHint").textContent = po.i < po.items.length - 1 ? `Tap for the next one (${po.i + 1}/${po.items.length})` : "Tap to continue";
+  if (it.kind === "char" && !it.dupe) {
+    sfx.finish();
+    coinRain(card, it.char.rarity === "legendary" ? 30 : 14);
+  } else sfx.boost();
+  po.busy = true;
+  setTimeout(() => po && (po.busy = false), 450);
+}
+packOpen.addEventListener("click", (e) => {
+  if (e.target.closest("#poDone")) return;
+  packStep();
+});
+$("#poDone").addEventListener("click", () => {
+  packOpen.hidden = true;
+  po = null;
+  renderPacks();
+  renderShop();
+  shopTab(false);
+});
+
 for (const b of document.querySelectorAll(".shopBtn")) b.addEventListener("click", openShop);
 $("#shopBack").addEventListener("click", () => {
   showScreen(shopReturn);
@@ -3538,6 +3730,7 @@ const ACHIEVEMENTS = [
   { id: "bananas", stat: "bananas", text: (n) => `Throw ${n} bananas`, tiers: [10, 50, 200], coins: [100, 300, 1000], icon: "/assets/pw_banana.png" },
   { id: "boxes", stat: "boxes", text: (n) => `Grab ${n} mystery boxes`, tiers: [25, 100, 500], coins: [100, 300, 1000], icon: "/assets/ui_box.webp" },
   { id: "bestCombo", stat: "bestCombo", text: (n) => `Reach a ${n} combo`, tiers: [10, 20, 30], coins: [100, 400, 1500], icon: "/assets/ui_flame.webp" },
+  { id: "packs", stat: "packs", text: (n) => `Open ${n} pack${n > 1 ? "s" : ""}`, tiers: [1, 10, 50], coins: [100, 400, 1500], icon: "/assets/pack_brain.webp" },
   { id: "days", stat: "days", text: (n) => `Claim the daily reward ${n} times`, tiers: [3, 7, 30], coins: [100, 300, 1500], icon: "/assets/ui_chest.webp" },
 ];
 function achClaimed() {
