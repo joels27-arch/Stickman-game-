@@ -728,3 +728,4 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
   .dock-grid .btn.big { padding-top: 10px; padding-bottom: 10px; }
 }
 .home .roster { display: none; }
+@media (max-height: 820px) { .lu-card { display: none; } }
