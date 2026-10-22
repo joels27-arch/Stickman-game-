@@ -146,19 +146,36 @@ describe("course", () => {
   });
 });
 
-describe("coins and countries", () => {
-  it("pays gold, silver and bronze by finishing place", () => {
-    let s: S = act(lobbyOf(3), "p0", { type: "start", t: T0 });
+describe("medals and countries", () => {
+  const pos = (d: number, t: number) => ({ type: "pos", d, lane: 0, y: 0, act: "run", t });
+
+  it("gives gold, silver and bronze to the podium and nothing to 4th", () => {
+    let s: S = act(lobbyOf(4), "p0", { type: "start", t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
-    const pos = (d: number, t: number) => ({ type: "pos", d, lane: 0, y: 0, act: "run", t });
     s = act(s, "p2", pos(L.TRACK_LEN, s.startAt + 50_000));
     s = act(s, "p0", pos(L.TRACK_LEN, s.startAt + 51_000));
-    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt + 51_000 + L.AFTER_FIRST_MS });
+    s = act(s, "p3", pos(L.TRACK_LEN, s.startAt + 52_000));
+    s = act(s, "p1", pos(L.TRACK_LEN, s.startAt + 53_000));
     expect(s.phase).toBe("results");
     const r = (L.viewFor(s, "p0") as S).rewards;
-    expect(r.p2).toEqual({ place: 1, coin: "gold", coins: 50 });
-    expect(r.p0).toEqual({ place: 2, coin: "silver", coins: 30 });
-    expect(r.p1).toEqual({ place: 3, coin: "bronze", coins: 5 }); // did not finish
+    expect(r.p2).toEqual({ place: 1, medal: "gold" });
+    expect(r.p0).toEqual({ place: 2, medal: "silver" });
+    expect(r.p3).toEqual({ place: 3, medal: "bronze" });
+    expect(r.p1).toEqual({ place: 4, medal: null });
+  });
+
+  it("gives no medal for not finishing, or for racing alone", () => {
+    let s: S = act(lobbyOf(2), "p0", { type: "start", t: T0 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    s = act(s, "p1", pos(L.TRACK_LEN, s.startAt + 50_000));
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt + 50_000 + L.AFTER_FIRST_MS });
+    const r = (L.viewFor(s, "p0") as S).rewards;
+    expect(r.p1.medal).toBe("gold");
+    expect(r.p0).toEqual({ place: 2, medal: null });
+
+    let solo: S = act(lobbyOf(1), "p0", { type: "start", t: T0 });
+    solo = act(solo, "p0", pos(L.TRACK_LEN, solo.startAt + 50_000));
+    expect((L.viewFor(solo, "p0") as S).rewards.p0).toEqual({ place: 1, medal: null });
   });
 
   it("keeps a valid country and rejects made-up ones", () => {

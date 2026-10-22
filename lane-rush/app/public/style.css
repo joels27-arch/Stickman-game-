@@ -370,8 +370,11 @@ input:focus { border-color: var(--blue-dark); }
 
 /* wallet, shop, countries, results rewards */
 .topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
-.wallet { display: flex; align-items: center; gap: 6px; background: #fff3c4; border: 3px solid var(--ink); border-radius: 999px; padding: 3px 12px 3px 4px; font-family: var(--display); font-size: 20px; }
-.wallet img { width: 28px; height: 28px; }
+.wallet { display: flex; align-items: center; gap: 8px; background: #fff3c4; border: 3px solid var(--ink); border-radius: 999px; padding: 3px 12px 3px 6px; font-family: var(--display); font-size: 19px; }
+.wallet .chip { display: flex; align-items: center; gap: 2px; }
+.wallet img { width: 26px; height: 26px; object-fit: contain; }
+.skin .pays { font-size: 12px; font-weight: 800; color: var(--muted); min-height: 1.2em; }
+.res-reward .nomedal { font-family: var(--body); font-weight: 800; font-size: 15px; color: #6b7280; }
 .btn.gold { background: linear-gradient(#ffe27a, #f0a500); }
 .countrySel { font: 800 16px var(--body); color: var(--ink); padding: 8px 10px; border: 4px solid var(--ink); border-radius: 14px; background: #fff; max-width: 100%; min-width: 0; }
 .field .countrySel { width: 100%; font-size: 18px; }
@@ -400,5 +403,5 @@ input:focus { border-color: var(--blue-dark); }
 .podium .pl { font-size: 22px; border-radius: 12px; color: #fff; -webkit-text-stroke: 1px var(--ink); padding: 2px 0; }
 .podium .pl.p1 { background: #f5b921; } .podium .pl.p2 { background: #a9b6c7; } .podium .pl.p3 { background: #d67b45; } .podium .pl.p4 { background: #8a94a8; }
 .podium .earn { display: flex; align-items: center; gap: 3px; font-family: var(--display); font-size: 17px; color: var(--go-dark); }
-.podium .earn img { width: 22px; height: 22px; }
+.podium .earn img { width: 34px; height: 34px; object-fit: contain; }
 @media (max-width: 420px) { .podium li { grid-template-columns: 44px 44px 1fr auto; } .podium .tm { display: none; } .podium img { width: 44px; height: 44px; } }

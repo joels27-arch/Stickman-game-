@@ -48,17 +48,14 @@ export const COUNTRIES = [
 const COUNTRY_CODES = new Set(COUNTRIES.map(([c]) => c));
 
 /**
- * Coins for a finishing place: 1st a gold coin, 2nd silver, 3rd and 4th
- * bronze. Runners who didn't finish still get a little something; runners
- * who left get nothing.
+ * Medals for the podium: 1st gold, 2nd silver, 3rd bronze. 4th place, runners
+ * who didn't finish and runners who left get nothing. Medals are only handed
+ * out when at least two people raced, so solo practice can't farm them.
+ * `worth` is what a medal counts for when paying in the shop.
  */
-export const REWARDS = [
-  { coin: "gold", coins: 50 },
-  { coin: "silver", coins: 30 },
-  { coin: "bronze", coins: 20 },
-  { coin: "bronze", coins: 10 },
-];
-export const DNF_REWARD = { coin: "bronze", coins: 5 };
+export const MEDALS = ["gold", "silver", "bronze"];
+export const MEDAL_WORTH = { gold: 10, silver: 5, bronze: 3 };
+export const MIN_RACERS_FOR_MEDALS = 2;
 
 /** Fastest anyone can legitimately be, plus slack for network jitter. */
 const SPEED_CAP = BOOST_SPEED + 1.5;
@@ -408,15 +405,16 @@ export function isGameOver() {
   return { over: false };
 }
 
-/** Coins each runner earned this race, keyed by player id (results only). */
+/** Place and medal (or null) for each runner in this race, keyed by player id. */
 export function rewards(state) {
   if (state.phase !== "results") return {};
+  const order = standings(state);
+  const paying = order.length >= MIN_RACERS_FOR_MEDALS;
   const out = {};
-  standings(state).forEach((id, i) => {
+  order.forEach((id, i) => {
     const p = state.players[id];
-    if (p.left) return;
-    const r = p.finish !== null ? REWARDS[i] ?? DNF_REWARD : DNF_REWARD;
-    out[id] = { place: i + 1, coin: r.coin, coins: r.coins };
+    const medal = paying && !p.left && p.finish !== null ? MEDALS[i] ?? null : null;
+    out[id] = { place: i + 1, medal };
   });
   return out;
 }

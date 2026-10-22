@@ -22,6 +22,9 @@ import {
   BOOST_SPEED,
   LANES,
   COUNTRIES,
+  MEDALS,
+  MEDAL_WORTH,
+  MIN_RACERS_FOR_MEDALS,
 } from "/logic.js";
 
 // ── constants ───────────────────────────────────────────────────────────────
@@ -32,13 +35,14 @@ const RUNNERS = [
   { name: "Ivy", color: "#2fbf55", file: "c2" },
   { name: "Gizmo", color: "#f5b921", file: "c3" },
   // shop skins
-  { name: "Pip", color: "#e0703a", file: "c4", price: 100 },
-  { name: "Kiko", color: "#7c4dff", file: "c5", price: 150 },
-  { name: "Dino", color: "#14b8a6", file: "c6", price: 200 },
-  { name: "Nova", color: "#8fa3bf", file: "c7", price: 300 },
+  { name: "Pip", color: "#e0703a", file: "c4", price: { medal: "bronze", count: 6 } },
+  { name: "Kiko", color: "#7c4dff", file: "c5", price: { medal: "silver", count: 4 } },
+  { name: "Dino", color: "#14b8a6", file: "c6", price: { medal: "gold", count: 3 } },
+  { name: "Nova", color: "#8fa3bf", file: "c7", price: { medal: "gold", count: 6 } },
 ];
 const STARTERS = 4;
-const COIN_IMG = { gold: "/assets/coin_gold.png", silver: "/assets/coin_silver.png", bronze: "/assets/coin_bronze.png" };
+const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
+const medalText = (medal, n) => `${n} ${medal} medal${n === 1 ? "" : "s"}`;
 const flagOf = (code) => (code && code.length === 2 ? String.fromCodePoint(...[...code].map((c) => 127397 + c.charCodeAt(0))) : "");
 const withFlag = (name, code) => (code ? `${flagOf(code)} ${name}` : name);
 const LANE_W = 2.0; // metres between lane centres
@@ -77,11 +81,18 @@ function store(kind) {
 const local = store("localStorage");
 const session = store("sessionStorage");
 
-// ── wallet: coins and owned skins live on this device ──────────────────────
+// ── wallet: medals and owned skins live on this device ─────────────────────
 const wallet = {
-  coins() {
-    const n = Number(local.getItem("lr:coins"));
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  medals() {
+    let m = {};
+    try { m = JSON.parse(local.getItem("lr:medals") || "{}") || {}; } catch { /* fresh wallet */ }
+    const out = {};
+    for (const k of MEDALS) out[k] = Number.isInteger(m[k]) && m[k] > 0 ? m[k] : 0;
+    return out;
+  },
+  save(m) {
+    local.setItem("lr:medals", JSON.stringify(m));
+    renderWallet();
   },
   owned() {
     try {
@@ -94,32 +105,66 @@ const wallet = {
   owns(i) {
     return i < STARTERS || this.owned().includes(i);
   },
-  add(n) {
-    local.setItem("lr:coins", String(this.coins() + n));
-    renderWallet();
+  /**
+   * How a price would be paid: medals of the asked type first; anything still
+   * missing is covered by higher medals at their worth (gold 10, silver 5,
+   * bronze 3), using the smallest ones first. null when you can't afford it.
+   */
+  plan(price) {
+    const have = this.medals();
+    const spend = { gold: 0, silver: 0, bronze: 0 };
+    const own = Math.min(have[price.medal], price.count);
+    spend[price.medal] = own;
+    let missing = (price.count - own) * MEDAL_WORTH[price.medal];
+    const higher = MEDALS.filter((m) => MEDAL_WORTH[m] > MEDAL_WORTH[price.medal]).sort((a, b) => MEDAL_WORTH[a] - MEDAL_WORTH[b]);
+    for (const m of higher) {
+      while (missing > 0 && have[m] - spend[m] > 0) {
+        spend[m] += 1;
+        missing -= MEDAL_WORTH[m];
+      }
+    }
+    return missing > 0 ? null : spend;
   },
   buy(i) {
-    const price = RUNNERS[i]?.price ?? 0;
-    if (this.owns(i) || this.coins() < price) return false;
-    local.setItem("lr:coins", String(this.coins() - price));
+    const price = RUNNERS[i]?.price;
+    const spend = price && !this.owns(i) ? this.plan(price) : null;
+    if (!spend) return false;
+    const m = this.medals();
+    for (const k of MEDALS) m[k] -= spend[k];
     local.setItem("lr:owned", JSON.stringify([...this.owned(), i]));
-    renderWallet();
+    this.save(m);
     return true;
   },
-  /** Credit a race reward once (keyed by the race), so reloads don't pay twice. */
-  claim(key, n) {
+  /** Credit a race's medal once (keyed by the race), so reloads don't pay twice. */
+  claim(key, medal) {
     let done = [];
     try { done = JSON.parse(local.getItem("lr:claimed") || "[]"); } catch { /* fresh list */ }
     if (!Array.isArray(done)) done = [];
-    if (done.includes(key)) return false;
+    if (done.includes(key) || !MEDALS.includes(medal)) return false;
     done.push(key);
     local.setItem("lr:claimed", JSON.stringify(done.slice(-60)));
-    this.add(n);
+    const m = this.medals();
+    m[medal] += 1;
+    this.save(m);
     return true;
   },
 };
 function renderWallet() {
-  for (const el of document.querySelectorAll(".coinCount")) el.textContent = String(wallet.coins());
+  const m = wallet.medals();
+  for (const box of document.querySelectorAll(".wallet")) {
+    box.replaceChildren(...MEDALS.map((k) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.title = `${k} medals`;
+      const img = document.createElement("img");
+      img.src = MEDAL_IMG[k];
+      img.alt = `${k} medals`;
+      const b = document.createElement("b");
+      b.textContent = String(m[k]);
+      chip.append(img, b);
+      return chip;
+    }));
+  }
 }
 
 function randomId(n, alphabet = "abcdefghijklmnopqrstuvwxyz0123456789") {
@@ -360,10 +405,10 @@ function renderShop() {
   RUNNERS.forEach((r, i) => {
     if (i < STARTERS) return;
     const owned = wallet.owns(i);
-    const can = wallet.coins() >= r.price;
+    const spend = owned ? null : wallet.plan(r.price);
     const btn = el("button", { class: `btn ${owned ? "blue" : "go"}`, type: "button" });
-    btn.textContent = owned ? "Owned ✓" : can ? `Buy for ${r.price}` : `Need ${r.price - wallet.coins()} more`;
-    btn.disabled = owned || !can;
+    btn.textContent = owned ? "Owned ✓" : spend ? "Buy" : "Not enough medals";
+    btn.disabled = owned || !spend;
     btn.addEventListener("click", () => {
       if (wallet.buy(i)) {
         sfx.finish();
@@ -373,8 +418,12 @@ function renderShop() {
         renderShop();
       }
     });
-    const price = el("div", { class: "price" }, el("img", { src: COIN_IMG.gold, alt: "" }), el("span", { text: String(r.price) }));
-    grid.append(el("div", { class: `skin${owned ? " owned" : ""}` }, el("img", { class: "pic", src: portrait(i), alt: "" }), el("b", { text: r.name, style: `color:${r.color}` }), price, btn));
+    const price = el("div", { class: "price" }, el("img", { src: MEDAL_IMG[r.price.medal], alt: "" }), el("span", { text: medalText(r.price.medal, r.price.count) }));
+    const paysWith = spend && (spend.gold || spend.silver || (spend.bronze && r.price.medal !== "bronze"))
+      ? MEDALS.filter((k) => spend[k]).map((k) => medalText(k, spend[k])).join(" + ")
+      : "";
+    const note = el("small", { class: "pays", text: owned ? "" : paysWith && paysWith !== medalText(r.price.medal, r.price.count) ? `Pays with ${paysWith}` : "" });
+    grid.append(el("div", { class: `skin${owned ? " owned" : ""}` }, el("img", { class: "pic", src: portrait(i), alt: "" }), el("b", { text: r.name, style: `color:${r.color}` }), price, note, btn));
   });
   renderWallet();
 }
@@ -544,7 +593,7 @@ function renderLobby(v) {
     const mine = owner?.id === playerId;
     const locked = !wallet.owns(i);
     const sub = locked
-      ? el("small", { class: "lock" }, el("span", { text: "🔒" }), el("img", { src: COIN_IMG.gold, alt: "" }), el("span", { text: String(r.price) }))
+      ? el("small", { class: "lock" }, el("span", { text: "🔒" }), el("img", { src: MEDAL_IMG[r.price.medal], alt: "" }), el("span", { text: `×${r.price.count}` }))
       : el("small", { text: mine ? "You" : owner ? owner.name : "" });
     const card = el(
       "button",
@@ -620,7 +669,6 @@ function showResults(v) {
 }
 
 const PLACE = ["1st", "2nd", "3rd", "4th"];
-const COIN_NAME = { gold: "gold coin", silver: "silver coin", bronze: "bronze coin" };
 
 function renderResults(v) {
   const list = $("#podium");
@@ -636,8 +684,8 @@ function renderResults(v) {
       : p.finish !== null
         ? `${p.hits} bump${p.hits === 1 ? "" : "s"}`
         : `${Math.round(p.d)} m of ${TRACK_LEN} m`;
-    const earn = rw
-      ? el("span", { class: "earn" }, el("img", { src: COIN_IMG[rw.coin] ?? COIN_IMG.bronze, alt: "" }), el("span", { text: `+${rw.coins}` }))
+    const earn = rw?.medal
+      ? el("span", { class: "earn" }, el("img", { src: MEDAL_IMG[rw.medal], alt: `${rw.medal} medal` }))
       : el("span", { class: "earn", text: "" });
     list.append(
       el(
@@ -659,10 +707,15 @@ function renderResults(v) {
   $("#resTitle").textContent = myPlace === 1 ? "You win!" : myPlace ? `You finished ${PLACE[myPlace - 1] ?? myPlace}` : "Race results";
   const reward = $("#resReward");
   reward.replaceChildren();
-  if (mine) {
-    const fresh = wallet.claim(`${v.startAt}:${playerId}`, mine.coins);
-    reward.append(el("img", { src: COIN_IMG[mine.coin] ?? COIN_IMG.bronze, alt: "" }), el("span", { text: `+${mine.coins} coins · ${COIN_NAME[mine.coin] ?? "coin"}` }));
+  if (mine?.medal) {
+    const fresh = wallet.claim(`${v.startAt}:${playerId}`, mine.medal);
+    reward.append(el("img", { src: MEDAL_IMG[mine.medal], alt: "" }), el("span", { text: `+1 ${mine.medal} medal` }));
     if (fresh) sfx.boost();
+  } else if (myPlace) {
+    reward.append(el("span", {
+      class: "nomedal",
+      text: v.standings.length < MIN_RACERS_FOR_MEDALS ? "Medals are won in races with 2 or more players" : "No medal this time. Top 3 win medals!",
+    }));
   }
   renderWallet();
 
