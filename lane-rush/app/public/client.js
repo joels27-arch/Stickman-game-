@@ -949,7 +949,6 @@ function renderLobby(v) {
 $("#lockBtn").addEventListener("click", () => {
   sfx.unlock();
   game.locked = true;
-  act({ type: "ready", ready: true });
   if (net.view) renderLobby(net.view);
 });
 $("#changeRunner").addEventListener("click", () => {
@@ -1021,7 +1020,7 @@ function renderLineup(v, { isHost, gm, mp, mode, what }) {
     go.classList.toggle("waiting", waiting.length > 0);
     status.textContent = waiting.length ? `Waiting for ${waiting.map((p) => p.name).join(", ")} to get ready` : present.length > 1 ? "Everyone's ready!" : "Start now, or share the code first";
   } else {
-    go.textContent = meP?.ready ? "Not ready" : "Ready ✓";
+    go.textContent = meP?.ready ? "Cancel ready" : "Ready ✓";
     go.classList.toggle("waiting", Boolean(meP?.ready));
     status.textContent = meP?.ready ? (waiting.length ? `Waiting for ${waiting.map((p) => p.name).join(", ")}` : "Waiting for the host to start…") : "Press Ready when you're set";
   }
