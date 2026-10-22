@@ -111,3 +111,5 @@ export const MOVER_KINDS: Record<string, { map: string; half: number; period: nu
 export function moverX(m: { kind: string; phase: number }, t: number): number;
 export function moverCovers(m: { kind: string; phase: number }, lane: number, t: number): boolean;
 export function moversFor(course: any, seed: number, map: string): { z: number; kind: string; phase: number }[];
+export const SHOP_EMOTES: string[];
+export const TRAILS: string[];

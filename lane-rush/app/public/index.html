@@ -58,6 +58,7 @@
       <div class="home-dock">
         <div class="quest-row">
           <button id="questPill" class="pill quests" type="button"><img class="pi" src="/assets/ui_star.webp" alt="" /><span><b id="questCount">0/3</b><small>Challenges</small></span></button>
+          <button id="passPill" class="pill pass" type="button"><img class="pi" src="/assets/ui_chest.webp" alt="" /><span><b id="passPillLv">Lv 1</b><small>Season</small></span><i class="dot" hidden></i></button>
           <button id="rankPill" class="pill rank" type="button"><img class="pi" id="rankPillImg" src="/assets/lg_bronze.webp" alt="" /><span><b id="rankPillName">Bronze I</b><small id="rankPillRp">0 RP</small></span></button>
           <button class="pill shop shopBtn" type="button"><img class="pi" src="/assets/ui_c3.webp" alt="" /><span><b>Shop</b><small>Characters</small></span></button>
         </div>
@@ -250,6 +251,24 @@
       </div>
     </div>
 
+    <!-- SEASON PASS -->
+    <div id="passModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet pass-sheet" role="dialog" aria-modal="true" aria-labelledby="passTitle">
+        <div class="ribbon gold"><h2 id="passTitle">Season Pass</h2></div>
+        <button id="passClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div class="pass-head">
+          <div><b id="passSeason">Season</b><small id="passEnds"></small></div>
+          <div class="pass-lv"><span>LEVEL</span><b id="passLv">1</b></div>
+        </div>
+        <div class="qbar pbar"><i id="passBar"></i><span id="passXp"></span></div>
+        <div class="pass-rows-label"><span>FREE</span><span class="gold">GOLD</span></div>
+        <div id="passTrack" class="pass-track"></div>
+        <button id="passBuy" class="gbtn gold-buy" type="button">Unlock Gold Pass</button>
+        <p class="pass-note">Earn XP from every race, daily challenges and all-time challenges. A new season starts every month.</p>
+      </div>
+    </div>
+
     <!-- RANKING: leagues + friends -->
     <div id="rankModal" class="modal gmodal" hidden>
       <div class="grays" aria-hidden="true"></div>
@@ -298,9 +317,11 @@
         <div class="wallet shop-wallet" title="Your coins and medals"></div>
         <div class="gtabs shop-tabs" role="tablist">
           <button id="tabChars" class="gtab on" type="button">Characters</button>
-          <button id="tabPacks" class="gtab" type="button">Packs <i class="newtag">New</i></button>
+          <button id="tabPacks" class="gtab" type="button">Packs</button>
+          <button id="tabItems" class="gtab" type="button">Items <i class="newtag">New</i></button>
         </div>
         <div id="shopGrid" class="shop-grid"></div>
+        <div id="itemView" class="pack-view item-view" hidden></div>
         <div id="packView" class="pack-view" hidden>
           <div id="packRow" class="pack-row"></div>
           <h3 class="album-title">Pack exclusives <small id="albumCount">0/5</small></h3>

@@ -56,6 +56,8 @@ import {
   moverX,
   moverCovers,
   moversFor,
+  SHOP_EMOTES,
+  TRAILS,
 } from "/logic.js";
 
 // ── constants ───────────────────────────────────────────────────────────────
@@ -523,6 +525,7 @@ function sendHello() {
     char: preferredChar(),
     country: myCountry(),
     rp: rank.rp(),
+    trail: equipped().trail,
     create: net.creating || wasHost,
   });
   net.helloSent = true;
@@ -585,6 +588,40 @@ for (const chip of document.querySelectorAll(".country-chip")) chip.addEventList
 $("#settingsBtn").addEventListener("click", () => openCountry("Settings · your country"));
 renderCountryChips();
 
+// ── cosmetics: trails, celebrations, emotes ──
+const TRAIL_INFO = {
+  sparkle: { name: "Sparkle", colors: ["#ffffff", "#fff2b0", "#ffd23f"], price: 300 },
+  bubbles: { name: "Bubbles", colors: ["#9fe3ff", "#4fc3ff", "#ffffff"], price: 400 },
+  fire: { name: "Fire", colors: ["#ff4d00", "#ff9f1c", "#ffe066"], price: 600 },
+  rainbow: { name: "Rainbow", colors: ["#ff4d6d"], price: 800 },
+  lightning: { name: "Lightning", colors: ["#7df9ff", "#ffffff", "#4f7dff"], price: 800 },
+  gold: { name: "Golden", colors: ["#ffd23f", "#ffb300", "#fff2b0"], pass: "free" },
+  neon: { name: "Neon", colors: ["#ff3df5", "#3dfcff", "#b6f72a"], pass: "gold" },
+};
+const CEL_INFO = {
+  confetti: { name: "Confetti", icon: "🎊", price: 300 },
+  hearts: { name: "Love", icon: "💖", price: 400 },
+  goldrain: { name: "Golden rain", icon: "🌟", price: 500 },
+  mega: { name: "Mega fireworks", icon: "🎆", pass: "gold" },
+};
+const EMOTE_PRICE = 200;
+function equipped() {
+  try {
+    const e = JSON.parse(local.getItem("lr:equip") || "{}") || {};
+    return { trail: TRAILS.includes(e.trail) && wallet.has(`trail:${e.trail}`) ? e.trail : "", cel: CEL_INFO[e.cel] && wallet.has(`cel:${e.cel}`) ? e.cel : "" };
+  } catch {
+    return { trail: "", cel: "" };
+  }
+}
+function equip(slot, id) {
+  const e = equipped();
+  e[slot] = e[slot] === id ? "" : id;
+  local.setItem("lr:equip", JSON.stringify(e));
+}
+function giveItem(id) {
+  if (!wallet.has(id)) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), id]));
+}
+
 // ── shop ───────────────────────────────────────────────────────────────────
 let shopReturn = "home";
 function openShop() {
@@ -593,15 +630,67 @@ function openShop() {
   shopTab(true);
   showScreen("shop");
 }
-function shopTab(chars) {
-  $("#tabChars").classList.toggle("on", chars);
-  $("#tabPacks").classList.toggle("on", !chars);
-  $("#shopGrid").hidden = !chars;
-  $("#packView").hidden = chars;
-  if (!chars) renderPacks();
+/** Shop tabs: true = characters, false = packs, "items" = trails, celebrations, emotes. */
+function shopTab(which) {
+  const tab = which === true ? "chars" : which === false ? "packs" : which;
+  $("#tabChars").classList.toggle("on", tab === "chars");
+  $("#tabPacks").classList.toggle("on", tab === "packs");
+  $("#tabItems").classList.toggle("on", tab === "items");
+  $("#shopGrid").hidden = tab !== "chars";
+  $("#packView").hidden = tab !== "packs";
+  $("#itemView").hidden = tab !== "items";
+  if (tab === "packs") renderPacks();
+  if (tab === "items") renderItems();
 }
 $("#tabChars").addEventListener("click", () => shopTab(true));
 $("#tabPacks").addEventListener("click", () => shopTab(false));
+$("#tabItems").addEventListener("click", () => shopTab("items"));
+function renderItems() {
+  const eq = equipped();
+  const card = (id, slot, name, preview, price, pass) => {
+    const owned = wallet.has(id);
+    const key = id.split(":")[1];
+    const on = slot && eq[slot] === key;
+    let btn;
+    if (owned) {
+      btn = el("button", { class: `sbuy${on ? " on" : ""}`, type: "button", text: slot ? (on ? "Equipped ✓" : "Equip") : "Owned ✓" });
+      btn.disabled = !slot;
+      btn.addEventListener("click", () => {
+        equip(slot, key);
+        sfx.pop();
+        renderItems();
+        if (slot === "trail" && net.socket?.readyState === WebSocket.OPEN && net.view?.joined) sendHello();
+      });
+    } else if (pass) {
+      btn = el("button", { class: "sbuy", type: "button", text: pass === "gold" ? "Gold Pass" : "Season Pass" });
+      btn.disabled = true;
+    } else {
+      btn = el("button", { class: "sbuy", type: "button" }, el("i", { class: "coin" }), el("span", { text: price.toLocaleString() }));
+      btn.disabled = wallet.coins() < price;
+      btn.addEventListener("click", () => {
+        if (wallet.coins() < price) return;
+        wallet.addCoins(-price);
+        giveItem(id);
+        if (slot) equip(slot, key);
+        sfx.finish();
+        toast(`${name} unlocked!`);
+        renderItems();
+        renderEmoteRows();
+      });
+    }
+    return el("div", { class: `icard${owned ? " owned" : ""}${on ? " on" : ""}` }, preview, el("b", { text: name }), btn);
+  };
+  const swatch = (k) => el("i", { class: `swatch t-${k}`, style: `--c1:${TRAIL_INFO[k].colors[0]};--c2:${TRAIL_INFO[k].colors[1] ?? TRAIL_INFO[k].colors[0]};--c3:${TRAIL_INFO[k].colors[2] ?? TRAIL_INFO[k].colors[0]}` });
+  $("#itemView").replaceChildren(
+    el("h3", { class: "album-title", text: "Running trails" }),
+    el("div", { class: "item-grid" }, ...Object.entries(TRAIL_INFO).map(([k, t]) => card(`trail:${k}`, "trail", t.name, swatch(k), t.price, t.pass))),
+    el("h3", { class: "album-title", text: "Win celebrations" }),
+    el("div", { class: "item-grid" }, ...Object.entries(CEL_INFO).map(([k, c]) => card(`cel:${k}`, "cel", c.name, el("i", { class: "big-emoji", text: c.icon }), c.price, c.pass))),
+    el("h3", { class: "album-title", text: "Emotes" }),
+    el("div", { class: "item-grid emotes" }, ...SHOP_EMOTES.map((e) => card(`emote:${e}`, null, e, el("i", { class: "big-emoji", text: e }), EMOTE_PRICE))),
+  );
+  renderWallet();
+}
 const RARITY = { bronze: "common", silver: "rare", gold: "epic" };
 function renderShop() {
   const grid = $("#shopGrid");
@@ -679,6 +768,10 @@ function buyPack(pack) {
   if (!free && wallet.coins() < pack.price) return null;
   if (free) local.setItem("lr:freePack", "1");
   else wallet.addCoins(-pack.price);
+  return grantPack(pack);
+}
+/** Roll a pack's items and credit them (characters, medals, coins). */
+function grantPack(pack) {
   const items = pack.slots.map(rollSlot);
   for (const it of items) {
     if (it.kind === "char") {
@@ -1445,6 +1538,7 @@ function renderResults(v) {
   }
   if (rpChange) {
     reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
+    if (rpChange.xp) reward.append(el("span", { class: "xpchip", text: `+${rpChange.xp} XP` }));
     if (rpChange.botsOnly) reward.append(el("span", { class: "nomedal", text: "Medals and rank points need 2 real players" }));
     else reward.append(rankChip(rpChange));
   }
@@ -2652,6 +2746,62 @@ const world = (() => {
     }
   }
 
+  // ── cosmetic trails: one pooled particle cloud for every runner's trail ──
+  const TRAIL_N = 900;
+  const trailPos = new Float32Array(TRAIL_N * 3);
+  const trailCol = new Float32Array(TRAIL_N * 3);
+  const trailBase = new Float32Array(TRAIL_N * 3);
+  const trailAge = new Float32Array(TRAIL_N).fill(9);
+  let trailHead = 0;
+  const trailGeo = new THREE.BufferGeometry();
+  trailGeo.setAttribute("position", new THREE.BufferAttribute(trailPos, 3));
+  trailGeo.setAttribute("color", new THREE.BufferAttribute(trailCol, 3));
+  const trailPts = new THREE.Points(trailGeo, new THREE.PointsMaterial({ size: 0.32, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  trailPts.frustumCulled = false;
+  scene.add(trailPts);
+  const trailColor = new THREE.Color();
+  function trail(kind, x, y, z) {
+    const info = TRAIL_INFO[kind];
+    if (!info) return;
+    for (let n = 0; n < 2; n++) {
+      const i = trailHead;
+      trailHead = (trailHead + 1) % TRAIL_N;
+      const k = performance.now() / 1000;
+      if (kind === "rainbow") trailColor.setHSL((k * 0.6 + n * 0.1) % 1, 1, 0.55);
+      else trailColor.set(info.colors[Math.floor(Math.random() * info.colors.length)]);
+      trailPos.set([x + (Math.random() - 0.5) * 0.5, y + 0.15 + Math.random() * 0.5, z + 0.3 + Math.random() * 0.3], i * 3);
+      trailBase.set([trailColor.r, trailColor.g, trailColor.b], i * 3);
+      trailAge[i] = 0;
+    }
+  }
+  function stepTrails(dt) {
+    for (let i = 0; i < TRAIL_N; i++) {
+      if (trailAge[i] > 1) {
+        trailCol[i * 3] = trailCol[i * 3 + 1] = trailCol[i * 3 + 2] = 0;
+        continue;
+      }
+      trailAge[i] += dt / 0.7;
+      const f = Math.max(0, 1 - trailAge[i]);
+      trailCol[i * 3] = trailBase[i * 3] * f;
+      trailCol[i * 3 + 1] = trailBase[i * 3 + 1] * f;
+      trailCol[i * 3 + 2] = trailBase[i * 3 + 2] * f;
+      trailPos[i * 3 + 1] += dt * 0.6;
+    }
+    trailGeo.attributes.position.needsUpdate = true;
+    trailGeo.attributes.color.needsUpdate = true;
+  }
+  /** Your win celebration, over your runner. */
+  function celebrate(kind, x, z) {
+    const at = (ms, fn) => setTimeout(fn, ms);
+    if (kind === "confetti") for (let i = 0; i < 5; i++) at(i * 220, () => spray(x, 3.2, z - 2, ["#ff4d6d", "#ffd23f", "#4cd964", "#4fa8ff", "#c27bff"], 90, { speed: 8, up: 4, life: 1.8, gravity: 5 }));
+    else if (kind === "goldrain") for (let i = 0; i < 8; i++) at(i * 150, () => spray(x + (Math.random() - 0.5) * 3, 6, z - 2, ["#ffd23f", "#ffb300", "#fff2b0"], 50, { speed: 2, life: 2, gravity: 6, size: 0.45 }));
+    else if (kind === "hearts") for (let i = 0; i < 4; i++) at(i * 260, () => spray(x, 2.6, z - 2, ["#ff4d8d", "#ff9fc4", "#ffffff"], 80, { speed: 6, up: 3, life: 1.5, gravity: 3, size: 0.5 }));
+    else if (kind === "mega") {
+      for (let i = 0; i < 4; i++) at(i * 300, () => fireworks(z - 10 - i * 4));
+      at(200, () => spray(x, 3, z - 2, ["#ffd23f", "#c27bff", "#4fa8ff"], 150, { speed: 10, up: 5, life: 2 }));
+    } else fireworks(z - 14);
+  }
+
   // ── moving obstacles: they sweep across the lanes on the race clock ──
   let moverList = [];
   const MOVER_MODEL = {
@@ -3021,6 +3171,9 @@ const world = (() => {
     syncMode,
     setupMovers,
     syncMovers,
+    trail,
+    stepTrails,
+    celebrate,
     get movers() {
       return moverList;
     },
@@ -3276,11 +3429,12 @@ function finishRaceView(v) {
         ? me.out && !won ? "GAME OVER" : "LAST ONE STANDING!"
         : me.finished ? "FINISHED!" : "TIME UP!",
   );
-  // the last runner standing gets fireworks over their head
+  // the last runner standing gets fireworks over their head (yours: your celebration)
   if (isSurvival()) {
     const top = v.standings?.[0];
     const z = top === playerId ? -me.d : -(remote.map.get(top)?.dispD ?? me.d);
-    world.fireworks(z - 14);
+    if (top === playerId && equipped().cel) world.celebrate(equipped().cel, laneX(me.x), z);
+    else world.fireworks(z - 14);
   }
   setTimeout(() => {
     if (game.mode === "results-pending") showResults(net.view ?? v);
@@ -3767,13 +3921,19 @@ function showEmote(id, e) {
     }
   }
 }
-for (const box of document.querySelectorAll(".emote-row")) {
-  for (const e of EMOTES) {
-    const b = el("button", { type: "button", class: "emote-btn", text: e });
-    b.addEventListener("click", () => sendEmote(e));
-    box.append(b);
+function renderEmoteRows() {
+  const mine = [...EMOTES, ...SHOP_EMOTES.filter((e) => wallet.has(`emote:${e}`))];
+  for (const box of document.querySelectorAll(".emote-row")) {
+    box.replaceChildren(
+      ...mine.map((e) => {
+        const b = el("button", { type: "button", class: "emote-btn", text: e });
+        b.addEventListener("click", () => sendEmote(e));
+        return b;
+      }),
+    );
   }
 }
+renderEmoteRows();
 $("#emoteToggle").addEventListener("click", () => $("#emoteMenu").classList.toggle("show"));
 
 // ── daily challenges: three a day (easy, medium, hard), coins for each ──
@@ -3861,6 +4021,7 @@ function challenge(stat, value) {
     if (value >= q.goal) {
       st.done[q.id] = true;
       wallet.addCoins(q.coins);
+      passXp(150);
       banner("CHALLENGE DONE!", 1600);
       toast(`✅ ${q.text}: +${q.coins} coins`);
       sfx.finish();
@@ -3969,6 +4130,7 @@ function claimStreak() {
   const r = STREAK_REWARDS[st.next - 1];
   local.setItem("lr:streak", JSON.stringify({ day: st.next, last: todayKey() }));
   stats.add("days", 1);
+  passXp(50);
   wallet.addCoins(r.coins);
   if (r.medal) {
     const m = wallet.medals();
@@ -4117,6 +4279,8 @@ function recordRace(v, place) {
   res.promoted = after.name !== before.name && res.after > res.before ? after : null;
   res.coins = coins;
   res.kos = kos;
+  // season XP: everyone gets some for racing, more for a good place
+  res.xp = passXp(n >= 2 ? 60 + ([60, 40, 20][place - 1] ?? 0) : 40 + Math.min(60, Math.floor(d / 50)));
   res.botsOnly = real < 2 && n >= 2;
   if (res.promoted) {
     setTimeout(() => {
@@ -4277,6 +4441,7 @@ function renderAch() {
           c[a.id] = st.tier + 1;
           local.setItem("lr:ach", JSON.stringify(c));
           wallet.addCoins(a.coins[st.tier]);
+          passXp(100);
           coinRain(right, 14);
           sfx.finish();
           toast(`+${a.coins[st.tier]} coins`);
@@ -4311,6 +4476,165 @@ function questTab(daily) {
 $("#tabDaily").addEventListener("click", () => questTab(true));
 $("#tabAll").addEventListener("click", () => questTab(false));
 renderAchDot();
+
+// ── season pass: 30 levels, a free and a gold track, a new season every month ──
+
+const PASS_LEVELS = 30;
+const PASS_XP = 400; // per level
+const GOLD_PASS_PRICE = 3000;
+const PASS_CHAR = { id: "brainstorm", name: "Captain Brainstorm" };
+function seasonId(d = new Date()) {
+  return `${d.getFullYear()}-${d.getMonth() + 1}`;
+}
+function seasonName(d = new Date()) {
+  return d.toLocaleString("en", { month: "long" });
+}
+function passState() {
+  const fresh = { season: seasonId(), xp: 0, free: [], gold: [], hasGold: false };
+  try {
+    const p = JSON.parse(local.getItem("lr:pass") || "{}");
+    return p && p.season === seasonId() ? { ...fresh, ...p } : fresh;
+  } catch {
+    return fresh;
+  }
+}
+function savePass(p) {
+  local.setItem("lr:pass", JSON.stringify(p));
+  renderPassPill();
+}
+function passLevel(xp) {
+  return Math.min(PASS_LEVELS, Math.floor(xp / PASS_XP) + 1);
+}
+/** Add season XP; announces a level-up. Returns the XP added. */
+function passXp(n) {
+  const p = passState();
+  const before = passLevel(p.xp);
+  p.xp += n;
+  savePass(p);
+  const after = passLevel(p.xp);
+  if (after > before) setTimeout(() => toast(`⭐ Season Pass level ${after}! A reward is waiting`), 1200);
+  return n;
+}
+/** What each level gives. Free: coins, medals, packs, a trail. Gold: more of everything, exclusives, and the level-30 character. */
+function passReward(level, track) {
+  if (track === "free") {
+    if (level === 30) return { item: "trail:gold", label: "Golden trail", icon: "✨" };
+    if (level % 10 === 5) return { pack: "brain", label: "Brain Pack", img: "/assets/pack_brain.webp" };
+    if (level % 4 === 0) return { medal: level >= 20 ? "silver" : "bronze", label: `${level >= 20 ? "Silver" : "Bronze"} medal`, img: MEDAL_IMG[level >= 20 ? "silver" : "bronze"] };
+    return { coins: 50 + level * 10, label: `${50 + level * 10} coins`, img: "/assets/ui_c1.webp" };
+  }
+  if (level === 30) return { char: PASS_CHAR.id, label: PASS_CHAR.name, img: `/assets/pk_${PASS_CHAR.id}.webp` };
+  if (level === 10) return { item: "trail:neon", label: "Neon trail", icon: "🌈" };
+  if (level === 20) return { item: "cel:mega", label: "Mega fireworks", icon: "🎆" };
+  if (level === 15 || level === 25) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
+  if (level % 5 === 0) return { medal: "gold", label: "Gold medal", img: MEDAL_IMG.gold };
+  return { coins: 150 + level * 15, label: `${150 + level * 15} coins`, img: level > 15 ? "/assets/ui_c3.webp" : "/assets/ui_c2.webp" };
+}
+function passClaimable(p = passState()) {
+  const lv = passLevel(p.xp);
+  let n = 0;
+  for (let l = 1; l <= lv; l++) {
+    if (!p.free.includes(l)) n++;
+    if (p.hasGold && !p.gold.includes(l)) n++;
+  }
+  return n;
+}
+function claimPass(level, track, tile) {
+  const p = passState();
+  if (level > passLevel(p.xp) || p[track].includes(level) || (track === "gold" && !p.hasGold)) return;
+  const r = passReward(level, track);
+  p[track] = [...p[track], level];
+  savePass(p);
+  if (r.coins) {
+    wallet.addCoins(r.coins);
+    coinRain(tile, 12);
+  } else if (r.medal) {
+    const m = wallet.medals();
+    m[r.medal] += 1;
+    wallet.save(m);
+  } else if (r.item) {
+    giveItem(r.item);
+    renderEmoteRows();
+  } else if (r.char) giveItem(r.char);
+  else if (r.pack) {
+    const pk = PACKS.find((x) => x.id === r.pack);
+    passModal.hidden = true;
+    openPackAnim(pk, grantPack(pk));
+  }
+  sfx.finish();
+  toast(`${r.label}!`);
+  renderPass();
+}
+const passModal = $("#passModal");
+function renderPassPill() {
+  const p = passState();
+  $("#passPillLv").textContent = `Lv ${passLevel(p.xp)}`;
+  const n = passClaimable(p);
+  $("#passPill .dot").hidden = n === 0;
+}
+function renderPass() {
+  const p = passState();
+  const lv = passLevel(p.xp);
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const days = Math.max(0, Math.ceil((end - now) / 864e5));
+  $("#passSeason").textContent = `Season · ${seasonName()}`;
+  $("#passEnds").textContent = `Ends in ${days} day${days === 1 ? "" : "s"}`;
+  $("#passLv").textContent = String(lv);
+  const into = lv >= PASS_LEVELS ? PASS_XP : p.xp - (lv - 1) * PASS_XP;
+  $("#passBar").style.width = `${Math.round((into / PASS_XP) * 100)}%`;
+  $("#passXp").textContent = lv >= PASS_LEVELS ? "Max level!" : `${into} / ${PASS_XP} XP`;
+  const tile = (level, track) => {
+    const r = passReward(level, track);
+    const got = p[track].includes(level);
+    const reached = level <= lv;
+    const locked = track === "gold" && !p.hasGold;
+    const ready = reached && !got && !locked;
+    const t = el(
+      "button",
+      { class: `ptile ${track}${got ? " got" : ""}${ready ? " ready" : ""}${!reached ? " future" : ""}${locked ? " locked" : ""}${r.char ? " star" : ""}`, type: "button" },
+      r.img ? el("img", { src: r.img, alt: "" }) : el("i", { class: "big-emoji", text: r.icon }),
+      el("small", { text: r.label }),
+      got ? el("span", { class: "tick", text: "✓" }) : locked ? el("span", { class: "lock", text: "🔒" }) : null,
+    );
+    t.disabled = !ready;
+    t.addEventListener("click", () => claimPass(level, track, t));
+    return t;
+  };
+  const cols = [];
+  for (let l = 1; l <= PASS_LEVELS; l++) {
+    cols.push(el("div", { class: `pcol${l === lv ? " now" : ""}` }, el("span", { class: "plv", text: String(l) }), tile(l, "free"), tile(l, "gold")));
+  }
+  const track = $("#passTrack");
+  track.replaceChildren(...cols);
+  // scroll so the current level is in view
+  requestAnimationFrame(() => {
+    const cur = track.querySelector(".pcol.now");
+    if (cur) track.scrollLeft = cur.offsetLeft - track.clientWidth / 2 + cur.clientWidth / 2;
+  });
+  const buy = $("#passBuy");
+  buy.hidden = p.hasGold;
+  buy.replaceChildren(el("span", { text: "Unlock Gold Pass" }), el("i", { class: "coin" }), el("span", { text: GOLD_PASS_PRICE.toLocaleString() }));
+  buy.disabled = wallet.coins() < GOLD_PASS_PRICE;
+}
+$("#passBuy").addEventListener("click", () => {
+  const p = passState();
+  if (p.hasGold || wallet.coins() < GOLD_PASS_PRICE) return;
+  wallet.addCoins(-GOLD_PASS_PRICE);
+  p.hasGold = true;
+  savePass(p);
+  sfx.finish();
+  coinRain($("#passBuy"), 20);
+  toast("Gold Pass unlocked! Claim your gold rewards");
+  renderPass();
+});
+$("#passPill").addEventListener("click", () => {
+  renderPass();
+  passModal.hidden = false;
+});
+$("#passClose").addEventListener("click", () => (passModal.hidden = true));
+passModal.addEventListener("click", (e) => e.target === passModal && (passModal.hidden = true));
+renderPassPill();
 
 // first visit of the day: pop the reward open
 setTimeout(() => {
@@ -4979,6 +5303,7 @@ function frame(now) {
     const zMe = -me.d;
     if (me.runner) {
       me.runner.group.position.set(laneX(me.x), me.y, zMe);
+      if (equipped().trail && me.speed > 2 && !me.out) world.trail(equipped().trail, laneX(me.x), me.y, zMe);
       me.runner.group.visible = !(me.invulnT > 0 && me.stumbleT <= 0 && !me.power && Math.floor(now / 90) % 2 === 0);
       animateRunner(me.runner, currentAct(), me.speed, dt, me.power);
       if (me.power) $("#powerSlot .bar i").style.width = `${(me.powerT / POWER_S[me.power]) * 100}%`;
@@ -4999,6 +5324,7 @@ function frame(now) {
       r.dispX += (laneX(p.lane) - r.dispX) * Math.min(1, dt * 12);
       r.dispY += (p.y - r.dispY) * Math.min(1, dt * 18);
       r.runner.group.position.set(r.dispX, r.dispY, -r.dispD);
+      if (r.p.trail && r.vel > 2 && !r.p.outAt) world.trail(r.p.trail, r.dispX, r.dispY, -r.dispD);
       r.runner.group.visible = !p.left;
       const ra = !isSurvival() && p.finish !== null && r.dispD > TRACK_LEN - 1 ? "cheer" : p.gone && p.act !== "out" ? "idle" : p.act;
       if (!isSurvival() && p.finish !== null && game.cheered && !game.cheered.has(p.id)) {
@@ -5052,6 +5378,7 @@ function frame(now) {
     });
     renderCloudHud();
     if (net.view) world.syncMovers(Math.max(0, (serverNow() - net.view.startAt) / 1000));
+    world.stepTrails(dt);
     if (net.view) world.syncMode(net.view, (id) => {
       const g = id === playerId ? me.runner?.group : remote.map.get(id)?.runner?.group;
       return g ? g.position : null;

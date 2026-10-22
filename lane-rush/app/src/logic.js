@@ -77,6 +77,10 @@ export const POTATO_NEXT_MS = 2500;
 export const BOMB_PASS_M = 1.8;
 /** Quick reactions anyone can show above their runner. */
 export const EMOTES = ["👋", "😂", "🔥", "😱", "😎", "💪"];
+/** Emotes you can buy in the shop (anyone may send them; the shop decides who sees the button). */
+export const SHOP_EMOTES = ["👑", "🧠", "🤡", "🥶", "💩", "🫡"];
+/** Running trails (cosmetic): everyone in the race sees yours. "" = none. */
+export const TRAILS = ["", "sparkle", "bubbles", "fire", "rainbow", "lightning", "gold", "neon"];
 export const EMOTE_COOLDOWN_MS = 1200;
 /** In survival a heart floats over the track every so often: grab it to win back a lost heart. */
 export const HEART_EVERY_M = 420;
@@ -1202,6 +1206,7 @@ export function validateAction(state, playerId, action) {
       if (!cleanName(action.name)) return { ok: false, error: "Enter a name first" };
       if (!intIn(action.char, 0, CHARACTERS - 1)) return { ok: false, error: "bad character" };
       if (action.rp !== undefined && !intIn(action.rp, 0, MAX_RP)) return { ok: false, error: "bad rank" };
+      if (action.trail !== undefined && !TRAILS.includes(action.trail)) return { ok: false, error: "bad trail" };
       if (action.country !== undefined && action.country !== "" && !COUNTRY_CODES.has(action.country)) {
         return { ok: false, error: "bad country" };
       }
@@ -1314,7 +1319,7 @@ export function validateAction(state, playerId, action) {
     }
     case "emote": {
       if (!me) return { ok: false, error: "join first" };
-      if (!EMOTES.includes(action.e)) return { ok: false, error: "bad emote" };
+      if (!EMOTES.includes(action.e) && !SHOP_EMOTES.includes(action.e)) return { ok: false, error: "bad emote" };
       const t = num(action.t) ? action.t : state.now;
       if (me.emoteAt != null && t - me.emoteAt < EMOTE_COOLDOWN_MS) return { ok: false, error: "too soon" };
       return { ok: true };
@@ -1389,6 +1394,7 @@ export function applyAction(state0, playerId, action) {
         if (state.phase === "lobby") me.name = cleanName(action.name);
         if (action.country !== undefined) me.country = cleanCountry(action.country);
         if (action.rp !== undefined) me.rp = action.rp;
+        if (action.trail !== undefined) me.trail = action.trail;
       } else {
         const used = new Set(ids(state).map((id) => state.players[id].char));
         let char = action.char;
@@ -1400,6 +1406,7 @@ export function applyAction(state0, playerId, action) {
           char,
           country: cleanCountry(action.country),
           rp: action.rp ?? 0,
+          trail: action.trail ?? "",
           slot,
           gone: false,
           goneAt: null,
@@ -1686,6 +1693,7 @@ export function viewFor(state, playerId) {
         country: p.country || "",
         rp: p.rp ?? 0,
         bot: Boolean(p.bot),
+        trail: p.trail ?? "",
         warp: p.warp ?? 0,
         coins: p.coins ?? 0,
         booms: p.booms ?? 0,
