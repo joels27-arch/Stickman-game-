@@ -1052,7 +1052,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .pcard b { position: relative; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 30px; text-transform: uppercase; color: #fff; -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.45); paint-order: stroke fill; text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
 .pcard small { position: relative; font-weight: 900; font-size: 15px; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
 .pcard.flip { animation: cardIn 520ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
-@keyframes cardIn { from { transform: perspective(800px) rotateY(90deg) scale(0.6); opacity: 0; } }
+@keyframes cardIn { from { transform: perspective(800px) rotateY(70deg) scale(0.6); } }
 .pcard.legendary.flip { animation: cardIn 520ms cubic-bezier(0.2, 1.4, 0.4, 1) both, legShake 600ms 520ms ease-out; }
 @keyframes legShake { 20% { transform: scale(1.08) rotate(-2deg); } 40% { transform: scale(1.05) rotate(2deg); } 60% { transform: scale(1.03) rotate(-1deg); } }
 .po-summary { grid-area: 1 / 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0 12px; margin-bottom: 80px; }
