@@ -994,3 +994,5 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .smedal:disabled { opacity: 0.55; cursor: default; }
 .owned-tag { padding: 4px 10px; border-radius: 8px; background: #fff; color: #23a047; font-family: var(--display); font-weight: 900; font-size: 15px; text-transform: uppercase; }
 @media (min-width: 700px) { .shop-screen .shop-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.quest-list, .rank-list, .shop-screen .shop-grid, .streak-grid { grid-auto-rows: max-content; align-content: start; }
+.pill.top-streak b { white-space: nowrap; }

@@ -3497,7 +3497,7 @@ function renderRank() {
         el("b", { class: "rrp", text: f.rp.toLocaleString() }),
       );
     }),
-    rows.length < 2 ? el("p", { class: "rempty", text: "Play with friends: everyone you race with shows up here, so you can compare ranks." }) : null,
+    ...(rows.length < 2 ? [el("p", { class: "rempty", text: "Play with friends: everyone you race with shows up here, so you can compare ranks." })] : []),
   );
   $("#leagueList").replaceChildren(
     ...[...LEAGUES].reverse().map((l) => el(
