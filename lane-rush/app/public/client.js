@@ -25,6 +25,9 @@ import {
   MEDALS,
   MEDAL_WORTH,
   MIN_RACERS_FOR_MEDALS,
+  POWERS,
+  ROLLER_SPEED,
+  ROLLER_TRIGGER_M,
 } from "/logic.js";
 
 // ── constants ───────────────────────────────────────────────────────────────
@@ -52,8 +55,23 @@ const CHAR_H = 1.55; // runner height in metres
 const JUMP_V = 8.6;
 const GRAVITY = 26;
 const SLIDE_S = 0.75;
-const STUMBLE_S = 0.8;
-const INVULN_S = 1.4;
+// hitting something: fall flat on your face, then get back up
+const FALL_S = 0.6;
+const GETUP_S = 1.0;
+const STUMBLE_S = FALL_S + GETUP_S;
+const INVULN_S = STUMBLE_S + 0.9;
+// [start, end] seconds cut from the Higgsfield clips (the rest is wind-up / standing still)
+const FALL_CLIP = [0.35, 1.75];
+const GETUP_CLIP = [1.9, 6.1];
+// power-ups (seconds)
+const POWER_S = { shield: 9, rocket: 3.2, ghost: 4.5 };
+const ROCKET_Y = 2.1;
+const POWER_INFO = {
+  shield: { label: "Shield", hint: "Blocks the next hit" },
+  rocket: { label: "Rocket", hint: "Fly over everything" },
+  ghost: { label: "Ghost", hint: "Run through obstacles" },
+  lightning: { label: "Lightning", hint: "Everyone ahead falls over" },
+};
 const BOOST_S = 1.6;
 const LANE_SWITCH_SPEED = 9; // lanes per second
 const SEND_MS = 100;
@@ -218,6 +236,16 @@ const sfx = (() => {
     slide: () => tone(240, 0.22, "sawtooth", 0.05, -120),
     hit: () => tone(140, 0.35, "sawtooth", 0.18, -90),
     boost: () => tone(400, 0.35, "triangle", 0.14, 900),
+    pickup: () => {
+      [660, 880, 1175].forEach((f, i) => setTimeout(() => tone(f, 0.12, "triangle", 0.1), i * 60));
+    },
+    zap: () => {
+      tone(1400, 0.4, "sawtooth", 0.12, -1300);
+      setTimeout(() => tone(90, 0.5, "square", 0.12, -40), 80);
+    },
+    pop: () => tone(900, 0.18, "sine", 0.16, -700),
+    rocket: () => tone(120, 1.2, "sawtooth", 0.08, 500),
+    roll: () => tone(70, 0.6, "triangle", 0.1, 20),
     lane: () => tone(660, 0.06, "triangle", 0.06),
     finish: () => {
       [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.22, "square", 0.1), i * 110));
@@ -1064,11 +1092,30 @@ const world = (() => {
     return clip;
   }
 
+  function trimClip(clip, [from, to]) {
+    const end = Math.min(to, clip.duration);
+    if (from <= 0 && end >= clip.duration) return clip;
+    for (const tr of clip.tracks) {
+      tr.trim(from, end);
+      tr.shift(-from);
+    }
+    clip.resetDuration();
+    return clip;
+  }
+
   async function loadChar(i) {
     const gltf = await loadGLB(`/assets/${RUNNERS[i].file}.glb`);
     const clips = {};
     for (const c of gltf.animations) {
       const n = c.name.toLowerCase();
+      if (n.includes("getup") || n.includes("stand_up")) {
+        clips.getup = trimClip(stripRootMotion(c), GETUP_CLIP);
+        continue;
+      }
+      if (n.includes("fall")) {
+        clips.fall = trimClip(stripRootMotion(c), FALL_CLIP);
+        continue;
+      }
       const key = n.includes("jump") && !n.includes("happy")
         ? "jump"
         : n.includes("slide")
@@ -1120,9 +1167,16 @@ const world = (() => {
   async function load(onProgress) {
     const jobs = [
       ...[0, 1, 2, 3].map((i) => ensureChar(i)),
-      loadGLB("/assets/hurdle.glb").then((g) => (assets.props.hurdle = fitProp(g.scene, { width: 1.75, maxHeight: 0.75 }))),
-      loadGLB("/assets/gate.glb").then((g) => (assets.props.gate = fitProp(g.scene, { width: 1.9, maxHeight: 2.15 }))),
-      loadGLB("/assets/crate.glb").then((g) => (assets.props.crate = fitProp(g.scene, { width: 1.55 }))),
+      // obstacles: `${kind}${look}` (see LOOKS in logic.js)
+      loadGLB("/assets/hurdle2.glb").then((g) => (assets.props.hurdle0 = fitProp(g.scene, { width: 1.75, maxHeight: 0.72 }))),
+      loadGLB("/assets/hay.glb").then((g) => (assets.props.hurdle1 = fitProp(g.scene, { width: 1.7, maxHeight: 0.7 }))),
+      loadGLB("/assets/gate2.glb").then((g) => (assets.props.gate0 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
+      loadGLB("/assets/arch.glb").then((g) => (assets.props.gate1 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
+      loadGLB("/assets/crates.glb").then((g) => (assets.props.crate0 = fitProp(g.scene, { width: 1.45, maxHeight: 2.6 }))),
+      loadGLB("/assets/cow.glb").then((g) => (assets.props.crate1 = fitProp(g.scene, { width: 1.7, maxHeight: 1.9 }))),
+      loadGLB("/assets/tires.glb").then((g) => (assets.props.crate2 = fitProp(g.scene, { width: 1.4, maxHeight: 2.5 }))),
+      loadGLB("/assets/barrel.glb").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
+      loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
       loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
       loadGLB("/assets/tree_oak.glb").then((g) => (assets.props.oak = fitProp(g.scene, { height: 6.5 }))),
       loadGLB("/assets/tree_pine.glb").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
@@ -1160,11 +1214,39 @@ const world = (() => {
       actions.slide.setLoop(THREE.LoopOnce, 1);
       actions.slide.clampWhenFinished = true;
     }
+    for (const k of ["fall", "getup"]) {
+      if (!actions[k]) continue;
+      actions[k].setLoop(THREE.LoopOnce, 1);
+      actions[k].clampWhenFinished = true;
+    }
+    // power-up looks: a bubble, a rocket flame, a see-through ghost
+    const fx = powerFx();
+    g.add(fx.group);
+    const mats = [];
+    body.traverse((o) => {
+      if (!o.isMesh) return;
+      o.material = o.material.clone();
+      mats.push(o.material);
+    });
+    let pw = "";
     let current = null;
     const r = {
       group: g,
       pivot,
       mixer,
+      fallT: 0,
+      setPower(next) {
+        if (next === pw) return;
+        pw = next;
+        fx.bubble.visible = next === "shield";
+        fx.flame.visible = next === "rocket";
+        for (const m of mats) {
+          m.transparent = next === "ghost";
+          m.opacity = next === "ghost" ? 0.38 : 1;
+          m.depthWrite = next !== "ghost";
+        }
+      },
+      fx,
       play(name, fade = 0.15, timeScale = 1) {
         const next = actions[name] || actions.run || Object.values(actions)[0];
         if (!next) return;
@@ -1191,6 +1273,27 @@ const world = (() => {
     }
     r.play("idle", 0);
     return r;
+  }
+
+  function powerFx() {
+    const group = new THREE.Group();
+    const bubble = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 28, 20),
+      new THREE.MeshPhongMaterial({ color: "#5fd0ff", emissive: "#1d6fd8", emissiveIntensity: 0.35, transparent: true, opacity: 0.32, shininess: 120, depthWrite: false }),
+    );
+    bubble.scale.set(0.95, 1.05, 0.95);
+    bubble.position.y = CHAR_H / 2;
+    bubble.visible = false;
+    const flame = new THREE.Group();
+    const outer = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.1, 14), new THREE.MeshBasicMaterial({ color: "#ff8a1f", transparent: true, opacity: 0.9 }));
+    const inner = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.7, 12), new THREE.MeshBasicMaterial({ color: "#fff27a" }));
+    outer.rotation.x = inner.rotation.x = -Math.PI / 2; // tip points back along +z
+    inner.position.z = -0.1;
+    flame.add(outer, inner);
+    flame.position.set(0, CHAR_H * 0.55, 0.65);
+    flame.visible = false;
+    group.add(bubble, flame);
+    return { group, bubble, flame };
   }
 
   function nameTag(text, color) {
@@ -1228,6 +1331,8 @@ const world = (() => {
   const raceGroup = new THREE.Group();
   scene.add(raceGroup);
   let cullables = []; // {obj, z}
+  let rollers = []; // {obj, lane, z0, z, startedAt}
+  let boxes = []; // {obj, lane, z, taken}
   let scenery = null;
 
   const clouds = new THREE.Group();
@@ -1299,16 +1404,40 @@ const world = (() => {
   function buildCourseObjects(seed) {
     clearCourse();
     const course = buildCourse(seed);
+    rollers = [];
+    boxes = [];
     for (const row of course.rows) {
       row.lanes.forEach((kind, lane) => {
         if (!kind) return;
-        const proto = assets.props[kind];
+        const look = row.looks?.[lane] ?? 0;
+        const proto = assets.props[`${kind}${look}`] || assets.props[`${kind}0`];
         const o = proto.clone();
         o.position.set(laneX(lane), 0, -row.z);
-        if (kind === "crate") o.rotation.y = ((row.z * 7 + lane) % 3 - 1) * 0.12;
+        if (kind === "crate") o.rotation.y = ((row.z * 7 + lane) % 3 - 1) * 0.12 + (look === 1 ? (lane < 2 ? 0.5 : -0.5) : 0);
+        if (kind === "roller") {
+          // the barrel rolls on a pivot at its centre
+          const pivotY = 0.5;
+          const holder = new THREE.Group();
+          o.position.set(0, -pivotY, 0);
+          holder.add(o);
+          holder.position.set(laneX(lane), pivotY, -row.z);
+          raceGroup.add(holder);
+          rollers.push({ obj: holder, lane, z0: row.z, z: row.z, startedAt: null });
+          return;
+        }
         raceGroup.add(o);
         cullables.push({ obj: o, z: row.z });
       });
+    }
+    for (const b of course.boxes || []) {
+      const o = assets.props.box.clone();
+      const holder = new THREE.Group();
+      o.position.y = -0.45;
+      holder.add(o);
+      holder.position.set(laneX(b.lane), 1.0, -b.z);
+      raceGroup.add(holder);
+      boxes.push({ obj: holder, lane: b.lane, z: b.z, taken: false });
+      cullables.push({ obj: holder, z: b.z, box: boxes[boxes.length - 1] });
     }
     for (const b of course.boosts) {
       const pad = new THREE.Mesh(
@@ -1326,10 +1455,36 @@ const world = (() => {
   function clearCourse() {
     for (const c of raceGroup.children.slice()) raceGroup.remove(c);
     cullables = cullables.filter((c) => c.keep);
+    rollers = [];
+    boxes = [];
   }
 
   function cull(d) {
-    for (const c of cullables) c.obj.visible = c.z > d - VIEW_BEHIND && c.z < d + VIEW_AHEAD + (c.wide ? 60 : 0);
+    for (const c of cullables) {
+      c.obj.visible = c.z > d - VIEW_BEHIND && c.z < d + VIEW_AHEAD + (c.wide ? 60 : 0) && !c.box?.taken;
+    }
+    for (const r of rollers) r.obj.visible = r.z > d - VIEW_BEHIND && r.z < d + VIEW_AHEAD;
+  }
+
+  // barrels start rolling at you when you get close; boxes spin and bob
+  function animateCourse(d, raceT, dt) {
+    for (const r of rollers) {
+      if (r.startedAt === null && raceT !== null && d >= r.z0 - ROLLER_TRIGGER_M) {
+        r.startedAt = raceT;
+        if (r.z0 - d < ROLLER_TRIGGER_M + 2) sfx.roll();
+      }
+      if (r.startedAt !== null) {
+        r.z = r.z0 - ROLLER_SPEED * (raceT - r.startedAt);
+        r.obj.position.z = -r.z;
+        r.obj.rotation.x -= (ROLLER_SPEED / 0.5) * dt; // rolling toward +z
+      }
+    }
+    const t = performance.now() / 1000;
+    for (const b of boxes) {
+      if (b.taken) continue;
+      b.obj.rotation.y = t * 1.6 + b.z;
+      b.obj.position.y = 1.0 + Math.sin(t * 3 + b.z) * 0.12;
+    }
   }
 
   // ── lobby showcase: your runner idling in front of the camera ──
@@ -1368,6 +1523,13 @@ const world = (() => {
     buildScenery,
     cull,
     tick,
+    animateCourse,
+    get rollers() {
+      return rollers;
+    },
+    get boxes() {
+      return boxes;
+    },
     ensureChar,
     hasChars,
     showcase,
@@ -1397,11 +1559,14 @@ const me = {
   stumbleT: 0,
   invulnT: 0,
   boostT: 0,
+  power: "", // active timed power: shield | rocket | ghost
+  powerT: 0,
   speed: 0,
   hits: 0,
   finished: false,
   act: "idle",
   runner: null,
+  lastZap: 0,
   lastSent: 0,
   sentAct: "",
 };
@@ -1471,13 +1636,18 @@ function enterRace(v) {
     stumbleT: 0,
     invulnT: 0,
     boostT: 0,
+    power: "",
+    powerT: 0,
     speed: 0,
     hits: mine?.hits ?? 0,
     finished: mine?.finish != null,
     act: "idle",
     lastSent: 0,
     sentAct: "",
+    // zaps from before we (re)entered this race don't count
+    lastZap: Math.max(0, ...(v.zaps || []).map((z) => z.id)),
   });
+  renderPower();
   me.x = me.lane;
   if (me.runner) scene.remove(me.runner.group);
   me.runner = world.makeRunner(mine?.char ?? 0, mine?.name ?? "", RUNNERS[mine?.char ?? 0].color, true);
@@ -1503,8 +1673,8 @@ function enterRace(v) {
   const touch = matchMedia("(pointer: coarse)").matches;
   const hint = $("#controlsHint");
   hint.textContent = touch
-    ? "Swipe ↑ jump · ↓ slide · ← → switch lane"
-    : "↑ / Space jump · ↓ slide · ← → switch lane";
+    ? "Swipe ↑ jump · ↓ slide · ← → switch lane · grab ? boxes"
+    : "↑ / Space jump · ↓ slide · ← → switch lane · grab ? boxes";
   hint.style.opacity = "1";
   setTimeout(() => (hint.style.opacity = "0"), 6000);
   $("#banner").classList.remove("show");
@@ -1537,6 +1707,7 @@ function canControl() {
 
 function input(kind) {
   if (!canControl()) return;
+  if (me.stumbleT > 0) return; // flat on your face — wait until you're back up
   if (kind === "left" || kind === "right") {
     const next = clamp(me.lane + (kind === "left" ? -1 : 1), 0, LANES - 1);
     if (next !== me.lane) {
@@ -1544,6 +1715,7 @@ function input(kind) {
       sfx.lane();
     }
   } else if (kind === "jump") {
+    if (me.power === "rocket") return;
     if (me.y <= 0.001 && me.stumbleT <= 0) {
       me.vy = JUMP_V;
       me.y = 0.001;
@@ -1551,6 +1723,7 @@ function input(kind) {
       sfx.jump();
     }
   } else if (kind === "slide") {
+    if (me.power === "rocket") return;
     if (me.y > 0.001) {
       me.vy = Math.min(me.vy, -16); // fast-fall, then slide on landing
       me.slideT = SLIDE_S;
@@ -1626,8 +1799,11 @@ function stepMe(dt) {
   const stepX = LANE_SWITCH_SPEED * dt;
   me.x = Math.abs(dx) <= stepX ? me.lane : me.x + Math.sign(dx) * stepX;
 
-  // vertical
-  if (me.y > 0 || me.vy > 0) {
+  // vertical (the rocket holds you up in the air)
+  if (me.power === "rocket") {
+    me.y += (ROCKET_Y - me.y) * Math.min(1, dt * 6);
+    me.vy = 0;
+  } else if (me.y > 0 || me.vy > 0) {
     me.vy -= GRAVITY * dt;
     me.y += me.vy * dt;
     if (me.y <= 0) {
@@ -1639,6 +1815,10 @@ function stepMe(dt) {
   me.stumbleT = Math.max(0, me.stumbleT - dt);
   me.invulnT = Math.max(0, me.invulnT - dt);
   me.boostT = Math.max(0, me.boostT - dt);
+  if (me.power) {
+    me.powerT = Math.max(0, me.powerT - dt);
+    if (me.powerT <= 0) endPower();
+  }
 
   if (!running) {
     me.speed = 0;
@@ -1646,10 +1826,11 @@ function stepMe(dt) {
   }
 
   // speed
-  let target = me.boostT > 0 ? BOOST_SPEED : BASE_SPEED;
-  if (me.stumbleT > 0) target = 3.5;
+  let target = me.boostT > 0 || me.power === "rocket" ? BOOST_SPEED : BASE_SPEED;
+  // sliding along the grass while falling, then stopped while getting up
+  if (me.stumbleT > 0) target = me.stumbleT > GETUP_S ? 3 : 0;
   if (me.finished) target = me.d > TRACK_LEN + 14 ? 0 : 6;
-  const accel = me.stumbleT > 0 ? 40 : 14;
+  const accel = me.stumbleT > 0 ? 30 : 14;
   me.speed += clamp(target - me.speed, -accel * dt, accel * dt);
   const prevD = me.d;
   me.d += me.speed * dt;
@@ -1665,17 +1846,34 @@ function stepMe(dt) {
   // collisions (swept over this step's distance)
   const course = race.course;
   if (!course) return;
+  const untouchable = me.power === "rocket" || me.power === "ghost";
   for (const row of course.rows) {
+    if (untouchable) break;
     if (row.z < prevD - 0.6 || row.z > me.d + 0.6) continue;
     for (let lane = 0; lane < LANES; lane++) {
       const kind = row.lanes[lane];
-      if (!kind) continue;
+      if (!kind || kind === "roller") continue;
       const half = kind === "crate" ? 0.58 : 0.62;
       if (Math.abs(me.x - lane) > half) continue;
       const clear =
         (kind === "hurdle" && me.y > 0.62) || (kind === "gate" && me.slideT > 0);
       if (!clear) hit(kind);
     }
+  }
+  // rolling barrels: wherever they are right now
+  for (const r of world.rollers) {
+    if (untouchable) break;
+    if (r.hit || r.z < prevD - 0.7 || r.z > me.d + 0.7) continue;
+    if (Math.abs(me.x - r.lane) > 0.62 || me.y > 0.8) continue;
+    r.hit = true;
+    hit("roller");
+  }
+  // mystery boxes
+  for (const b of world.boxes) {
+    if (b.taken || b.z < prevD - 0.8 || b.z > me.d + 0.8) continue;
+    if (Math.abs(me.x - b.lane) > 0.6 || me.y > 2.4) continue;
+    b.taken = true;
+    grabBox();
   }
   for (const b of course.boosts) {
     if (b.z < prevD - 1 || b.z > me.d + 1) continue;
@@ -1688,23 +1886,155 @@ function stepMe(dt) {
 }
 
 function hit(kind) {
-  if (me.invulnT > 0) return;
+  if (me.invulnT > 0 || me.stumbleT > 0) return;
+  if (me.power === "shield") {
+    endPower();
+    me.invulnT = 0.8;
+    sfx.pop();
+    banner("SHIELD SAVED YOU!", 900);
+    return;
+  }
+  if (me.power === "rocket" || me.power === "ghost") return;
   me.hits += 1;
   me.stumbleT = STUMBLE_S;
   me.invulnT = INVULN_S;
   me.boostT = 0;
   me.slideT = 0;
-  shake = 0.35;
+  me.vy = 0;
+  shake = 0.4;
   sfx.hit();
-  if (navigator.vibrate) navigator.vibrate(60);
-  const hintText = kind === "hurdle" ? "Jump! ↑" : kind === "gate" ? "Slide! ↓" : "Dodge! ← →";
-  banner(hintText, 800);
+  if (navigator.vibrate) navigator.vibrate(80);
+  const hintText = {
+    hurdle: "Jump! ↑",
+    gate: "Slide! ↓",
+    crate: "Dodge! ← →",
+    roller: "Jump the barrel! ↑",
+    zap: "ZAPPED! ⚡",
+  }[kind] || "Ouch!";
+  banner(hintText, 900);
+}
+
+// ── power-ups ──
+
+function currentPlace() {
+  const v = net.view;
+  if (!v) return 1;
+  let ahead = 0;
+  for (const p of v.players) {
+    if (p.id === playerId || p.left) continue;
+    const r = remote.map.get(p.id);
+    if (p.finish !== null || (r ? r.dispD : p.d) > me.d) ahead += 1;
+  }
+  return ahead + 1;
+}
+
+/** Leaders mostly get defence, the back of the pack gets the big stuff. */
+function rollPower() {
+  const v = net.view;
+  const racers = v ? v.players.filter((p) => !p.left).length : 1;
+  const place = currentPlace();
+  const back = racers > 1 ? (place - 1) / (racers - 1) : 0.5; // 0 = leading, 1 = last
+  const weights = {
+    shield: 3 - back * 1.5,
+    ghost: 2,
+    rocket: 1 + back * 3,
+    lightning: racers > 1 && place > 1 ? 0.5 + back * 3 : 0,
+  };
+  let total = 0;
+  for (const k of POWERS) total += weights[k];
+  let roll = Math.random() * total;
+  for (const k of POWERS) {
+    roll -= weights[k];
+    if (roll <= 0) return k;
+  }
+  return "shield";
+}
+
+function grabBox() {
+  const kind = rollPower();
+  sfx.pickup();
+  if (kind === "lightning") {
+    act({ type: "zap" });
+    sfx.zap();
+    flash();
+    banner("⚡ LIGHTNING! ⚡", 1100);
+    showPowerToast("lightning");
+    return;
+  }
+  if (me.power === "rocket" && kind !== "rocket") me.vy = 0;
+  me.power = kind;
+  me.powerT = POWER_S[kind];
+  if (kind === "rocket") {
+    me.slideT = 0;
+    sfx.rocket();
+  }
+  banner(`${POWER_INFO[kind].label.toUpperCase()}!`, 900);
+  showPowerToast(kind);
+  renderPower();
+}
+
+function endPower() {
+  if (me.power === "rocket") {
+    me.vy = 0; // drop back down; brief grace so you don't land in a crate
+    me.invulnT = Math.max(me.invulnT, 0.7);
+  }
+  me.power = "";
+  me.powerT = 0;
+  renderPower();
+}
+
+/** Lightning from someone behind you trips you up (unless you're protected). */
+function checkZaps() {
+  const v = net.view;
+  if (!v?.zaps || game.mode !== "race") return;
+  for (const z of v.zaps) {
+    if (z.id <= me.lastZap) continue;
+    me.lastZap = z.id;
+    if (z.by === playerId) continue;
+    flash();
+    sfx.zap();
+    if (me.finished || me.d <= z.d) continue;
+    if (me.power === "rocket") continue;
+    if (me.power === "ghost") endPower();
+    me.invulnT = 0; // lightning gets through the after-hit blink
+    hit("zap");
+  }
+}
+
+function flash() {
+  const f = $("#zapFlash");
+  f.classList.remove("on");
+  void f.offsetWidth;
+  f.classList.add("on");
+}
+
+function showPowerToast(kind) {
+  const t = $("#powerToast");
+  t.replaceChildren(
+    el("img", { src: `/assets/pw_${kind}.png`, alt: "" }),
+    el("div", {}, el("b", {}, POWER_INFO[kind].label), el("span", {}, POWER_INFO[kind].hint)),
+  );
+  t.classList.remove("show");
+  void t.offsetWidth;
+  t.classList.add("show");
+}
+
+function renderPower() {
+  const slot = $("#powerSlot");
+  if (!me.power) {
+    slot.classList.remove("show");
+    return;
+  }
+  slot.classList.add("show");
+  slot.querySelector("img").src = `/assets/pw_${me.power}.png`;
+  slot.querySelector("b").textContent = POWER_INFO[me.power].label;
 }
 
 function currentAct() {
   if (net.view && serverNow() < net.view.startAt) return "idle";
   if (me.finished && me.speed < 0.5) return "cheer";
   if (me.stumbleT > 0) return "stumble";
+  if (me.power === "rocket") return "run";
   if (me.y > 0) return "jump";
   if (me.slideT > 0) return "slide";
   return "run";
@@ -1713,9 +2043,10 @@ function currentAct() {
 function sendPos(force = false) {
   const now = performance.now();
   const a = currentAct();
-  if (!force && now - me.lastSent < SEND_MS && a === me.sentAct) return;
+  if (!force && now - me.lastSent < SEND_MS && a === me.sentAct && me.power === me.sentPw) return;
   me.lastSent = now;
   me.sentAct = a;
+  me.sentPw = me.power;
   act({
     type: "pos",
     d: Math.round(Math.min(me.d, TRACK_LEN) * 100) / 100,
@@ -1723,19 +2054,33 @@ function sendPos(force = false) {
     y: Math.round(me.y * 100) / 100,
     act: a,
     hits: me.hits,
+    pw: me.power,
   });
 }
 
-function animateRunner(r, a, speed, dt) {
+function animateRunner(r, a, speed, dt, pw = "") {
   if (!r) return;
+  r.setPower(pw);
+  if (pw === "rocket") r.fx.flame.scale.setScalar(0.85 + Math.random() * 0.35);
+  if (pw === "shield") r.fx.bubble.rotation.y += dt * 1.5;
+  // hit something: face-plant, then get back up
+  if (a === "stumble") {
+    r.fallT += dt;
+    if (r.fallT < FALL_S) r.play("fall", 0.06, r.clipDuration("fall") / FALL_S);
+    else r.play("getup", 0.1, r.clipDuration("getup") / GETUP_S);
+    r.pivot.rotation.z = 0;
+    r.mixer.update(dt);
+    return;
+  }
+  r.fallT = 0;
   if (a === "jump") r.play("jump", 0.08, (r.clipDuration("jump") / 0.75) * 0.9);
   else if (a === "slide") r.play("slide", 0.08, r.clipDuration("slide") / SLIDE_S);
   else if (a === "cheer") r.play("cheer", 0.25);
   else if (a === "idle") r.play("idle", 0.25);
   else r.play("run", 0.12, clamp(speed / BASE_SPEED, 0.45, 1.45));
-  // stumble: a quick wobble on top of whatever is playing
-  r.pivot.rotation.z = a === "stumble" ? Math.sin(performance.now() / 45) * 0.35 : 0;
-  r.pivot.rotation.x = a === "stumble" ? 0.25 : 0;
+  // a little forward lean while flying the rocket
+  r.pivot.rotation.x = pw === "rocket" ? 0.35 : 0;
+  r.pivot.rotation.z = 0;
   r.mixer.update(dt);
 }
 
@@ -1759,14 +2104,19 @@ function frame(now) {
   if (game.mode === "race" || game.mode === "results-pending") {
     // substeps keep fast runners from tunnelling through thin obstacles
     const steps = Math.ceil(dt / (1 / 120));
+    const v = net.view;
+    const raceT = v && serverNow() >= v.startAt ? (serverNow() - v.startAt) / 1000 : null;
+    world.animateCourse(me.d, raceT, dt);
+    checkZaps();
     for (let i = 0; i < steps; i++) stepMe(dt / steps);
     if (game.mode === "race") sendPos(false);
 
     const zMe = -me.d;
     if (me.runner) {
       me.runner.group.position.set(laneX(me.x), me.y, zMe);
-      me.runner.group.visible = !(me.invulnT > 0 && me.stumbleT <= 0 && Math.floor(now / 90) % 2 === 0);
-      animateRunner(me.runner, currentAct(), me.speed, dt);
+      me.runner.group.visible = !(me.invulnT > 0 && me.stumbleT <= 0 && !me.power && Math.floor(now / 90) % 2 === 0);
+      animateRunner(me.runner, currentAct(), me.speed, dt, me.power);
+      if (me.power) $("#powerSlot i").style.width = `${(me.powerT / POWER_S[me.power]) * 100}%`;
     }
 
     for (const r of remote.map.values()) {
@@ -1780,7 +2130,7 @@ function frame(now) {
       r.runner.group.position.set(r.dispX, r.dispY, -r.dispD);
       r.runner.group.visible = !p.left;
       const ra = p.finish !== null && r.dispD > TRACK_LEN - 1 ? "cheer" : p.gone ? "idle" : p.act;
-      animateRunner(r.runner, ra, r.vel || BASE_SPEED, dt);
+      animateRunner(r.runner, ra, r.vel || BASE_SPEED, dt, p.left || p.finish !== null ? "" : p.pw || "");
     }
 
     // camera: behind and above the player, looking down the track

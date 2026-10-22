@@ -34,6 +34,22 @@ export const AFTER_FIRST_MS = 15000; // stragglers get this long after the winne
 export const LOBBY_GRACE_MS = 10000; // a dropped lobby player keeps their spot this long
 export const CHARACTERS = 8; // 4 starters + 4 shop skins
 
+/**
+ * Power-ups come out of mystery boxes on the course. The client rolls which
+ * one you get; only the lightning bolt needs the server (it trips everyone
+ * ahead of you, so it is relayed as a "zap").
+ *   shield    — the next hit (obstacle or zap) just pops the bubble
+ *   rocket    — fly over everything at boost speed for a few seconds
+ *   ghost     — run straight through obstacles for a few seconds
+ *   lightning — everyone ahead of you falls over (unless shielded)
+ */
+export const POWERS = ["shield", "rocket", "ghost", "lightning"];
+export const ZAP_COOLDOWN_MS = 3000;
+export const ROLLER_SPEED = 6; // m/s a barrel rolls toward you once it's triggered
+export const ROLLER_TRIGGER_M = 34; // a barrel starts rolling when you're this close
+/** How many visual variants each obstacle kind has (same collision rules). */
+export const LOOKS = { hurdle: 2, gate: 2, crate: 3, roller: 1 };
+
 /** Countries a runner can cheer for (ISO 3166 alpha-2 + English name). */
 export const COUNTRIES = [
   ["US", "United States"], ["GB", "United Kingdom"], ["DE", "Germany"], ["FR", "France"],
@@ -61,6 +77,7 @@ export const MIN_RACERS_FOR_MEDALS = 2;
 const SPEED_CAP = BOOST_SPEED + 1.5;
 const POS_SLACK_M = 6;
 const ACTS = ["run", "jump", "slide", "stumble", "idle"];
+const POWER_STATES = ["", "shield", "rocket", "ghost"];
 
 // ── course ──────────────────────────────────────────────────────────────────
 
@@ -77,26 +94,31 @@ function rng(seed) {
 
 /**
  * The course for a seed: rows of obstacles across the four lanes, plus boost
- * pads. Obstacle kinds:
- *   hurdle — low fence: JUMP over it
- *   gate   — high beam: SLIDE / DUCK under it
- *   crate  — tall crate stack: change LANE around it
- * Every row leaves at least two lanes free of crates.
+ * pads and mystery boxes. Obstacle kinds:
+ *   hurdle — low barrier (hurdle or hay bale): JUMP over it
+ *   gate   — high beam (barrier or log arch): SLIDE / DUCK under it
+ *   crate  — tall block (crates, a cow or a tyre stack): change LANE around it
+ *   roller — a barrel that rolls at you once you get close: JUMP it or dodge
+ * Every row leaves at least two lanes free of crates. `looks[lane]` picks the
+ * visual variant; it never changes how an obstacle is cleared.
  */
 export function buildCourse(seed) {
   const r = rng(seed);
+  // looks and boxes use their own stream, so they don't reshuffle the layout
+  const r2 = rng((seed ^ 0x9e3779b9) >>> 0);
   const pick = (arr) => arr[Math.floor(r() * arr.length)];
   const rows = [];
   const boosts = [];
+  const boxes = [];
   let z = 45;
   while (z < TRACK_LEN - 40) {
     const roll = r();
     let lanes;
-    if (roll < 0.2) {
+    if (roll < 0.17) {
       lanes = ["hurdle", "hurdle", "hurdle", "hurdle"];
-    } else if (roll < 0.38) {
+    } else if (roll < 0.32) {
       lanes = ["gate", "gate", "gate", "gate"];
-    } else if (roll < 0.7) {
+    } else if (roll < 0.62) {
       lanes = [null, null, null, null].map(() => pick([null, null, "hurdle", "gate"]));
       const crates = 1 + Math.floor(r() * 2);
       // Fisher–Yates, not sort(): sort order with a random comparator differs
@@ -107,6 +129,12 @@ export function buildCourse(seed) {
         [order[i], order[j]] = [order[j], order[i]];
       }
       for (let i = 0; i < crates; i++) lanes[order[i]] = "crate";
+    } else if (roll < 0.74 && z > 90) {
+      // one or two barrels with free lanes beside them
+      lanes = [null, null, null, null];
+      const a = Math.floor(r() * 4);
+      lanes[a] = "roller";
+      if (r() < 0.5) lanes[(a + 2) % 4] = "roller";
     } else {
       let crates = 0;
       lanes = [0, 1, 2, 3].map(() => {
@@ -117,14 +145,22 @@ export function buildCourse(seed) {
       });
       if (lanes.every((k) => k === null)) lanes[Math.floor(r() * 4)] = "hurdle";
     }
-    rows.push({ z: Math.round(z * 10) / 10, lanes });
-    const gap = 15 + r() * 9;
+    const looks = lanes.map((k) => (k ? Math.floor(r2() * LOOKS[k]) : 0));
+    rows.push({ z: Math.round(z * 10) / 10, lanes, looks });
+    // barrels roll toward you, so leave them a longer runway
+    const gap = (lanes.includes("roller") ? 26 : 15) + r() * 9;
     if (r() < 0.4) {
       boosts.push({ z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) });
     }
+    if (r2() < 0.34 && z > 60) {
+      const bz = Math.round((z + gap * 0.62) * 10) / 10;
+      const first = Math.floor(r2() * 4);
+      boxes.push({ z: bz, lane: first });
+      if (r2() < 0.5) boxes.push({ z: bz, lane: (first + 1 + Math.floor(r2() * 3)) % 4 });
+    }
     z += gap;
   }
-  return { rows, boosts, len: TRACK_LEN };
+  return { rows, boosts, boxes, len: TRACK_LEN };
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -152,7 +188,7 @@ function present(state) {
 }
 
 function freshRunner(p) {
-  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", finish: null, hits: 0, left: false };
+  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, zapAt: null, left: false };
 }
 
 function pickHost(state) {
@@ -214,6 +250,8 @@ export function setup() {
     startAt: 0,
     endAt: 0,
     firstFinishAt: null,
+    zaps: [],
+    zapSeq: 0,
   };
 }
 
@@ -262,6 +300,15 @@ export function validateAction(state, playerId, action) {
       if (!intIn(action.lane, 0, LANES - 1)) return { ok: false, error: "bad lane" };
       if (!ACTS.includes(action.act)) return { ok: false, error: "bad act" };
       if (action.hits !== undefined && !intIn(action.hits, 0, 999)) return { ok: false, error: "bad hits" };
+      if (action.pw !== undefined && !POWER_STATES.includes(action.pw)) return { ok: false, error: "bad power" };
+      return { ok: true };
+    }
+    case "zap": {
+      if (!me) return { ok: false, error: "join first" };
+      if (state.phase !== "race") return { ok: false, error: "not racing" };
+      if (me.finish !== null || me.left) return { ok: false, error: "not racing" };
+      const t = num(action.t) ? action.t : state.now;
+      if (me.zapAt !== null && t - me.zapAt < ZAP_COOLDOWN_MS) return { ok: false, error: "too soon" };
       return { ok: true };
     }
     case "again": {
@@ -324,6 +371,7 @@ export function applyAction(state0, playerId, action) {
       state.startAt = t + COUNTDOWN_MS;
       state.endAt = 0;
       state.firstFinishAt = null;
+      state.zaps = [];
       for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
       break;
     }
@@ -344,12 +392,22 @@ export function applyAction(state0, playerId, action) {
       me.y = Math.max(0, Math.min(action.y, 5));
       me.act = action.act;
       if (action.hits !== undefined) me.hits = action.hits;
+      if (action.pw !== undefined) me.pw = action.pw;
       if (me.d >= TRACK_LEN) {
         me.finish = Math.max(1, Math.round(elapsed));
         me.act = "idle";
+        me.pw = "";
         if (state.firstFinishAt === null) state.firstFinishAt = t;
       }
       maybeEnd(state, t);
+      break;
+    }
+    case "zap": {
+      // everyone ahead of the zapper (at this moment) gets tripped; clients
+      // apply it to themselves when they see a zap they haven't seen yet
+      me.zapAt = t;
+      state.zapSeq = (state.zapSeq ?? 0) + 1;
+      state.zaps = [...(state.zaps ?? []), { id: state.zapSeq, by: playerId, d: me.d, at: t }].slice(-6);
       break;
     }
     case "again": {
@@ -447,6 +505,7 @@ export function viewFor(state, playerId) {
         lane: p.lane,
         y: Math.round(p.y * 100) / 100,
         act: p.act,
+        pw: p.pw || "",
         finish: p.finish,
         hits: p.hits,
         gone: p.gone,
@@ -455,6 +514,7 @@ export function viewFor(state, playerId) {
     }),
     standings: standings(state),
     rewards: rewards(state),
+    zaps: state.zaps ?? [],
   };
 }
 

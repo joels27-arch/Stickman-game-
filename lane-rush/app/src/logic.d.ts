@@ -31,8 +31,9 @@ export function wakeAfter(state: unknown): number | null;
 export function standings(state: unknown): string[];
 
 export function buildCourse(seed: number): {
-  rows: { z: number; lanes: (string | null)[] }[];
+  rows: { z: number; lanes: (string | null)[]; looks: number[] }[];
   boosts: { z: number; lane: number }[];
+  boxes: { z: number; lane: number }[];
   len: number;
 };
 
@@ -46,6 +47,11 @@ export const RACE_LIMIT_MS: number;
 export const AFTER_FIRST_MS: number;
 export const LOBBY_GRACE_MS: number;
 export const CHARACTERS: number;
+export const POWERS: string[];
+export const ZAP_COOLDOWN_MS: number;
+export const ROLLER_SPEED: number;
+export const ROLLER_TRIGGER_M: number;
+export const LOOKS: Record<string, number>;
 export const COUNTRIES: [string, string][];
 export const MEDALS: string[];
 export const MEDAL_WORTH: Record<string, number>;

@@ -146,6 +146,72 @@ describe("course", () => {
   });
 });
 
+describe("obstacles and power-ups", () => {
+  it("gives every obstacle a valid look and keeps barrels and boxes on the track", () => {
+    let rollers = 0;
+    let boxes = 0;
+    for (let seed = 0; seed < 200; seed++) {
+      const c = L.buildCourse(seed * 104729);
+      for (const row of c.rows) {
+        row.lanes.forEach((k, i) => {
+          if (!k) return;
+          expect(row.looks[i]).toBeGreaterThanOrEqual(0);
+          expect(row.looks[i]).toBeLessThan(L.LOOKS[k]);
+        });
+        // a barrel row always leaves at least two lanes open
+        if (row.lanes.includes("roller")) {
+          rollers++;
+          expect(row.lanes.filter((k) => k === null).length).toBeGreaterThanOrEqual(2);
+        }
+      }
+      for (const b of c.boxes) {
+        boxes++;
+        expect(b.lane).toBeGreaterThanOrEqual(0);
+        expect(b.lane).toBeLessThan(L.LANES);
+        expect(b.z).toBeLessThan(L.TRACK_LEN);
+      }
+    }
+    expect(rollers).toBeGreaterThan(100);
+    expect(boxes).toBeGreaterThan(300);
+  });
+
+  function racing(n = 2): S {
+    let s = act(lobbyOf(n), "p0", { type: "start", t: T0 });
+    return L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+  }
+
+  it("relays a lightning zap with the zapper's distance, at most once per cooldown", () => {
+    let s = racing(3);
+    s = act(s, "p1", { type: "pos", d: 40, lane: 1, y: 0, act: "run", t: s.startAt + 5000 });
+    s = act(s, "p1", { type: "zap", t: s.startAt + 5100 });
+    const view = L.viewFor(s, "p0") as any;
+    expect(view.zaps).toEqual([{ id: 1, by: "p1", d: 40, at: s.startAt + 5100 }]);
+    expect(reject(s, "p1", { type: "zap", t: s.startAt + 6000 })).toMatch(/soon/);
+    s = act(s, "p1", { type: "zap", t: s.startAt + 5100 + L.ZAP_COOLDOWN_MS });
+    expect(s.zaps.map((z: any) => z.id)).toEqual([1, 2]);
+  });
+
+  it("only zaps during the race, and a new race forgets old zaps", () => {
+    const lobby = lobbyOf(2);
+    expect(reject(lobby, "p0", { type: "zap" })).toBeTruthy();
+    let s = racing(2);
+    s = act(s, "p0", { type: "zap", t: s.startAt + 1000 });
+    s = act(s, "p0", { type: "pos", d: L.TRACK_LEN, lane: 0, y: 0, act: "run", t: s.startAt + 50_000 });
+    expect(reject(s, "p0", { type: "zap", t: s.startAt + 50_100 })).toBeTruthy();
+    s = act(s, "p1", { type: "pos", d: L.TRACK_LEN, lane: 0, y: 0, act: "run", t: s.startAt + 51_000 });
+    s = act(s, "p0", { type: "again", t: s.startAt + 60_000 });
+    s = act(s, "p0", { type: "start", t: s.startAt + 61_000 });
+    expect(s.zaps).toEqual([]);
+  });
+
+  it("shares which power a runner has on and rejects made-up ones", () => {
+    let s = racing(2);
+    s = act(s, "p0", { type: "pos", d: 10, lane: 0, y: 2, act: "run", pw: "rocket", t: s.startAt + 1000 });
+    expect((L.viewFor(s, "p1") as any).players[0].pw).toBe("rocket");
+    expect(reject(s, "p0", { type: "pos", d: 11, lane: 0, y: 0, act: "run", pw: "laser" })).toMatch(/power/);
+  });
+});
+
 describe("medals and countries", () => {
   const pos = (d: number, t: number) => ({ type: "pos", d, lane: 0, y: 0, act: "run", t });
 
