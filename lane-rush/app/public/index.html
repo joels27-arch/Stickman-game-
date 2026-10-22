@@ -116,7 +116,13 @@
 
     <!-- LINE-UP: everyone's runner on a pedestal, waiting for READY -->
     <section id="lineup" class="screen lineup">
-      <div class="lu-arena"><div class="lu-grid"></div><div class="lu-beams"></div></div>
+      <div class="lu-arena">
+        <picture class="lu-bg">
+          <source media="(max-aspect-ratio: 1/1)" srcset="/assets/lobby_tall.jpg" />
+          <img src="/assets/lobby_wide.jpg" alt="" />
+        </picture>
+        <div class="lu-shade"></div>
+      </div>
       <header class="lu-top">
         <div class="lu-code"><small>Lobby code</small><b id="luCode">----</b><button id="luCopy" class="btn small blue" type="button">Copy invite</button></div>
         <div class="lu-mode"><small>Game mode</small><b id="luMode">Survival</b><span id="luMap">Meadow</span></div>

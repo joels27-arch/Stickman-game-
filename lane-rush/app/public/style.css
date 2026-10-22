@@ -776,3 +776,26 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .quest.done small { color: #2ec36b; }
 .coin-buy { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .play-card [hidden], .pill [hidden] { display: none !important; }
+
+/* line-up: painted stadium backdrop */
+.lineup { background: #2a1d4a; }
+.lu-bg, .lu-bg img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lu-bg img { object-fit: cover; object-position: 50% 60%; }
+.lu-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10, 8, 30, 0.55) 0%, rgba(10, 8, 30, 0) 24%, rgba(10, 8, 30, 0) 62%, rgba(5, 8, 15, 0.7) 88%, rgba(5, 8, 15, 0.85) 100%); }
+.lu-code, .lu-mode { background: rgba(12, 14, 34, 0.72); backdrop-filter: blur(8px); border-radius: 14px; }
+.ped .tag b { text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); }
+.ped .tag span { text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9); }
+.ped.empty .ghost { border-color: rgba(255, 255, 255, 0.55); color: #fff; background: rgba(10, 8, 30, 0.35); text-shadow: 0 1px 3px #000; }
+.lu-status { text-shadow: 0 1px 4px #000; }
+/* phones: everyone stands on the painted round stage */
+@media (max-aspect-ratio: 1/1) {
+  .lu-bg img { object-position: 50% 50%; }
+  .lu-stage { bottom: 30.5vh; height: 44vh; gap: 2px; }
+}
+/* both layouts: runners stand on the painted platform, only you keep a glow */
+.ped .disc { opacity: 0; }
+.ped.me .disc { opacity: 1; height: 20px; margin-top: -12px; }
+@media (min-aspect-ratio: 1/1) {
+  .lu-bg img { object-position: 50% 70%; }
+  .lu-stage { bottom: 24vh; height: 56vh; left: 22%; right: 22%; }
+}
