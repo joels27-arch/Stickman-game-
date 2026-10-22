@@ -2604,7 +2604,7 @@ world
 
 // test hooks for the local dev server only (headless browser checks)
 if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
-  window.__laneRush = { me, hit, grabBox, game };
+  window.__laneRush = { me, hit, grabBox, game, net };
 }
 
 requestAnimationFrame(frame);
