@@ -1,0 +1,10 @@
+logs
+*.log
+node_modules
+dist
+.wrangler
+.dev.vars
+.DS_Store
+# Downloaded by ../fetch-assets.sh (3D models, textures, three.js)
+public/assets/
+public/vendor/
