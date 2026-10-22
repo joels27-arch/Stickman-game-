@@ -1554,7 +1554,7 @@ const world = (() => {
     // Higgsfield start and finish gates
     if (P.startGate) {
       const g = P.startGate.clone();
-      g.position.set(0, 0, 1.2);
+      g.position.set(0, 0, -7); // a few metres past the start line: you run through it at GO
       scene.add(g);
     }
     if (P.finishGate) {
