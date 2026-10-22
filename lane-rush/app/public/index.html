@@ -35,38 +35,40 @@
     <div class="veil" aria-hidden="true"></div>
 
     <!-- HOME -->
-    <section id="home" class="screen show">
-      <div class="frame">
-        <header class="strip top"><span class="runner-ico">🏃</span><span>4 players</span><i>/</i><span>4 lanes</span><i>/</i><span>1 victory</span></header>
-        <div class="panel home-panel">
-          <div class="brand">
-            <h1 class="logo"><span class="w1">BRAIN</span><span class="w2">RUN</span></h1>
-            <p class="tag">4-player racing<br />meadow track</p>
-          </div>
-          <div class="topbar">
-            <div class="wallet" title="Your medals"></div>
-            <div class="topbar-btns">
-              <button id="settingsBtn" class="btn small ghost" type="button">⚙ Settings</button>
-              <button class="btn small gold shopBtn" type="button">Shop</button>
-            </div>
-          </div>
-          <div class="roster" id="homeRoster"></div>
-          <div id="daily" class="daily"></div>
-          <label class="field">
+    <section id="home" class="screen show home">
+      <picture class="home-art">
+        <source media="(max-aspect-ratio: 1/1)" srcset="/assets/home_tall.jpg" />
+        <img src="/assets/home_wide.jpg" alt="" />
+      </picture>
+      <div class="home-shade"></div>
+      <header class="home-top">
+        <div class="wallet" title="Your medals"></div>
+        <div class="topbar-btns">
+          <button id="settingsBtn" class="btn small ghost" type="button">⚙ Settings</button>
+          <button class="btn small gold shopBtn" type="button">Shop</button>
+        </div>
+      </header>
+      <h1 class="logo home-logo"><span class="w1">BRAIN</span><span class="w2">RUN</span></h1>
+      <div class="roster" id="homeRoster" hidden></div>
+      <div class="home-dock">
+        <div id="daily" class="daily"></div>
+        <div class="dock-grid">
+          <label class="field name-field">
             <span>Your name</span>
             <input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Speedy" />
           </label>
           <button id="soloBtn" class="btn big go"><span class="flagico">❤️</span> Play solo <span class="arrow">→</span></button>
           <button id="createBtn" class="btn big blue"><span class="flagico">👥</span> Create lobby <span class="arrow">→</span></button>
-          <div class="or"><span>Join lobby</span></div>
-          <div class="join-row">
-            <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" />
-            <button id="joinBtn" class="btn big ghost">Join</button>
+          <div class="join-wrap">
+            <div class="or"><span>Join lobby</span></div>
+            <div class="join-row">
+              <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" />
+              <button id="joinBtn" class="btn big ghost">Join</button>
+            </div>
           </div>
-          <p id="homeMsg" class="msg" role="alert"></p>
-          <p class="hint" id="loadHint">Loading 3D runners…</p>
         </div>
-        <footer class="strip bottom"><b class="mini-logo">BRAIN<em>RUN</em></b><i>|</i><span>Live</span><i>/</i><span>4-player racing</span><i>/</i><span>Meadow track</span></footer>
+        <p id="homeMsg" class="msg" role="alert"></p>
+        <p class="hint" id="loadHint">Loading 3D runners…</p>
       </div>
     </section>
 
