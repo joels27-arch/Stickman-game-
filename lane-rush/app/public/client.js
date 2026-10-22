@@ -1203,7 +1203,7 @@ $("#luGo").addEventListener("click", () => {
 function renderLineup(v, { isHost, gm, mp, mode, what }) {
   $("#luCode").textContent = net.code;
   $("#luMode").textContent = gm === "tournament" ? "Tournament" : gm === "survival" && v.players.length < 2 && !botsOn() ? "Endless run" : GAME_MODE_INFO[gm].label;
-  $("#luMap").textContent = gm === "tournament" ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${mode}`;
+  $("#luMap").textContent = gm === "tournament" ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${botsOn() && v.players.length < 4 ? "with bots" : mode}`;
   const qs = dailyChallenges();
   const qd = dailyState();
   $("#luDaily").textContent = `📋 Challenges ${qs.filter((q) => qd.done[q.id]).length}/${qs.length}`;
@@ -1236,7 +1236,7 @@ function renderLineup(v, { isHost, gm, mp, mode, what }) {
     return ped;
   });
   for (let i = order.length; i < 4; i++) {
-    peds.push(el("div", { class: "ped empty" }, el("div", { class: "ghost", text: v.botFill !== false && botsOn() ? `🤖 A bot joins at the start · code ${net.code}` : `Waiting… code ${net.code}` }), el("div", { class: "disc" })));
+    peds.push(el("div", { class: "ped empty" }, el("div", { class: "ghost", text: botsOn() ? "🤖 Bot joins at the start" : `Waiting… code ${net.code}` }), el("div", { class: "disc" })));
   }
   stage.replaceChildren(...peds);
 
@@ -1373,7 +1373,7 @@ function renderResults(v) {
     if (fresh) sfx.boost();
   } else if (cup && !cupDone) {
     reward.append(el("span", { class: "nomedal", text: `+${CUP_POINTS[v.standings.indexOf(playerId)] ?? 0} points · medals are paid after race ${cup.races.length}` }));
-  } else if (myPlace) {
+  } else if (myPlace && v.players.filter((p) => !p.bot).length >= MIN_RACERS_FOR_MEDALS) {
     reward.append(el("span", {
       class: "nomedal",
       text: v.players.filter((p) => !p.bot).length < MIN_RACERS_FOR_MEDALS ? "Medals are won in races with 2 or more players" : "No medal this time. Top 3 win medals!",
@@ -1381,7 +1381,7 @@ function renderResults(v) {
   }
   if (rpChange) {
     reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
-    if (rpChange.botsOnly) reward.append(el("span", { class: "nomedal", text: "Rank points need 2 real players" }));
+    if (rpChange.botsOnly) reward.append(el("span", { class: "nomedal", text: "Medals and rank points need 2 real players" }));
     else reward.append(rankChip(rpChange));
   }
   renderWallet();

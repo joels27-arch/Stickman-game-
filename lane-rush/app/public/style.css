@@ -1069,3 +1069,8 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .coinchip b { font-family: var(--display); font-weight: 900; font-size: 22px; color: #ffd23f; }
 .coinchip small { font-weight: 700; font-size: 12px; color: #dfe7d3; }
 #rematchBtn.waiting { opacity: 0.7; }
+.res-reward { flex-wrap: wrap; row-gap: 6px; }
+.res-reward .coinchip, .res-reward .rpchip { margin-left: 0; }
+.res-reward .nomedal { flex-basis: 100%; font-size: 13px; }
+.res-reward .coinchip img { width: 40px; height: 34px; animation: none; }
+.res-reward .rpchip img { width: 40px; height: 40px; animation: none; }
