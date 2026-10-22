@@ -13,7 +13,7 @@
       content="A cartoon 4-player running race. Make a lobby, share the code, then jump, slide and dodge your way to the finish line."
     />
     <meta property="og:image" content="/assets/cover.jpg" />
-    <meta name="theme-color" content="#3fb3ff" />
+    <meta name="theme-color" content="#0b0f0c" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -22,7 +22,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800;1,900&family=Barlow:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/style.css" />
@@ -32,71 +32,77 @@
   </head>
   <body>
     <canvas id="scene"></canvas>
+    <div class="veil" aria-hidden="true"></div>
 
     <!-- HOME -->
     <section id="home" class="screen show">
-      <div class="panel home-panel">
-        <div class="topbar">
-          <div class="wallet" title="Your medals"></div>
-          <button class="btn small gold shopBtn" type="button">🛒 Shop</button>
+      <div class="frame">
+        <header class="strip top"><span class="runner-ico">🏃</span><span>4 players</span><i>/</i><span>4 lanes</span><i>/</i><span>1 victory</span></header>
+        <div class="panel home-panel">
+          <div class="brand">
+            <h1 class="logo"><span class="w1">LANE</span><span class="w2">RUSH</span></h1>
+            <p class="tag">4-player racing<br />meadow track</p>
+          </div>
+          <div class="topbar">
+            <div class="wallet" title="Your medals"></div>
+            <button class="btn small gold shopBtn" type="button">Shop</button>
+          </div>
+          <div class="roster" id="homeRoster"></div>
+          <div class="form-grid">
+            <label class="field">
+              <span>Your name</span>
+              <input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Speedy" />
+            </label>
+            <label class="field">
+              <span>Country you cheer for</span>
+              <select id="countrySel" class="countrySel"></select>
+            </label>
+          </div>
+          <button id="createBtn" class="btn big go"><span class="flagico">🏁</span> Create lobby <span class="arrow">→</span></button>
+          <div class="or"><span>or join a friend</span></div>
+          <div class="join-row">
+            <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" />
+            <button id="joinBtn" class="btn big blue">Join</button>
+          </div>
+          <p id="homeMsg" class="msg" role="alert"></p>
+          <p class="hint" id="loadHint">Loading 3D runners…</p>
         </div>
-        <h1 class="logo">LANE<span>RUSH</span></h1>
-        <p class="tag">The 4-player party race</p>
-        <div class="roster" id="homeRoster"></div>
-        <label class="field">
-          <span>Your name</span>
-          <input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Speedy" />
-        </label>
-        <label class="field">
-          <span>Country you cheer for</span>
-          <select id="countrySel" class="countrySel"></select>
-        </label>
-        <button id="createBtn" class="btn big go">Create lobby</button>
-        <div class="or"><span>or join a friend</span></div>
-        <div class="join-row">
-          <input
-            id="codeInput"
-            maxlength="4"
-            autocomplete="off"
-            autocapitalize="characters"
-            spellcheck="false"
-            placeholder="CODE"
-          />
-          <button id="joinBtn" class="btn big blue">Join</button>
-        </div>
-        <p id="homeMsg" class="msg" role="alert"></p>
-        <p class="hint" id="loadHint">Loading 3D runners…</p>
+        <footer class="strip bottom"><b class="mini-logo">LANE<em>RUSH</em></b><i>|</i><span>Live</span><i>/</i><span>4-player racing</span><i>/</i><span>Meadow track</span></footer>
       </div>
     </section>
 
     <!-- LOBBY -->
     <section id="lobby" class="screen">
-      <div class="panel lobby-panel">
-        <div class="lobby-head">
-          <div>
-            <div class="small">Lobby code</div>
-            <div id="lobbyCode" class="code">----</div>
+      <div class="frame">
+        <header class="strip top"><span class="runner-ico">🏃</span><span>Lobby</span><i>/</i><span>Code <b id="lobbyCodeStrip">----</b></span><i>/</i><span id="lobbyCount">1/4 players</span></header>
+        <div class="panel lobby-panel">
+          <div class="lobby-head">
+            <div class="brand small-brand">
+              <h1 class="logo"><span class="w1">LANE</span><span class="w2">RUSH</span></h1>
+            </div>
+            <div class="code-box">
+              <div class="label">Lobby code</div>
+              <div id="lobbyCode" class="code">----</div>
+              <button id="copyBtn" class="btn small blue">Copy invite link</button>
+              <div id="copyMsg" class="small"></div>
+            </div>
           </div>
-          <div class="share">
-            <button id="copyBtn" class="btn small blue">Copy invite link</button>
-            <div id="copyMsg" class="small"></div>
+          <div id="slots" class="slots"></div>
+          <div class="topbar">
+            <div class="wallet" title="Your medals"></div>
+            <select id="lobbyCountry" class="countrySel" aria-label="Country you cheer for"></select>
+            <button class="btn small gold shopBtn" type="button">Shop</button>
           </div>
+          <h3 class="pick-title">Choose your runner</h3>
+          <div id="picker" class="picker"></div>
+          <div class="lobby-actions">
+            <button id="leaveBtn" class="btn small ghost">Leave</button>
+            <button id="startBtn" class="btn big go"><span class="flagico">🏁</span> Start race <span class="arrow">→</span></button>
+            <div id="waitHost" class="wait">Waiting for the host to start…</div>
+          </div>
+          <div class="panel-foot"><span id="readyCount">👥 1/4 players ready</span><span class="motto">Same track. Different dreams.</span></div>
+          <p id="lobbyMsg" class="msg" role="alert"></p>
         </div>
-        <p class="small center">Friends open the game and type this code (up to 4 players).</p>
-        <div class="topbar">
-          <div class="wallet" title="Your medals"></div>
-          <select id="lobbyCountry" class="countrySel" aria-label="Country you cheer for"></select>
-          <button class="btn small gold shopBtn" type="button">🛒 Shop</button>
-        </div>
-        <div id="slots" class="slots"></div>
-        <h3 class="pick-title">Choose your runner</h3>
-        <div id="picker" class="picker"></div>
-        <div class="lobby-actions">
-          <button id="leaveBtn" class="btn small ghost">Leave</button>
-          <button id="startBtn" class="btn big go">Start race</button>
-          <div id="waitHost" class="wait">Waiting for the host to start…</div>
-        </div>
-        <p id="lobbyMsg" class="msg" role="alert"></p>
       </div>
     </section>
 
@@ -115,33 +121,39 @@
 
     <!-- RESULTS -->
     <section id="results" class="screen">
-      <div class="panel results-panel">
-        <div id="resHead" class="res-head">
-          <div id="resPlace" class="res-place">1<sup>st</sup></div>
-          <div>
-            <div id="resTitle" class="title">Race results</div>
-            <div id="resReward" class="res-reward"></div>
+      <div class="frame">
+        <header class="strip top"><span class="runner-ico">🏁</span><span>Race complete</span><i>/</i><span>Final standings</span></header>
+        <div class="panel results-panel">
+          <div id="resHead" class="res-head">
+            <div id="resPlace" class="res-place">1<sup>st</sup></div>
+            <div>
+              <div id="resTitle" class="title">Race results</div>
+              <div id="resReward" class="res-reward"></div>
+            </div>
           </div>
-        </div>
-        <ol id="podium" class="podium"></ol>
-        <div class="lobby-actions">
-          <button id="leave2Btn" class="btn small ghost">Leave</button>
-          <button id="againBtn" class="btn big go">Play again</button>
-          <div id="waitHost2" class="wait">Waiting for the host…</div>
+          <ol id="podium" class="podium"></ol>
+          <div class="lobby-actions">
+            <button id="leave2Btn" class="btn small ghost">Leave</button>
+            <button id="againBtn" class="btn big go"><span class="flagico">🏁</span> Play again <span class="arrow">→</span></button>
+            <div id="waitHost2" class="wait">Waiting for the host…</div>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- SHOP -->
     <section id="shop" class="screen">
-      <div class="panel shop-panel">
-        <div class="shop-head">
-          <h2 class="title">Skin shop</h2>
-          <div class="wallet" title="Your medals"></div>
+      <div class="frame">
+        <header class="strip top"><span class="runner-ico">🛒</span><span>Skin shop</span><i>/</i><span>Pay with medals</span></header>
+        <div class="panel shop-panel">
+          <div class="shop-head">
+            <h2 class="title">Skin shop</h2>
+            <div class="wallet" title="Your medals"></div>
+          </div>
+          <p class="small center">Win medals in races with friends: 1st gold (worth 10) · 2nd silver (worth 5) · 3rd bronze (worth 3). Bigger medals can pay for cheaper prices.</p>
+          <div id="shopGrid" class="shop-grid"></div>
+          <button id="shopBack" class="btn big blue" type="button">← Back</button>
         </div>
-        <p class="small center">Win medals in races with friends: 🥇 1st gold (worth 10) · 🥈 2nd silver (worth 5) · 🥉 3rd bronze (worth 3). Bigger medals can pay for cheaper prices.</p>
-        <div id="shopGrid" class="shop-grid"></div>
-        <button id="shopBack" class="btn big blue" type="button">Back</button>
       </div>
     </section>
 

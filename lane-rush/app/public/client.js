@@ -45,6 +45,8 @@ const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silve
 const medalText = (medal, n) => `${n} ${medal} medal${n === 1 ? "" : "s"}`;
 const flagOf = (code) => (code && code.length === 2 ? String.fromCodePoint(...[...code].map((c) => 127397 + c.charCodeAt(0))) : "");
 const withFlag = (name, code) => (code ? `${flagOf(code)} ${name}` : name);
+const countryName = (code) => (COUNTRIES.find(([c]) => c === code) || [])[1] || "";
+const MODES = ["Solo", "Duo", "Trio", "Squad"];
 const LANE_W = 2.0; // metres between lane centres
 const CHAR_H = 1.55; // runner height in metres
 const JUMP_V = 8.6;
@@ -256,7 +258,17 @@ function el(tag, attrs = {}, ...kids) {
 }
 
 // Home roster
-for (let i = 0; i < 4; i++) $("#homeRoster").append(el("img", { src: portrait(i), alt: RUNNERS[i].name }));
+/** A team-coloured runner card like the lobby's, used on the home screen. */
+function runnerCard(i, num) {
+  return el(
+    "div",
+    { class: "rcard", style: `--team:${RUNNERS[i].color}` },
+    el("span", { class: "num", text: String(num) }),
+    el("img", { class: "pic", src: portrait(i), alt: "" }),
+    el("div", { class: "info" }, el("span", { class: "nm", text: RUNNERS[i].name })),
+  );
+}
+for (let i = 0; i < 4; i++) $("#homeRoster").append(runnerCard(i, i + 1));
 
 const nameInput = $("#nameInput");
 const codeInput = $("#codeInput");
@@ -566,23 +578,32 @@ function enterLobby() {
 
 function renderLobby(v) {
   $("#lobbyCode").textContent = net.code;
+  $("#lobbyCodeStrip").textContent = net.code;
   const slots = $("#slots");
   slots.replaceChildren();
   for (let i = 0; i < 4; i++) {
     const p = v.players[i];
     if (!p) {
-      slots.append(el("div", { class: "slot empty" }, el("span", { class: "nm", text: "Waiting…" })));
+      slots.append(el("div", { class: "rcard empty" }, el("span", { class: "num", text: String(i + 1) }), el("span", { class: "nm", text: "Waiting for player…" })));
       continue;
     }
-    const s = el(
+    const cty = p.country ? `${flagOf(p.country)} ${countryName(p.country)}` : "🌍 No country";
+    const card = el(
       "div",
-      { class: `slot${p.gone ? " gone" : ""}`, style: `background:${RUNNERS[p.char].color}33` },
-      el("img", { src: portrait(p.char), alt: "" }),
-      el("span", { class: "nm", text: withFlag(p.name, p.country) }),
+      { class: `rcard${p.gone ? " gone" : ""}`, style: `--team:${RUNNERS[p.char]?.color ?? "#666"}` },
+      el("span", { class: "num", text: String(i + 1) }),
+      el("img", { class: "pic", src: portrait(p.char), alt: "" }),
+      el(
+        "div",
+        { class: "info" },
+        el("span", { class: "nm", text: p.name }),
+        el("span", { class: "cty", text: cty }),
+        el("div", { class: "ready" }, el("span", { text: p.gone ? "Away" : "Ready" }), el("span", { class: `toggle${p.gone ? "" : " on"}` })),
+      ),
     );
-    if (p.id === v.host) s.append(el("span", { class: "crown", text: "👑" }));
-    if (p.id === playerId) s.append(el("span", { class: "you", text: "YOU" }));
-    slots.append(s);
+    if (p.id === v.host) card.append(el("span", { class: "crown", text: "👑" }));
+    if (p.id === playerId) card.append(el("span", { class: "you", text: "YOU" }));
+    slots.append(card);
   }
 
   const me = v.players.find((p) => p.id === playerId);
@@ -597,7 +618,7 @@ function renderLobby(v) {
       : el("small", { text: mine ? "You" : owner ? owner.name : "" });
     const card = el(
       "button",
-      { class: `card${mine ? " mine" : ""}${owner && !mine ? " taken" : ""}${locked ? " locked" : ""}`, type: "button" },
+      { class: `card${mine ? " mine" : ""}${owner && !mine ? " taken" : ""}${locked ? " locked" : ""}`, type: "button", style: `--team:${r.color}` },
       el("img", { src: portrait(i), alt: "" }),
       el("b", { text: r.name, style: `color:${r.color}` }),
       sub,
@@ -626,8 +647,13 @@ function renderLobby(v) {
   const n = v.players.filter((p) => !p.gone).length;
   $("#startBtn").style.display = isHost ? "" : "none";
   $("#waitHost").style.display = isHost ? "none" : "block";
-  $("#startBtn").textContent = n >= 2 ? `Start race (${n}/4)` : "Start solo practice";
-  $("#lobbyMsg").textContent = isHost && n < 2 ? "Share the code — friends can join until you press start." : "";
+  const mode = MODES[Math.max(0, Math.min(n, 4) - 1)];
+  const start = $("#startBtn");
+  start.replaceChildren(el("span", { class: "flagico", text: "🏁" }), el("span", { text: `Start ${mode} race` }), el("span", { class: "arrow", text: "→" }));
+  $("#lobbyCount").textContent = `${mode} · ${n}/4 players`;
+  $("#readyCount").textContent = `👥 ${n}/4 players ready`;
+  $("#lobbyMsg").textContent =
+    isHost && n < 2 ? "Race solo for practice, or share the code: duo, trio or a full squad of 4. Medals need 2+ players." : "";
   world.setShowcase(me?.char ?? 0);
   if (world.ready) for (const p of v.players) world.ensureChar(p.char).catch(() => {});
   renderWallet();
@@ -1171,20 +1197,24 @@ const world = (() => {
     c.width = 256;
     c.height = 72;
     const g = c.getContext("2d");
-    g.font = "900 38px Nunito, 'Arial Rounded MT Bold', sans-serif";
-    const w = Math.min(240, g.measureText(text).width + 36);
-    g.fillStyle = color;
-    g.strokeStyle = "#23314d";
-    g.lineWidth = 6;
+    g.font = "italic 800 36px 'Barlow Condensed', 'Arial Narrow', sans-serif";
+    const label = text.toUpperCase();
+    const w = Math.min(244, g.measureText(label).width + 34);
     const x = (256 - w) / 2;
+    g.fillStyle = "rgba(8,11,9,0.88)";
     g.beginPath();
-    g.roundRect ? g.roundRect(x, 8, w, 54, 18) : g.rect(x, 8, w, 54);
+    g.moveTo(x + 10, 10);
+    g.lineTo(x + w, 10);
+    g.lineTo(x + w - 10, 62);
+    g.lineTo(x, 62);
+    g.closePath();
     g.fill();
-    g.stroke();
-    g.fillStyle = "#fff";
+    g.fillStyle = color;
+    g.fillRect(x + 2, 56, w - 12, 6);
+    g.fillStyle = "#ffffff";
     g.textAlign = "center";
     g.textBaseline = "middle";
-    g.fillText(text, 128, 37, 220);
+    g.fillText(label, 128, 34, 220);
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false }));
