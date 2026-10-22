@@ -797,5 +797,5 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .ped.me .disc { opacity: 1; height: 20px; margin-top: -12px; }
 @media (min-aspect-ratio: 1/1) {
   .lu-bg img { object-position: 50% 70%; }
-  .lu-stage { bottom: 24vh; height: 56vh; left: 22%; right: 22%; }
+  .lu-stage { bottom: 22vh; height: 56vh; left: 22%; right: 22%; }
 }
