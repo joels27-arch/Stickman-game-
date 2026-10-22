@@ -1179,3 +1179,61 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .pass-note { margin: 0; text-align: center; font-weight: 700; font-size: 12px; color: rgba(255, 255, 255, 0.8); }
 .pill.pass .dot[hidden] { display: none; }
 .shop-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* ================= mobile race HUD (thumb-first) ================= */
+.hud { --safe-b: max(14px, calc(env(safe-area-inset-bottom) + 8px)); --safe-l: max(12px, env(safe-area-inset-left)); --safe-r: max(12px, env(safe-area-inset-right)); }
+.hud-top { gap: 8px; }
+.place { border: 0; border-radius: 14px; padding: 2px 12px; min-width: 0; background: rgba(8, 12, 30, 0.78); box-shadow: inset 0 0 0 2px rgba(182, 247, 42, 0.8); }
+.timer { border: 0; border-radius: 14px; padding: 2px 12px; min-width: 0; background: rgba(8, 12, 30, 0.78); }
+.track-bar { border-radius: 12px; overflow: hidden; background: rgba(8, 12, 30, 0.7); }
+/* power-up: a big round button in the left thumb zone, with a timer ring */
+.power-slot { left: var(--safe-l); bottom: var(--safe-b); width: 86px; height: 86px; padding: 0; border: 0; border-radius: 50%; clip-path: none; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, #3a4a9a, #141a46 70%); box-shadow: 0 6px 0 #070a24, 0 10px 20px rgba(0, 0, 0, 0.45); overflow: visible; }
+.power-slot img { width: 58px; height: 58px; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45)); transition: transform 0.12s; }
+.power-slot:active img { transform: scale(0.88); }
+.power-slot .ring { position: absolute; inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px); transform: rotate(-90deg); pointer-events: none; }
+.power-slot .ring circle { fill: none; stroke: rgba(255, 255, 255, 0.18); stroke-width: 6; }
+.power-slot .ring .fill { stroke: #b6f72a; stroke-linecap: round; stroke-dasharray: 289; stroke-dashoffset: calc(289 * (1 - var(--p, 1))); transition: stroke-dashoffset 0.1s linear; }
+.power-slot .lbl { position: absolute; left: calc(100% + 8px); bottom: 6px; width: max-content; max-width: 46vw; text-align: left; pointer-events: none; }
+.power-slot .lbl b { font-size: 16px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); }
+.power-slot .bar { display: none; }
+.power-slot .use { font-size: 12px; color: #b6f72a; text-shadow: 0 1px 3px #000; }
+.power-slot.held { box-shadow: 0 6px 0 #070a24, 0 0 0 3px #b6f72a, 0 0 26px rgba(182, 247, 42, 0.6); }
+.power-slot.aims .lbl { display: none; }
+.saved-slot { left: calc(var(--safe-l) + 62px); bottom: calc(var(--safe-b) + 64px); width: 40px; height: 40px; padding: 0; border: 2px solid #fff; border-radius: 50%; background: #141a46; justify-content: center; z-index: 2; }
+.saved-slot img { width: 28px; height: 28px; }
+.saved-slot small { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #fff; text-shadow: 0 1px 2px #000; }
+/* throw ahead / drop behind: next to the power button */
+.throw-pad { position: absolute; left: calc(var(--safe-l) + 98px); bottom: var(--safe-b); display: none; flex-direction: column; gap: 10px; pointer-events: auto; }
+.throw-pad.show { display: flex; }
+.tbtn { width: 74px; height: 58px; border: 3px solid #fff; border-radius: 18px; display: grid; place-items: center; gap: 0; padding: 2px; cursor: pointer; color: #fff; font: inherit; touch-action: manipulation; }
+.tbtn b { font-size: 22px; line-height: 1; }
+.tbtn small { font-family: var(--display); font-weight: 900; font-size: 11px; text-transform: uppercase; line-height: 1.05; }
+.tbtn.ahead { background: linear-gradient(180deg, #d8ff6a, #6cc000); box-shadow: 0 5px 0 #3f7a00; color: #1d3a00; }
+.tbtn.back { background: linear-gradient(180deg, #ffd56a, #f08a00); box-shadow: 0 5px 0 #8a4b00; color: #4a2400; }
+.tbtn:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4); }
+/* right thumb zone: look back + emotes */
+.look-btn { right: var(--safe-r); bottom: var(--safe-b); width: 66px; height: 66px; padding: 0; border: 3px solid #fff; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #3a4a9a, #141a46 70%); box-shadow: 0 5px 0 #070a24; place-content: center; gap: 0; font-size: 26px; }
+.look-btn small { font-size: 10px; color: #fff; }
+.look-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #070a24; border-color: #b6f72a; }
+.emote-toggle { right: calc(var(--safe-r) + 8px); bottom: calc(var(--safe-b) + 80px); width: 50px; height: 50px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.8); background: rgba(20, 26, 70, 0.85); font-size: 24px; }
+.emote-menu { right: calc(var(--safe-r) + 66px); bottom: calc(var(--safe-b) + 80px); flex-wrap: wrap; width: 176px; justify-content: flex-end; border-radius: 16px; border: 2px solid rgba(255, 255, 255, 0.6); background: rgba(20, 26, 70, 0.92); }
+.emote-menu .emote-btn { width: 50px; height: 50px; font-size: 26px; border-radius: 12px; }
+.feed { top: max(110px, calc(env(safe-area-inset-top) + 100px)); max-width: min(56vw, 300px); }
+.feed-item { border-radius: 10px; border-right-width: 0; border-left: 3px solid var(--lime); font-size: 13px; }
+.feed-item:nth-child(n + 4) { display: none; }
+.spectate { bottom: calc(var(--safe-b) + 90px); }
+.controls-hint { bottom: calc(var(--safe-b) + 96px); }
+/* first-race swipe card */
+.swipe-tut { position: absolute; inset: 0; display: grid; place-items: center; z-index: 20; pointer-events: none; }
+.swipe-tut[hidden] { display: none; }
+.st-card { width: min(330px, 88vw); display: grid; gap: 10px; justify-items: center; padding: 16px; border-radius: 22px; border: 3px solid #fff; background: rgba(20, 26, 70, 0.9); box-shadow: 0 8px 0 #070a24; animation: gpop 380ms cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+.st-card > b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 26px; text-transform: uppercase; }
+.st-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.st-grid span { display: grid; justify-items: center; padding: 8px; border-radius: 14px; background: rgba(255, 255, 255, 0.08); font-weight: 800; font-size: 12px; text-align: center; }
+.st-grid i { font-style: normal; font-size: 28px; animation: todayBob 1.2s ease-in-out infinite; }
+.st-grid em { font-style: normal; color: #b6f72a; font-family: var(--display); font-size: 16px; text-transform: uppercase; }
+.st-card > small { font-weight: 800; color: #ffd23f; animation: btnPulse 1s ease-in-out infinite; }
+/* desktop: the old keyboard hint stays, the throw pad isn't needed (E / Q) */
+@media (pointer: fine) {
+  .power-slot .lbl { bottom: 18px; }
+}

@@ -3409,10 +3409,10 @@ function enterRace(v) {
   game.coinGot = new Set();
   renderModeHud();
   const touch = matchMedia("(pointer: coarse)").matches;
+  $("#swipeTut").hidden = !(touch && !local.getItem("lr:tutDone"));
   const hint = $("#controlsHint");
-  hint.textContent = touch
-    ? "Swipe ↑ jump · ↓ slide · ← → lane · tap a power-up to use it"
-    : "↑ jump · ↓ slide · ← → lane · E use power-up · hold C to look back";
+  // phones get the swipe card the first time; after that the HUD speaks for itself
+  hint.textContent = touch ? "" : "↑ jump · ↓ slide · ← → lane · E use power-up · hold C to look back";
   hint.style.opacity = "1";
   setTimeout(() => (hint.style.opacity = "0"), 6000);
   $("#banner").classList.remove("show");
@@ -3459,6 +3459,10 @@ function canControl() {
 }
 
 function input(kind) {
+  if (!$("#swipeTut").hidden && kind !== "use") {
+    $("#swipeTut").hidden = true;
+    local.setItem("lr:tutDone", "1");
+  }
   if (me.out && game.mode === "race" && (kind === "left" || kind === "right")) return cycleSpectate(kind === "left" ? -1 : 1);
   if (!canControl()) return;
   if (me.stumbleT > 0) return; // knocked over — wait until you're back up
@@ -5196,8 +5200,13 @@ function renderPower() {
   const next = me.power ? me.items[0] : me.items[1];
   const held = !me.power && Boolean(me.items[0]);
   const aims = held && (me.items[0] === "banana" || me.items[0] === "bowling");
-  $("#throwLanes").classList.toggle("show", aims);
-  if (aims) $("#throwLanes").dataset.kind = me.items[0];
+  // bananas and bowling balls: two clear buttons, into the lane you're in
+  $("#throwPad").classList.toggle("show", aims && TOUCH);
+  if (aims) {
+    $("#throwAhead small").textContent = me.items[0] === "bowling" ? "Roll ahead" : "Throw ahead";
+    $("#throwBack small").textContent = me.items[0] === "bowling" ? "Roll back" : "Drop behind";
+  }
+  slot.classList.toggle("aims", aims && TOUCH);
   slot.classList.toggle("held", held);
   saved.classList.toggle("show", Boolean(next));
   if (next) saved.querySelector("img").src = `/assets/pw_${next}.png`;
@@ -5208,14 +5217,18 @@ function renderPower() {
   slot.classList.add("show");
   slot.querySelector("img").src = `/assets/pw_${main}.png`;
   slot.querySelector("b").textContent = POWER_INFO[main].label;
-  slot.querySelector(".use").textContent = held ? (TOUCH ? "Tap to use" : aims ? "E ahead · Q behind" : "E to use") : "";
-  if (held) slot.querySelector(".bar i").style.width = "100%";
+  slot.querySelector(".use").textContent = held ? (TOUCH ? (aims ? "" : "Tap!") : aims ? "E ahead · Q behind" : "E to use") : "";
+  if (held) {
+    slot.querySelector(".bar i").style.width = "100%";
+    slot.style.setProperty("--p", "1");
+  }
 }
 $("#powerSlot").addEventListener("click", () => useItem());
-for (const b of document.querySelectorAll("#throwLanes button")) {
-  b.addEventListener("click", (e) => {
+for (const [id, dir] of [["#throwAhead", 1], ["#throwBack", -1]]) {
+  $(id).addEventListener("click", (e) => {
     e.stopPropagation();
-    useItem(Number(b.dataset.lane), Number(b.dataset.dir));
+    if (navigator.vibrate) navigator.vibrate(15);
+    useItem(me.lane, dir);
   });
 }
 
@@ -5322,7 +5335,11 @@ function frame(now) {
       if (equipped().trail && me.speed > 2 && !me.out) world.trail(equipped().trail, laneX(me.x), me.y, zMe);
       me.runner.group.visible = !(me.invulnT > 0 && me.stumbleT <= 0 && !me.power && Math.floor(now / 90) % 2 === 0);
       animateRunner(me.runner, currentAct(), me.speed, dt, me.power);
-      if (me.power) $("#powerSlot .bar i").style.width = `${(me.powerT / POWER_S[me.power]) * 100}%`;
+      if (me.power) {
+        const f = me.powerT / POWER_S[me.power];
+        $("#powerSlot .bar i").style.width = `${f * 100}%`;
+        $("#powerSlot").style.setProperty("--p", f.toFixed(3));
+      }
     }
 
     for (const r of remote.map.values()) {
