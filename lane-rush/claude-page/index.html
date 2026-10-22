@@ -237,10 +237,6 @@ input[type="text"], #nameInput, #codeInput {
     <div class="label">Your runner</div>
     <div id="picker" class="picker"></div>
     <button id="createBtn" class="btn" type="button" disabled>Loading 3D models…</button>
-    <div class="join-row">
-      <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Lobby code">
-      <button id="joinBtn" class="btn blue" type="button" disabled>Join</button>
-    </div>
     <button id="soloBtn" class="btn small ghost" type="button" disabled>Practice alone vs computer</button>
     <p id="menuNote" class="note"></p>
   </div>
@@ -249,11 +245,8 @@ input[type="text"], #nameInput, #codeInput {
 <section id="lobby" class="screen" hidden>
   <div class="panel">
     <div class="lobby-head">
-      <div>
-        <div class="label">Lobby code</div>
-        <div id="lobbyCode" class="code">----</div>
-      </div>
-      <p class="share">Friends open this page in Claude, type the code and press <b>Join</b>.</p>
+      <div class="code">LOBBY</div>
+      <p class="share">Friends open this page and press <b>Play with friends</b>. They show up here.</p>
     </div>
     <div id="slots" class="slots"></div>
     <div class="label">Your runner</div>
@@ -1113,46 +1106,25 @@ function newCode() {
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function enterRoom(code, creating) {
+async function enterRoom() {
   if (!roomApi) return;
-  setMenuBusy(true, creating ? "Creating lobby…" : `Joining ${code}…`);
+  setMenuBusy(true, "Joining the lobby…");
   try {
-    const nr = await roomApi.join(`lr-${code.toLowerCase()}`);
+    const nr = await roomApi.join("lr-lobby");
     session.kind = "room";
     session.nr = nr;
-    session.code = code;
+    session.code = "LOBBY";
     session.game = null;
     session.pres = {};
     pub({ t: Date.now(), n: myName(), c: choice.char });
-    const others = () => humans().filter((p) => !p.sameTab);
-    if (creating) {
-      await wait(1200);
-      if (others().some((p) => num(p.presence.t) < session.pres.t)) {
-        await leaveRoom(true);
-        return enterRoom(newCode(), true);
-      }
-    } else {
-      let found = false;
-      for (let i = 0; i < 30 && !found; i++) { await wait(100); found = others().length > 0; }
-      if (!found) {
-        await leaveRoom(true);
-        setMenuBusy(false, `No lobby “${code}” is open. Check the code and that your friend still has the lobby open.`, true);
-        return;
-      }
-      const ahead = humans().findIndex((p) => p.sameTab);
-      if (ahead >= 4) {
-        await leaveRoom(true);
-        setMenuBusy(false, "That lobby already has 4 runners.", true);
-        return;
-      }
-      session.lastRound = num(hostPeer()?.presence.g?.round);
-    }
+    await wait(1200); // let the people already here answer
+    session.lastRound = humans()[0]?.sameTab ? 0 : num(hostPeer()?.presence.g?.round);
     setMenuBusy(false, "");
     enterLobby();
   } catch (err) {
     console.error(err);
     await leaveRoom(true);
-    setMenuBusy(false, "Couldn't open the live lobby. Try again in a moment.", true);
+    setMenuBusy(false, "Couldn't open the lobby. Try again in a moment.", true);
   }
 }
 
@@ -1191,7 +1163,6 @@ function renderLobby() {
   if (sig === lobbySig) return;
   lobbySig = sig;
 
-  $("#lobbyCode").textContent = session.code;
   const slots = $("#slots");
   slots.replaceChildren();
   for (let i = 0; i < 4; i++) {
@@ -1332,9 +1303,8 @@ let modelsReady = false;
 function setMenuBusy(busy, note, isErr = false) {
   const live = modelsReady && !busy;
   $("#createBtn").disabled = !live;
-  $("#joinBtn").disabled = !live;
   $("#soloBtn").disabled = !modelsReady || busy;
-  if (modelsReady) $("#createBtn").textContent = "Create lobby";
+  if (modelsReady) $("#createBtn").textContent = "Play with friends";
   const n = $("#menuNote");
   n.textContent = note ?? n.textContent;
   n.classList.toggle("err", isErr);
@@ -1366,31 +1336,22 @@ function renderMenu() {
 }
 
 const nameInput = $("#nameInput");
-const codeInput = $("#codeInput");
 nameInput.value = store.get("lr:name") || "";
 nameInput.addEventListener("input", () => store.set("lr:name", nameInput.value));
-codeInput.addEventListener("input", () => { codeInput.value = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4); });
 function needName() {
   if (cleanText(nameInput.value, 14)) return false;
   setMenuBusy(false, "Type your name first.", true);
   nameInput.focus();
   return true;
 }
-const NO_ROOM = "Live lobbies aren't available on this screen. To race friends, everyone must be signed in to Claude, and the host must invite each friend by name or email with the page's Share button. People who open a public link can only practice alone.";
+const NO_ROOM = "Playing with friends isn't available here. Claude only connects people who are signed in and were invited to this page by name or email (Share button). You can still practice alone.";
 function needRoom() {
   if (roomApi) return false;
   setMenuBusy(false, NO_ROOM, true);
   return true;
 }
-$("#createBtn").addEventListener("click", () => { sfx.unlock(); if (!needName() && !needRoom()) enterRoom(newCode(), true); });
-$("#joinBtn").addEventListener("click", () => {
-  sfx.unlock();
-  if (needName() || needRoom()) return;
-  const code = codeInput.value.trim().toUpperCase();
-  if (code.length !== 4) { setMenuBusy(false, "Lobby codes have 4 characters.", true); codeInput.focus(); return; }
-  enterRoom(code, false);
-});
-codeInput.addEventListener("keydown", (e) => e.key === "Enter" && $("#joinBtn").click());
+$("#createBtn").addEventListener("click", () => { sfx.unlock(); if (!needName() && !needRoom()) enterRoom(); });
+nameInput.addEventListener("keydown", (e) => e.key === "Enter" && $("#createBtn").click());
 $("#soloBtn").addEventListener("click", () => { session.kind = "solo"; session.lastRound = 0; hostStart(); });
 
 $("#fillBots").addEventListener("change", (e) => { choice.fill = e.target.checked; store.set("lr:fill", choice.fill ? "1" : "0"); lobbySig = ""; renderLobby(); });
@@ -1552,9 +1513,6 @@ loadAll((f) => ($("#createBtn").textContent = `Loading 3D models… ${Math.round
     return;
   }
   setMenuBusy(false, "");
-  const params = new URLSearchParams(location.search);
-  const code = (location.hash.replace("#", "") || params.get("join") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
-  if (code.length === 4) codeInput.value = code;
 }).catch(() => setMenuBusy(false, "Live lobbies aren't available here. You can still practice alone."));
 
 </script>
