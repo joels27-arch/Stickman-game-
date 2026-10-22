@@ -3352,9 +3352,20 @@ function announce(prev, v) {
     if (was && was.finish == null && p.finish != null) feed(`🏁 ${p.id === playerId ? "You" : p.name} crossed the line!`);
   }
   const fresh = (list, set) => (list || []).filter((x) => !set.has(x.id) && set.add(x.id));
-  for (const z of fresh(v.zaps, seen.zaps)) feed(z.kind === "freeze" ? `❄️ ${nameOf(z.by)} froze everyone` : `⚡ ${nameOf(z.by)} called lightning`);
+  for (const z of fresh(v.zaps, seen.zaps)) {
+    if (z.kind === "thunder") continue; // the hit line covers it
+    feed({ freeze: `❄️ ${nameOf(z.by)} froze everyone`, brainwave: `🌀 ${nameOf(z.by)} sent a brain wave` }[z.kind] ?? `⚡ ${nameOf(z.by)} called lightning`);
+  }
   for (const b of fresh(v.bowls, seen.bowls)) feed(`🎳 ${nameOf(b.by)} rolled a bowling ball ${b.dir > 0 ? "ahead" : "back"}`);
-  for (const b of fresh(v.bananas, seen.bananas)) feed(`🍌 ${nameOf(b.by)} dropped a banana in lane ${b.lane + 1}`);
+  for (const b of fresh(v.bananas, seen.bananas)) {
+    // a fake box is a secret: no callout
+    if (b.kind === "glue") feed(`🟢 ${nameOf(b.by)} spilled glue`);
+    else if (b.kind !== "fake" || b.by === playerId) feed(b.kind === "fake" ? "🎁 You set a fake box" : `🍌 ${nameOf(b.by)} dropped a banana in lane ${b.lane + 1}`);
+  }
+  if (v.cloud && v.cloud.id !== seen.cloud) {
+    seen.cloud = v.cloud.id;
+    feed(`⛈️ ${nameOf(v.cloud.by)} put a storm on ${v.cloud.holder === playerId ? "you" : nameOf(v.cloud.holder)}!`);
+  }
   for (const h of fresh(v.hits, seen.hits)) {
     const victim = h.victim === playerId ? "You" : nameOf(h.victim);
     const whose = h.by === playerId ? "your" : `${nameOf(h.by)}'s`;
