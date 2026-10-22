@@ -584,8 +584,10 @@ const world = (() => {
   scene.add(ground);
 
   // a slightly lighter, mown track on top of the meadow
-  const trackTex = grassTex.clone();
-  trackTex.needsUpdate = true;
+  const trackTex = texLoader.load("/assets/grass.jpg");
+  trackTex.colorSpace = THREE.SRGBColorSpace;
+  trackTex.wrapS = trackTex.wrapT = THREE.RepeatWrapping;
+  trackTex.anisotropy = 4;
   trackTex.repeat.set((LANES * LANE_W + 1) / 3, GROUND_LEN / 3);
   const track = new THREE.Mesh(
     new THREE.PlaneGeometry(LANES * LANE_W + 1, GROUND_LEN),
@@ -786,7 +788,18 @@ const world = (() => {
         if (o.material) o.material.side = THREE.FrontSide;
       }
     });
-    const box = new THREE.Box3().setFromObject(gltf.scene);
+    // Measure the POSED, skinned mesh (precise box): the bind-pose bounds of a
+    // skinned mesh don't match what is drawn.
+    const mixer = new THREE.AnimationMixer(gltf.scene);
+    const probe = clips.idle || clips.run;
+    if (probe) {
+      mixer.clipAction(probe).play();
+      mixer.update(0);
+    }
+    gltf.scene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(gltf.scene, true);
+    mixer.stopAllAction();
+    mixer.uncacheRoot(gltf.scene);
     const h = box.max.y - box.min.y || 1;
     return { scene: gltf.scene, clips, scale: CHAR_H / h, footY: box.min.y };
   }
