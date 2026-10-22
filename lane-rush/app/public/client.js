@@ -2630,9 +2630,9 @@ const world = (() => {
     }
   }
 
-  function buildCourseObjects(seed, len) {
+  function buildCourseObjects(seed, len, boost = 0) {
     clearCourse();
-    const course = buildCourse(seed, len);
+    const course = buildCourse(seed, len, boost);
     rollers = [];
     boxes = [];
     hearts = [];
@@ -3329,7 +3329,8 @@ function enterRace(v) {
   world.buildScenery(map);
   world.setEndless(isSurvival());
   remote.clear();
-  race.course = world.buildCourseObjects(v.seed, game.len);
+  race.course = world.buildCourseObjects(v.seed, game.len, v.courseBoost ?? 0);
+  game.introsShown = new Set();
   showScreen("race");
 
   const mine = v.players.find((p) => p.id === playerId);
@@ -4992,8 +4993,23 @@ function myCoins() {
   return Math.max(server, game.coinsShown ?? 0);
 }
 /** Per-frame: brain catch, coin pickups. */
+/** The first time an obstacle type shows up, say what to do just before you reach it. */
+const INTRO_HINT = { hurdle: "⬆ JUMP over hurdles", gate: "⬇ SLIDE under gates", crate: "⬅ ➡ CHANGE LANE around crates", roller: "⬆ JUMP the rolling barrel (or dodge it)" };
+function introHints() {
+  const course = race.course;
+  if (!course || !game.introsShown) return;
+  for (const row of course.rows) {
+    if (row.z < me.d) continue;
+    if (row.z > me.d + me.speed * 1.6 + 6) break;
+    if (row.intro && !game.introsShown.has(row.intro)) {
+      game.introsShown.add(row.intro);
+      if (stats.get("races") < 6 || row.intro === "roller") banner(INTRO_HINT[row.intro] ?? "", 1400);
+    }
+  }
+}
 function modeTick(prevD, v) {
   if (me.finished || me.out) return;
+  introHints();
   const elapsed = (serverNow() - v.startAt) / 1000;
   // moving obstacles: jump the low ones, slide under the bees, dodge the rest
   if (me.power !== "rocket") {

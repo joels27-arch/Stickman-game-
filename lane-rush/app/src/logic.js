@@ -89,6 +89,7 @@ export const HEART_EVERY_M = 420;
 export const MAPS = ["meadow", "farm", "beach"];
 /** A Party Cup is three rounds; each placing scores points, most points wins. */
 export const CUP_ROUNDS = 3;
+export const CUP_ROUND_BOOST_M = 350;
 export const CUP_POINTS = [10, 5, 3, 1];
 /** Rank points are reported by each player's device (shown to friends in the lobby). */
 export const MAX_RP = 999999;
@@ -299,22 +300,22 @@ export function speedAtDistance(kind, d) {
 }
 
 /**
- * Obstacle patterns. Each returns one or more rows (lanes left→right) and is
- * only offered once the run is hard enough (`from`, 0..1). Every row keeps at
- * least one lane that can be passed (empty, or a hurdle/gate you can clear),
- * so there is always a way through.
+ * Obstacle patterns. Each returns one or more rows (lanes left→right). Every
+ * row keeps at least one lane you can get through (empty, or a hurdle/gate
+ * you can clear), and the difficulty manager below checks that you can
+ * actually *reach* it in time from wherever the previous row left you.
  *   H hurdle → jump · G gate → slide · C crate → change lane · R barrel → jump/dodge
  */
 const PATTERNS = {
-  // one obstacle in an otherwise open row: learn the moves
-  single: { from: 0, weight: (k) => 3 * (1 - k) + 0.3, rows: (r) => [placeOne(r, r() < 0.5 ? "hurdle" : "gate")] },
+  // one obstacle in an otherwise open row: learn the moves one at a time
+  hurdleOne: { rows: (r) => [placeOne(r, "hurdle")] },
+  gateOne: { rows: (r) => [placeOne(r, "gate")] },
+  crateOne: { rows: (r) => [placeOne(r, "crate")] },
   // a full wall of the same thing: jump it or slide under it
-  hurdleWall: { from: 0, weight: () => 1.1, rows: () => [["hurdle", "hurdle", "hurdle", "hurdle"]] },
-  gateWall: { from: 0, weight: () => 1.1, rows: () => [["gate", "gate", "gate", "gate"]] },
-  // two blocks, the open side has something to jump or duck
+  hurdleWall: { rows: () => [["hurdle", "hurdle", "hurdle", "hurdle"]] },
+  gateWall: { rows: () => [["gate", "gate", "gate", "gate"]] },
+  // two crates; the other lanes are open or hold something to jump or duck
   split: {
-    from: 0,
-    weight: () => 2,
     rows: (r) => {
       const lanes = [0, 1, 2, 3].map(() => pickFrom(r, [null, "hurdle", "gate"]));
       for (const i of shuffled(r).slice(0, 2)) lanes[i] = "crate";
@@ -323,8 +324,6 @@ const PATTERNS = {
   },
   // every lane has a hurdle or a gate: read the row and pick jump or slide
   mixedWall: {
-    from: 0.15,
-    weight: (k) => 0.5 + 1.5 * k,
     rows: (r) => {
       const lanes = [0, 1, 2, 3].map(() => (r() < 0.5 ? "hurdle" : "gate"));
       if (lanes.every((x) => x === lanes[0])) lanes[Math.floor(r() * 4)] = lanes[0] === "hurdle" ? "gate" : "hurdle";
@@ -332,47 +331,138 @@ const PATTERNS = {
     },
   },
   // barrels roll at you; the lanes next to them are free
-  barrels: {
-    from: 0,
-    weight: (k) => 0.8 + 0.6 * k,
-    lead: 16, // the barrel needs open track in front of it to roll on
+  barrels: { lead: 16, tail: 10, rows: (r) => [placeOne(r, "roller")] },
+  barrels2: {
+    lead: 16,
     tail: 10,
     rows: (r) => {
       const lanes = [null, null, null, null];
       const a = Math.floor(r() * 4);
       lanes[a] = "roller";
-      if (r() < 0.5) lanes[(a + 2) % 4] = "roller";
+      lanes[(a + 2) % 4] = "roller";
       return [lanes];
     },
   },
-  // slalom: three blocks per row and the gap moves one lane each row
-  slalom: {
-    from: 0.3,
-    weight: (k) => 1.6 * k,
+  // three crates and a gate in the gap: get over there and duck
+  tunnel: {
     rows: (r) => {
-      let open = Math.floor(r() * 4);
-      const dir = open === 0 ? 1 : open === 3 ? -1 : r() < 0.5 ? -1 : 1;
-      const out = [];
-      const n = 2 + Math.floor(r() * 2);
-      for (let i = 0; i < n; i++) {
-        const lanes = ["crate", "crate", "crate", "crate"];
-        lanes[open] = null;
-        out.push(lanes);
-        const next = open + dir;
-        open = next < 0 || next > 3 ? open - dir : next;
-      }
-      return out;
+      const lanes = ["crate", "crate", "crate", "crate"];
+      lanes[Math.floor(r() * 4)] = "gate";
+      return [lanes];
     },
   },
-  // jump, then slide straight away
+  // slalom: three crates per row and the gap moves one lane each row
+  slalom2: { rows: (r) => slalom(r, 2) },
+  slalom3: { rows: (r) => slalom(r, 3) },
+  // jump, then slide straight away (or the other way round)
   combo: {
-    from: 0.4,
-    weight: (k) => k,
     rows: (r) => (r() < 0.5 ? [["hurdle", "hurdle", "hurdle", "hurdle"], ["gate", "gate", "gate", "gate"]] : [["gate", "gate", "gate", "gate"], ["hurdle", "hurdle", "hurdle", "hurdle"]]),
   },
-  // a breather: no obstacles, a mystery box and a boost pad
-  breather: { from: 0.1, weight: () => 0.6, rows: () => [], rest: true },
+  // a slalom where every gap also needs a jump or a slide
+  zigzag: {
+    rows: (r) => slalom(r, 3).map((lanes, i) => lanes.map((k) => (k === null ? (i % 2 ? "gate" : "hurdle") : k))),
+  },
 };
+function slalom(r, n) {
+  let open = Math.floor(r() * 4);
+  const dir = open === 0 ? 1 : open === 3 ? -1 : r() < 0.5 ? -1 : 1;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const lanes = ["crate", "crate", "crate", "crate"];
+    lanes[open] = null;
+    out.push(lanes);
+    const next = open + dir;
+    open = next < 0 || next > 3 ? open - dir : next;
+  }
+  return out;
+}
+
+/**
+ * The difficulty manager: the run is split into stages by distance. Each
+ * stage has its own pattern mix and a reaction budget (seconds between rows
+ * at the speed you'll be going there). New mechanics arrive one at a time:
+ * the first time an obstacle type shows up it gets extra room and is marked
+ * `intro` so the game can tell you what to do. Breathers (a box and a boost
+ * pad, no obstacles) give you a moment between the hard parts.
+ *   Warm-up       0 m    single hurdles, then gates, then walls, then a crate
+ *   Getting going 250 m  crates with things to jump/duck, the first barrels
+ *   In the zone   700 m  mixed walls, tunnels, two-row slaloms
+ *   Pro           1.4 km three-row slaloms, jump-then-slide combos, barrel pairs
+ *   Master        2.4 km zigzags, everything, tightest (but always fair) timing
+ */
+export const STAGES = [
+  { name: "Warm-up", from: 0, react: 1.7, mix: { hurdleOne: 4, gateOne: 3, hurdleWall: 1.5, gateWall: 1.5, crateOne: 2 } },
+  { name: "Getting going", from: 250, react: 1.4, mix: { hurdleOne: 1, gateOne: 1, crateOne: 1, hurdleWall: 1, gateWall: 1, split: 2.5, barrels: 1.2, breather: 0.7 } },
+  { name: "In the zone", from: 700, react: 1.2, mix: { split: 2, mixedWall: 1.6, barrels: 1, tunnel: 1.2, slalom2: 1.5, hurdleWall: 0.5, gateWall: 0.5, breather: 0.55 } },
+  { name: "Pro", from: 1400, react: 1.05, mix: { split: 1.2, mixedWall: 1.5, tunnel: 1, slalom2: 1, slalom3: 1.3, combo: 1.2, barrels2: 1, breather: 0.45 } },
+  { name: "Master", from: 2400, react: 0.92, mix: { mixedWall: 1.3, tunnel: 1, slalom3: 1.5, combo: 1.3, zigzag: 1.2, barrels2: 1, split: 1, breather: 0.35 } },
+];
+/** In the warm-up, each first-time pattern waits until here (so they come one at a time). */
+const FIRST_AT = { hurdleOne: 0, gateOne: 90, hurdleWall: 150, gateWall: 190, crateOne: 220 };
+export function stageAt(z) {
+  let st = STAGES[0];
+  for (const x of STAGES) if (z >= x.from) st = x;
+  return st;
+}
+
+/**
+ * Fairness check between two rows. To clear a row you must be in a lane with
+ * nothing (run), a hurdle (jump) or a gate (slide); crates and barrels need
+ * another lane. Getting from lane a (done with `act`) to lane b in time needs:
+ * a moment to react + lane changes + finishing the jump/slide you were in +
+ * starting the next jump/slide early enough.
+ */
+export const REACT_S = 0.3;
+export const LANE_S = 0.12; // seconds per lane change
+const RECOVER_S = { run: 0, jump: 0.33, slide: 0.38 };
+const LEAD_S = { run: 0, jump: 0.25, slide: 0.12 };
+const actFor = (k) => (k === null ? "run" : k === "hurdle" ? "jump" : k === "gate" ? "slide" : null);
+export function needSeconds(fromLane, fromAct, toLane, toAct) {
+  return REACT_S + Math.abs(fromLane - toLane) * LANE_S + RECOVER_S[fromAct] + LEAD_S[toAct];
+}
+/** The worst case over the lanes you might be in: the time needed to reach a way through `row`. */
+function worstNeed(reach, row) {
+  let worst = 0;
+  for (const [a, actA] of reach) {
+    let best = Infinity;
+    row.lanes.forEach((k, b) => {
+      const actB = actFor(k);
+      if (actB) best = Math.min(best, needSeconds(a, actA, b, actB));
+    });
+    worst = Math.max(worst, best);
+  }
+  return worst;
+}
+/** Lanes (and what you did there) you can be in after clearing `row`, given `dt` seconds from `reach`. */
+function nextReach(reach, row, dt) {
+  const out = new Map();
+  row.lanes.forEach((k, b) => {
+    const actB = actFor(k);
+    if (!actB) return;
+    for (const [a, actA] of reach) if (needSeconds(a, actA, b, actB) <= dt + 1e-6) out.set(b, actB);
+  });
+  return out;
+}
+/**
+ * Check a whole course: from every lane you could be in at one row, there is
+ * a way through the next row you can reach in time. Returns the problems
+ * (empty = fair). Used by the tests; the generator applies the same rule as it
+ * builds, widening a gap whenever a pattern would be too tight.
+ */
+export function checkCourse(course, kind = "survival") {
+  const problems = [];
+  let reach = new Map([[0, "run"], [1, "run"], [2, "run"], [3, "run"]]);
+  let prevZ = 0;
+  for (const row of course.rows) {
+    if (!row.lanes.some((k) => actFor(k))) problems.push({ z: row.z, why: "no way through" });
+    const dt = (row.z - prevZ) / speedAtDistance(kind, prevZ);
+    const need = worstNeed(reach, row);
+    if (need > dt + 1e-6) problems.push({ z: row.z, why: `needs ${need.toFixed(2)} s, has ${dt.toFixed(2)} s` });
+    reach = nextReach(reach, row, Math.max(dt, need));
+    prevZ = row.z;
+  }
+  return problems;
+}
 
 function pickFrom(r, arr) {
   return arr[Math.floor(r() * arr.length)];
@@ -394,26 +484,33 @@ function placeOne(r, kind) {
 }
 
 /**
- * The course for a seed: a run of obstacle patterns, boost pads and mystery
- * boxes. Difficulty grows with distance (easy patterns fade out, slaloms and
- * combos come in), and the space between rows is a reaction-time budget at
- * the speed you'll be running there, so rows never come faster than you can
- * react. The same pattern never comes twice in a row. `looks[lane]` picks the
+ * The course for a seed: patterns picked by the difficulty manager (see
+ * STAGES), boost pads, mystery boxes and (endless runs) heart pickups.
+ * `boost` (metres) starts the difficulty further along: later Party Cup rounds
+ * open harder. Rows are spaced by the stage's reaction budget at the speed
+ * you'll be running there, and then widened if the fairness check needs it.
+ * The same pattern never comes twice in a row. `looks[lane]` picks the
  * visual variant of each obstacle; it never changes how it's cleared.
  */
-export function buildCourse(seed, len = TRACK_LEN) {
+export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
   const r = rng(seed);
   // looks and boxes use their own stream, so they don't reshuffle the layout
   const r2 = rng((seed ^ 0x9e3779b9) >>> 0);
   const endless = len > TRACK_LEN;
+  const kind = endless ? "survival" : "sprint";
   const rows = [];
   const boosts = [];
   const boxes = [];
   const hearts = [];
+  const seen = new Set();
+  const taught = new Set();
   let lastHeart = 0;
   let z = 45;
   let last = "";
   let sinceBox = 0;
+  let sinceRest = 0;
+  let reach = new Map([[0, "run"], [1, "run"], [2, "run"], [3, "run"]]);
+  let prevZ = 0;
   const addBox = (bz) => {
     const first = Math.floor(r2() * 4);
     boxes.push({ z: Math.round(bz * 10) / 10, lane: first });
@@ -421,43 +518,71 @@ export function buildCourse(seed, len = TRACK_LEN) {
     sinceBox = 0;
   };
   while (z < len - 40) {
-    // 0 → 1 over the first 1.6 km (a sprint stays in the gentle half)
-    // difficulty keeps climbing over the first 2.5 km of a survival run
-    const k = Math.min(1, z / (endless ? 2500 : 1600));
-    const speed = speedAtDistance(endless ? "survival" : "sprint", z);
-    // seconds you get between rows: 1.3 s at the start, down to 0.9 s
-    const step = speed * (1.3 - 0.4 * k);
+    const dz = z + boost; // difficulty distance
+    const stage = stageAt(dz);
+    const speed = speedAtDistance(kind, z);
+    const step = speed * stage.react;
 
-    const names = Object.keys(PATTERNS).filter((n) => n !== last && k >= PATTERNS[n].from && !(n === "barrels" && z < 90));
-    let total = 0;
-    for (const n of names) total += PATTERNS[n].weight(k);
-    let roll = r() * total;
-    let name = names[names.length - 1];
-    for (const n of names) {
-      roll -= PATTERNS[n].weight(k);
-      if (roll <= 0) {
-        name = n;
-        break;
+    // the stage's mix, minus last pattern, minus warm-up patterns not due yet
+    // barrels only once crates have been taught (you learn to change lanes first)
+    const due = Object.entries(stage.mix).filter(([n]) => !(dz < 250 && FIRST_AT[n] !== undefined && dz < FIRST_AT[n]) && !(n.startsWith("barrels") && !seen.has("crate")));
+    const fresh = due.filter(([n]) => n !== last);
+    const mix = fresh.length ? fresh : due;
+    // after a long hard stretch, force a breather
+    const forceRest = endless && sinceRest >= 9 && stage.mix.breather;
+    // the warm-up teaches in order: each lesson comes as soon as it's due
+    const lesson = dz < 400 ? Object.keys(FIRST_AT).find((n) => !taught.has(n) && FIRST_AT[n] <= dz) : null;
+    let name = forceRest ? "breather" : lesson ?? mix[mix.length - 1][0];
+    if (lesson) taught.add(lesson);
+    if (!forceRest && !lesson) {
+      let total = 0;
+      for (const [, w] of mix) total += w;
+      let roll = r() * total;
+      for (const [n, w] of mix) {
+        roll -= w;
+        if (roll <= 0) {
+          name = n;
+          break;
+        }
       }
     }
-    const pat = PATTERNS[name];
     last = name;
 
-    if (pat.rest) {
+    if (name === "breather") {
       addBox(z + step * 0.3);
       boosts.push({ z: Math.round((z + step * 0.8) * 10) / 10, lane: Math.floor(r() * 4) });
       z += step * 1.6;
+      sinceRest = 0;
       continue;
     }
+    sinceRest += 1;
+    const pat = PATTERNS[name];
     z += pat.lead ?? 0;
     const out = pat.rows(r);
+    let stop = false;
     out.forEach((lanes, i) => {
-      if (z >= len - 40) return;
-      const looks = lanes.map((kind) => (kind ? Math.floor(r2() * LOOKS[kind]) : 0));
-      rows.push({ z: Math.round(z * 10) / 10, lanes, looks });
+      if (stop || z >= len - 40) return (stop = true);
+      const looks = lanes.map((k) => (k ? Math.floor(r2() * LOOKS[k]) : 0));
+      const row = { z: 0, lanes, looks };
+      // a first-ever obstacle type gets room and a hint
+      const fresh = lanes.find((k) => k && !seen.has(k));
+      if (fresh) {
+        seen.add(fresh);
+        row.intro = fresh;
+        if (rows.length) z += step * 0.6;
+      }
+      // fairness: widen the gap if this row can't be reached from every lane you might be in
+      const need = worstNeed(reach, row) * speedAtDistance(kind, prevZ);
+      if (z - prevZ < need) z = prevZ + need + 0.5;
+      row.z = Math.round(z * 10) / 10;
+      reach = nextReach(reach, row, (row.z - prevZ) / speedAtDistance(kind, prevZ));
+      prevZ = row.z;
+      rows.push(row);
       if (i < out.length - 1) z += step;
     });
+    if (stop) break;
     // room to land and line up for the next pattern (more slack early on)
+    const k = Math.min(1, dz / 2400);
     const gap = step * (1.15 + r() * 0.5 * (1 - k)) + (pat.tail ?? 0);
     sinceBox += 1;
     if (endless && z - lastHeart > HEART_EVERY_M) {
@@ -665,6 +790,8 @@ function startRace(state, t) {
   state.round += 1;
   state.seed = ((Math.floor(t) % 2147483647) ^ Math.imul(state.round, 2654435761)) >>> 0;
   state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode;
+  // later Party Cup rounds open further into the difficulty curve
+  state.courseBoost = state.cup ? (state.cup.race - 1) * CUP_ROUND_BOOST_M : 0;
   state.raceMap = state.cup ? MAPS[(MAPS.indexOf(state.map ?? "meadow") + state.cup.race - 1) % MAPS.length] : state.map ?? "meadow";
   state.phase = "countdown";
   state.startAt = t + COUNTDOWN_MS;
@@ -896,10 +1023,10 @@ function moversOf(state) {
 }
 function courseFor(state) {
   const len = isEndless(state.kind) ? SURVIVAL_LEN : TRACK_LEN;
-  const key = `${state.seed}:${len}`;
+  const key = `${state.seed}:${len}:${state.courseBoost ?? 0}`;
   if (!courses.has(key)) {
     if (courses.size > 6) courses.delete(courses.keys().next().value);
-    courses.set(key, buildCourse(state.seed, len));
+    courses.set(key, buildCourse(state.seed, len, state.courseBoost ?? 0));
   }
   return courses.get(key);
 }
@@ -1666,6 +1793,7 @@ export function viewFor(state, playerId) {
     kind: state.kind ?? "survival",
     map: state.map ?? "meadow",
     raceMap: state.raceMap ?? state.map ?? "meadow",
+    courseBoost: state.courseBoost ?? 0,
     cup: state.cup
       ? {
           race: state.cup.race,

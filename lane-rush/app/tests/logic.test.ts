@@ -177,6 +177,53 @@ describe("course", () => {
   });
 });
 
+describe("difficulty manager", () => {
+  it("every course is fair: from any lane you could be in, the next way through is reachable in time", () => {
+    for (let seed = 0; seed < 400; seed++) {
+      for (const len of [L.TRACK_LEN, L.SURVIVAL_LEN]) {
+        expect(L.checkCourse(L.buildCourse(seed * 7919, len), len > L.TRACK_LEN ? "survival" : "sprint")).toEqual([]);
+      }
+      expect(L.checkCourse(L.buildCourse(seed, L.SURVIVAL_LEN, 700))).toEqual([]);
+    }
+  });
+
+  it("teaches one mechanic at a time: hurdles, then gates, then crates, then barrels, each flagged once", () => {
+    for (let seed = 0; seed < 50; seed++) {
+      const c = L.buildCourse(seed * 13, L.SURVIVAL_LEN);
+      const intros = c.rows.filter((r) => r.intro).map((r) => r.intro);
+      expect(intros.slice(0, 3)).toEqual(["hurdle", "gate", "crate"]);
+      expect(new Set(intros).size).toBe(intros.length);
+      // the first 120 m only ask one thing per row
+      for (const r of c.rows.filter((x) => x.z < 120)) expect(r.lanes.filter(Boolean).length).toBe(1);
+    }
+  });
+
+  it("gets harder by stage: more obstacles per row and tighter rows later on", () => {
+    let early = 0;
+    let late = 0;
+    let earlyRows = 0;
+    let lateRows = 0;
+    for (let seed = 0; seed < 60; seed++) {
+      const c = L.buildCourse(seed * 101, L.SURVIVAL_LEN);
+      for (const r of c.rows) {
+        const n = r.lanes.filter((k) => k && k !== "hurdle" && k !== "gate").length;
+        if (r.z < 600) (early += n), earlyRows++;
+        else if (r.z > 1500 && r.z < 3500) (late += n), lateRows++;
+      }
+    }
+    expect(late / lateRows).toBeGreaterThan((early / earlyRows) * 2);
+    expect(L.stageAt(0).react).toBeGreaterThan(L.stageAt(3000).react);
+    expect(L.STAGES.map((s) => s.from)).toEqual([...L.STAGES.map((s) => s.from)].sort((a, b) => a - b));
+  });
+
+  it("starts later Party Cup rounds further along the curve", () => {
+    const plain = L.buildCourse(9, L.SURVIVAL_LEN);
+    const boosted = L.buildCourse(9, L.SURVIVAL_LEN, 700);
+    const crates = (c: any) => c.rows.filter((r: any) => r.z < 400).reduce((a: number, r: any) => a + r.lanes.filter((k: any) => k === "crate").length, 0);
+    expect(crates(boosted)).toBeGreaterThan(crates(plain));
+  });
+});
+
 describe("obstacles and power-ups", () => {
   it("gives every obstacle a valid look and keeps barrels and boxes on the track", () => {
     let rollers = 0;

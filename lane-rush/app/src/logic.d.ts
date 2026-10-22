@@ -30,8 +30,8 @@ export function wakeAfter(state: unknown): number | null;
 
 export function standings(state: unknown): string[];
 
-export function buildCourse(seed: number, len?: number): {
-  rows: { z: number; lanes: (string | null)[]; looks: number[] }[];
+export function buildCourse(seed: number, len?: number, boost?: number): {
+  rows: { z: number; lanes: (string | null)[]; looks: number[]; intro?: string }[];
   boosts: { z: number; lane: number }[];
   boxes: { z: number; lane: number }[];
   hearts: { z: number; lane: number }[];
@@ -113,3 +113,10 @@ export function moverCovers(m: { kind: string; phase: number }, lane: number, t:
 export function moversFor(course: any, seed: number, map: string): { z: number; kind: string; phase: number }[];
 export const SHOP_EMOTES: string[];
 export const TRAILS: string[];
+export const STAGES: { name: string; from: number; react: number; mix: Record<string, number> }[];
+export function stageAt(z: number): { name: string; from: number; react: number; mix: Record<string, number> };
+export function checkCourse(course: any, kind?: string): { z: number; why: string }[];
+export function needSeconds(fromLane: number, fromAct: string, toLane: number, toAct: string): number;
+export const CUP_ROUND_BOOST_M: number;
+export const REACT_S: number;
+export const LANE_S: number;
