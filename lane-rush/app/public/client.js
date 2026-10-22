@@ -2627,7 +2627,7 @@ const world = (() => {
   let bombObj = null;
   let coinList = [];
   let looseMeshes = new Map();
-  const coinGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.1, 20);
+  const coinGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.14, 24);
   const coinMat = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.2, roughness: 0.35, emissive: 0xb07a00, emissiveIntensity: 0.55 });
   const bigCoinMat = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.2, roughness: 0.3, emissive: 0xc05000, emissiveIntensity: 0.6 });
   function makeCoin(big) {
