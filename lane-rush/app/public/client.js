@@ -1950,8 +1950,7 @@ function rollPower() {
   return "shield";
 }
 
-function grabBox() {
-  const kind = rollPower();
+function grabBox(kind = rollPower()) {
   sfx.pickup();
   if (kind === "lightning") {
     act({ type: "zap" });
@@ -2237,5 +2236,10 @@ world
     console.error(err);
     $("#loadHint").textContent = "Couldn't load the 3D models — check your connection and reload.";
   });
+
+// test hooks for the local dev server only (headless browser checks)
+if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
+  window.__laneRush = { me, hit, grabBox };
+}
 
 requestAnimationFrame(frame);
