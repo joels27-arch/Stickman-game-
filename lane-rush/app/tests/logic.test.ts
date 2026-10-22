@@ -834,3 +834,27 @@ describe("new modes", () => {
     expect(s.bomb).toBeNull();
   });
 });
+
+describe("moving obstacles", () => {
+  it("each map gets its own two movers, spaced out in the wide gaps", () => {
+    const course = L.buildCourse(7, L.SURVIVAL_LEN);
+    for (const map of L.MAPS) {
+      const ms = L.moversFor(course, 7, map);
+      expect(ms.length).toBeGreaterThan(20);
+      expect(new Set(ms.map((m) => m.kind)).size).toBe(2);
+      expect(ms.every((m) => L.MOVER_KINDS[m.kind]!.map === map)).toBe(true);
+      expect(ms[0]!.z).toBeGreaterThan(140);
+      for (let i = 1; i < ms.length; i++) expect(ms[i]!.z - ms[i - 1]!.z).toBeGreaterThan(100);
+    }
+  });
+
+  it("sweep across all four lanes and back on the shared clock", () => {
+    const m = { kind: "tractor", z: 200, phase: 0 };
+    const p = L.MOVER_KINDS.tractor!.period;
+    expect(L.moverX(m, 0)).toBeCloseTo(0);
+    expect(L.moverX(m, p / 2)).toBeCloseTo(3);
+    expect(L.moverX(m, p)).toBeCloseTo(0);
+    expect(L.moverCovers(m, 0, 0)).toBe(true);
+    expect(L.moverCovers(m, 3, 0)).toBe(false);
+  });
+});

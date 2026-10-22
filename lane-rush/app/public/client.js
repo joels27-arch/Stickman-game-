@@ -52,6 +52,10 @@ import {
   coinLines,
   COINRUSH_MS,
   isEndless,
+  MOVER_KINDS,
+  moverX,
+  moverCovers,
+  moversFor,
 } from "/logic.js";
 
 // ── constants ───────────────────────────────────────────────────────────────
@@ -2648,6 +2652,94 @@ const world = (() => {
     }
   }
 
+  // ── moving obstacles: they sweep across the lanes on the race clock ──
+  let moverList = [];
+  const MOVER_MODEL = {
+    log: { file: "mlog", size: 1.7, emoji: "🪵", y: 0 },
+    bees: { file: null, size: 1, emoji: "🐝", y: 1.5 },
+    tractor: { file: "tractor", size: 2.6, emoji: "🚜", y: 0 },
+    chicken: { file: "chicken", size: 0.85, emoji: "🐔", y: 0 },
+    wave: { file: null, size: 1, emoji: "🌊", y: 0 },
+    crab: { file: "crab", size: 0.85, emoji: "🦀", y: 0 },
+  };
+  function emojiSprite(e, size) {
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex(e), transparent: true }));
+    spr.scale.set(size, size, 1);
+    return spr;
+  }
+  function makeWave() {
+    const g = new THREE.Group();
+    const water = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.1, 1.1, LANE_W * 2.1, 24, 1, false, 0, Math.PI),
+      new THREE.MeshStandardMaterial({ color: 0x2fa8ff, transparent: true, opacity: 0.78, roughness: 0.2 }),
+    );
+    water.rotation.z = Math.PI / 2;
+    water.rotation.y = Math.PI / 2;
+    g.add(water);
+    const foam = new THREE.Mesh(new THREE.BoxGeometry(LANE_W * 2.1, 0.22, 0.6), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }));
+    foam.position.y = 1.12;
+    g.add(foam);
+    return g;
+  }
+  function makeBees() {
+    const g = new THREE.Group();
+    for (let i = 0; i < 4; i++) {
+      const b = emojiSprite("🐝", 0.55);
+      b.userData.k = i * 1.7;
+      g.add(b);
+    }
+    return g;
+  }
+  function setupMovers(course, seed, map) {
+    for (const m of moverList) raceGroup.remove(m.obj);
+    moverList = moversFor(course, seed, map).map((m) => {
+      const spec = MOVER_MODEL[m.kind];
+      const holder = new THREE.Group();
+      let body;
+      if (m.kind === "wave") body = makeWave();
+      else if (m.kind === "bees") body = makeBees();
+      else {
+        body = emojiSprite(spec.emoji, spec.size * 1.2);
+        body.position.y = spec.size * 0.6;
+        loadModeProp(spec.file, { width: spec.size, maxHeight: spec.size * 1.5 }).then((model) => {
+          if (!model) return;
+          holder.remove(body);
+          const inner = sizeTo(model.clone(), spec.size);
+          // the log lies along the track and rolls sideways
+          if (m.kind === "log") inner.rotation.y = Math.PI / 2;
+          holder.add(inner);
+          holder.userData.model = inner;
+        });
+      }
+      holder.add(body);
+      holder.position.set(0, spec.y, -m.z);
+      raceGroup.add(holder);
+      const entry = { ...m, obj: holder };
+      cullables.push({ obj: holder, z: m.z });
+      return entry;
+    });
+  }
+  function syncMovers(raceT) {
+    const k = performance.now() / 1000;
+    for (const m of moverList) {
+      if (!m.obj.visible) continue;
+      const x = moverX(m, raceT);
+      const dir = Math.sign(moverX(m, raceT + 0.05) - x) || 1;
+      m.obj.position.x = laneX(x);
+      const model = m.obj.userData.model;
+      if (m.kind === "log" && model) model.rotation.x = -x * 2.2; // rolls as it goes
+      else if ((m.kind === "tractor" || m.kind === "chicken") && model) model.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+      if (m.kind === "chicken" || m.kind === "crab") m.obj.position.y = Math.abs(Math.sin(k * 12 + m.z)) * 0.12;
+      if (m.kind === "bees") {
+        for (const b of m.obj.children) {
+          const q = k * 6 + b.userData.k;
+          b.position.set(Math.sin(q) * 0.45, Math.cos(q * 1.3) * 0.25, Math.sin(q * 0.7) * 0.3);
+        }
+      }
+      if (m.kind === "wave") m.obj.scale.y = 0.9 + Math.sin(k * 4 + m.z) * 0.1;
+    }
+  }
+
   // ── mode objects: the giant brain, coins, the bomb, explosions ──
   let modeKind = "";
   let brainObj = null;
@@ -2927,6 +3019,11 @@ const world = (() => {
     syncCloud,
     setupMode,
     syncMode,
+    setupMovers,
+    syncMovers,
+    get movers() {
+      return moverList;
+    },
     explode,
     get coins() {
       return coinList;
@@ -3152,6 +3249,7 @@ function enterRace(v) {
   setTimeout(() => game.round === v.round && tag.classList.add("small"), 7000);
   tag.classList.toggle("small", Boolean(v.cup)); // the cup's reel shows the mode instead
   world.setupMode(game.kind, race.course);
+  world.setupMovers(race.course, v.seed, game.mapFailed ? "meadow" : map);
   if (v.cup && v.phase === "countdown") spinReveal(v.cup.race, game.kind);
   game.lastBlast = Math.max(0, ...(v.blasts || []).map((b) => b.id));
   game.coinGot = new Set();
@@ -3542,6 +3640,11 @@ function hit(kind) {
     banana: "Slipped on a banana! 🍌",
     bowling: "STRIKE! 🎳",
     fake: "It was a trap! 💥",
+    log: "Jump the log! ↑",
+    bees: "Slide under the bees! ↓",
+    tractor: "Dodge the tractor! ← →",
+    chicken: "Hop over the chicken! ↑",
+    crab: "Jump the crab! ↑",
   }[kind] || "Ouch!";
   banner(hintText, 900);
 }
@@ -4568,6 +4671,28 @@ function myCoins() {
 function modeTick(prevD, v) {
   if (me.finished || me.out) return;
   const elapsed = (serverNow() - v.startAt) / 1000;
+  // moving obstacles: jump the low ones, slide under the bees, dodge the rest
+  if (me.power !== "rocket") {
+    for (const m of world.movers) {
+      if (m.z <= prevD || m.z > me.d || !moverCovers(m, me.x, elapsed)) continue;
+      const info = MOVER_KINDS[m.kind];
+      if (info.clear === "jump" && me.y > 0.6) {
+        style("HOP!", 20);
+        continue;
+      }
+      if (info.clear === "slide" && me.slideT > 0) {
+        style("DUCKED!", 20);
+        continue;
+      }
+      if (info.slows) {
+        me.glueT = 1.2;
+        banner("🌊 SPLASH!", 800);
+        sfx.pop();
+        continue;
+      }
+      hit(m.kind);
+    }
+  }
   if (game.kind === "chase" && elapsed > 0 && brainDistance(elapsed) >= me.d) {
     knockOut("brain");
     return;
@@ -4926,6 +5051,7 @@ function frame(now) {
       return g ? g.position : null;
     });
     renderCloudHud();
+    if (net.view) world.syncMovers(Math.max(0, (serverNow() - net.view.startAt) / 1000));
     if (net.view) world.syncMode(net.view, (id) => {
       const g = id === playerId ? me.runner?.group : remote.map.get(id)?.runner?.group;
       return g ? g.position : null;

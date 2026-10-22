@@ -467,6 +467,53 @@ export function buildCourse(seed, len = TRACK_LEN) {
   return { rows, boosts, boxes, hearts, len };
 }
 
+// ── moving obstacles: each map has two, sweeping across the lanes ──────────
+
+/**
+ * A mover sits at distance `z` and slides back and forth across the four
+ * lanes on the shared race clock (seconds since the gun): x = 3 · tri(t /
+ * period + phase), in lane units. It covers `half` lanes either side of x.
+ * How you get past it:
+ *   jump  — low enough to hop over (log, chicken, crab)
+ *   slide — flies at head height (bees)
+ *   dodge — only by being in another lane (tractor, wave)
+ * A wave doesn't knock you down, it slows you.
+ */
+export const MOVER_KINDS = {
+  log: { map: "meadow", half: 0.55, period: 3.4, clear: "jump" },
+  bees: { map: "meadow", half: 0.5, period: 2.6, clear: "slide" },
+  tractor: { map: "farm", half: 0.75, period: 4.6, clear: "dodge" },
+  chicken: { map: "farm", half: 0.35, period: 1.9, clear: "jump" },
+  wave: { map: "beach", half: 1.0, period: 5.2, clear: "dodge", slows: true },
+  crab: { map: "beach", half: 0.4, period: 2.3, clear: "jump" },
+};
+const tri = (u) => 1 - Math.abs(2 * (u - Math.floor(u)) - 1);
+/** Where mover `m` is (0..3, lane units) `t` seconds into the race. */
+export function moverX(m, t) {
+  return 3 * tri(t / MOVER_KINDS[m.kind].period + m.phase);
+}
+/** Does mover `m` cover `lane` (can be fractional) at race time `t`? */
+export function moverCovers(m, lane, t) {
+  return Math.abs(moverX(m, t) - lane) < MOVER_KINDS[m.kind].half + 0.35;
+}
+/** The course's moving obstacles for a map: one every ~150 m (from 150 m on), in a wide gap between rows. */
+export function moversFor(course, seed, map) {
+  const kinds = Object.keys(MOVER_KINDS).filter((k) => MOVER_KINDS[k].map === (map ?? "meadow"));
+  if (!kinds.length) return [];
+  const r = rng((seed ^ 0x5bd1e995) >>> 0);
+  const out = [];
+  let next = 150 + r() * 60;
+  const rows = course.rows;
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const a = rows[i];
+    const b = rows[i + 1];
+    if (a.z < next || b.z - a.z < 12) continue;
+    out.push({ z: Math.round(((a.z + b.z) / 2) * 10) / 10, kind: kinds[Math.floor(r() * kinds.length)], phase: Math.round(r() * 100) / 100 });
+    next = a.z + 120 + r() * 90;
+  }
+  return out;
+}
+
 // ── helpers ─────────────────────────────────────────────────────────────────
 
 const clone = (s) => JSON.parse(JSON.stringify(s));
@@ -834,6 +881,15 @@ export const BOT_NAMES = ["Turbo Tim", "Zippy", "Bolt Bot", "Speedy Sam", "Rocke
 const BOT_ITEMS = ["banana", "lightning", "rocket", "shield", "freeze", "glue", "fake", "brainwave", "thunder", "swap", "boxing"];
 const STUN_MS = 1600; // fall + get up, like a real runner
 const courses = new Map();
+const moverCache = new Map();
+function moversOf(state) {
+  const key = `${state.seed}:${state.raceMap}`;
+  if (!moverCache.has(key)) {
+    if (moverCache.size > 6) moverCache.delete(moverCache.keys().next().value);
+    moverCache.set(key, moversFor(courseFor(state), state.seed, state.raceMap));
+  }
+  return moverCache.get(key);
+}
 function courseFor(state) {
   const len = isEndless(state.kind) ? SURVIVAL_LEN : TRACK_LEN;
   const key = `${state.seed}:${len}`;
@@ -1012,6 +1068,18 @@ function stepBots(state, t) {
       // steer toward the nearest runner ahead to hand the bomb over
       const target = runners.filter((o) => o.id !== id && racingNow(o) && o.d > p.d && o.d - p.d < 25).sort((a, b) => a.d - b.d)[0];
       if (target && target.lane !== p.lane && roll(state.seed, bi, t / 700) < 0.5) p.lane += Math.sign(target.lane - p.lane);
+    }
+    // moving obstacles: time the jump/slide, or be in another lane when it passes
+    if (!rocketing) {
+      for (const m of moversOf(state)) {
+        if (m.z <= d0 || m.z > d1) continue;
+        // race time (s) when the bot reaches it
+        const at = (last - state.startAt) / 1000 + (m.z - d0) / Math.max(1, v);
+        if (!moverCovers(m, p.lane, at)) continue;
+        if (roll(state.seed, bi, m.z + 0.7) < sharp) continue;
+        if (MOVER_KINDS[m.kind].slows) p.slowUntil = Math.max(p.slowUntil ?? 0, t + 1500);
+        else botHit(state, p, t);
+      }
     }
     // mystery boxes (first come, first served), bananas, bowling balls
     course.boxes.forEach((b, i) => {
