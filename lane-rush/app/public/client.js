@@ -2600,8 +2600,8 @@ const world = (() => {
   let coinList = [];
   let looseMeshes = new Map();
   const coinGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.1, 20);
-  const coinMat = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.75, roughness: 0.25, emissive: 0x6b4a00, emissiveIntensity: 0.35 });
-  const bigCoinMat = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.8, roughness: 0.2, emissive: 0x7a3300, emissiveIntensity: 0.5 });
+  const coinMat = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.2, roughness: 0.35, emissive: 0xb07a00, emissiveIntensity: 0.55 });
+  const bigCoinMat = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.2, roughness: 0.3, emissive: 0xc05000, emissiveIntensity: 0.6 });
   function makeCoin(big) {
     const m = new THREE.Mesh(coinGeo, big ? bigCoinMat : coinMat);
     m.rotation.x = Math.PI / 2;
@@ -4937,7 +4937,7 @@ world
 
 // test hooks for the local dev server only (headless browser checks)
 if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
-  window.__laneRush = { me, hit, grabBox, useItem, game, net, remote };
+  window.__laneRush = { me, hit, grabBox, useItem, game, net, remote, world };
 }
 
 requestAnimationFrame(frame);
