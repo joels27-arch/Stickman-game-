@@ -68,16 +68,16 @@ const STARTERS = RUNNERS.length; // every 3D runner is free to play
  * track") but you can't race with it.
  */
 const COLLECTION = [
-  { id: "luna", name: "Luna", color: "#9b5cff", price: { medal: "bronze", count: 5 } },
-  { id: "toto", name: "Toto", color: "#f2f2f2", price: { medal: "bronze", count: 8 } },
-  { id: "blaze", name: "Blaze", color: "#ff4b2b", price: { medal: "silver", count: 3 } },
-  { id: "zara", name: "Zara", color: "#ff6fb5", price: { medal: "silver", count: 4 } },
-  { id: "jax", name: "Jax", color: "#c98a3c", price: { medal: "silver", count: 6 } },
-  { id: "leo", name: "Sir Leo", color: "#4c8dff", price: { medal: "gold", count: 2 } },
-  { id: "kai", name: "Kai", color: "#21c7d9", price: { medal: "gold", count: 3 } },
-  { id: "momo", name: "Momo", color: "#e9ecef", price: { medal: "gold", count: 4 } },
-  { id: "zed", name: "Zed", color: "#7be3b0", price: { medal: "gold", count: 5 } },
-  { id: "aria", name: "Aria", color: "#e03cff", price: { medal: "gold", count: 8 } },
+  { id: "luna", name: "Luna", color: "#9b5cff", price: { medal: "bronze", count: 5 }, coins: 800 },
+  { id: "toto", name: "Toto", color: "#f2f2f2", price: { medal: "bronze", count: 8 }, coins: 1200 },
+  { id: "blaze", name: "Blaze", color: "#ff4b2b", price: { medal: "silver", count: 3 }, coins: 1800 },
+  { id: "zara", name: "Zara", color: "#ff6fb5", price: { medal: "silver", count: 4 }, coins: 2400 },
+  { id: "jax", name: "Jax", color: "#c98a3c", price: { medal: "silver", count: 6 }, coins: 3000 },
+  { id: "leo", name: "Sir Leo", color: "#4c8dff", price: { medal: "gold", count: 2 }, coins: 3800 },
+  { id: "kai", name: "Kai", color: "#21c7d9", price: { medal: "gold", count: 3 }, coins: 4600 },
+  { id: "momo", name: "Momo", color: "#e9ecef", price: { medal: "gold", count: 4 }, coins: 5400 },
+  { id: "zed", name: "Zed", color: "#7be3b0", price: { medal: "gold", count: 5 }, coins: 6500 },
+  { id: "aria", name: "Aria", color: "#e03cff", price: { medal: "gold", count: 8 }, coins: 8000 },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
 const medalText = (medal, n) => `${n} ${medal} medal${n === 1 ? "" : "s"}`;
@@ -196,6 +196,20 @@ const wallet = {
     }
     return missing > 0 ? null : spend;
   },
+  coins() {
+    const c = Number(local.getItem("lr:coins"));
+    return Number.isFinite(c) && c > 0 ? Math.floor(c) : 0;
+  },
+  addCoins(n) {
+    local.setItem("lr:coins", String(Math.max(0, this.coins() + n)));
+    renderWallet();
+  },
+  buyWithCoins(item) {
+    if (!item.coins || this.has(item.id) || this.coins() < item.coins) return false;
+    local.setItem("lr:owned", JSON.stringify([...this.owned(), item.id]));
+    this.addCoins(-item.coins);
+    return true;
+  },
   /** Collection characters are owned by id. */
   has(id) {
     return this.owned().includes(id);
@@ -225,8 +239,11 @@ const wallet = {
 };
 function renderWallet() {
   const m = wallet.medals();
+  const coins = wallet.coins().toLocaleString();
+  for (const b of document.querySelectorAll(".coinCount")) b.textContent = coins;
   for (const box of document.querySelectorAll(".wallet")) {
-    box.replaceChildren(...MEDALS.map((k) => {
+    const coinChip = el("span", { class: "chip", title: "coins" }, el("i", { class: "coin" }), el("b", { text: coins }));
+    box.replaceChildren(coinChip, ...MEDALS.map((k) => {
       const chip = document.createElement("span");
       chip.className = "chip";
       chip.title = `${k} medals`;
@@ -356,8 +373,25 @@ for (let i = 0; i < 4; i++) $("#homeRoster").append(runnerCard(i, i + 1));
 const nameInput = $("#nameInput");
 const codeInput = $("#codeInput");
 nameInput.value = local.getItem("lr:name") || "";
+if (!nameInput.value.trim()) {
+  nameInput.value = `Runner${Math.floor(100 + Math.random() * 900)}`;
+  local.setItem("lr:name", nameInput.value);
+}
+nameInput.addEventListener("change", () => myName() && local.setItem("lr:name", myName()));
+// Join room opens the code box inside the same card
+function openJoin(open) {
+  $("#joinOpen").hidden = open;
+  $("#joinRow").hidden = !open;
+  if (open) setTimeout(() => codeInput.focus(), 30);
+}
+$("#joinOpen").addEventListener("click", () => openJoin(true));
+$("#joinClose").addEventListener("click", () => openJoin(false));
 const joinParam = new URLSearchParams(location.search).get("join");
-if (joinParam) codeInput.value = joinParam.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+if (joinParam) {
+  codeInput.value = joinParam.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+  $("#joinOpen").hidden = true;
+  $("#joinRow").hidden = false;
+}
 codeInput.addEventListener("input", () => {
   codeInput.value = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
 });
@@ -535,15 +569,19 @@ function renderShop() {
     const owned = wallet.has(r.id);
     const spend = owned ? null : wallet.plan(r.price);
     const btn = el("button", { class: `btn ${owned ? "blue" : "go"}`, type: "button" });
-    btn.textContent = owned ? "Owned ✓" : spend ? "Buy" : "Not enough medals";
+    btn.textContent = owned ? "Owned ✓" : spend ? "Buy with medals" : "Not enough medals";
     btn.disabled = owned || !spend;
-    btn.addEventListener("click", () => {
-      if (wallet.buy(r)) {
-        sfx.finish();
-        toast(`${r.name} is in your collection! Racing with them is coming soon.`);
-        renderShop();
-      }
-    });
+    const bought = () => {
+      sfx.finish();
+      toast(`${r.name} is in your collection! Racing with them is coming soon.`);
+      renderShop();
+    };
+    btn.addEventListener("click", () => wallet.buy(r) && bought());
+    const coinBtn = owned ? null : el("button", { class: "btn gold coin-buy", type: "button" }, el("i", { class: "coin" }), el("span", { text: r.coins.toLocaleString() }));
+    if (coinBtn) {
+      coinBtn.disabled = wallet.coins() < r.coins;
+      coinBtn.addEventListener("click", () => wallet.buyWithCoins(r) && bought());
+    }
     const price = el("div", { class: "price" }, el("img", { src: MEDAL_IMG[r.price.medal], alt: "" }), el("span", { text: medalText(r.price.medal, r.price.count) }));
     const paysWith = spend && (spend.gold || spend.silver || (spend.bronze && r.price.medal !== "bronze"))
       ? MEDALS.filter((k) => spend[k]).map((k) => medalText(k, spend[k])).join(" + ")
@@ -558,6 +596,7 @@ function renderShop() {
         el("b", { text: r.name, style: `color:${r.color}` }),
         price,
         note,
+        coinBtn,
         btn,
       ),
     );
@@ -782,7 +821,7 @@ $("#joinBtn").addEventListener("click", () => {
   game.solo = false;
   const code = codeInput.value.trim().toUpperCase();
   if (code.length !== 4) {
-    $("#homeMsg").textContent = "Lobby codes have 4 characters";
+    $("#homeMsg").textContent = "Room codes have 4 characters";
     codeInput.focus();
     return;
   }
@@ -976,8 +1015,9 @@ function renderLineup(v, { isHost, gm, mp, mode, what }) {
   $("#luCode").textContent = net.code;
   $("#luMode").textContent = gm === "tournament" ? "Tournament" : gm === "survival" && v.players.length < 2 ? "Endless run" : GAME_MODE_INFO[gm].label;
   $("#luMap").textContent = gm === "tournament" ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${mode}`;
-  const ch = dailyChallenge();
-  $("#luDaily").textContent = `⭐ Daily: ${ch.text}`;
+  const qs = dailyChallenges();
+  const qd = dailyState();
+  $("#luDaily").textContent = `📋 Challenges ${qs.filter((q) => qd.done[q.id]).length}/${qs.length}`;
   const present = v.players.filter((p) => !p.gone);
   const order = [...v.players];
   // you stand in the middle, like a real lobby
@@ -2862,7 +2902,7 @@ function stepMe(dt) {
     world.burst(laneX(b.lane), 1.0, -b.z, ["#b06bff", "#ff6bd5", "#6be3ff", "#ffffff", "#ffd84a"], 70);
     me.lastBox = { idx: b.idx, kind: grabBox() };
     game.boxesGrabbed = (game.boxesGrabbed ?? 0) + 1;
-    challenge("boxes6", game.boxesGrabbed);
+    challenge("boxes", game.boxesGrabbed);
   }
   // bowling balls rolling back down the track (not your own)
   const sn = serverNow();
@@ -2951,11 +2991,11 @@ const ballRel = new Map(); // ball id -> where it was relative to you last frame
 function style(text, points) {
   me.combo += 1;
   me.bestCombo = Math.max(me.bestCombo, me.combo);
-  challenge("combo12", me.combo);
+  challenge("combo", me.combo);
   const mult = Math.min(5, 1 + Math.floor(me.combo / 4)); // x2 from 4 in a row, up to x5
   const gained = points * mult;
   me.score += gained;
-  challenge("style1500", me.score);
+  challenge("style", me.score);
   const pop = $("#stylePop");
   pop.replaceChildren(el("b", { text }), el("span", { text: `+${gained}` }));
   pop.classList.remove("show");
@@ -3043,66 +3083,219 @@ for (const box of document.querySelectorAll(".emote-row")) {
 }
 $("#emoteToggle").addEventListener("click", () => $("#emoteMenu").classList.toggle("show"));
 
-// ── daily challenge: one goal per day, a medal for finishing it ──
+// ── daily challenges: three a day (easy, medium, hard), coins for each ──
 
-const CHALLENGES = [
-  { id: "dist800", text: "Run 800 m in one endless run", goal: 800, reward: "silver" },
-  { id: "bananas3", text: "Throw 3 bananas in one race", goal: 3, reward: "bronze" },
-  { id: "combo12", text: "Reach a 12 combo", goal: 12, reward: "silver" },
-  { id: "survive90", text: "Survive 90 seconds in Survival", goal: 90, reward: "silver" },
-  { id: "style1500", text: "Score 1500 style points in one race", goal: 1500, reward: "gold" },
-  { id: "boxes6", text: "Grab 6 mystery boxes in one race", goal: 6, reward: "bronze" },
-  { id: "nohit400", text: "Run 400 m without getting hit", goal: 400, reward: "silver" },
-];
-function todayKey() {
-  const d = new Date();
+const CHALLENGE_POOL = {
+  easy: [
+    { stat: "dist", goal: 300, text: "Run 300 m in one race" },
+    { stat: "boxes", goal: 3, text: "Grab 3 mystery boxes in one race" },
+    { stat: "bananas", goal: 1, text: "Throw a banana" },
+    { stat: "combo", goal: 5, text: "Reach a 5 combo" },
+    { stat: "nohit", goal: 150, text: "Run 150 m without getting hit" },
+  ],
+  medium: [
+    { stat: "dist", goal: 700, text: "Run 700 m in one race" },
+    { stat: "boxes", goal: 6, text: "Grab 6 mystery boxes in one race" },
+    { stat: "bananas", goal: 3, text: "Throw 3 bananas in one race" },
+    { stat: "combo", goal: 10, text: "Reach a 10 combo" },
+    { stat: "survive", goal: 60, text: "Survive 60 seconds in Survival" },
+    { stat: "nohit", goal: 350, text: "Run 350 m without getting hit" },
+  ],
+  hard: [
+    { stat: "dist", goal: 1500, text: "Run 1500 m in one race" },
+    { stat: "combo", goal: 18, text: "Reach an 18 combo" },
+    { stat: "style", goal: 2500, text: "Score 2500 style points in one race" },
+    { stat: "survive", goal: 120, text: "Survive 2 minutes in Survival" },
+    { stat: "nohit", goal: 700, text: "Run 700 m without getting hit" },
+    { stat: "boxes", goal: 10, text: "Grab 10 mystery boxes in one race" },
+  ],
+};
+const CHALLENGE_COINS = { easy: 100, medium: 200, hard: 400 };
+function dayKey(d = new Date()) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
-function dailyChallenge() {
-  const key = todayKey();
-  let h = 0;
-  for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return CHALLENGES[h % CHALLENGES.length];
+const todayKey = () => dayKey();
+function dayHash(salt) {
+  let h = 2166136261;
+  for (const ch of todayKey() + salt) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return h;
+}
+/** Today's three challenges, the same for everyone on the same date. */
+function dailyChallenges() {
+  return ["easy", "medium", "hard"].map((tier) => {
+    const pool = CHALLENGE_POOL[tier];
+    const c = pool[dayHash(tier) % pool.length];
+    return { ...c, tier, id: `${tier}:${c.stat}:${c.goal}`, coins: CHALLENGE_COINS[tier] };
+  });
 }
 function dailyState() {
+  const fresh = { day: todayKey(), best: {}, done: {} };
   try {
-    const s = JSON.parse(local.getItem("lr:daily") || "{}");
-    return s.day === todayKey() ? s : { day: todayKey(), best: 0, done: false };
+    const s = JSON.parse(local.getItem("lr:daily2") || "{}");
+    return s.day === todayKey() && s.best && s.done ? s : fresh;
   } catch {
-    return { day: todayKey(), best: 0, done: false };
+    return fresh;
   }
 }
-/** Report progress on today's challenge (only the matching id counts). */
-function challenge(id, value) {
-  const ch = dailyChallenge();
-  if (ch.id !== id) return;
+/** Report a stat (dist, boxes, bananas, combo, nohit, survive, style). */
+function challenge(stat, value) {
   const st = dailyState();
-  if (st.done || value <= st.best) return;
-  st.best = value;
-  if (value >= ch.goal) {
-    st.done = true;
-    const m = wallet.medals();
-    m[ch.reward] += 1;
-    wallet.save(m);
-    banner("CHALLENGE DONE!", 1600);
-    toast(`Daily challenge complete: +1 ${ch.reward} medal`);
-    sfx.finish();
+  let changed = false;
+  for (const q of dailyChallenges()) {
+    if (q.stat !== stat || st.done[q.id] || value <= (st.best[q.id] ?? 0)) continue;
+    st.best[q.id] = value;
+    changed = true;
+    if (value >= q.goal) {
+      st.done[q.id] = true;
+      wallet.addCoins(q.coins);
+      banner("CHALLENGE DONE!", 1600);
+      toast(`✅ ${q.text}: +${q.coins} coins`);
+      sfx.finish();
+    }
   }
-  local.setItem("lr:daily", JSON.stringify(st));
+  if (!changed) return;
+  local.setItem("lr:daily2", JSON.stringify(st));
   renderDaily();
 }
 function renderDaily() {
-  const ch = dailyChallenge();
+  const qs = dailyChallenges();
   const st = dailyState();
-  const box = $("#daily");
-  box.classList.toggle("done", st.done);
-  box.replaceChildren(
-    el("span", { class: "tag", text: "Daily challenge" }),
-    el("b", { text: ch.text }),
-    el("small", {}, el("img", { src: MEDAL_IMG[ch.reward], alt: "" }), el("span", { text: st.done ? "Done ✓ come back tomorrow" : `${Math.min(st.best, ch.goal)} / ${ch.goal} · reward: 1 ${ch.reward} medal` })),
+  const n = qs.filter((q) => st.done[q.id]).length;
+  $("#questCount").textContent = `${n}/${qs.length}`;
+  $("#questPill").classList.toggle("done", n === qs.length);
+  $("#questSub").textContent = n === qs.length ? "All done! New challenges tomorrow." : "New challenges every day. Each one pays coins.";
+  $("#questList").replaceChildren(
+    ...qs.map((q) => {
+      const have = Math.min(st.best[q.id] ?? 0, q.goal);
+      const done = Boolean(st.done[q.id]);
+      const bar = el("div", { class: "qbar" }, el("i", { style: `width:${Math.round((have / q.goal) * 100)}%` }));
+      return el(
+        "div",
+        { class: `quest ${q.tier}${done ? " done" : ""}` },
+        el("span", { class: "qtier", text: q.tier }),
+        el("b", { text: q.text }),
+        bar,
+        el("small", { text: done ? "Done ✓" : `${have} / ${q.goal}` }),
+        el("span", { class: "qreward" }, el("i", { class: "coin" }), el("b", { text: `+${q.coins}` })),
+      );
+    }),
   );
 }
+const questModal = $("#questModal");
+$("#questPill").addEventListener("click", () => {
+  renderDaily();
+  questModal.hidden = false;
+});
+$("#questClose").addEventListener("click", () => (questModal.hidden = true));
+questModal.addEventListener("click", (e) => e.target === questModal && (questModal.hidden = true));
 renderDaily();
+
+// ── login streak: come back every day, day 7 pays big ──
+
+const STREAK_REWARDS = [
+  { coins: 50 },
+  { coins: 75 },
+  { coins: 100 },
+  { coins: 150 },
+  { coins: 200 },
+  { coins: 300 },
+  { coins: 750, medal: "gold" },
+];
+function streakState() {
+  let s = {};
+  try { s = JSON.parse(local.getItem("lr:streak") || "{}") || {}; } catch { /* fresh streak */ }
+  const day = Number.isInteger(s.day) && s.day >= 1 && s.day <= 7 ? s.day : 0;
+  const yesterday = dayKey(new Date(Date.now() - 864e5));
+  const claimedToday = s.last === todayKey();
+  // the day you'd claim next: keep going if you came yesterday, else back to day 1
+  const next = claimedToday ? day : s.last === yesterday ? (day % 7) + 1 : 1;
+  return { day, last: s.last, claimedToday, next, broken: !claimedToday && Boolean(s.last) && s.last !== yesterday };
+}
+function renderStreak() {
+  const st = streakState();
+  $("#streakDay").textContent = `Day ${st.next}`;
+  $("#streakPill").querySelector(".dot").hidden = st.claimedToday;
+  $("#streakPill").classList.toggle("ready", !st.claimedToday);
+  $("#streakSub").textContent = st.claimedToday
+    ? "Claimed for today. Come back tomorrow to keep your streak!"
+    : st.broken
+      ? "Your streak reset. Log in every day to reach the day 7 jackpot!"
+      : "Log in every day. Each day pays more, and day 7 is the jackpot!";
+  $("#streakGrid").replaceChildren(
+    ...STREAK_REWARDS.map((r, i) => {
+      const n = i + 1;
+      const claimed = st.claimedToday ? n <= st.day : n < st.next;
+      const today = n === st.next;
+      return el(
+        "div",
+        { class: `sday${claimed ? " claimed" : ""}${today ? " today" : ""}${n === 7 ? " jackpot" : ""}` },
+        el("small", { text: today ? "Today" : `Day ${n}` }),
+        n === 7 ? el("span", { class: "chest", text: "🎁" }) : el("i", { class: "coin big" }),
+        el("b", { text: r.coins.toLocaleString() }),
+        r.medal ? el("em", { text: "+ gold medal" }) : null,
+        claimed ? el("span", { class: "tick", text: "✓" }) : null,
+      );
+    }),
+  );
+  const btn = $("#streakClaim");
+  btn.disabled = st.claimedToday;
+  btn.textContent = st.claimedToday ? "Come back tomorrow" : `Claim ${STREAK_REWARDS[st.next - 1].coins} coins`;
+}
+function claimStreak() {
+  const st = streakState();
+  if (st.claimedToday) return;
+  const r = STREAK_REWARDS[st.next - 1];
+  local.setItem("lr:streak", JSON.stringify({ day: st.next, last: todayKey() }));
+  wallet.addCoins(r.coins);
+  if (r.medal) {
+    const m = wallet.medals();
+    m[r.medal] += 1;
+    wallet.save(m);
+  }
+  sfx.finish();
+  coinRain($("#streakGrid .sday.today") || $("#streakClaim"), st.next === 7 ? 36 : 16);
+  toast(st.next === 7 ? `JACKPOT! +${r.coins} coins and a gold medal` : `Day ${st.next}: +${r.coins} coins`);
+  renderStreak();
+  setTimeout(() => ($("#streakModal").hidden = true), 1400);
+}
+/** Little coins flying from a tile up to the coin counter. */
+function coinRain(from, n) {
+  const a = from.getBoundingClientRect();
+  const target = [...document.querySelectorAll(".coin-chip, .wallet .chip")].find((e) => e.offsetParent);
+  const b = target ? target.getBoundingClientRect() : { left: innerWidth - 60, top: 20, width: 0, height: 0 };
+  for (let i = 0; i < n; i++) {
+    const c = el("i", { class: "coin fly-coin" });
+    const x0 = a.left + a.width / 2 + (Math.random() - 0.5) * 40;
+    const y0 = a.top + a.height / 2 + (Math.random() - 0.5) * 30;
+    c.style.left = `${x0}px`;
+    c.style.top = `${y0}px`;
+    document.body.append(c);
+    const dx = b.left + b.width / 2 - x0;
+    const dy = b.top + b.height / 2 - y0;
+    c.animate(
+      [
+        { transform: "translate(0,0) scale(0.4)", opacity: 0 },
+        { transform: `translate(${(Math.random() - 0.5) * 80}px, ${-40 - Math.random() * 60}px) scale(1.2)`, opacity: 1, offset: 0.35 },
+        { transform: `translate(${dx}px, ${dy}px) scale(0.6)`, opacity: 0.9 },
+      ],
+      { duration: 900 + i * 35, easing: "cubic-bezier(.3,.7,.4,1)", fill: "forwards" },
+    ).onfinish = () => c.remove();
+  }
+}
+const streakModal = $("#streakModal");
+function openStreak() {
+  renderStreak();
+  streakModal.hidden = false;
+}
+$("#streakPill").addEventListener("click", openStreak);
+$("#streakClose").addEventListener("click", () => (streakModal.hidden = true));
+$("#streakClaim").addEventListener("click", claimStreak);
+streakModal.addEventListener("click", (e) => e.target === streakModal && (streakModal.hidden = true));
+renderStreak();
+// first visit of the day: pop the reward open
+setTimeout(() => {
+  if (!streakState().claimedToday && game.mode === "home" && countryModal.hidden) openStreak();
+}, 900);
 
 // ── personal best (solo endless run) ──
 
@@ -3111,9 +3304,9 @@ function personalBest() {
 }
 function checkBest() {
   if (game.mode === "race" && !me.out && net.view && serverNow() > net.view.startAt) {
-    if (game.soloRun) challenge("dist800", Math.floor(me.d));
-    challenge("nohit400", Math.floor(me.d - (game.lastHitD ?? 0)));
-    if (isSurvival()) challenge("survive90", Math.floor((serverNow() - net.view.startAt) / 1000));
+    challenge("dist", Math.floor(me.d));
+    challenge("nohit", Math.floor(me.d - (game.lastHitD ?? 0)));
+    if (isSurvival()) challenge("survive", Math.floor((serverNow() - net.view.startAt) / 1000));
   }
   if (!game.soloRun || game.bestBeaten) return;
   const best = personalBest();
@@ -3246,7 +3439,7 @@ function useItem(lane = me.lane, dir = 1) {
   const kind = me.items.shift();
   if (kind === "banana") {
     game.bananasThrown = (game.bananasThrown ?? 0) + 1;
-    challenge("bananas3", game.bananasThrown);
+    challenge("bananas", game.bananasThrown);
     const d = dir > 0 ? me.d + BANANA_AHEAD_M : me.d - BANANA_BEHIND_M;
     act({ type: "banana", lane, d: Math.round(d * 10) / 10 });
     sfx.lane();

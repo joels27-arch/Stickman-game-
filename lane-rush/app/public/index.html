@@ -42,33 +42,36 @@
       </picture>
       <div class="home-shade"></div>
       <header class="home-top">
-        <div class="wallet" title="Your medals"></div>
+        <label class="name-chip" title="Your name">
+          <span class="ni">👤</span>
+          <input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Your name" />
+          <span class="pen">✎</span>
+        </label>
         <div class="topbar-btns">
-          <button id="settingsBtn" class="btn small ghost" type="button">⚙ Settings</button>
+          <span class="coin-chip" title="Coins"><i class="coin"></i><b class="coinCount">0</b></span>
+          <button id="settingsBtn" class="btn small ghost icon-btn" type="button" aria-label="Settings">⚙</button>
           <button class="btn small gold shopBtn" type="button">Shop</button>
         </div>
       </header>
       <h1 class="logo home-logo"><span class="w1">BRAIN</span><span class="w2">RUN</span></h1>
       <div class="roster" id="homeRoster" hidden></div>
       <div class="home-dock">
-        <div id="daily" class="daily"></div>
-        <div class="dock-grid">
-          <label class="field name-field">
-            <span>Your name</span>
-            <input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Speedy" />
-          </label>
-          <button id="soloBtn" class="btn big go"><span class="flagico">❤️</span> Play solo <span class="arrow">→</span></button>
-          <button id="createBtn" class="btn big blue"><span class="flagico">👥</span> Create lobby <span class="arrow">→</span></button>
-          <div class="join-wrap">
-            <div class="or"><span>Join lobby</span></div>
-            <div class="join-row">
-              <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" />
-              <button id="joinBtn" class="btn big ghost">Join</button>
-            </div>
-          </div>
+        <div class="quest-row">
+          <button id="streakPill" class="pill streak" type="button"><span class="pi">🔥</span><span><b id="streakDay">Day 1</b><small>Daily reward</small></span><i class="dot" hidden></i></button>
+          <button id="questPill" class="pill quests" type="button"><span class="pi">📋</span><span><b id="questCount">0/3</b><small>Challenges</small></span></button>
         </div>
-        <p id="homeMsg" class="msg" role="alert"></p>
-        <p class="hint" id="loadHint">Loading 3D runners…</p>
+        <div class="play-card">
+          <button id="soloBtn" class="btn big go"><span class="flagico">❤️</span> Play solo <span class="arrow">→</span></button>
+          <button id="createBtn" class="btn big blue"><span class="flagico">👥</span> Create room <span class="arrow">→</span></button>
+          <button id="joinOpen" class="btn big ghost" type="button"><span class="flagico">🔑</span> Join room <span class="arrow">→</span></button>
+          <div class="join-row" id="joinRow" hidden>
+            <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" />
+            <button id="joinBtn" class="btn big go">Join</button>
+            <button id="joinClose" class="btn big ghost x" type="button" aria-label="Cancel">✕</button>
+          </div>
+          <p id="homeMsg" class="msg" role="alert"></p>
+          <p class="hint" id="loadHint">Loading 3D runners…</p>
+        </div>
       </div>
     </section>
 
@@ -201,6 +204,31 @@
         </header>
         <input id="countrySearch" class="search" placeholder="Search countries" autocomplete="off" />
         <div id="flagGrid" class="flag-grid"></div>
+      </div>
+    </div>
+
+    <!-- DAILY REWARD: 7-day login streak -->
+    <div id="streakModal" class="modal" hidden>
+      <div class="sheet streak-sheet" role="dialog" aria-modal="true" aria-labelledby="streakTitle">
+        <header class="sheet-head">
+          <h2 id="streakTitle">Daily reward</h2>
+          <button id="streakClose" class="btn small ghost" type="button">Close</button>
+        </header>
+        <p id="streakSub" class="sheet-sub"></p>
+        <div id="streakGrid" class="streak-grid"></div>
+        <button id="streakClaim" class="btn big go" type="button">Claim</button>
+      </div>
+    </div>
+
+    <!-- DAILY CHALLENGES: three a day, coins for each -->
+    <div id="questModal" class="modal" hidden>
+      <div class="sheet quest-sheet" role="dialog" aria-modal="true" aria-labelledby="questTitle">
+        <header class="sheet-head">
+          <h2 id="questTitle">Daily challenges</h2>
+          <button id="questClose" class="btn small ghost" type="button">Close</button>
+        </header>
+        <p id="questSub" class="sheet-sub"></p>
+        <div id="questList" class="quest-list"></div>
       </div>
     </div>
 
