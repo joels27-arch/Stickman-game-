@@ -34,6 +34,7 @@ export function buildCourse(seed: number, len?: number): {
   rows: { z: number; lanes: (string | null)[]; looks: number[] }[];
   boosts: { z: number; lane: number }[];
   boxes: { z: number; lane: number }[];
+  hearts: { z: number; lane: number }[];
   len: number;
 };
 
@@ -62,6 +63,9 @@ export const BOWL_RANGE_M: number;
 export const BANANA_COOLDOWN_MS: number;
 export const GAME_MODES: string[];
 export const MAPS: string[];
+export const EMOTES: string[];
+export const EMOTE_COOLDOWN_MS: number;
+export const HEART_EVERY_M: number;
 export const CUP_RACES: string[];
 export const CUP_POINTS: number[];
 export function cupStandings(state: unknown): string[];

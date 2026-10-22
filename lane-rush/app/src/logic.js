@@ -46,6 +46,12 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  * `state.mode` is what the host picked; `state.kind` is the race being run.
  */
 export const GAME_MODES = ["survival", "sprint", "tournament"];
+/** Quick reactions anyone can show above their runner. */
+export const EMOTES = ["👋", "😂", "🔥", "😱", "😎", "💪"];
+export const EMOTE_COOLDOWN_MS = 1200;
+/** In survival a heart floats over the track every so often: grab it to win back a lost heart. */
+export const HEART_EVERY_M = 420;
+
 /** Where you race. The host picks one; a tournament visits them in turn. */
 export const MAPS = ["meadow", "farm", "beach"];
 /** A tournament is three races; each placing scores points, most points wins. */
@@ -352,6 +358,8 @@ export function buildCourse(seed, len = TRACK_LEN) {
   const rows = [];
   const boosts = [];
   const boxes = [];
+  const hearts = [];
+  let lastHeart = 0;
   let z = 45;
   let last = "";
   let sinceBox = 0;
@@ -401,11 +409,15 @@ export function buildCourse(seed, len = TRACK_LEN) {
     // room to land and line up for the next pattern (more slack early on)
     const gap = step * (1.15 + r() * 0.5 * (1 - k)) + (pat.tail ?? 0);
     sinceBox += 1;
+    if (endless && z - lastHeart > HEART_EVERY_M) {
+      hearts.push({ z: Math.round((z + gap * 0.45) * 10) / 10, lane: Math.floor(r2() * 4) });
+      lastHeart = z;
+    }
     if (r() < 0.3) boosts.push({ z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) });
     else if (z > 60 && (sinceBox >= 4 || r2() < 0.22)) addBox(z + gap * 0.55);
     z += gap;
   }
-  return { rows, boosts, boxes, len };
+  return { rows, boosts, boxes, hearts, len };
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -433,7 +445,7 @@ function present(state) {
 }
 
 function freshRunner(p) {
-  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, left: false };
+  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, emoteAt: null, sc: 0, cb: 0, left: false };
 }
 
 function pickHost(state) {
@@ -624,6 +636,8 @@ export function validateAction(state, playerId, action) {
       if (action.hits !== undefined && !intIn(action.hits, 0, 999)) return { ok: false, error: "bad hits" };
       if (action.pw !== undefined && !POWER_STATES.includes(action.pw)) return { ok: false, error: "bad power" };
       if (action.v !== undefined && !(num(action.v) && action.v >= 0 && action.v <= 60)) return { ok: false, error: "bad speed" };
+      if (action.sc !== undefined && !intIn(action.sc, 0, 10_000_000)) return { ok: false, error: "bad score" };
+      if (action.cb !== undefined && !intIn(action.cb, 0, 9999)) return { ok: false, error: "bad combo" };
       return { ok: true };
     }
     case "zap": {
@@ -652,6 +666,13 @@ export function validateAction(state, playerId, action) {
       if (action.d < me.d - BANANA_BEHIND_M - 2 * POS_SLACK_M || action.d > me.d + BANANA_AHEAD_M + 2 * POS_SLACK_M) return { ok: false, error: "bad banana" };
       const t = num(action.t) ? action.t : state.now;
       if (me.bananaAt !== null && t - me.bananaAt < BANANA_COOLDOWN_MS) return { ok: false, error: "too soon" };
+      return { ok: true };
+    }
+    case "emote": {
+      if (!me) return { ok: false, error: "join first" };
+      if (!EMOTES.includes(action.e)) return { ok: false, error: "bad emote" };
+      const t = num(action.t) ? action.t : state.now;
+      if (me.emoteAt != null && t - me.emoteAt < EMOTE_COOLDOWN_MS) return { ok: false, error: "too soon" };
       return { ok: true };
     }
     case "take": {
@@ -765,6 +786,8 @@ export function applyAction(state0, playerId, action) {
       // screen place this runner where they are *now*, not where they were
       me.v = action.v ?? 0;
       me.at = t;
+      if (action.sc !== undefined) me.sc = action.sc;
+      if (action.cb !== undefined) me.cb = Math.max(me.cb ?? 0, action.cb);
       if (survival) {
         if (me.hits >= LIVES) {
           me.outAt = t;
@@ -804,6 +827,11 @@ export function applyAction(state0, playerId, action) {
       state.bowls = [...(state.bowls ?? []), { id: state.bowlSeq, by: playerId, lane: action.lane, d: Math.round(action.d * 10) / 10, dir: action.dir, at: t }].slice(-8);
       break;
     }
+    case "emote":
+      me.emoteAt = t;
+      state.emoteSeq = (state.emoteSeq ?? 0) + 1;
+      state.emotes = [...(state.emotes ?? []), { id: state.emoteSeq, by: playerId, e: action.e, at: t }].slice(-8);
+      break;
     case "take":
       // mystery boxes are first come, first served
       state.taken = [...(state.taken ?? []), action.box];
@@ -937,6 +965,8 @@ export function viewFor(state, playerId) {
         act: p.act,
         pw: p.pw || "",
         v: Math.round((p.v ?? 0) * 100) / 100,
+        sc: p.sc ?? 0,
+        cb: p.cb ?? 0,
         at: p.at ?? 0,
         finish: p.finish,
         hits: p.hits,
@@ -951,6 +981,7 @@ export function viewFor(state, playerId) {
     bananas: state.bananas ?? [],
     bowls: state.bowls ?? [],
     taken: state.taken ?? [],
+    emotes: state.emotes ?? [],
   };
 }
 

@@ -535,3 +535,28 @@ describe("maps", () => {
     expect(seen).toEqual(["farm", "beach", "meadow"]);
   });
 });
+
+describe("extras: emotes, scores, heart pickups", () => {
+  it("relays emotes with a short cooldown, even in the lobby", () => {
+    let s = act(lobbyOf(2), "p1", { type: "emote", e: "🔥", t: T0 + 100 });
+    expect((L.viewFor(s, "p0") as any).emotes).toEqual([{ id: 1, by: "p1", e: "🔥", at: T0 + 100 }]);
+    expect(reject(s, "p1", { type: "emote", e: "😂", t: T0 + 500 })).toMatch(/soon/);
+    expect(reject(s, "p0", { type: "emote", e: "🍔", t: T0 + 500 })).toBeTruthy();
+  });
+
+  it("keeps everyone's style score and best combo for the results", () => {
+    let s = act(lobbyOf(2), "p0", { type: "start", t: T0 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    s = act(s, "p0", { type: "pos", d: 20, lane: 0, y: 0, act: "run", sc: 340, cb: 7, t: s.startAt + 2000 });
+    s = act(s, "p0", { type: "pos", d: 30, lane: 0, y: 0, act: "run", sc: 360, cb: 2, t: s.startAt + 2500 });
+    const me = (L.viewFor(s, "p1") as any).players.find((p: any) => p.id === "p0");
+    expect([me.sc, me.cb]).toEqual([360, 7]);
+  });
+
+  it("puts heart pickups only on survival courses, every few hundred metres", () => {
+    expect(L.buildCourse(5).hearts).toEqual([]);
+    const h = L.buildCourse(5, 4000).hearts;
+    expect(h.length).toBeGreaterThan(5);
+    for (let i = 1; i < h.length; i++) expect(h[i]!.z - h[i - 1]!.z).toBeGreaterThan(L.HEART_EVERY_M - 50);
+  });
+});

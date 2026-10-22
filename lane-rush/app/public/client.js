@@ -35,6 +35,7 @@ import {
   CUP_RACES,
   CUP_POINTS,
   MAPS,
+  EMOTES,
   BANANA_AHEAD_M,
   BOWL_SPEED,
   BOWL_RANGE_M,
@@ -625,6 +626,7 @@ function onState(msg) {
   net.awaitingHello = false;
   net.creating = false; // we are in; never "create" again on reconnect unless host
   for (const p of v.players) remote.ingest(p, v);
+  announce(prev, v);
 
   if (v.phase === "lobby") {
     if (game.solo && v.host === playerId) {
@@ -782,6 +784,7 @@ function renderLobby(v) {
         el("span", { class: "cty", text: p.gone ? "Away…" : cty }),
       ),
     );
+    card.dataset.id = p.id;
     if (p.id === v.host) card.append(el("span", { class: "crown", text: "👑" }));
     if (p.id === playerId) card.append(el("span", { class: "you", text: "YOU" }));
     slots.append(card);
@@ -930,6 +933,7 @@ function renderResults(v) {
         : p.finish !== null
           ? `${p.hits} bump${p.hits === 1 ? "" : "s"}`
           : `${Math.round(p.d)} m of ${TRACK_LEN} m`;
+    const extra = p.sc ? ` · ${p.sc} style${p.cb > 1 ? ` · best combo ${p.cb}` : ""}` : "";
     const time = survival
       ? p.outAt !== null
         ? `out ${fmtTime(p.outAt - v.startAt)}`
@@ -948,7 +952,7 @@ function renderResults(v) {
         { class: p.id === playerId ? "me" : "" },
         el("span", { class: `pl p${Math.min(i + 1, 4)}`, text: PLACE[i] ?? `${i + 1}th` }),
         el("img", { src: portrait(p.char), alt: "" }),
-        el("span", { class: "who", text: withFlag(p.name, p.country) + (p.id === playerId ? " (you)" : "") }, el("small", { text: detail })),
+        el("span", { class: "who", text: withFlag(p.name, p.country) + (p.id === playerId ? " (you)" : "") }, el("small", { text: detail + extra })),
         el("span", { class: "tm", text: time }),
         earn,
       ),
@@ -968,7 +972,7 @@ function renderResults(v) {
       ? "Tournament champion!"
       : `Tournament: ${PLACE[myPlace - 1] ?? myPlace}`
     : solo && v.kind === "survival"
-      ? `You ran ${Math.round(v.players[0]?.d ?? 0)} m`
+      ? `You ran ${Math.round(v.players[0]?.d ?? 0)} m${Math.round(v.players[0]?.d ?? 0) >= personalBest() ? " · new record!" : ` · best ${personalBest()} m`}`
       : myPlace === 1
         ? "You win!"
         : myPlace
@@ -1720,6 +1724,73 @@ const world = (() => {
   let cullables = []; // {obj, z}
   let rollers = []; // {obj, lane, z0, z, startedAt}
   let boxes = []; // {obj, lane, z, taken}
+  let hearts = []; // survival heart pickups
+  const emojiTexCache = new Map();
+  function emojiTex(e) {
+    if (!emojiTexCache.has(e)) {
+      const c = document.createElement("canvas");
+      c.width = c.height = 128;
+      const g = c.getContext("2d");
+      g.font = "100px 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.fillText(e, 64, 72);
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      emojiTexCache.set(e, t);
+    }
+    return emojiTexCache.get(e);
+  }
+  /** An emote floats up over a runner's head and fades. */
+  function emoteBubble(runner, e) {
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex(e), depthTest: false, transparent: true }));
+    spr.scale.set(0.9, 0.9, 1);
+    spr.position.y = CHAR_H + 0.9;
+    spr.renderOrder = 11;
+    runner.group.add(spr);
+    const t0 = performance.now();
+    const step = () => {
+      const k = (performance.now() - t0) / 2200;
+      if (k >= 1) return runner.group.remove(spr);
+      spr.position.y = CHAR_H + 0.9 + k * 0.8;
+      spr.material.opacity = k < 0.75 ? 1 : 1 - (k - 0.75) / 0.25;
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+  // your best solo distance, as a glowing post beside the track
+  const bestMarker = new THREE.Group();
+  {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 6, 10), new THREE.MeshBasicMaterial({ color: "#b6f72a" }));
+    post.position.set(TRACK_W / 2 + 0.6, 3, 0);
+    const c = document.createElement("canvas");
+    c.width = 256;
+    c.height = 64;
+    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c) }));
+    label.scale.set(3.2, 0.8, 1);
+    label.position.set(TRACK_W / 2 + 0.6, 6.4, 0);
+    bestMarker.add(post, label);
+    bestMarker.userData.canvas = c;
+    bestMarker.userData.label = label;
+    bestMarker.visible = false;
+    scene.add(bestMarker);
+  }
+  function setBestMarker(d) {
+    bestMarker.visible = d > 50;
+    if (!bestMarker.visible) return;
+    bestMarker.position.z = -d;
+    const c = bestMarker.userData.canvas;
+    const g = c.getContext("2d");
+    g.clearRect(0, 0, 256, 64);
+    g.fillStyle = "rgba(10,14,8,0.85)";
+    g.fillRect(0, 0, 256, 64);
+    g.fillStyle = "#b6f72a";
+    g.font = "italic 900 34px 'Barlow Condensed', 'Arial Narrow', sans-serif";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(`BEST ${Math.round(d)} M`, 128, 34);
+    bestMarker.userData.label.material.map.needsUpdate = true;
+  }
   let scenery = null;
 
   const clouds = new THREE.Group();
@@ -1974,6 +2045,16 @@ const world = (() => {
     const course = buildCourse(seed, len);
     rollers = [];
     boxes = [];
+    hearts = [];
+    for (const h of course.hearts || []) {
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex("❤️"), depthWrite: false }));
+      spr.scale.set(1.1, 1.1, 1);
+      spr.position.set(laneX(h.lane), 1.2, -h.z);
+      raceGroup.add(spr);
+      const heart = { obj: spr, lane: h.lane, z: h.z, taken: false };
+      hearts.push(heart);
+      cullables.push({ obj: spr, z: h.z, box: heart });
+    }
     for (const row of course.rows) {
       row.lanes.forEach((kind, lane) => {
         if (!kind) return;
@@ -2061,6 +2142,7 @@ const world = (() => {
     cullables = cullables.filter((c) => c.keep);
     rollers = [];
     boxes = [];
+    hearts = [];
   }
 
   /** Endless runs: no finish line, and the scenery follows you forward. */
@@ -2165,6 +2247,11 @@ const world = (() => {
     get boxes() {
       return boxes;
     },
+    get hearts() {
+      return hearts;
+    },
+    emoteBubble,
+    setBestMarker,
     ensureChar,
     hasChars,
     showcase,
@@ -2197,6 +2284,10 @@ const me = {
   boostT: 0,
   items: [], // power-ups you're holding: [next, saved] (two at most)
   frozenT: 0, // slowed by someone's freeze
+  score: 0, // style points: clean jumps, slides and close calls
+  combo: 0,
+  bestCombo: 0,
+  laneAt: 0, // when you last changed lane (for close calls)
   power: "", // active timed power: shield | rocket | ghost
   powerT: 0,
   speed: 0,
@@ -2268,6 +2359,12 @@ function enterRace(v) {
   game.round = v.round;
   game.soloStarting = false;
   game.lookBack = false;
+  game.soloRun = isSurvival() && v.players.length === 1;
+  game.bestBeaten = false;
+  world.setBestMarker(game.soloRun ? personalBest() : 0);
+  renderCombo();
+  $("#feed").replaceChildren();
+  $("#emoteMenu").classList.remove("show");
   game.spectating = null;
   game.shownSpectate = undefined;
   $("#spectate").classList.remove("show");
@@ -2298,6 +2395,10 @@ function enterRace(v) {
     // everyone starts each race holding a random power-up
     items: mine?.outAt != null || mine?.finish != null ? [] : [startingItem()],
     frozenT: 0,
+    score: 0,
+    combo: 0,
+    bestCombo: 0,
+    laneAt: 0,
     power: "",
     powerT: 0,
     speed: 0,
@@ -2352,6 +2453,7 @@ function enterRace(v) {
 function finishRaceView(v) {
   // brief celebration in 3D, then the results card
   game.mode = "results-pending";
+  saveBest();
   banner(isSurvival() ? (me.out ? "GAME OVER" : "LAST ONE STANDING!") : me.finished ? "FINISHED!" : "TIME UP!");
   // the last runner standing gets fireworks over their head
   if (isSurvival()) {
@@ -2388,6 +2490,7 @@ function input(kind) {
     const next = clamp(me.lane + (kind === "left" ? -1 : 1), 0, LANES - 1);
     if (next !== me.lane) {
       me.lane = next;
+      me.laneAt = performance.now();
       sfx.lane();
     }
   } else if (kind === "jump") {
@@ -2578,6 +2681,30 @@ function stepMe(dt) {
     r.hit = true;
     hit("roller");
   }
+  // style points for every row you get past without a scratch
+  if (!untouchable && me.stumbleT <= 0) {
+    for (const row of course.rows) {
+      if (row.z <= prevD || row.z > me.d) continue;
+      const lane = Math.round(me.x);
+      const mine = row.lanes[lane];
+      const beside = [row.lanes[lane - 1], row.lanes[lane + 1]].some((k) => k === "crate" || k === "roller");
+      if (mine === "hurdle") style("NICE JUMP!", 10);
+      else if (mine === "gate") style("NICE SLIDE!", 10);
+      else if (!mine && beside && performance.now() - me.laneAt < 650) style("CLOSE CALL!", 25);
+    }
+  }
+  // survival: hearts floating over the track give back a lost heart
+  for (const h of world.hearts) {
+    if (h.taken || h.z < prevD - 0.8 || h.z > me.d + 0.8 || Math.abs(me.x - h.lane) > 0.6) continue;
+    if (!isSurvival() || me.hits <= 0) continue; // full health: leave it
+    h.taken = true;
+    me.hits -= 1;
+    renderHearts(false);
+    sfx.pickup();
+    banner("+1 ❤️", 900);
+    world.burst(laneX(h.lane), 1.2, -h.z, ["#ff4d6d", "#ff9fb3", "#ffffff"], 60);
+    sendPos(true);
+  }
   // mystery boxes
   for (const b of world.boxes) {
     if (b.taken || b.z < prevD - 0.8 || b.z > me.d + 0.8) continue;
@@ -2635,6 +2762,8 @@ function hit(kind) {
   if (me.power === "rocket" || me.power === "ghost") return;
   if (me.out) return;
   me.hits += 1;
+  me.combo = 0;
+  renderCombo();
   if (isSurvival()) {
     renderHearts(true);
     if (me.hits >= LIVES) {
@@ -2665,6 +2794,114 @@ function hit(kind) {
 const slipped = new Set(); // banana ids you've already run onto
 const bowled = new Set(); // bowling balls that already got you
 const ballRel = new Map(); // ball id -> where it was relative to you last frame
+
+// ── style points & combos ──
+
+function style(text, points) {
+  me.combo += 1;
+  me.bestCombo = Math.max(me.bestCombo, me.combo);
+  const mult = Math.min(5, 1 + Math.floor(me.combo / 4)); // x2 from 4 in a row, up to x5
+  const gained = points * mult;
+  me.score += gained;
+  const pop = $("#stylePop");
+  pop.replaceChildren(el("b", { text }), el("span", { text: `+${gained}` }));
+  pop.classList.remove("show");
+  void pop.offsetWidth;
+  pop.classList.add("show");
+  renderCombo();
+}
+function renderCombo() {
+  const c = $("#combo");
+  const mult = Math.min(5, 1 + Math.floor(me.combo / 4));
+  c.classList.toggle("show", me.combo >= 2);
+  c.textContent = `${me.combo} combo${mult > 1 ? ` · x${mult}` : ""} · ${me.score}`;
+}
+
+// ── announcer feed ──
+
+function feed(text) {
+  const list = $("#feed");
+  const item = el("div", { class: "feed-item", text });
+  list.prepend(item);
+  while (list.children.length > 4) list.lastChild.remove();
+  setTimeout(() => item.classList.add("gone"), 3600);
+  setTimeout(() => item.remove(), 4200);
+}
+const nameOf = (id) => (id === playerId ? "You" : net.view?.players.find((p) => p.id === id)?.name ?? "Someone");
+
+/** Turn what changed in the room into callouts (and emote bubbles). */
+function announce(prev, v) {
+  if (!prev || v.round !== prev.round) {
+    game.seen = { bowls: new Set((v.bowls || []).map((b) => b.id)), bananas: new Set((v.bananas || []).map((b) => b.id)), emotes: new Set((v.emotes || []).map((e) => e.id)), zaps: new Set((v.zaps || []).map((z) => z.id)) };
+    return;
+  }
+  const seen = game.seen;
+  if (!seen) return;
+  for (const e of v.emotes || []) {
+    if (seen.emotes.has(e.id)) continue;
+    seen.emotes.add(e.id);
+    showEmote(e.by, e.e);
+  }
+  if (v.phase !== "race") return;
+  for (const p of v.players) {
+    const was = prev.players.find((q) => q.id === p.id);
+    if (was && was.outAt == null && p.outAt != null) feed(`💥 ${p.id === playerId ? "You are" : `${p.name} is`} out!`);
+    if (was && was.finish == null && p.finish != null) feed(`🏁 ${p.id === playerId ? "You" : p.name} crossed the line!`);
+  }
+  const fresh = (list, set) => (list || []).filter((x) => !set.has(x.id) && set.add(x.id));
+  for (const z of fresh(v.zaps, seen.zaps)) feed(z.kind === "freeze" ? `❄️ ${nameOf(z.by)} froze everyone` : `⚡ ${nameOf(z.by)} called lightning`);
+  for (const b of fresh(v.bowls, seen.bowls)) feed(`🎳 ${nameOf(b.by)} rolled a bowling ball ${b.dir > 0 ? "ahead" : "back"}`);
+  for (const b of fresh(v.bananas, seen.bananas)) feed(`🍌 ${nameOf(b.by)} dropped a banana in lane ${b.lane + 1}`);
+}
+
+// ── emotes ──
+
+function sendEmote(e) {
+  if (!net.view?.joined) return;
+  act({ type: "emote", e });
+  $("#emoteMenu").classList.remove("show");
+}
+function showEmote(id, e) {
+  if (game.mode === "race" || game.mode === "results-pending") {
+    const r = id === playerId ? me.runner : remote.map.get(id)?.runner;
+    if (r) world.emoteBubble(r, e);
+    feed(`${e} ${nameOf(id)}`);
+  } else {
+    const card = [...document.querySelectorAll("#slots .rcard")].find((c) => c.dataset.id === id);
+    if (card) {
+      const b = el("span", { class: "emo", text: e });
+      card.append(b);
+      setTimeout(() => b.remove(), 2200);
+    }
+  }
+}
+for (const box of document.querySelectorAll(".emote-row")) {
+  for (const e of EMOTES) {
+    const b = el("button", { type: "button", class: "emote-btn", text: e });
+    b.addEventListener("click", () => sendEmote(e));
+    box.append(b);
+  }
+}
+$("#emoteToggle").addEventListener("click", () => $("#emoteMenu").classList.toggle("show"));
+
+// ── personal best (solo endless run) ──
+
+function personalBest() {
+  return Number(local.getItem("lr:best")) || 0;
+}
+function checkBest() {
+  if (!game.soloRun || game.bestBeaten) return;
+  const best = personalBest();
+  if (best > 50 && me.d > best) {
+    game.bestBeaten = true;
+    banner("NEW RECORD!", 1500);
+    world.fireworks(-me.d - 18);
+  }
+}
+function saveBest() {
+  if (!game.soloRun) return;
+  if (me.d > personalBest()) local.setItem("lr:best", String(Math.round(me.d)));
+}
 
 // ── spectating (out of hearts) ──
 
@@ -2716,6 +2953,7 @@ function renderHearts(pop) {
 /** Third hit in survival: down for good, then watch whoever is still running. */
 function knockOut() {
   me.out = true;
+  saveBest();
   me.items = [];
   me.power = "";
   me.powerT = 0;
@@ -2975,6 +3213,8 @@ function sendPos(force = false) {
     hits: me.hits,
     pw: me.power,
     v: Math.round(me.speed * 100) / 100,
+    sc: me.score,
+    cb: me.bestCombo,
   });
 }
 
@@ -3038,6 +3278,7 @@ function frame(now) {
     const raceT = v && serverNow() >= v.startAt ? (serverNow() - v.startAt) / 1000 : null;
     world.animateCourse(me.out ? Math.max(me.d, ...[...remote.map.values()].map((r) => r.dispD)) : me.d, raceT, dt);
     checkZaps();
+    checkBest();
     for (let i = 0; i < steps; i++) stepMe(dt / steps);
     if (game.mode === "race") sendPos(false);
 
