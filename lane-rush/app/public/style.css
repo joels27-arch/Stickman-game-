@@ -530,3 +530,5 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .look-btn small { font-family: var(--display); font-weight: 800; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
 .look-btn:active { border-color: var(--lime); }
 .look-btn, .throw-lanes button { pointer-events: auto; }
+.solo-picker { grid-template-columns: repeat(4, minmax(0, 1fr)); overflow-y: auto; min-height: 0; }
+@media (max-width: 480px) { .solo-picker { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; } }

@@ -618,10 +618,47 @@ function requireName() {
   return n;
 }
 
-// Play solo: a private room that starts an endless survival run straight away
+// Play solo: pick a runner, then a private room starts an endless survival run straight away
+const soloModal = $("#soloModal");
+function renderSoloPicker() {
+  const cur = preferredChar();
+  $("#soloPicker").replaceChildren(
+    ...RUNNERS.map((r, i) => {
+      const locked = !wallet.owns(i);
+      const sub = locked
+        ? el("small", { class: "lock" }, el("span", { text: "🔒" }), el("img", { src: MEDAL_IMG[r.price.medal], alt: "" }), el("span", { text: `×${r.price.count}` }))
+        : el("small", { text: i === cur ? "Selected" : "" });
+      const card = el(
+        "button",
+        { class: `card${i === cur ? " mine" : ""}${locked ? " locked" : ""}`, type: "button", style: `--team:${r.color}` },
+        el("img", { src: portrait(i), alt: "" }),
+        el("b", { text: r.name, style: `color:${r.color}` }),
+        sub,
+      );
+      card.addEventListener("click", () => {
+        if (locked) {
+          soloModal.hidden = true;
+          return openShop();
+        }
+        local.setItem("lr:char", String(i));
+        world.setShowcase(i);
+        renderSoloPicker();
+      });
+      return card;
+    }),
+  );
+  $("#soloGo").replaceChildren(el("span", { class: "flagico", text: "❤️" }), el("span", { text: `Run as ${RUNNERS[cur].name}` }), el("span", { class: "arrow", text: "→" }));
+}
 $("#soloBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
+  renderSoloPicker();
+  soloModal.hidden = false;
+});
+$("#soloClose").addEventListener("click", () => (soloModal.hidden = true));
+soloModal.addEventListener("click", (e) => e.target === soloModal && (soloModal.hidden = true));
+$("#soloGo").addEventListener("click", () => {
+  soloModal.hidden = true;
   game.solo = true;
   game.soloStarting = false;
   connect(newCode(), true);
@@ -1163,6 +1200,28 @@ const world = (() => {
   }
 
   // ── asset loading ──
+  /**
+   * The gates were modelled from slightly angled pictures, so they come out
+   * turned a little. Turn them until they're thinnest front-to-back, i.e.
+   * square across the track.
+   */
+  function squareUp(root) {
+    const size = new THREE.Vector3();
+    const depth = (deg) => {
+      root.rotation.y = (deg * Math.PI) / 180;
+      root.updateMatrixWorld(true);
+      new THREE.Box3().setFromObject(root, true).getSize(size);
+      return size.z / size.x;
+    };
+    let best = 0;
+    for (let a = -50; a <= 50; a += 2) if (depth(a) < depth(best)) best = a;
+    let fine = best;
+    for (let a = best - 2; a <= best + 2; a += 0.25) if (depth(a) < depth(fine)) fine = a;
+    root.rotation.y = (fine * Math.PI) / 180;
+    root.updateMatrixWorld(true);
+    return root;
+  }
+
   function bananaStandIn() {
     const m = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.1, 8, 16, Math.PI), new THREE.MeshLambertMaterial({ color: "#ffd21f" }));
     m.rotation.x = -Math.PI / 2;
@@ -1346,8 +1405,8 @@ const world = (() => {
       loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
       // nice-to-haves: the game still runs with stand-ins if one of these fails
       loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
-      loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(g.scene, { width: TRACK_W + 1.6, maxHeight: 6.5 }))).catch(() => {}),
-      loadGLB("/assets/gate_start.glb").then((g) => (assets.props.startGate = fitProp(g.scene, { width: TRACK_W + 1.6, maxHeight: 6 }))).catch(() => {}),
+      loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W + 1.6, maxHeight: 6.5 }))).catch(() => {}),
+      loadGLB("/assets/gate_start.glb").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W + 1.6, maxHeight: 6 }))).catch(() => {}),
       loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
       loadGLB("/assets/tree_oak.glb").then((g) => (assets.props.oak = fitProp(g.scene, { height: 6.5 }))),
       loadGLB("/assets/tree_pine.glb").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
@@ -1419,11 +1478,12 @@ const world = (() => {
         }
       },
       fx,
-      play(name, fade = 0.15, timeScale = 1) {
+      play(name, fade = 0.15, timeScale = 1, restart = false) {
         const next = actions[name] || actions.run || Object.values(actions)[0];
         if (!next) return;
         if (current === next) {
           next.timeScale = timeScale;
+          if (restart) next.reset().play();
           return;
         }
         next.reset();
@@ -1554,7 +1614,7 @@ const world = (() => {
     // Higgsfield start and finish gates
     if (P.startGate) {
       const g = P.startGate.clone();
-      g.position.set(0, 0, -7); // a few metres past the start line: you run through it at GO
+      g.position.set(0, 0, 0); // right on the start line
       scene.add(g);
     }
     if (P.finishGate) {
@@ -1975,6 +2035,7 @@ function input(kind) {
       me.vy = Math.min(me.vy, -16); // fast-fall, then slide on landing
       me.slideT = SLIDE_S;
     } else if (me.stumbleT <= 0) {
+      if (me.slideT > 0) me.slideKick = true; // sliding again: start the slide clip over
       me.slideT = SLIDE_S;
       sfx.slide();
     }
@@ -1984,6 +2045,12 @@ function input(kind) {
 window.addEventListener("keydown", (e) => {
   if (e.target instanceof HTMLInputElement) return;
   const k = e.key;
+  // a held key auto-repeats: one press = one move (holding ↓ used to keep
+  // restarting the slide, leaving the runner frozen in a slide pose)
+  if (e.repeat) {
+    if (/^Arrow|^[wasdWASD ]$/.test(k)) e.preventDefault();
+    return;
+  }
   if (k === "ArrowLeft" || k === "a" || k === "A") input("left");
   else if (k === "ArrowRight" || k === "d" || k === "D") input("right");
   else if (k === "ArrowUp" || k === "w" || k === "W" || k === " ") input("jump");
@@ -2260,7 +2327,7 @@ function rollPower() {
     ghost: 2,
     rocket: 1 + back * 3,
     lightning: racers > 1 && place > 1 ? 0.5 + back * 3 : 0,
-    banana: racers > 1 ? 2 : 0, // it stays on the track until someone slips on it
+    banana: racers > 1 ? 2 : 1, // it stays on the track until someone slips on it (alone: mind your own!)
   };
   let total = 0;
   for (const k of POWERS) total += weights[k];
@@ -2433,7 +2500,10 @@ function animateRunner(r, a, speed, dt, pw = "") {
   }
   r.fallT = 0;
   if (a === "jump") r.play("jump", 0.08, (r.clipDuration("jump") / 0.75) * 0.9);
-  else if (a === "slide") r.play("slide", 0.08, r.clipDuration("slide") / SLIDE_S);
+  else if (a === "slide") {
+    r.play("slide", 0.08, r.clipDuration("slide") / SLIDE_S, r === me.runner && me.slideKick);
+    if (r === me.runner) me.slideKick = false;
+  }
   else if (a === "cheer") r.play("cheer", 0.25);
   else if (a === "idle") r.play("idle", 0.25);
   else r.play("run", 0.12, clamp(speed / BASE_SPEED, 0.45, 1.45));
