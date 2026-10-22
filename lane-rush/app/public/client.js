@@ -1487,6 +1487,34 @@ if (renderer) {
   renderer.toneMappingExposure = 1.05;
 }
 
+// Brain Chase: a little rear-view mirror in the corner, so you can see it coming
+const mirrorCam = new THREE.PerspectiveCamera(55, 1.5, 0.5, 400);
+function renderMirror() {
+  const on = renderer && game.mode === "race" && game.kind === "chase" && !me.out && me.runner;
+  $("#mirrorFrame").hidden = !on;
+  if (!on) return;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const mw = Math.round(Math.min(170, w * 0.38));
+  const mh = Math.round(mw / 1.5);
+  const x = w - mw - 12;
+  const y = h - mh - Math.round(h * 0.2); // bottom-left origin in WebGL
+  const p = me.runner.group.position;
+  mirrorCam.position.set(p.x * 0.5, 3.2, p.z - 3);
+  mirrorCam.lookAt(p.x * 0.3, 2.2, p.z + 30);
+  renderer.setScissorTest(true);
+  renderer.setScissor(x, y, mw, mh);
+  renderer.setViewport(x, y, mw, mh);
+  renderer.render(scene, mirrorCam);
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, w, h);
+  const f = $("#mirrorFrame");
+  f.style.width = `${mw}px`;
+  f.style.height = `${mh}px`;
+  f.style.right = "12px";
+  f.style.bottom = `${Math.round(h * 0.2)}px`;
+}
+
 function resize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -2645,8 +2673,8 @@ const world = (() => {
         if (!m || !brainObj || modeKind !== "chase") return;
         brainObj.remove(fallback);
         const inner = m.clone();
+        inner.rotation.y = Math.PI; // face the runners it's chasing
         const roll = new THREE.Group();
-        // spin around the brain's own centre
         const box = new THREE.Box3().setFromObject(inner);
         const c = box.getCenter(new THREE.Vector3());
         inner.position.sub(c);
@@ -2675,9 +2703,15 @@ const world = (() => {
     if (modeKind === "chase" && brainObj) {
       const bd = brainDistance(Math.max(0, (sn - v.startAt) / 1000));
       brainObj.position.set(0, 0, -bd);
-      const roll = brainObj.getObjectByName("roll");
-      if (roll) roll.rotation.x = -bd / 3.2;
-      else brainObj.children[0].rotation.x = -bd / 2.6;
+      // bounding along, leaning in, jaws first
+      const k = performance.now() / 1000;
+      const hop = Math.abs(Math.sin(k * 5)) * 0.9;
+      const body = brainObj.getObjectByName("roll") ?? brainObj.children[0];
+      if (body) {
+        body.position.y = (body.userData.y0 ??= body.position.y) + hop;
+        body.rotation.x = -0.18 + Math.sin(k * 10) * 0.05;
+        body.rotation.z = Math.sin(k * 5) * 0.08;
+      }
     }
     if (modeKind === "coinrush") {
       const k = performance.now() / 1000;
@@ -4843,6 +4877,7 @@ function frame(now) {
 
   world.tick(camera.position.z, dt);
   renderer?.render(scene, camera);
+  renderMirror();
 }
 
 function updateHud() {
