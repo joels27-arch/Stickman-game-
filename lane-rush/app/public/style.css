@@ -451,7 +451,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .power-slot b { display: block; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 20px; text-transform: uppercase; }
 .power-slot .bar { display: block; width: 92px; height: 6px; background: rgba(255, 255, 255, 0.15); margin-top: 4px; }
 .power-slot .bar i { display: block; height: 100%; width: 100%; background: var(--lime); }
-.power-toast { position: absolute; top: 34%; left: 50%; transform: translate(-50%, 10px); display: flex; align-items: center; gap: 12px; padding: 10px 20px 10px 12px; background: var(--panel); border: 1px solid rgba(255, 255, 255, 0.15); opacity: 0; pointer-events: none; }
+.power-toast { position: absolute; top: 15%; left: 50%; transform: translate(-50%, 10px); display: flex; align-items: center; gap: 12px; padding: 10px 20px 10px 12px; background: var(--panel); border: 1px solid rgba(255, 255, 255, 0.15); opacity: 0; pointer-events: none; }
 .power-toast.show { animation: toastin 1.8s ease-out forwards; }
 .power-toast img { width: 64px; height: 64px; object-fit: contain; }
 .power-toast b { display: block; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 28px; text-transform: uppercase; color: var(--lime); }

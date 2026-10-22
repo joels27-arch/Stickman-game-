@@ -1244,6 +1244,7 @@ const world = (() => {
           m.transparent = next === "ghost";
           m.opacity = next === "ghost" ? 0.38 : 1;
           m.depthWrite = next !== "ghost";
+          m.needsUpdate = true; // transparency changes the shader
         }
       },
       fx,
@@ -1956,7 +1957,6 @@ function grabBox(kind = rollPower()) {
     act({ type: "zap" });
     sfx.zap();
     flash();
-    banner("⚡ LIGHTNING! ⚡", 1100);
     showPowerToast("lightning");
     return;
   }
@@ -1967,7 +1967,6 @@ function grabBox(kind = rollPower()) {
     me.slideT = 0;
     sfx.rocket();
   }
-  banner(`${POWER_INFO[kind].label.toUpperCase()}!`, 900);
   showPowerToast(kind);
   renderPower();
 }
@@ -2134,14 +2133,14 @@ function frame(now) {
 
     // camera: behind and above the player, looking down the track
     const tx = laneX(me.x) * 0.75;
-    camPos.lerp(new THREE.Vector3(tx, 3.0 + me.y * 0.35, zMe + 5.6), Math.min(1, dt * 6));
+    camPos.lerp(new THREE.Vector3(tx, 3.0 + me.y * 0.75, zMe + 5.6), Math.min(1, dt * 6));
     camera.position.copy(camPos);
     if (shake > 0) {
       shake = Math.max(0, shake - dt);
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
-    camLook.set(tx * 0.8, 1.0, zMe - 9);
+    camLook.set(tx * 0.8, 1.0 + me.y * 0.6, zMe - 9);
     camera.lookAt(camLook);
     world.cull(me.d);
     updateHud();
