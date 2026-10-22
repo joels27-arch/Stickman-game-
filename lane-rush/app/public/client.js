@@ -807,7 +807,7 @@ const world = (() => {
   async function load(onProgress) {
     const jobs = [
       ...[0, 1, 2, 3].map((i) => loadChar(i).then((c) => (assets.chars[i] = c))),
-      loadGLB("/assets/hurdle.glb").then((g) => (assets.props.hurdle = fitProp(g.scene, { width: 1.75, maxHeight: 0.85 }))),
+      loadGLB("/assets/hurdle.glb").then((g) => (assets.props.hurdle = fitProp(g.scene, { width: 1.75, maxHeight: 0.75 }))),
       loadGLB("/assets/gate.glb").then((g) => (assets.props.gate = fitProp(g.scene, { width: 1.9, maxHeight: 2.15 }))),
       loadGLB("/assets/crate.glb").then((g) => (assets.props.crate = fitProp(g.scene, { width: 1.55 }))),
       loadGLB("/assets/tree.glb").then((g) => (assets.props.tree = fitProp(g.scene, { height: 4.2 }))),
@@ -865,7 +865,7 @@ const world = (() => {
     };
     if (!isMe) {
       const tag = nameTag(name, color);
-      tag.position.y = CHAR_H + 0.55;
+      tag.position.y = CHAR_H + 0.3;
       g.add(tag);
       r.tag = tag;
     }
@@ -1294,7 +1294,7 @@ function stepMe(dt) {
       const half = kind === "crate" ? 0.58 : 0.62;
       if (Math.abs(me.x - lane) > half) continue;
       const clear =
-        (kind === "hurdle" && me.y > 0.55) || (kind === "gate" && me.slideT > 0);
+        (kind === "hurdle" && me.y > 0.62) || (kind === "gate" && me.slideT > 0);
       if (!clear) hit(kind);
     }
   }
@@ -1406,14 +1406,14 @@ function frame(now) {
 
     // camera: behind and above the player, looking down the track
     const tx = laneX(me.x) * 0.75;
-    camPos.lerp(new THREE.Vector3(tx, 3.4 + me.y * 0.35, zMe + 6.6), Math.min(1, dt * 6));
+    camPos.lerp(new THREE.Vector3(tx, 3.0 + me.y * 0.35, zMe + 5.6), Math.min(1, dt * 6));
     camera.position.copy(camPos);
     if (shake > 0) {
       shake = Math.max(0, shake - dt);
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
-    camLook.set(tx * 0.8, 1.1, zMe - 9);
+    camLook.set(tx * 0.8, 1.0, zMe - 9);
     camera.lookAt(camLook);
     world.cull(me.d);
     updateHud();
