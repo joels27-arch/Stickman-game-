@@ -54,8 +54,8 @@ describe("lobby", () => {
 
   it("only lets the host start", () => {
     const s = lobbyOf(2);
-    expect(reject(s, "p1", { type: "start", t: T0 })).toMatch(/host/);
-    const started = act(s, "p0", { type: "start", t: T0 + 10 });
+    expect(reject(s, "p1", { type: "start", bots: false, t: T0 })).toMatch(/host/);
+    const started = act(s, "p0", { type: "start", bots: false, t: T0 + 10 });
     expect(started.phase).toBe("countdown");
     expect(started.startAt).toBe(T0 + 10 + L.COUNTDOWN_MS);
     expect(reject(started, "p3", { type: "hello", name: "Late", char: 0, create: false, t: T0 })).toMatch(/started/);
@@ -82,7 +82,7 @@ describe("lobby", () => {
 
 describe("race", () => {
   function racing(n = 2): S {
-    let s = act(sprint(lobbyOf(n)), "p0", { type: "start", t: T0 });
+    let s = act(sprint(lobbyOf(n)), "p0", { type: "start", bots: false, t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     expect(s.phase).toBe("race");
     return s;
@@ -98,7 +98,7 @@ describe("race", () => {
   });
 
   it("starts the race on the first position after the gun even before the tick", () => {
-    let s = act(sprint(lobbyOf(1)), "p0", { type: "start", t: T0 });
+    let s = act(sprint(lobbyOf(1)), "p0", { type: "start", bots: false, t: T0 });
     s = act(s, "p0", pos(3, s.startAt + 300));
     expect(s.phase).toBe("race");
     expect(s.players.p0.d).toBe(3);
@@ -202,7 +202,7 @@ describe("obstacles and power-ups", () => {
   });
 
   function racing(n = 2): S {
-    let s = act(sprint(lobbyOf(n)), "p0", { type: "start", t: T0 });
+    let s = act(sprint(lobbyOf(n)), "p0", { type: "start", bots: false, t: T0 });
     return L.applyAction(s, "__system", { type: "tick", t: s.startAt });
   }
 
@@ -227,7 +227,7 @@ describe("obstacles and power-ups", () => {
     s = act(s, "p1", { type: "pos", d: L.TRACK_LEN, lane: 0, y: 0, act: "run", t: s.startAt + 51_000 });
     s = act(s, "p0", { type: "again", t: s.startAt + 60_000 });
     s = act(s, "p1", { type: "ready", ready: true, t: s.startAt + 60_500 });
-    s = act(s, "p0", { type: "start", t: s.startAt + 61_000 });
+    s = act(s, "p0", { type: "start", bots: false, t: s.startAt + 61_000 });
     expect(s.zaps).toEqual([]);
   });
 
@@ -243,7 +243,7 @@ describe("medals and countries", () => {
   const pos = (d: number, t: number) => ({ type: "pos", d, lane: 0, y: 0, act: "run", t });
 
   it("gives gold, silver and bronze to the podium and nothing to 4th", () => {
-    let s: S = act(sprint(lobbyOf(4)), "p0", { type: "start", t: T0 });
+    let s: S = act(sprint(lobbyOf(4)), "p0", { type: "start", bots: false, t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     s = act(s, "p2", pos(L.TRACK_LEN, s.startAt + 50_000));
     s = act(s, "p0", pos(L.TRACK_LEN, s.startAt + 51_000));
@@ -258,7 +258,7 @@ describe("medals and countries", () => {
   });
 
   it("gives no medal for not finishing, or for racing alone", () => {
-    let s: S = act(sprint(lobbyOf(2)), "p0", { type: "start", t: T0 });
+    let s: S = act(sprint(lobbyOf(2)), "p0", { type: "start", bots: false, t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     s = act(s, "p1", pos(L.TRACK_LEN, s.startAt + 50_000));
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt + 50_000 + L.AFTER_FIRST_MS });
@@ -266,7 +266,7 @@ describe("medals and countries", () => {
     expect(r.p1.medal).toBe("gold");
     expect(r.p0).toEqual({ place: 2, medal: null });
 
-    let solo: S = act(sprint(lobbyOf(1)), "p0", { type: "start", t: T0 });
+    let solo: S = act(sprint(lobbyOf(1)), "p0", { type: "start", bots: false, t: T0 });
     solo = act(solo, "p0", pos(L.TRACK_LEN, solo.startAt + 50_000));
     expect((L.viewFor(solo, "p0") as S).rewards.p0).toEqual({ place: 1, medal: null });
   });
@@ -284,7 +284,7 @@ describe("medals and countries", () => {
 describe("survival (3 hearts)", () => {
   const pos = (d: number, t: number, hits = 0) => ({ type: "pos", d, lane: 0, y: 0, act: "run", hits, t });
   function survival(n: number): S {
-    let s = act(lobbyOf(n), "p0", { type: "start", t: T0 });
+    let s = act(lobbyOf(n), "p0", { type: "start", bots: false, t: T0 });
     expect(s.kind).toBe("survival");
     return L.applyAction(s, "__system", { type: "tick", t: s.startAt });
   }
@@ -337,7 +337,7 @@ describe("tournament", () => {
 
   it("runs three races, adds up points, and pays medals only for the final table", () => {
     let s = act(lobbyOf(3), "p0", { type: "mode", mode: "tournament" });
-    s = act(s, "p0", { type: "start", t: T0 });
+    s = act(s, "p0", { type: "start", bots: false, t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     // race 1 (survival): p2 wins, p0 second, p1 out first
     expect(s.kind).toBe(L.CUP_RACES[0]);
@@ -380,7 +380,7 @@ describe("tournament", () => {
 
 describe("bananas", () => {
   function racing(n = 2): S {
-    let s = act(lobbyOf(n), "p0", { type: "start", t: T0 });
+    let s = act(lobbyOf(n), "p0", { type: "start", bots: false, t: T0 });
     return L.applyAction(s, "__system", { type: "tick", t: s.startAt });
   }
 
@@ -405,7 +405,7 @@ describe("bananas", () => {
 
 describe("bowling and freeze", () => {
   function racing(n = 2): S {
-    let s = act(lobbyOf(n), "p0", { type: "start", t: T0 });
+    let s = act(lobbyOf(n), "p0", { type: "start", bots: false, t: T0 });
     return L.applyAction(s, "__system", { type: "tick", t: s.startAt });
   }
 
@@ -429,7 +429,7 @@ describe("bowling and freeze", () => {
 
 describe("keeping screens in sync", () => {
   it("tells everyone when a position was true and how fast that runner was going", () => {
-    let s = act(lobbyOf(2), "p0", { type: "start", t: T0 });
+    let s = act(lobbyOf(2), "p0", { type: "start", bots: false, t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     s = act(s, "p1", { type: "pos", d: 36, lane: 1, y: 0, act: "run", v: 12, t: s.startAt + 3000 });
     const p1 = (L.viewFor(s, "p0") as any).players.find((p: any) => p.id === "p1");
@@ -502,7 +502,7 @@ describe("rounds get faster, boxes are first come first served", () => {
   });
 
   it("gives a mystery box to whoever reaches it first", () => {
-    let s = act(lobbyOf(2), "p0", { type: "start", t: T0 });
+    let s = act(lobbyOf(2), "p0", { type: "start", bots: false, t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     s = act(s, "p1", { type: "take", box: 3 });
     expect((L.viewFor(s, "p0") as any).taken).toEqual([3]);
@@ -520,10 +520,10 @@ describe("maps", () => {
     let s = act(lobbyOf(2), "p0", { type: "map", map: "farm" });
     expect(reject(s, "p1", { type: "map", map: "beach" })).toMatch(/host/);
     expect(reject(s, "p0", { type: "map", map: "moon" })).toBeTruthy();
-    let r = act(s, "p0", { type: "start", t: T0 });
+    let r = act(s, "p0", { type: "start", bots: false, t: T0 });
     expect((L.viewFor(r, "p1") as any).raceMap).toBe("farm");
     s = act(s, "p0", { type: "mode", mode: "tournament" });
-    s = act(s, "p0", { type: "start", t: T0 });
+    s = act(s, "p0", { type: "start", bots: false, t: T0 });
     const seen = [s.raceMap];
     for (let race = 2; race <= 3; race++) {
       s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
@@ -548,7 +548,7 @@ describe("extras: emotes, scores, heart pickups", () => {
   });
 
   it("keeps everyone's style score and best combo for the results", () => {
-    let s = act(lobbyOf(2), "p0", { type: "start", t: T0 });
+    let s = act(lobbyOf(2), "p0", { type: "start", bots: false, t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     s = act(s, "p0", { type: "pos", d: 20, lane: 0, y: 0, act: "run", sc: 340, cb: 7, t: s.startAt + 2000 });
     s = act(s, "p0", { type: "pos", d: 30, lane: 0, y: 0, act: "run", sc: 360, cb: 2, t: s.startAt + 2500 });
@@ -566,7 +566,7 @@ describe("extras: emotes, scores, heart pickups", () => {
 
 describe("hit credit", () => {
   it("credits the thrower when someone slips on their banana or gets bowled", () => {
-    let s = act(lobbyOf(2), "p0", { type: "start", t: T0 });
+    let s = act(lobbyOf(2), "p0", { type: "start", bots: false, t: T0 });
     s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
     s = act(s, "p0", { type: "pos", d: 40, lane: 1, y: 0, act: "run", t: s.startAt + 4000 });
     s = act(s, "p0", { type: "banana", lane: 1, d: 68, t: s.startAt + 4100 });
@@ -584,13 +584,13 @@ describe("ready check", () => {
     let s: S = L.setup([]);
     s = act(s, "p0", { type: "hello", name: "Ann", char: 0, create: true, t: T0 });
     s = act(s, "p1", { type: "hello", name: "Bob", char: 1, t: T0 + 1 });
-    expect(reject(s, "p0", { type: "start", t: T0 + 2 })).toMatch(/Waiting for Bob/);
+    expect(reject(s, "p0", { type: "start", bots: false, t: T0 + 2 })).toMatch(/Waiting for Bob/);
     s = act(s, "p1", { type: "ready", ready: true, t: T0 + 3 });
     expect((L.viewFor(s, "p0") as any).players[1].ready).toBe(true);
     s = act(s, "p1", { type: "pick", char: 2, t: T0 + 4 });
     expect(s.players.p1.ready).toBe(false);
     s = act(s, "p1", { type: "ready", ready: true, t: T0 + 5 });
-    s = act(s, "p0", { type: "start", t: T0 + 6 });
+    s = act(s, "p0", { type: "start", bots: false, t: T0 + 6 });
     expect(s.phase).toBe("countdown");
   });
 
@@ -602,5 +602,92 @@ describe("ready check", () => {
     expect(v.players.find((p: any) => p.id === "p0").rp).toBe(420);
     expect(v.players.find((p: any) => p.id === "p1").rp).toBe(0);
     expect(reject(s, "p2", { type: "hello", name: "Cy", char: 2, create: false, rp: -5 })).toBe("bad rank");
+  });
+
+});
+
+describe("bots", () => {
+  function race(s: S, until: (s: S) => boolean, maxMs = 400000): S {
+    let t = s.startAt;
+    let hd = 0;
+    while (!until(s) && t < s.startAt + maxMs) {
+      t += 250;
+      s = L.applyAction(s, "SYS", { type: "tick", t });
+      hd += L.runSpeed(s.kind, (t - s.startAt) / 1000) * 0.25;
+      if (s.phase === "race") s = act(s, "p0", { type: "pos", d: hd, lane: 0, y: 0, act: "run", hits: 0, t });
+      // a second real player trips out early, so the race ends on the bots
+      if (s.phase === "race" && s.players.p1 && s.players.p1.outAt === null) s = act(s, "p1", { type: "pos", d: 1, lane: 1, y: 0, act: "run", hits: 3, t });
+    }
+    return s;
+  }
+
+  it("fill the empty spots when the host starts, and never become host", () => {
+    let s = lobbyOf(2);
+    s = act(s, "p0", { type: "start", t: T0 + 50 });
+    const v = L.viewFor(s, "p0") as any;
+    expect(v.players).toHaveLength(4);
+    expect(v.players.filter((p: any) => p.bot)).toHaveLength(2);
+    expect(new Set(v.players.map((p: any) => p.char)).size).toBe(4);
+    expect(new Set(v.players.map((p: any) => p.name)).size).toBe(4);
+    s = act(s, "p0", { type: "leave", t: T0 + 60 });
+    expect(s.players[s.host].bot).toBeFalsy();
+  });
+
+  it("stay out when asked (solo endless run)", () => {
+    let s = lobbyOf(1);
+    s = act(s, "p0", { type: "start", bots: false, t: T0 + 50 });
+    expect((L.viewFor(s, "p0") as any).players).toHaveLength(1);
+  });
+
+  it("run the course, pick up boxes, make mistakes and get knocked out", () => {
+    let s = lobbyOf(1);
+    s = act(s, "p0", { type: "start", t: T0 + 50 });
+    s = race(s, (x) => x.phase === "results");
+    expect(s.phase).toBe("results");
+    const bots = Object.values(s.players).filter((p: any) => p.bot) as any[];
+    expect(bots.every((b) => b.d > 100)).toBe(true);
+    expect(bots.every((b) => b.outAt !== null && b.hits >= L.LIVES)).toBe(true);
+    expect((s.taken ?? []).length).toBeGreaterThan(0);
+  });
+
+  it("pay no medals in a game with only one real player", () => {
+    let s = lobbyOf(1);
+    s = act(s, "p0", { type: "start", t: T0 + 50 });
+    s = race(s, (x) => x.phase === "results");
+    const r = (L.viewFor(s, "p0") as any).rewards as any;
+    expect(Object.values(r).every((x: any) => x.medal === null)).toBe(true);
+  });
+
+  it("finish a sprint", () => {
+    let s = lobbyOf(1);
+    s = act(s, "p0", { type: "mode", mode: "sprint" });
+    s = act(s, "p0", { type: "start", t: T0 + 50 });
+    s = race(s, (x) => x.phase === "results");
+    const bots = Object.values(s.players).filter((p: any) => p.bot) as any[];
+    expect(bots.every((b) => b.finish !== null)).toBe(true);
+  });
+
+  it("rematch: everyone votes, the same room (bots too) goes again", () => {
+    let s = lobbyOf(2);
+    s = act(s, "p0", { type: "start", t: T0 + 50 });
+    s = race(s, (x) => x.phase === "results");
+    expect(s.phase).toBe("results");
+    const round = s.round;
+    s = act(s, "p0", { type: "rematch", t: s.now + 10 });
+    expect(s.phase).toBe("results");
+    expect((L.viewFor(s, "p1") as any).rematch).toEqual(["p0"]);
+    expect(reject(s, "bot1", { type: "rematch" })).toBe("join first");
+    s = act(s, "p1", { type: "rematch", t: s.now + 20 });
+    expect(s.phase).toBe("countdown");
+    expect(s.round).toBe(round + 1);
+    expect(Object.values(s.players).filter((p: any) => p.bot)).toHaveLength(2);
+  });
+
+  it("leave when the host goes back to the lobby", () => {
+    let s = lobbyOf(2);
+    s = act(s, "p0", { type: "start", t: T0 + 50 });
+    s = race(s, (x) => x.phase === "results");
+    s = act(s, "p0", { type: "again", t: s.now + 10 });
+    expect(Object.values(s.players).some((p: any) => p.bot)).toBe(false);
   });
 });

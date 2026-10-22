@@ -446,16 +446,20 @@ function present(state) {
   return ids(state).filter((id) => !state.players[id].gone);
 }
 
+function humans(state) {
+  return ids(state).filter((id) => !state.players[id].bot);
+}
+
 function freshRunner(p) {
-  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, emoteAt: null, sc: 0, cb: 0, left: false };
+  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, emoteAt: null, sc: 0, cb: 0, left: false, item: "" };
 }
 
 function pickHost(state) {
   const h = state.players[state.host];
   if (h && !h.gone) return;
-  const next = present(state)[0];
+  const next = present(state).find((id) => !state.players[id].bot);
   if (next) state.host = next;
-  else if (!h) state.host = ids(state)[0] ?? null;
+  else if (!h) state.host = humans(state)[0] ?? null;
 }
 
 function removePlayer(state, id) {
@@ -501,8 +505,10 @@ function maybeEnd(state, t) {
       const p = state.players[id];
       return p.outAt === null && !p.gone;
     });
-    // with friends: last one standing wins; alone: run until your hearts run out
-    const over = racing.length >= 2 ? alive.length <= 1 : alive.length === 0;
+    // with friends: last one standing wins; alone: run until your hearts run out;
+    // and once every real player is out there's nobody left to watch the bots
+    const humanAlive = alive.some((id) => !state.players[id].bot);
+    const over = (racing.length >= 2 ? alive.length <= 1 : alive.length === 0) || !humanAlive;
     if (over || t >= state.startAt + SURVIVAL_LIMIT_MS) endRace(state, t);
     return;
   }
@@ -557,7 +563,221 @@ function startRace(state, t) {
   state.bowls = [];
   state.taken = [];
   state.hitLog = [];
+  state.rematch = [];
   for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
+}
+
+// ── bots: fill empty spots, run the same course, make mistakes ─────────────
+
+export const BOT_NAMES = ["Turbo Tim", "Zippy", "Bolt Bot", "Speedy Sam", "Rocket Rita", "Dash", "Nitro Nia", "Flash Fred", "Sprinty", "Max Speed"];
+const BOT_ITEMS = ["banana", "lightning", "rocket", "shield", "banana", "freeze"];
+const STUN_MS = 1600; // fall + get up, like a real runner
+const courses = new Map();
+function courseFor(state) {
+  const len = state.kind === "survival" ? SURVIVAL_LEN : TRACK_LEN;
+  const key = `${state.seed}:${len}`;
+  if (!courses.has(key)) {
+    if (courses.size > 6) courses.delete(courses.keys().next().value);
+    courses.set(key, buildCourse(state.seed, len));
+  }
+  return courses.get(key);
+}
+/** A stable 0..1 roll for (seed, bot, thing): the same race replays the same way. */
+function roll(seed, a, b) {
+  let h = (seed ^ Math.imul(a + 1, 0x9e3779b1) ^ Math.imul(Math.round(b * 10) + 7, 0x85ebca6b)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0;
+  h = Math.imul(h ^ (h >>> 12), 0x297a2d39) >>> 0;
+  return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
+}
+
+function fillBots(state) {
+  const used = new Set(ids(state).map((id) => state.players[id].char));
+  const real = humans(state).map((id) => state.players[id]);
+  const avgRp = real.length ? real.reduce((a, p) => a + (p.rp ?? 0), 0) / real.length : 0;
+  let n = 0;
+  while (ids(state).length < MAX_RUNNERS) {
+    const id = `bot${n + 1}`;
+    n += 1;
+    if (state.players[id]) continue;
+    const char = [0, 1, 2, 3, 4, 5, 6, 7].find((c) => !used.has(c)) ?? 0;
+    used.add(char);
+    const r = roll(state.seed + state.round, n, 3);
+    const slot = ids(state).length;
+    state.players[id] = freshRunner({
+      id,
+      name: freeName(state, Math.floor(roll(state.seed ^ (state.now & 0xffff), n, 9) * BOT_NAMES.length)),
+      char,
+      country: "",
+      rp: Math.max(0, Math.round(avgRp + (r - 0.5) * 300)),
+      slot,
+      gone: false,
+      goneAt: null,
+      ready: true,
+      bot: true,
+      // better bots for better players
+      skill: Math.min(0.98, 0.94 + Math.min(0.025, avgRp / 100000) + r * 0.02),
+    });
+    state.order.push(id);
+  }
+}
+
+function freeName(state, start) {
+  const taken = new Set(ids(state).map((id) => state.players[id].name));
+  for (let k = 0; k < BOT_NAMES.length; k++) {
+    const name = BOT_NAMES[(start + k) % BOT_NAMES.length];
+    if (!taken.has(name)) return name;
+  }
+  return "Bot";
+}
+
+function botHit(state, p, t) {
+  if ((p.shieldUntil ?? 0) > t) {
+    p.shieldUntil = 0;
+    p.pw = "";
+    return;
+  }
+  p.hits += 1;
+  p.stunUntil = t + STUN_MS;
+  p.act = "stumble";
+  p.y = 0;
+  if (state.kind === "survival" && p.hits >= LIVES) {
+    p.outAt = t;
+    p.act = "out";
+    p.pw = "";
+  }
+}
+
+function stepBots(state, t) {
+  if (t < state.startAt) return;
+  const course = courseFor(state);
+  const survival = state.kind === "survival";
+  const len = survival ? SURVIVAL_LEN : TRACK_LEN;
+  const elapsedS = (t - state.startAt) / 1000;
+  const runners = ids(state).map((id) => state.players[id]);
+  ids(state).forEach((id, bi) => {
+    const p = state.players[id];
+    if (!p.bot || p.left || p.outAt !== null || p.finish !== null) return;
+    const last = Math.max(state.startAt, p.at ?? state.startAt);
+    const dt = Math.min(1, Math.max(0, (t - last) / 1000));
+    // zaps from anyone else since the last step
+    for (const z of state.zaps ?? []) {
+      if (z.id <= (p.lastZap ?? 0)) continue;
+      p.lastZap = z.id;
+      if (z.by === id) continue;
+      if (z.kind === "freeze") p.slowUntil = t + 3000;
+      else if (p.d > z.d && (p.rocketUntil ?? 0) <= t) botHit(state, p, t);
+    }
+    if (p.outAt !== null) return;
+    let v = 0;
+    if ((p.stunUntil ?? 0) > t) {
+      p.act = "stumble";
+    } else {
+      v = runSpeed(state.kind, elapsedS) * (0.97 + roll(state.seed, bi, 1) * 0.03);
+      if ((p.rocketUntil ?? 0) > t) v += survival ? SURVIVAL_ROCKET : ROCKET_SPEED - BASE_SPEED;
+      if ((p.slowUntil ?? 0) > t) v *= 0.55;
+      if (p.act === "stumble") p.act = "run";
+    }
+    const d0 = p.d;
+    const d1 = Math.min(len, d0 + v * dt);
+    // gets a little sloppier as the course speeds up
+    const sharp = (p.skill ?? 0.95) - 0.05 * Math.min(1, elapsedS / 150);
+    const rocketing = (p.rocketUntil ?? 0) > t;
+    let act = (p.stunUntil ?? 0) > t ? "stumble" : "run";
+    let y = 0;
+    // look ahead: line up for what's coming
+    for (const row of course.rows) {
+      if (row.z <= d0) continue;
+      if (row.z > d0 + v * 0.7 + 4) break;
+      const kind = row.lanes[p.lane];
+      if (!kind || rocketing) continue;
+      const dodge = roll(state.seed, bi, row.z) < sharp;
+      if (!dodge) continue;
+      if (kind === "crate" || kind === "roller") {
+        const free = [0, 1, 2, 3].filter((l) => !row.lanes[l]).sort((a, b) => Math.abs(a - p.lane) - Math.abs(b - p.lane));
+        if (free.length) p.lane = free[0];
+      } else if (row.z - d0 < v * 0.35 + 1.5) {
+        if (kind === "hurdle") {
+          act = "jump";
+          y = 1.1;
+        } else if (kind === "gate") act = "slide";
+      }
+    }
+    // what we actually ran through
+    if (!rocketing) {
+      for (const row of course.rows) {
+        if (row.z <= d0) continue;
+        if (row.z > d1) break;
+        const kind = row.lanes[p.lane];
+        if (!kind) continue;
+        const cleared = (kind === "hurdle" || kind === "gate") && roll(state.seed, bi, row.z) < sharp;
+        if (!cleared) {
+          botHit(state, p, t);
+          break;
+        }
+      }
+    }
+    // mystery boxes (first come, first served), bananas, bowling balls
+    course.boxes.forEach((b, i) => {
+      if (b.z <= d0 || b.z > d1 || b.lane !== p.lane || p.item || (state.taken ?? []).includes(i)) return;
+      state.taken = [...(state.taken ?? []), i];
+      p.item = BOT_ITEMS[Math.floor(roll(state.seed, bi, b.z + 0.3) * BOT_ITEMS.length)];
+      p.itemAt = t;
+    });
+    for (const b of state.bananas ?? []) {
+      if (b.by === id || b.lane !== p.lane || b.d <= d0 - 0.5 || b.d > d1 + 0.5) continue;
+      state.bananas = state.bananas.filter((x) => x.id !== b.id);
+      addHit(state, "banana", b.by, id, t);
+      botHit(state, p, t);
+      break;
+    }
+    for (const b of state.bowls ?? []) {
+      if (b.by === id || b.lane !== p.lane || (p.bowled ?? []).includes(b.id)) continue;
+      const at = b.d + (b.dir * BOWL_SPEED * (t - b.at)) / 1000;
+      if (Math.abs(at - d1) > 3 || Math.abs(t - b.at) > (BOWL_RANGE_M / BOWL_SPEED) * 1000) continue;
+      p.bowled = [...(p.bowled ?? []), b.id].slice(-8);
+      addHit(state, "bowling", b.by, id, t);
+      botHit(state, p, t);
+    }
+    // use the item after a moment's thought
+    if (p.item && t - (p.itemAt ?? 0) > 1500 + roll(state.seed, bi, t / 1000) * 2500 && (p.stunUntil ?? 0) <= t) {
+      const ahead = runners.filter((o) => o.id !== id && !o.left && o.outAt === null && o.d > p.d);
+      if (p.item === "banana") {
+        state.bananaSeq = (state.bananaSeq ?? 0) + 1;
+        state.bananas = [...(state.bananas ?? []), { id: state.bananaSeq, by: id, lane: p.lane, d: Math.round((d1 - BANANA_BEHIND_M) * 10) / 10, at: t }].slice(-16);
+        p.item = "";
+      } else if (p.item === "lightning" || p.item === "freeze") {
+        if (ahead.length) {
+          state.zapSeq = (state.zapSeq ?? 0) + 1;
+          state.zaps = [...(state.zaps ?? []), { id: state.zapSeq, by: id, d: d1, at: t, kind: p.item }].slice(-6);
+          p.lastZap = state.zapSeq;
+          p.item = "";
+        }
+      } else if (p.item === "rocket") {
+        p.rocketUntil = t + 3000;
+        p.pw = "rocket";
+        p.item = "";
+      } else if (p.item === "shield") {
+        p.shieldUntil = t + 8000;
+        p.pw = "shield";
+        p.item = "";
+      }
+    }
+    if (p.pw === "rocket" && (p.rocketUntil ?? 0) <= t) p.pw = "";
+    if (p.pw === "shield" && (p.shieldUntil ?? 0) <= t) p.pw = "";
+    p.d = d1;
+    p.v = v;
+    p.at = t;
+    if (p.outAt === null) {
+      p.act = (p.stunUntil ?? 0) > t ? "stumble" : act;
+      p.y = p.act === "jump" ? y : 0;
+    }
+    if (!survival && p.d >= TRACK_LEN && p.finish === null) {
+      p.finish = Math.max(1, Math.round(t - state.startAt));
+      p.act = "idle";
+      p.pw = "";
+      if (state.firstFinishAt === null) state.firstFinishAt = t;
+    }
+  });
 }
 
 // ── the contract ────────────────────────────────────────────────────────────
@@ -639,6 +859,7 @@ export function validateAction(state, playerId, action) {
     }
     case "start": {
       if (state.phase !== "lobby") return { ok: false, error: "already started" };
+      if (action.bots !== undefined && typeof action.bots !== "boolean") return { ok: false, error: "bad bots" };
       if (state.host !== playerId) return { ok: false, error: "Only the host can start" };
       if (present(state).length < 1) return { ok: false, error: "nobody to race" };
       // everyone else has to have locked in their runner
@@ -710,6 +931,12 @@ export function validateAction(state, playerId, action) {
     case "slip": {
       if (!me) return { ok: false, error: "join first" };
       if (!(state.bananas ?? []).some((b) => b.id === action.id)) return { ok: false, error: "no banana" };
+      return { ok: true };
+    }
+    case "rematch": {
+      if (!me || me.bot) return { ok: false, error: "join first" };
+      if (state.phase !== "results") return { ok: false, error: "race not over" };
+      if (state.cup && state.cup.race < CUP_RACES.length) return { ok: false, error: "the cup isn't over" };
       return { ok: true };
     }
     case "again": {
@@ -784,8 +1011,19 @@ export function applyAction(state0, playerId, action) {
       break;
     case "start":
       state.cup = state.mode === "tournament" ? { race: 1, points: {} } : null;
+      state.botFill = action.bots !== false;
+      if (state.botFill) fillBots(state);
       startRace(state, t);
       break;
+    case "rematch": {
+      state.rematch = [...new Set([...(state.rematch ?? []), playerId])];
+      const voters = present(state).filter((id) => !state.players[id].bot);
+      if (voters.every((id) => state.rematch.includes(id))) {
+        state.cup = state.mode === "tournament" ? { race: 1, points: {} } : null;
+        startRace(state, t);
+      }
+      break;
+    }
     case "next":
       state.cup.race += 1;
       startRace(state, t);
@@ -881,7 +1119,7 @@ export function applyAction(state0, playerId, action) {
       break;
     }
     case "again": {
-      for (const id of ids(state)) if (state.players[id].gone) removePlayer(state, id);
+      for (const id of ids(state)) if (state.players[id].gone || state.players[id].bot) removePlayer(state, id);
       state.phase = "lobby";
       state.cup = null;
       for (const id of ids(state)) state.players[id].ready = false;
@@ -915,6 +1153,7 @@ export function applyAction(state0, playerId, action) {
         state.phase = "race";
         for (const id of ids(state)) state.players[id].act = "run";
       }
+      if (state.phase === "race") stepBots(state, t);
       maybeEnd(state, t);
       if (state.phase === "lobby" || state.phase === "results") {
         for (const id of ids(state)) {
@@ -942,7 +1181,7 @@ export function rewards(state) {
     // tournaments pay medals once, for the final table
     if (state.cup.race < CUP_RACES.length) return {};
     const table = cupStandings(state);
-    const paying = table.length >= MIN_RACERS_FOR_MEDALS;
+    const paying = humans(state).length >= MIN_RACERS_FOR_MEDALS;
     const out = {};
     table.forEach((id, i) => {
       out[id] = { place: i + 1, medal: paying && !state.players[id].left ? MEDALS[i] ?? null : null };
@@ -950,7 +1189,7 @@ export function rewards(state) {
     return out;
   }
   const order = standings(state);
-  const paying = order.length >= MIN_RACERS_FOR_MEDALS;
+  const paying = humans(state).length >= MIN_RACERS_FOR_MEDALS;
   const out = {};
   order.forEach((id, i) => {
     const p = state.players[id];
@@ -1000,6 +1239,7 @@ export function viewFor(state, playerId) {
         char: p.char,
         country: p.country || "",
         rp: p.rp ?? 0,
+        bot: Boolean(p.bot),
         slot: p.slot,
         d: Math.round(p.d * 100) / 100,
         lane: p.lane,
@@ -1026,6 +1266,8 @@ export function viewFor(state, playerId) {
     taken: state.taken ?? [],
     emotes: state.emotes ?? [],
     hits: state.hitLog ?? [],
+    rematch: state.rematch ?? [],
+    botFill: state.botFill !== false,
   };
 }
 

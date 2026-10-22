@@ -101,6 +101,7 @@
           <div id="hostPicks" class="host-picks">
             <h3 class="pick-title">Game mode</h3>
             <div id="modePick" class="mode-pick"></div>
+            <label class="bot-toggle"><input type="checkbox" id="botToggle" checked /> <span>🤖 Fill empty spots with bots</span></label>
             <h3 class="pick-title">Map</h3>
             <div id="mapPick" class="map-pick"></div>
           </div>
@@ -197,7 +198,8 @@
           <div class="lobby-actions">
             <button id="leave2Btn" class="btn small ghost">Leave</button>
             <button id="nextBtn" class="btn big go"><span class="flagico">🏆</span> Next race <span class="arrow">→</span></button>
-            <button id="againBtn" class="btn big go"><span class="flagico">🏁</span> Play again <span class="arrow">→</span></button>
+            <button id="rematchBtn" class="btn big go"><span class="flagico">🔁</span> <span id="rematchTxt">Rematch</span> <span class="arrow">→</span></button>
+            <button id="againBtn" class="btn small ghost">Back to lobby</button>
             <div id="waitHost2" class="wait">Waiting for the host…</div>
           </div>
         </div>

@@ -858,7 +858,7 @@ function onState(msg) {
       if (!game.soloStarting) {
         game.soloStarting = true;
         if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
-        act({ type: "start" });
+        act({ type: "start", bots: false });
       }
       return;
     }
@@ -1135,8 +1135,8 @@ function renderLobby(v) {
         "button",
         { class: `mode-card${gm === key ? " on" : ""}`, type: "button" },
         el("em", { text: info.tag }),
-        el("b", { text: `${info.icon} ${key === "survival" && n < 2 ? "Endless run" : info.label}` }),
-        el("span", { text: key === "survival" && n < 2 ? "Alone: 3 hearts, see how far you get. With friends: last one standing." : info.text }),
+        el("b", { text: `${info.icon} ${key === "survival" && n < 2 && !botsOn() ? "Endless run" : info.label}` }),
+        el("span", { text: key === "survival" && n < 2 && !botsOn() ? "Alone: 3 hearts, see how far you get. With friends: last one standing." : info.text }),
       );
       b.disabled = !isHost;
       b.addEventListener("click", () => gm !== key && act({ type: "mode", mode: key }));
@@ -1160,7 +1160,7 @@ function renderLobby(v) {
   );
   // start fetching the map's 3D props while everyone is still in the lobby
   for (const key of gm === "tournament" ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
-  const what = gm === "tournament" ? "tournament" : gm === "survival" && n < 2 ? "endless run" : `${GAME_MODE_INFO[gm].label} race`;
+  const what = gm === "tournament" ? "tournament" : gm === "survival" && n < 2 && !botsOn() ? "endless run" : `${GAME_MODE_INFO[gm].label} race`;
   $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
   renderLineup(v, { isHost, gm, mp, mode, what });
   // once you've locked in your runner, the lobby is the line-up
@@ -1168,7 +1168,7 @@ function renderLobby(v) {
   $("#lobbyCount").textContent = `${mode} · ${GAME_MODE_INFO[gm].label} · ${n}/4 players`;
   $("#readyCount").textContent = `👥 ${n}/4 players ready`;
   $("#lobbyMsg").textContent =
-    isHost && n < 2 ? "Play alone for practice, or share the code: duo, trio or a full squad of 4. Medals need 2+ players." : "";
+    isHost && n < 2 ? "Share the code with friends. Empty spots get bots (toggle below). Medals and rank points need 2+ real players." : "";
   world.setShowcase(me?.char ?? 0);
   if (world.ready) for (const p of v.players) world.ensureChar(p.char).catch(() => {});
   renderWallet();
@@ -1191,7 +1191,7 @@ $("#luGo").addEventListener("click", () => {
   const v = net.view;
   if (!v) return;
   const me = v.players.find((p) => p.id === playerId);
-  if (v.host === playerId) act({ type: "start" });
+  if (v.host === playerId) act({ type: "start", bots: botsOn() });
   else act({ type: "ready", ready: !me?.ready });
 });
 
@@ -1202,7 +1202,7 @@ $("#luGo").addEventListener("click", () => {
  */
 function renderLineup(v, { isHost, gm, mp, mode, what }) {
   $("#luCode").textContent = net.code;
-  $("#luMode").textContent = gm === "tournament" ? "Tournament" : gm === "survival" && v.players.length < 2 ? "Endless run" : GAME_MODE_INFO[gm].label;
+  $("#luMode").textContent = gm === "tournament" ? "Tournament" : gm === "survival" && v.players.length < 2 && !botsOn() ? "Endless run" : GAME_MODE_INFO[gm].label;
   $("#luMap").textContent = gm === "tournament" ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${mode}`;
   const qs = dailyChallenges();
   const qd = dailyState();
@@ -1236,7 +1236,7 @@ function renderLineup(v, { isHost, gm, mp, mode, what }) {
     return ped;
   });
   for (let i = order.length; i < 4; i++) {
-    peds.push(el("div", { class: "ped empty" }, el("div", { class: "ghost", text: `Waiting… code ${net.code}` }), el("div", { class: "disc" })));
+    peds.push(el("div", { class: "ped empty" }, el("div", { class: "ghost", text: v.botFill !== false && botsOn() ? `🤖 A bot joins at the start · code ${net.code}` : `Waiting… code ${net.code}` }), el("div", { class: "disc" })));
   }
   stage.replaceChildren(...peds);
 
@@ -1258,6 +1258,18 @@ function renderLineup(v, { isHost, gm, mp, mode, what }) {
 $("#leaveBtn").addEventListener("click", leaveLobby);
 $("#leave2Btn").addEventListener("click", leaveLobby);
 $("#againBtn").addEventListener("click", () => act({ type: "again" }));
+$("#rematchBtn").addEventListener("click", () => {
+  sfx.unlock();
+  act({ type: "rematch" });
+});
+function botsOn() {
+  return local.getItem("lr:bots") !== "0";
+}
+$("#botToggle").checked = botsOn();
+$("#botToggle").addEventListener("change", (e) => {
+  local.setItem("lr:bots", e.target.checked ? "1" : "0");
+  if (net.view) renderLobby(net.view);
+});
 $("#nextBtn").addEventListener("click", () => act({ type: "next" }));
 $("#copyBtn").addEventListener("click", async () => {
   const url = `${location.origin}/?join=${net.code}`;
@@ -1325,7 +1337,7 @@ function renderResults(v) {
         { class: p.id === playerId ? "me" : "" },
         el("span", { class: `pl p${Math.min(i + 1, 4)}`, text: PLACE[i] ?? `${i + 1}th` }),
         el("img", { src: portrait(p.char), alt: "" }),
-        el("span", { class: "who", text: withFlag(p.name, p.country) + (p.id === playerId ? " (you)" : "") }, el("small", { text: detail + extra })),
+        el("span", { class: "who", text: withFlag(p.name, p.country) + (p.bot ? " 🤖" : "") + (p.id === playerId ? " (you)" : "") }, el("small", { text: detail + extra })),
         el("span", { class: "tm", text: time }),
         earn,
       ),
@@ -1364,17 +1376,33 @@ function renderResults(v) {
   } else if (myPlace) {
     reward.append(el("span", {
       class: "nomedal",
-      text: v.standings.length < MIN_RACERS_FOR_MEDALS ? "Medals are won in races with 2 or more players" : "No medal this time. Top 3 win medals!",
+      text: v.players.filter((p) => !p.bot).length < MIN_RACERS_FOR_MEDALS ? "Medals are won in races with 2 or more players" : "No medal this time. Top 3 win medals!",
     }));
   }
-  if (rpChange) reward.append(rankChip(rpChange));
+  if (rpChange) {
+    reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
+    if (rpChange.botsOnly) reward.append(el("span", { class: "nomedal", text: "Rank points need 2 real players" }));
+    else reward.append(rankChip(rpChange));
+  }
   renderWallet();
 
   const isHost = v.host === playerId;
   const hasNext = cup && !cupDone;
   $("#nextBtn").style.display = isHost && hasNext ? "" : "none";
-  $("#againBtn").style.display = isHost && !hasNext ? "" : "none";
-  $("#waitHost2").style.display = isHost ? "none" : "block";
+  $("#againBtn").style.display = isHost && !hasNext && !game.solo ? "" : "none";
+  $("#waitHost2").style.display = !isHost && hasNext ? "block" : "none";
+  // rematch: everyone votes, the room goes again when all real players are in
+  const voters = v.players.filter((p) => !p.bot && !p.gone);
+  const votes = (v.rematch || []).length;
+  const voted = (v.rematch || []).includes(playerId);
+  $("#rematchBtn").style.display = hasNext ? "none" : "";
+  $("#rematchBtn").disabled = voted;
+  $("#rematchBtn").classList.toggle("waiting", voted);
+  $("#rematchTxt").textContent = voted
+    ? `Waiting for the others… ${votes}/${voters.length}`
+    : voters.length > 1
+      ? `Rematch${votes ? ` (${votes}/${voters.length})` : ""}`
+      : "Play again";
   if (hasNext) {
     $("#nextBtn").replaceChildren(
       el("span", { class: "flagico", text: "🏆" }),
@@ -2738,6 +2766,7 @@ function enterRace(v) {
   game.soloRun = isSurvival() && v.players.length === 1;
   game.bestBeaten = false;
   game.bananasThrown = 0;
+  game.kos = 0;
   game.boxesGrabbed = 0;
   game.lastHitD = 0;
   world.setBestMarker(game.soloRun ? personalBest() : 0);
@@ -3243,7 +3272,10 @@ function announce(prev, v) {
     const victim = h.victim === playerId ? "You" : nameOf(h.victim);
     const whose = h.by === playerId ? "your" : `${nameOf(h.by)}'s`;
     feed(h.kind === "banana" ? `🍌 ${victim} slipped on ${whose} banana!` : `🎳 ${victim} got bowled over by ${whose} ball!`);
-    if (h.by === playerId && h.victim !== playerId && game.mode === "race") style(h.kind === "banana" ? "BANANA HIT!" : "STRIKE!", 50);
+    if (h.by === playerId && h.victim !== playerId && game.mode === "race") {
+      style(h.kind === "banana" ? "BANANA HIT!" : "STRIKE!", 50);
+      game.kos = (game.kos ?? 0) + 1;
+    }
   }
 }
 
@@ -3529,6 +3561,7 @@ const LEAGUES = [
 const ROMAN = ["I", "II", "III"];
 /** RP for each place, by how many raced: winning a full lobby pays most. */
 const RP_TABLE = { 2: [20, -5], 3: [25, 8, -5], 4: [30, 15, 0, -8] };
+const RACE_COINS = [60, 40, 25, 15];
 function rankOf(rp) {
   const lg = [...LEAGUES].reverse().find((l) => rp >= l.min) ?? LEAGUES[0];
   const div = lg.steps.filter((x) => rp >= x).length - 1;
@@ -3603,12 +3636,20 @@ function recordRace(v, place) {
   if (n >= 2 && place === 1) stats.add("wins", 1);
   if (n >= 2 && place <= 3) stats.add("podiums", 1);
   if (n < 2 && v.kind === "survival") stats.max("bestRun", d);
-  // solo endless runs pay a little for distance; real points come from racing friends
-  const delta = n >= 2 ? (RP_TABLE[Math.min(n, 4)]?.[place - 1] ?? 0) : v.kind === "survival" ? Math.min(10, Math.floor(d / 300)) : 0;
+  // coins for every race: by place against everyone (bots too), plus hits you landed
+  const kos = game.kos ?? 0;
+  const coins = (n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos;
+  wallet.addCoins(coins);
+  // rank points only count against real people; solo runs pay a little for distance
+  const real = v.players.filter((p) => !p.bot).length;
+  const delta = real >= 2 ? (RP_TABLE[Math.min(n, 4)]?.[place - 1] ?? 0) : n < 2 && v.kind === "survival" ? Math.min(10, Math.floor(d / 300)) : 0;
   const before = rankOf(rank.rp());
   const res = rank.add(delta);
   const after = rankOf(res.after);
   res.promoted = after.name !== before.name && res.after > res.before ? after : null;
+  res.coins = coins;
+  res.kos = kos;
+  res.botsOnly = real < 2 && n >= 2;
   if (res.promoted) {
     setTimeout(() => {
       banner(`${after.name.toUpperCase()}!`, 2200);
