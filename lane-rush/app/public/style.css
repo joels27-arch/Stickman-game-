@@ -1385,3 +1385,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 #results .podium li:nth-child(3) { background: linear-gradient(90deg, rgba(205, 127, 50, 0.32), rgba(205, 127, 50, 0.06)); animation-delay: 160ms; }
 #results .podium li:nth-child(4) { animation-delay: 240ms; }
 #results .podium li.me { box-shadow: 0 0 0 3px #b6f72a, 0 0 18px rgba(182, 247, 42, 0.5); }
+.char-hero img { height: 100%; width: auto; max-width: 100%; min-height: 0; }
+/* centred without transform, so the button's pulse animation can't push it off-screen */
+.po-done { left: 0; right: 0; margin: 0 auto; transform: none; }
+.po-done:active { transform: translateY(5px); }
