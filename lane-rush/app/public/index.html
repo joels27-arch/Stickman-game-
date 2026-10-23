@@ -35,22 +35,19 @@
     <div class="veil" aria-hidden="true"></div>
 
     <!-- HOME -->
-    <section id="home" class="screen show home">
+    <section id="home" class="screen show home" data-page="play">
       <picture class="home-art">
         <source media="(max-aspect-ratio: 1/1)" srcset="/assets/home_tall.jpg" />
         <img src="/assets/home_wide.jpg" alt="" />
       </picture>
       <div class="home-shade"></div>
       <header class="home-top">
-        <button id="rankBadgeBtn" class="rank-badge-btn" type="button" aria-label="Your rank"><img id="rankPillImg" src="/assets/lg_bronze.webp" alt="" /></button>
-        <label class="name-chip" title="Your name">
-          <input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Your name" />
-          <span class="pen">✎</span>
-        </label>
+        <button id="rankBadgeBtn" class="rank-badge-btn tb-shop" type="button" aria-label="Your league"><img id="rankPillImg" src="/assets/lg_bronze.webp" alt="" /></button>
+        <div class="medal-chip" title="Your medals"></div>
         <div class="topbar-btns">
-          <span class="coin-chip" title="Coins"><i class="coin"></i><b class="coinCount">0</b></span>
+          <span class="coin-chip tb-coins" title="Coins"><i class="coin"></i><b class="coinCount">0</b></span>
+          <button id="streakPill" class="pill streak top-streak tb-shop" type="button" aria-label="Daily reward"><img class="pi" src="/assets/ui_flame.webp" alt="" /><b id="streakDay">Day 1</b><i class="dot" hidden></i></button>
           <button id="settingsBtn" class="btn small ghost icon-btn" type="button" aria-label="Settings">⚙</button>
-          <button id="streakPill" class="pill streak top-streak" type="button" aria-label="Daily reward"><img class="pi" src="/assets/ui_flame.webp" alt="" /><b id="streakDay">Day 1</b><i class="dot" hidden></i></button>
         </div>
       </header>
       <div id="homePages" class="home-pages">
@@ -64,14 +61,24 @@
                 <small>Your league</small>
                 <b id="leagueName">Bronze I</b>
                 <span class="qbar"><i id="leagueBar"></i></span>
-                <span id="leagueNext" class="lc-next">0 RP</span>
+                <span id="leagueNext" class="lc-next">0 pts</span>
               </span>
               <span class="lc-go">Rankings ›</span>
             </button>
             <div id="tourneyList" class="tourney-list"></div>
           </div>
         </div>
-        <!-- MIDDLE: play -->
+        <!-- SKINS: your collection and every character -->
+        <div class="hpage hp-side hp-skins" id="hpSkins" aria-label="Skins">
+          <div class="hp-scroll">
+            <div class="ribbon pink hp-ribbon"><h2>Skins</h2></div>
+            <div class="coll-progress"><b id="collCount">0/0</b><div class="qbar"><i id="collBar"></i><span id="collPct"></span></div></div>
+            <div id="collFilters" class="chip-row" role="tablist"></div>
+            <div id="collRarity" class="chip-row small" role="tablist"></div>
+            <div id="collGrid" class="coll-grid"></div>
+          </div>
+        </div>
+        <!-- PLAY -->
         <div class="hpage hp-play" id="hpPlay" aria-label="Play">
           <h1 class="logo home-logo"><span class="w1">BRAIN</span><span class="w2">RUN</span></h1>
           <div class="roster" id="homeRoster" hidden></div>
@@ -109,7 +116,7 @@
               <button class="store-tile shopBtn" type="button" data-tab="chars"><img src="/assets/sc_luna.webp" alt="" /><b>Characters</b><small>Coins &amp; medals</small></button>
               <button class="store-tile shopBtn" type="button" data-tab="packs"><img src="/assets/pack_brain.webp" alt="" /><b>Packs</b><small>Pack-only runners</small></button>
               <button class="store-tile shopBtn" type="button" data-tab="items"><img src="/assets/ui_shoe.webp" alt="" /><b>Items</b><small>Trails &amp; emotes</small></button>
-              <button id="collPill" class="store-tile coll" type="button"><img src="/assets/pk_brainz.webp" alt="" /><b>Collection</b><small id="collPillCount">8/24</small></button>
+              <button id="collPill" class="store-tile coll" type="button"><img src="/assets/pk_brainz.webp" alt="" /><b>Skins</b><small id="collPillCount">8/24</small></button>
             </div>
             <button id="questPill" class="store-card quests" type="button">
               <img src="/assets/ui_star.webp" alt="" />
@@ -125,9 +132,10 @@
         </div>
       </div>
       <nav class="home-tabs" role="tablist" aria-label="Home pages">
-        <button class="htab" type="button" role="tab" data-page="0"><img src="/assets/medal_gold.png" alt="" /><span>Tournaments</span></button>
-        <button class="htab on" type="button" role="tab" data-page="1"><img src="/assets/ui_flame.webp" alt="" /><span>Play</span></button>
-        <button class="htab" type="button" role="tab" data-page="2"><img src="/assets/ui_c3.webp" alt="" /><span>Shop</span><i class="dot" hidden></i></button>
+        <button class="htab" type="button" role="tab" data-page="0"><img src="/assets/tab_trophy.webp" alt="" /><span>Tournaments</span></button>
+        <button class="htab" type="button" role="tab" data-page="1"><img src="/assets/tab_skins.webp" alt="" /><span>Skins</span></button>
+        <button class="htab on" type="button" role="tab" data-page="2"><img src="/assets/tab_play.webp" alt="" /><span>Play</span></button>
+        <button class="htab" type="button" role="tab" data-page="3"><img src="/assets/tab_shop.webp" alt="" /><span>Shop</span><i class="dot" hidden></i></button>
       </nav>
     </section>
 
@@ -329,6 +337,7 @@
         <div class="ribbon"><h2 id="setTitle">Settings</h2></div>
         <button id="setClose" class="gclose" type="button" aria-label="Close">✕</button>
         <div class="set-list">
+          <label class="set-row name-row"><span><b>✏️ Name</b><small>What other players see</small></span><input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Your name" /></label>
           <label class="set-row"><span><b>🔊 Sound</b><small>Jumps, pickups, countdown</small></span><input type="checkbox" id="setSound" /></label>
           <label class="set-row"><span><b>📳 Vibration</b><small>Buzz on hits and big moments</small></span><input type="checkbox" id="setBuzz" /></label>
           <label class="set-row"><span><b>🔋 Battery saver</b><small>Sharper picture off, smoother on older phones</small></span><input type="checkbox" id="setLow" /></label>
@@ -336,6 +345,19 @@
           <button id="setTut" class="set-row btnrow" type="button"><span><b>👆 How to run</b><small>Show the swipe guide again next race</small></span><i>›</i></button>
         </div>
       </div>
+    </div>
+
+    <!-- FIRST RUN: pick a name once (changeable later in Settings) -->
+    <div id="nameModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <form id="nameForm" class="gsheet name-sheet" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
+        <div class="ribbon teal"><h2 id="nameTitle">Welcome!</h2></div>
+        <p class="name-lead">What should other runners call you?</p>
+        <input id="firstName" maxlength="14" autocomplete="nickname" placeholder="Your name" required />
+        <p id="nameMsg" class="name-msg"></p>
+        <button class="gbtn" type="submit">Let's run!</button>
+        <small class="name-note">You can change it any time in ⚙ Settings.</small>
+      </form>
     </div>
 
     <!-- SEASON PASS -->
@@ -366,7 +388,7 @@
           <img id="rankBadge" src="/assets/lg_bronze.webp" alt="" />
           <div class="rank-info">
             <b id="rankName">Bronze I</b>
-            <span id="rankRp">0 RP</span>
+            <span id="rankRp">0 league pts</span>
             <div class="qbar rbar"><i id="rankBar"></i><span id="rankNext"></span></div>
           </div>
         </div>
@@ -425,19 +447,6 @@
     </div>
 
     <!-- COLLECTION: every character, how to get them -->
-    <section id="collection" class="screen coll-screen">
-      <div class="grays" aria-hidden="true"></div>
-      <div class="shop-wrap">
-        <header class="shop-top">
-          <button id="collBack" class="gback" type="button" aria-label="Back">‹</button>
-          <div class="ribbon teal static"><h2>Collection</h2></div>
-        </header>
-        <div class="coll-progress"><b id="collCount">0/0</b><div class="qbar"><i id="collBar"></i><span id="collPct"></span></div></div>
-        <div id="collFilters" class="chip-row" role="tablist"></div>
-        <div id="collRarity" class="chip-row small" role="tablist"></div>
-        <div id="collGrid" class="coll-grid"></div>
-      </div>
-    </section>
 
     <div id="charModal" class="modal gmodal" hidden>
       <div class="grays" aria-hidden="true"></div>

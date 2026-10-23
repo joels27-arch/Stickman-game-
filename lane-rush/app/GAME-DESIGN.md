@@ -47,8 +47,8 @@ wide gap between rows.
 | Daily login streak | 50 → 750 + gold medal on day 7 |
 
 Medals (gold/silver/bronze) come from top-3 places **against at least one other
-real player**, the day-7 login reward, packs, the Season Pass and chapter
-chests. Bots never pay medals or rank points (they do pay coins).
+real player**, the day-7 login reward, the Weekend League, the Season Pass and
+chapter chests. Bots never pay medals (they do pay coins).
 
 ### Characters: one way to unlock each
 
@@ -87,9 +87,23 @@ because new keys are added alongside the old ones.
 
 ## Home pages
 
-The home screen is three pages with a tab bar (swipe or tap): **Tournaments**
-(left), **Play** (middle, the default) and **Shop** (right: Season Pass,
-shop tabs, Collection, Missions).
+The home screen is four pages with a tab bar (swipe or tap): **Tournaments**,
+**Skins** (your collection and every character), **Play** (the default) and
+**Shop** (Season Pass, shop tabs, Missions).
+
+* The top bar shows only your medals and Settings; coins also show on Skins and
+  Shop, and the Shop page adds the daily reward and your league badge.
+* Your name is asked once, the first time the game opens, and can be changed in
+  Settings.
+
+## Leagues
+
+Leagues are climbed with medals only: every medal earned is worth league
+points (gold 3, silver 2, bronze 1) and spending medals never takes points
+away. Bronze 0 · Silver 10 · Gold 28 · Platinum 55 · Diamond 90 · Brain Master
+140 (three divisions each, except Master). Rank points (RP) from race places
+were removed; existing players start with the points of every medal they hold
+or spent on characters.
 
 ## Tournaments
 
