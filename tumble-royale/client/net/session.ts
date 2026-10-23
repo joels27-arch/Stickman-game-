@@ -113,6 +113,8 @@ export class GameSession {
   /** Visual-only correction offset after reconciliation, decays to zero. */
   corr = v3();
   corrections = 0;
+  /** Ticks simulated in the last update() (0 on frames between ticks, e.g. 120 Hz screens). */
+  lastSteps = 0;
   bigCorrections = 0;
   lastCorrection = 0;
   // remote
@@ -352,6 +354,7 @@ export class GameSession {
     // Decay the reconciliation correction (~100 ms).
     const k = Math.exp(-dtMs / 90);
     this.corr.x *= k; this.corr.y *= k; this.corr.z *= k;
+    this.lastSteps = 0;
     if (!this.round || !this.world || !this.synced) return;
     // Advance the predicted clock, nudged so our inputs arrive ~TARGET_SLACK ticks early.
     const err = this.slackAvg - TARGET_SLACK;
@@ -376,6 +379,7 @@ export class GameSession {
       steps++;
     }
     if (steps === 40) this.clientTick = this.simTick; // long hitch: don't spiral
+    this.lastSteps = steps;
     if (this.history.size > 600) for (const t of this.history.keys()) if (t < this.simTick - 600) this.history.delete(t);
     this.updateRemotes(now);
   }

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Mode } from '../../shared/constants';
 import { type Cosmetics, ITEM_BY_ID } from '../../shared/cosmetics';
-import { bodyMaterial, lighten, shade } from './materials';
+import { beanMaterial, lighten, shade } from './materials';
 
 const partsMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.03 });
 const glowMat = new THREE.MeshStandardMaterial({ color: 0xfff3a0, emissive: 0xffe066, emissiveIntensity: 1.4, roughness: 0.3 });
@@ -53,15 +53,16 @@ function merge(parts: Part[]): THREE.BufferGeometry {
 }
 
 const G = {
-  sphere: new THREE.SphereGeometry(1, 20, 14),
-  sphereLo: new THREE.SphereGeometry(1, 12, 8),
-  hemi: new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-  cyl: new THREE.CylinderGeometry(1, 1, 1, 20),
-  cone: new THREE.ConeGeometry(1, 1, 20),
-  torus: new THREE.TorusGeometry(1, 0.25, 10, 24),
+  sphere: new THREE.SphereGeometry(1, 14, 10),
+  sphereLo: new THREE.SphereGeometry(1, 8, 6),
+  hemi: new THREE.SphereGeometry(1, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2),
+  cyl: new THREE.CylinderGeometry(1, 1, 1, 16),
+  cone: new THREE.ConeGeometry(1, 1, 14),
+  torus: new THREE.TorusGeometry(1, 0.25, 8, 18),
   box: new THREE.BoxGeometry(1, 1, 1),
-  capsule: new THREE.CapsuleGeometry(1, 1, 6, 12),
-  smile: new THREE.TorusGeometry(0.07, 0.017, 6, 16, Math.PI),
+  capsule: new THREE.CapsuleGeometry(1, 1, 4, 10),
+  smile: new THREE.TorusGeometry(0.07, 0.017, 5, 12, Math.PI),
+  grin: new THREE.CircleGeometry(0.09, 14, Math.PI, Math.PI),
   star: (() => {
     const s = new THREE.Shape();
     for (let i = 0; i < 10; i++) {
@@ -75,14 +76,14 @@ const G = {
 /** Bean body: lathe profile, feet-origin at y = 0.3. */
 const BODY_GEO = (() => {
   const pts: THREE.Vector2[] = [];
-  const N = 28;
+  const N = 22;
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     const y = 0.3 + t * 1.34;
     const r = 0.45 * Math.pow(Math.sin(Math.PI * t), 0.52) * (1 - 0.07 * t) * (t < 0.5 ? 0.96 + t * 0.08 : 1);
     pts.push(new THREE.Vector2(Math.max(0.0001, r), y));
   }
-  const g = new THREE.LatheGeometry(pts, 36);
+  const g = new THREE.LatheGeometry(pts, 28);
   g.computeVertexNormals();
   return g;
 })();
@@ -219,18 +220,22 @@ const zeroPose = (): Pose => ({ bob: 0, lean: 0, roll: 0, pitch: 0, squash: 1, a
 
 export class Character {
   readonly root = new THREE.Group();
-  private bodyPivot = new THREE.Group();
-  private tumble = new THREE.Group();
-  private armL = new THREE.Group();
-  private armR = new THREE.Group();
-  private legL = new THREE.Group();
-  private legR = new THREE.Group();
-  private eyes: THREE.Mesh;
-  private propeller: THREE.Mesh | null = null;
-  private wings: THREE.Group | null = null;
-  private cape: THREE.Mesh | null = null;
-  private halo: THREE.Mesh | null = null;
+  // Rigid-skinned rig: every part is welded to one bone, so the whole bean is ONE draw call.
+  private rootBone = new THREE.Bone();
+  private bodyPivot = new THREE.Bone();
+  private tumble = new THREE.Bone();
+  private off = new THREE.Bone();
+  private eyes = new THREE.Bone();
+  private armL = new THREE.Bone();
+  private armR = new THREE.Bone();
+  private legL = new THREE.Bone();
+  private legR = new THREE.Bone();
+  private propeller: THREE.Bone | null = null;
+  private wings: THREE.Bone[] = [];
+  private cape: THREE.Bone | null = null;
+  private halo: THREE.Bone | null = null;
   readonly shadow: THREE.Mesh;
+  private mesh: THREE.SkinnedMesh;
   private pose = zeroPose();
   private phase = Math.random() * 10;
   private t = Math.random() * 10;
@@ -241,8 +246,7 @@ export class Character {
   private modeClock = 0;
   private popT = 1;
   cos: Cosmetics;
-  private bodyMat: THREE.MeshStandardMaterial;
-  private meshes: THREE.Mesh[] = [];
+  private mat: THREE.MeshStandardMaterial;
 
   constructor(cos: Cosmetics, opts: { shadows?: boolean } = {}) {
     this.cos = cos;
@@ -250,17 +254,24 @@ export class Character {
     const bodyColor = colorItem?.hex ?? 0xff8a3d;
     const outfit = ITEM_BY_ID.get(cos.outfit);
     const o1 = outfit?.hex ?? 0xffffff, o2 = outfit?.hex2 ?? 0xffffff;
-    this.bodyMat = bodyMaterial({ color: bodyColor, color2: colorItem?.hex2, outfit: OUTFIT_ID[cos.outfit] ?? 0, o1, o2 });
+    this.mat = beanMaterial({ color: bodyColor, color2: colorItem?.hex2, outfit: OUTFIT_ID[cos.outfit] ?? 0, o1, o2 });
 
-    // Hierarchy: root(feet, yaw) → tumble (knockdown spin about hips) → bodyPivot(hips: lean/squash) → parts
-    this.root.add(this.tumble);
-    this.tumble.position.y = 0.75;
-    this.tumble.add(this.bodyPivot);
-    this.bodyPivot.position.y = -0.33; // pivot at the hips (y = 0.42 from the feet)
-    const off = new THREE.Group(); off.position.y = -0.42; this.bodyPivot.add(off);
+    // Bone hierarchy (rest pose): root(feet) → tumble (spin about the middle) → bodyPivot (hips) → off (feet level) → parts
+    const bones: THREE.Bone[] = [];
+    const bone = (b: THREE.Bone, parent: THREE.Object3D, x: number, y: number, z: number) => { b.position.set(x, y, z); parent.add(b); bones.push(b); return b; };
+    this.root.add(this.rootBone); bones.push(this.rootBone);
+    bone(this.tumble, this.rootBone, 0, 0.75, 0);
+    bone(this.bodyPivot, this.tumble, 0, -0.33, 0);
+    bone(this.off, this.bodyPivot, 0, -0.42, 0);
+    bone(this.eyes, this.off, 0, EYE_Y, 0);
+    bone(this.armL, this.off, 0.4, 0.98, 0);
+    bone(this.armR, this.off, -0.4, 0.98, 0);
+    bone(this.legL, this.tumble, 0.17, -0.33, 0);
+    bone(this.legR, this.tumble, -0.17, -0.33, 0);
+    const pieces: { g: THREE.BufferGeometry; b: THREE.Bone; flag: number }[] = [];
+    const put = (g: THREE.BufferGeometry, b: THREE.Bone, flag = 0) => pieces.push({ g, b, flag });
 
-    const body = new THREE.Mesh(BODY_GEO, this.bodyMat);
-    off.add(body);
+    put(part(BODY_GEO, bodyColor, [0, 0, 0]), this.off, 1);
 
     // Face
     const face = FACES[cos.face] ?? FACES.f_happy;
@@ -279,94 +290,95 @@ export class Character {
         eyeParts.push(part(G.sphereLo, 0xffffff, [s * 0.135 + 0.022, EYE_Y + 0.03, zf + 0.07], [0, 0, 0], [0.018, 0.018, 0.012]));
       }
     }
-    this.eyes = new THREE.Mesh(merge(eyeParts), partsMat);
-    this.eyes.geometry.translate(0, -EYE_Y, 0);
-    this.eyes.position.y = EYE_Y;
-    off.add(this.eyes);
+    for (const e of eyeParts) { e.translate(0, -EYE_Y, 0); put(e, this.eyes); }
 
     const lidColor = shade(bodyColor, 0.92);
-    const parts: Part[] = [];
     if (face.lids !== 'none' && !face.star) {
       for (const s of [-1, 1]) {
         if (face.wink && s === -1) continue;
         const tilt = face.lids === 'angry' ? -s * 0.45 : face.lids === 'sleepy' ? 0 : s * 0.1;
         const drop = face.lids === 'sleepy' ? -0.02 : face.lids === 'half' ? 0.02 : 0.045;
-        parts.push(part(G.hemi, lidColor, [s * 0.14, EYE_Y + drop, zf + 0.008], [0.2, s * 0.25, tilt], [0.115, 0.1, 0.07]));
+        put(part(G.hemi, lidColor, [s * 0.14, EYE_Y + drop, zf + 0.008], [0.2, s * 0.25, tilt], [0.115, 0.1, 0.07]), this.off);
       }
     }
     const my = EYE_Y - 0.21;
     const mz = beanR(my) - 0.005;
-    if (face.mouth === 'smile') parts.push(part(G.smile, 0x1d1b2e, [0, my + 0.04, mz], [0, 0, Math.PI], [1, 1, 1]));
-    else if (face.mouth === 'smirk') parts.push(part(G.smile, 0x1d1b2e, [0.03, my + 0.03, mz], [0, 0, Math.PI + 0.35], [0.8, 0.6, 1]));
-    else if (face.mouth === 'flat') parts.push(part(G.box, 0x1d1b2e, [0, my + 0.02, mz], [0, 0, 0], [0.11, 0.022, 0.02]));
-    else if (face.mouth === 'o') parts.push(part(G.torus, 0x1d1b2e, [0, my + 0.02, mz], [0, 0, 0], [0.035, 0.04, 0.03]));
+    if (face.mouth === 'smile') put(part(G.smile, 0x1d1b2e, [0, my + 0.04, mz], [0, 0, Math.PI], [1, 1, 1]), this.off);
+    else if (face.mouth === 'smirk') put(part(G.smile, 0x1d1b2e, [0.03, my + 0.03, mz], [0, 0, Math.PI + 0.35], [0.8, 0.6, 1]), this.off);
+    else if (face.mouth === 'flat') put(part(G.box, 0x1d1b2e, [0, my + 0.02, mz], [0, 0, 0], [0.11, 0.022, 0.02]), this.off);
+    else if (face.mouth === 'o') put(part(G.torus, 0x1d1b2e, [0, my + 0.02, mz], [0, 0, 0], [0.035, 0.04, 0.03]), this.off);
     else {
-      parts.push(part(new THREE.CircleGeometry(0.09, 20, Math.PI, Math.PI), 0x3a1020, [0, my + 0.06, mz + 0.012], [-0.15, 0, 0], [1, 1, 1]));
-      parts.push(part(new THREE.CircleGeometry(0.045, 16, Math.PI, Math.PI), 0xff6b8a, [0, my + 0.0, mz + 0.016], [-0.15, 0, 0], [1, 0.8, 1]));
+      put(part(G.grin, 0x3a1020, [0, my + 0.06, mz + 0.012], [-0.15, 0, 0], [1, 1, 1]), this.off);
+      put(part(G.grin, 0xff6b8a, [0, my + 0.0, mz + 0.016], [-0.15, 0, 0], [0.5, 0.4, 1]), this.off);
     }
-    // cheeks
-    for (const s of [-1, 1]) parts.push(part(G.sphereLo, lighten(0xff6b8a, 0.3), [s * 0.27, EYE_Y - 0.13, beanR(EYE_Y - 0.13) - 0.06], [0, s * 0.6, 0], [0.055, 0.03, 0.02]));
+    for (const s of [-1, 1]) put(part(G.sphereLo, lighten(0xff6b8a, 0.3), [s * 0.27, EYE_Y - 0.13, beanR(EYE_Y - 0.13) - 0.06], [0, s * 0.6, 0], [0.055, 0.03, 0.02]), this.off);
 
     const hat = ITEM_BY_ID.get(cos.hat);
-    parts.push(...hatParts(cos.hat, hat?.hex ?? 0xffffff, hat?.hex2 ?? 0xffffff));
+    for (const g of hatParts(cos.hat, hat?.hex ?? 0xffffff, hat?.hex2 ?? 0xffffff)) put(g, this.off);
     const acc = ITEM_BY_ID.get(cos.acc);
-    parts.push(...accParts(cos.acc, acc?.hex ?? 0xffffff, acc?.hex2 ?? 0xffffff, bodyColor));
-    if (parts.length) { const pm = new THREE.Mesh(merge(parts), partsMat); off.add(pm); this.meshes.push(pm); }
+    for (const g of accParts(cos.acc, acc?.hex ?? 0xffffff, acc?.hex2 ?? 0xffffff, bodyColor)) put(g, this.off);
 
-    // Animated accessories (separate meshes)
+    // Animated accessories get their own bones.
     if (cos.hat === 'h_propeller') {
-      this.propeller = new THREE.Mesh(merge([part(G.box, hat!.hex2!, [0.16, 0, 0], [0, 0, 0.15], [0.32, 0.02, 0.07]), part(G.box, hat!.hex!, [-0.16, 0, 0], [0, 0, -0.15], [0.32, 0.02, 0.07])]), partsMat);
-      this.propeller.position.set(0, HEAD_TOP + 0.18, 0); off.add(this.propeller);
+      this.propeller = bone(new THREE.Bone(), this.off, 0, HEAD_TOP + 0.18, 0);
+      put(part(G.box, hat!.hex2!, [0.16, 0, 0], [0, 0, 0.15], [0.32, 0.02, 0.07]), this.propeller);
+      put(part(G.box, hat!.hex!, [-0.16, 0, 0], [0, 0, -0.15], [0.32, 0.02, 0.07]), this.propeller);
     }
     if (cos.hat === 'h_halo') {
-      this.halo = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.035, 8, 28), glowMat);
-      this.halo.rotation.x = Math.PI / 2; this.halo.position.y = HEAD_TOP + 0.2; off.add(this.halo);
+      this.halo = bone(new THREE.Bone(), this.off, 0, HEAD_TOP + 0.2, 0);
+      put(part(G.torus, hat!.hex!, [0, 0, 0], [Math.PI / 2, 0, 0], [0.24, 0.24, 0.14]), this.halo, 2);
     }
     if (cos.acc === 'a_wings') {
-      this.wings = new THREE.Group(); this.wings.position.set(0, 1.0, -0.38); off.add(this.wings);
-      const wm = new THREE.MeshStandardMaterial({ color: acc!.hex, transparent: true, opacity: 0.8, roughness: 0.2, emissive: 0x335577, emissiveIntensity: 0.3 });
       for (const s of [-1, 1]) {
-        const w = new THREE.Mesh(G.sphere, wm); w.scale.set(0.35, 0.22, 0.03); w.position.set(s * 0.3, 0.08, 0); w.rotation.z = s * 0.4;
-        const pivot = new THREE.Group(); pivot.add(w); pivot.userData.s = s; this.wings.add(pivot);
+        const w = bone(new THREE.Bone(), this.off, 0, 1.0, -0.38);
+        w.userData.s = s;
+        put(part(G.sphere, acc!.hex!, [s * 0.3, 0.08, 0], [0, 0, s * 0.4], [0.35, 0.22, 0.03]), w, 2);
+        this.wings.push(w);
       }
     }
     if (cos.acc === 'a_cape') {
-      const cg = new THREE.PlaneGeometry(0.7, 0.95, 1, 6); cg.translate(0, -0.47, 0);
-      this.cape = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ color: acc!.hex, side: THREE.DoubleSide, roughness: 0.6 }));
-      this.cape.position.set(0, 1.1, -0.36); off.add(this.cape);
+      this.cape = bone(new THREE.Bone(), this.off, 0, 1.1, -0.36);
+      put(part(G.box, acc!.hex!, [0, -0.47, 0], [0, 0, 0], [0.7, 0.95, 0.03]), this.cape);
     }
 
     // Arms (shoulder pivots) and legs (hip pivots)
     const handColor = cos.outfit === 'o_hero' || cos.outfit === 'o_astro' ? 0xffffff : bodyColor;
     const armColor = cos.outfit === 'o_tux' || cos.outfit === 'o_ninja' || cos.outfit === 'o_hero' || cos.outfit === 'o_astro' ? (outfit?.hex ?? bodyColor) : bodyColor;
-    const armGeo = merge([
-      part(G.capsule, armColor, [0, -0.16, 0], [0, 0, 0], [0.085, 0.2, 0.085]),
-      part(G.sphere, handColor, [0, -0.33, 0], [0, 0, 0], [0.11, 0.11, 0.11]),
-    ]);
-    for (const [g, s] of [[this.armL, 1], [this.armR, -1]] as const) {
-      g.position.set(s * 0.4, 0.98, 0);
-      const m = new THREE.Mesh(armGeo, partsMat); g.add(m); off.add(g); this.meshes.push(m);
+    for (const b of [this.armL, this.armR]) {
+      put(part(G.capsule, armColor, [0, -0.16, 0], [0, 0, 0], [0.085, 0.2, 0.085]), b);
+      put(part(G.sphere, handColor, [0, -0.33, 0], [0, 0, 0], [0.11, 0.11, 0.11]), b);
     }
     const shoe = cos.outfit === 'o_astro' ? 0xeeeeee : shade(bodyColor, 0.55);
     const legColor = cos.outfit === 'o_overalls' || cos.outfit === 'o_tux' || cos.outfit === 'o_hero' || cos.outfit === 'o_ninja' || cos.outfit === 'o_astro' ? (outfit?.hex ?? bodyColor) : bodyColor;
-    const legGeo = merge([
-      part(G.capsule, legColor, [0, -0.15, 0], [0, 0, 0], [0.1, 0.14, 0.1]),
-      part(G.sphere, shoe, [0, -0.3, 0.05], [0, 0, 0], [0.13, 0.09, 0.18]),
-    ]);
-    for (const [g, s] of [[this.legL, 1], [this.legR, -1]] as const) {
-      g.position.set(s * 0.17, -0.33, 0);
-      const m = new THREE.Mesh(legGeo, partsMat); g.add(m); this.tumble.add(g); this.meshes.push(m);
+    for (const b of [this.legL, this.legR]) {
+      put(part(G.capsule, legColor, [0, -0.15, 0], [0, 0, 0], [0.1, 0.14, 0.1]), b);
+      put(part(G.sphere, shoe, [0, -0.3, 0.05], [0, 0, 0], [0.13, 0.09, 0.18]), b);
     }
 
-    this.meshes.push(body, this.eyes);
-    for (const m of this.meshes) { m.castShadow = !!opts.shadows; m.receiveShadow = false; }
+    // Weld every piece to its bone in the rest pose, then merge into one skinned mesh.
+    this.root.updateMatrixWorld(true);
+    for (const pc of pieces) {
+      pc.g.applyMatrix4(pc.b.matrixWorld);
+      const n = pc.g.attributes.position.count, bi = bones.indexOf(pc.b);
+      const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4), fl = new Float32Array(n).fill(pc.flag);
+      for (let i = 0; i < n; i++) { si[i * 4] = bi; sw[i * 4] = 1; }
+      pc.g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+      pc.g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+      pc.g.setAttribute('aFlag', new THREE.Float32BufferAttribute(fl, 1));
+    }
+    const geo = mergeGeometries(pieces.map((p) => p.g), false)!;
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 1, 0), 2.6);
+    this.mesh = new THREE.SkinnedMesh(geo, this.mat);
+    this.root.add(this.mesh);
+    this.mesh.bind(new THREE.Skeleton(bones));
+    this.mesh.castShadow = !!opts.shadows;
     this.shadow = new THREE.Mesh(shadowGeo, shadowMat);
     this.shadow.renderOrder = 1;
     this.root.add(this.shadow);
     this.shadow.position.y = 0.03;
   }
 
-  setShadows(on: boolean) { for (const m of this.meshes) m.castShadow = on; }
+  setShadows(on: boolean) { this.mesh.castShadow = on; }
 
   /** Ground height under the character relative to its feet (for the blob shadow). */
   setShadowDrop(d: number, visible = true) {
@@ -479,7 +491,7 @@ export class Character {
 
     if (this.propeller) this.propeller.rotation.y += dt * (6 + speed * 3);
     if (this.halo) this.halo.position.y = HEAD_TOP + 0.2 + Math.sin(t * 2.5) * 0.03;
-    if (this.wings) for (const w of this.wings.children) w.rotation.y = (w.userData.s as number) * (0.3 + Math.sin(t * (a.grounded ? 4 : 14)) * 0.35);
+    for (const w of this.wings) w.rotation.y = (w.userData.s as number) * (0.3 + Math.sin(t * (a.grounded ? 4 : 14)) * 0.35);
     if (this.cape) this.cape.rotation.x = -0.15 - Math.min(1.1, speed * 0.12) - (a.grounded ? 0 : 0.3) + Math.sin(t * 7) * 0.05;
   }
 
@@ -515,8 +527,9 @@ export class Character {
   }
 
   dispose() {
-    this.bodyMat.dispose();
-    this.root.traverse((o) => { if ((o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry !== BODY_GEO && (o as THREE.Mesh).geometry !== shadowGeo) (o as THREE.Mesh).geometry.dispose(); });
+    this.mesh.geometry.dispose();
+    this.mat.dispose();
+    this.mesh.skeleton.dispose();
   }
 }
 

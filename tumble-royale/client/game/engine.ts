@@ -495,6 +495,7 @@ export class Engine {
     const rx = -Math.cos(yaw), rz = Math.sin(yaw);
     const mx = rx * raw.x + fx * raw.y, mz = rz * raw.x + fz * raw.y;
     s.update(() => ({ mx, mz, btn: raw.btn }));
+    if (s.lastSteps > 0) this.input.ack();
     const tickRel = s.renderTickRel;
     const serverNow = s.serverTickNow;
 
