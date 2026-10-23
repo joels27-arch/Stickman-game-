@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DT, Ev, Mode, TICK_RATE } from '../../shared/constants';
 import { type Cosmetics, ITEM_BY_ID } from '../../shared/cosmetics';
 import { getMap } from '../../shared/maps';
@@ -217,9 +218,27 @@ export class Engine {
       this.menuRoot.add(c.root);
       this.lineup.push(c);
     }
+    this.placeMenuTrophy(n <= 1);
   }
 
   setShowcaseOffset(x: number) { this.showcaseX = x; }
+
+  private menuTrophy: THREE.Object3D | null = null;
+  private placeMenuTrophy(show: boolean) {
+    if (!this.menuTrophy) {
+      loadTrophy().then((t) => {
+        if (!t || this.menuTrophy) return;
+        this.menuTrophy = t.clone();
+        this.menuTrophy.position.set(1.65, 0, -0.55);
+        this.menuTrophy.scale.multiplyScalar(1.35);
+        this.menuTrophy.userData.spin = true;
+        this.menuRoot.add(this.menuTrophy);
+        this.menuTrophy.visible = this.lineup.length <= 1;
+      });
+      return;
+    }
+    this.menuTrophy.visible = show;
+  }
 
   showMenu() {
     this.leaveGame();
@@ -426,6 +445,14 @@ export class Engine {
       a.tag?.position.set(x, h + 2.4, 0.2);
       g.add(a.char.root); if (a.tag) g.add(a.tag);
     });
+    // The champion's trophy (a Higgsfield-generated 3D model), spinning in front of the top step.
+    loadTrophy().then((t) => {
+      if (!t || this.podiumRoot !== g) return;
+      const tr = t.clone();
+      tr.position.set(1.25, top + 0.05, 0.75);
+      tr.userData.spin = true;
+      g.add(tr);
+    });
     this.camera.position.set(0, 3.4, 9.5);
     this.camera.lookAt(0, 2.3, 0);
     this.fx.confetti(0, 7, 0, 160, 8);
@@ -456,6 +483,7 @@ export class Engine {
       c.update({ mode: Mode.Normal, grounded: true, speed: 0, vy: 0, dt, victory });
     });
     for (const o of this.menuRoot.children) if (o.userData.base !== undefined) o.position.y = o.userData.base + Math.sin(t * 0.8 + o.userData.k) * 0.25;
+    if (this.menuTrophy) this.menuTrophy.rotation.y = Math.sin(t * 0.6) * 0.5 - 0.3;
     if (this.session?.round && this.session.phase !== 'lobby' && this.roundKey !== this.roundId()) this.syncRound();
   }
 
@@ -474,6 +502,7 @@ export class Engine {
     this.camera.lookAt(0, 2.3, 0);
     const s = this.session;
     const w = hud.get().winner?.id;
+    this.podiumRoot?.traverse((o) => { if (o.userData.spin) o.rotation.y += dt * 1.2; });
     for (const a of this.avatars.values()) {
       const isWinner = a.id === w;
       a.char.update({ mode: Mode.Normal, grounded: true, speed: 0, vy: 0, dt, victory: isWinner ? a.char.cos.victory : null, lose: !isWinner && t > 0.5 });
@@ -610,4 +639,22 @@ export class Engine {
   }
 
   get currentFps() { return this.fps; }
+}
+
+let trophyPromise: Promise<THREE.Object3D | null> | null = null;
+/** Lazily loads the trophy model (normalised to ~0.9 m tall, base on y = 0). */
+export function loadTrophy(): Promise<THREE.Object3D | null> {
+  trophyPromise ??= new GLTFLoader().loadAsync('/models/trophy.glb').then((gltf) => {
+    const obj = gltf.scene;
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    const k = 0.9 / Math.max(0.001, size.y);
+    obj.scale.setScalar(k);
+    obj.position.set(-(box.min.x + size.x / 2) * k, -box.min.y * k, -(box.min.z + size.z / 2) * k);
+    const wrap = new THREE.Group();
+    wrap.add(obj);
+    obj.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.castShadow = true; const mat = m.material as THREE.MeshStandardMaterial; if (mat && 'metalness' in mat) { mat.metalness = Math.max(mat.metalness, 0.35); mat.roughness = Math.min(mat.roughness, 0.35); } } });
+    return wrap as THREE.Object3D;
+  }).catch(() => null);
+  return trophyPromise;
 }

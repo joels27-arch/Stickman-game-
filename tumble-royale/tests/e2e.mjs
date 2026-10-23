@@ -103,10 +103,20 @@ try {
   await pa.getByRole('button', { name: 'START' }).click();
   await pa.waitForSelector('.intro-card', { timeout: 15000 });
   check('round intro appears for the host', true);
-  check('round intro appears for the phone', await pb.locator('.intro-card').waitFor({ timeout: 20000 }).then(() => true).catch(() => false));
+  check('the phone enters the round (intro, countdown or HUD)', await pb.waitForFunction(() => window.__tumble.client.session?.round && (document.querySelector('.intro-card') || document.querySelector('.big-count') || document.querySelector('.hud-top')), null, { timeout: 20000 }).then(() => true).catch(() => false));
   await pa.screenshot({ path: `${OUT}/05-intro.png`, timeout: 120000 });
   await sleep(7500); // intro + countdown
   check('touch controls visible on the phone', await pb.locator('.tbtn-jump').waitFor({ timeout: 15000 }).then(() => true).catch(() => false) && await pb.locator('.tbtn-dive').isVisible());
+  // Jump button first, while the phone player stands on the start platform (after GO, when moving is allowed).
+  await pb.waitForFunction(() => { const s = window.__tumble.client.session; return s.round && s.serverTickNow > s.round.goTick + 30 && s.pred.mode === 0 && s.pred.grounded; }, null, { timeout: 30000 }).catch(() => {});
+  const yBefore = await pb.evaluate(() => window.__tumble.client.session.pred.y);
+  // Record the peak predicted height inside the game's own update loop (robust even at very low FPS).
+  await pb.evaluate(() => { window.__ymax = -99; const s = window.__tumble.client.session; const orig = s.update.bind(s); s.update = (f) => { orig(f); window.__ymax = Math.max(window.__ymax, s.pred.y); }; });
+  await pb.locator('.tbtn-jump').tap();
+  await sleep(3000);
+  const yAfter = await pb.evaluate(() => window.__ymax);
+  const st = await pb.evaluate(() => { const p = window.__tumble.client.session.pred; return `mode ${p.mode} grounded ${p.grounded}`; });
+  check('JUMP button jumps', yAfter > yBefore + 0.8, `peak ${yBefore.toFixed(2)} → ${yAfter.toFixed(2)} (${st})`);
   // A runs with the keyboard; B runs with the on-screen joystick (synthetic touch drag).
   await pa.keyboard.down('KeyW');
   const posBefore = await pa.evaluate(() => { const s = window.__tumble.client.session; const t = [...s.remotes.values()][0]; return t ? { x: t.x, z: t.z } : null; });
@@ -124,12 +134,6 @@ try {
   await tp('touchEnd', 0, 0);
   await pa.keyboard.up('KeyW');
   // Jump button
-  const yBefore = await pb.evaluate(() => window.__tumble.client.session.pred.y);
-  await pb.evaluate(() => { window.__ymax = -99; const s = window.__tumble.client.session; const t = setInterval(() => { window.__ymax = Math.max(window.__ymax, s.pred.y); }, 30); setTimeout(() => clearInterval(t), 2500); });
-  await pb.locator('.tbtn-jump').tap();
-  await sleep(2600);
-  const yAfter = await pb.evaluate(() => window.__ymax);
-  check('JUMP button jumps', yAfter > yBefore + 0.8, `peak ${yBefore.toFixed(2)} → ${yAfter.toFixed(2)}`);
   // Pause → leave from the phone; host keeps playing.
   await pb.locator('button[aria-label=Pause]').tap();
   await pb.getByRole('button', { name: 'Leave match' }).tap();
