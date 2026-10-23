@@ -178,12 +178,12 @@ const POWER_INFO = {
   shield: { label: "Shield", hint: "Blocks the next hit" },
   rocket: { label: "Rocket", hint: "Fly over everything" },
   ghost: { label: "Ghost", hint: "Run through obstacles" },
-  lightning: { label: "Lightning", hint: "Everyone ahead falls over" },
+  lightning: { label: "Lightning", hint: "Everyone ahead trips and slows down" },
   banana: { label: "Banana", hint: "Throw it ahead or drop it behind you" },
   bowling: { label: "Bowling ball", hint: "Roll it ahead or back down a lane" },
   freeze: { label: "Freeze", hint: "Everyone else slows down" },
-  glue: { label: "Glue puddle", hint: "Drop it behind you: sticky over 2 lanes" },
-  fake: { label: "Fake box", hint: "Drop a trap box behind you" },
+  glue: { label: "Glue puddle", hint: "Throw it ahead or drop it behind: sticky over 2 lanes" },
+  fake: { label: "Fake box", hint: "Throw a trap box ahead or drop it behind" },
   boxing: { label: "Boxing glove", hint: "Punch the nearest runner (25 m) a lane over" },
   brainwave: { label: "Brain Wave", hint: "Flips left and right for everyone ahead" },
   thunder: { label: "Thundercloud", hint: "Storms the leader: pass it on or get zapped" },
@@ -192,6 +192,7 @@ const POWER_INFO = {
 const WAVE_S = 4; // brain wave: controls flipped this long
 const GLUE_SLOW = 0.45; // speed factor while stuck in glue
 const STAGGER_S = 0.7; // after a punch
+const THROWN = new Set(["banana", "bowling", "glue", "fake"]); // items you aim: ahead or behind, any lane
 const POWER_TIPS = 3; // how many times a power-up is explained when you pick it up
 // phones and tablets (iPads can report a fine pointer, so check for touch too)
 const TOUCH = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0 || "ontouchstart" in window;
@@ -2788,13 +2789,14 @@ const world = (() => {
   }
 
   /** Normalise a static prop: long side across the lane, centred, base on the ground. */
-  function fitProp(root, { width, height, maxHeight }) {
+  function fitProp(root, { width, height, maxHeight, maxWidth, lengthwise }) {
     const size = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
     const holder = new THREE.Group();
     const inner = new THREE.Group();
     inner.add(root);
     holder.add(inner);
-    if (size.z > size.x * 1.15) inner.rotation.y = Math.PI / 2;
+    // long props lie across the lane, unless `lengthwise` (then they face the runner)
+    if (lengthwise ? size.x > size.z * 1.15 : size.z > size.x * 1.15) inner.rotation.y = Math.PI / 2;
     holder.updateMatrixWorld(true);
     const b2 = new THREE.Box3().setFromObject(inner);
     const s2 = b2.getSize(new THREE.Vector3());
@@ -2803,6 +2805,7 @@ const world = (() => {
     const k = width ? width / s2.x : height / s2.y;
     holder.scale.setScalar(k);
     if (maxHeight && s2.y * k > maxHeight) holder.scale.y = maxHeight / s2.y;
+    if (maxWidth && s2.x * k > maxWidth) holder.scale.x = maxWidth / s2.x;
     holder.traverse((o) => {
       if (o.isMesh) {
         o.material.side = THREE.FrontSide;
@@ -2951,7 +2954,8 @@ const world = (() => {
       loadGLB("/assets/gate2.glb").then((g) => (assets.props.gate0 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
       loadGLB("/assets/arch.glb").then((g) => (assets.props.gate1 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
       loadGLB("/assets/crates.glb").then((g) => (assets.props.crate0 = fitProp(g.scene, { width: 1.45, maxHeight: 2.6 }))),
-      loadGLB("/assets/cow.glb").then((g) => (assets.props.crate1 = fitProp(g.scene, { width: 1.7, maxHeight: 1.9 }))),
+      // the cow faces you and stands tall: far too big to jump, so you dodge it like the crates
+      loadGLB("/assets/cow.glb").then((g) => (assets.props.crate1 = fitProp(g.scene, { height: 2.5, maxWidth: 1.8, lengthwise: true }))),
       loadGLB("/assets/tires.glb").then((g) => (assets.props.crate2 = fitProp(g.scene, { width: 1.4, maxHeight: 2.5 }))),
       loadGLB("/assets/barrel.glb").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
       loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
@@ -4027,6 +4031,7 @@ const game = { mode: "home", round: -1, kind: "survival", len: TRACK_LEN };
 // every mode now runs on the endless course; only Survival uses obstacle hearts
 const isSurvival = () => isEndless(game.kind);
 const heartsFromHits = () => game.kind === "survival";
+const POWER_HITS = new Set(["zap", "banana", "bowling", "fake"]);
 /** Hearts the room gave out: gone for everyone, and +1 heart for whoever got it (once). */
 function healFromHearts() {
   for (const t of net.view?.heartsTaken || []) {
@@ -4302,6 +4307,7 @@ function input(kind) {
       me.lane = next;
       me.laneAt = performance.now();
       sfx.lane();
+      if (game.aimLane == null && me.items.length) paintAim(); // the picker follows you
     }
   } else if (kind === "jump") {
     if (me.power === "rocket") return;
@@ -4596,11 +4602,13 @@ function hit(kind) {
   }
   if (me.power === "rocket" || me.power === "ghost") return;
   if (me.out) return;
-  me.hits += 1;
+  // power-ups trip you and slow you down, but only obstacles cost a heart
+  const fromPower = POWER_HITS.has(kind);
+  if (!(fromPower && heartsFromHits())) me.hits += 1;
   game.lastHitD = me.d;
   me.combo = 0;
   renderCombo();
-  if (heartsFromHits()) {
+  if (heartsFromHits() && !fromPower) {
     renderHearts(true);
     if (me.hits >= LIVES) {
       knockOut();
@@ -5853,8 +5861,8 @@ function grabBox(kind = rollPower()) {
   sfx.pickup();
   me.items.push(kind);
   flyToSlot(kind);
-  const aims = kind === "banana" || kind === "bowling";
-  showPowerToast(kind, me.items.length > 1 || me.power ? "Saved for later" : TOUCH ? "Tap the power-up to use it" : aims ? "E ahead · Q behind" : "Press E to use it");
+  const aims = THROWN.has(kind);
+  showPowerToast(kind, me.items.length > 1 || me.power ? "Saved for later" : TOUCH ? (aims ? "Pick a lane, then ahead or behind" : "Tap the power-up to use it") : aims ? "E ahead · Q behind · 1-4 picks a lane" : "Press E to use it");
   renderPower();
   return kind;
 }
@@ -5886,9 +5894,10 @@ function useItem(lane = me.lane, dir = 1) {
     return;
   }
   if (kind === "glue" || kind === "fake") {
-    act({ type: "banana", kind, lane: me.lane, d: Math.round((me.d - BANANA_BEHIND_M) * 10) / 10 });
+    const d = dir > 0 ? me.d + BANANA_AHEAD_M : me.d - BANANA_BEHIND_M;
+    act({ type: "banana", kind, lane, d: Math.round(d * 10) / 10 });
     sfx.lane();
-    banner(kind === "glue" ? "🟢 GLUE DROPPED!" : "🎁 TRAP SET!", 800);
+    banner(kind === "glue" ? (dir > 0 ? "🟢 GLUE THROWN!" : "🟢 GLUE DROPPED!") : "🎁 TRAP SET!", 800);
     renderPower();
     return;
   }
@@ -6325,12 +6334,14 @@ function renderPower() {
   const main = me.power || me.items[0] || "";
   const next = me.power ? me.items[0] : me.items[1];
   const held = !me.power && Boolean(me.items[0]);
-  const aims = held && (me.items[0] === "banana" || me.items[0] === "bowling");
-  // bananas and bowling balls: two clear buttons, into the lane you're in
+  const aims = held && THROWN.has(me.items[0]);
+  // anything you can throw: pick a lane (yours unless you tap another), then ahead or behind
   $("#throwPad").classList.toggle("show", aims && TOUCH);
+  if (!aims) game.aimLane = null;
   if (aims) {
     $("#throwAhead small").textContent = me.items[0] === "bowling" ? "Roll ahead" : "Throw ahead";
     $("#throwBack small").textContent = me.items[0] === "bowling" ? "Roll back" : "Drop behind";
+    paintAim();
   }
   slot.classList.toggle("aims", aims && TOUCH);
   slot.classList.toggle("held", held);
@@ -6354,7 +6365,32 @@ for (const [id, dir] of [["#throwAhead", 1], ["#throwBack", -1]]) {
   $(id).addEventListener("click", (e) => {
     e.stopPropagation();
     buzz(15);
-    useItem(me.lane, dir);
+    const lane = game.aimLane ?? me.lane;
+    game.aimLane = null;
+    useItem(lane, dir);
+  });
+}
+/** The lane picker on the throw pad: a mini track, your lane marked, the target lit. */
+function paintAim() {
+  const box = $("#aimLanes");
+  if (box.children.length !== LANES) {
+    box.replaceChildren(
+      ...Array.from({ length: LANES }, (_, i) => {
+        const b = el("button", { class: "aim-lane", type: "button", "aria-label": `Lane ${i + 1}` });
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          buzz(8);
+          game.aimLane = i === me.lane ? null : i;
+          paintAim();
+        });
+        return b;
+      }),
+    );
+  }
+  const target = game.aimLane ?? me.lane;
+  [...box.children].forEach((b, i) => {
+    b.classList.toggle("on", i === target);
+    b.classList.toggle("me", i === me.lane);
   });
 }
 

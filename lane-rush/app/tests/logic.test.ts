@@ -455,6 +455,21 @@ describe("matches over several rounds", () => {
   });
 });
 
+describe("power-ups never cost a heart", () => {
+  it("lightning trips the bots ahead in survival but leaves their hearts alone", () => {
+    let s = act(lobbyOf(1), "p0", { type: "start", bots: true, t: T0 });
+    expect(s.kind).toBe("survival");
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt + 2000 });
+    const bots = Object.keys(s.players).filter((id) => s.players[id].bot);
+    const before = Object.fromEntries(bots.map((id) => [id, s.players[id].hits]));
+    s = act(s, "p0", { type: "zap", t: s.startAt + 2000 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt + 2050 });
+    const tripped = bots.filter((id) => s.players[id].stunUntil >= s.startAt + 2050);
+    expect(tripped.length).toBeGreaterThan(0);
+    for (const id of tripped) expect(s.players[id].hits).toBe(before[id]);
+  });
+});
+
 describe("survival hearts", () => {
   const racing = (kind = "survival"): S => {
     let s = act(lobbyOf(2), "p0", { type: "mode", mode: kind });

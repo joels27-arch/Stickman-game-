@@ -1812,3 +1812,13 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 @media (max-width: 760px) {
   .power-toast { bottom: calc(max(14px, calc(env(safe-area-inset-bottom) + 8px)) + 146px); }
 }
+
+/* throw pad: a mini track to pick the lane, then ahead / behind side by side */
+.throw-pad { gap: 6px; }
+.throw-pad.show { display: grid; grid-template-columns: 72px 72px; }
+.throw-pad .tbtn { width: 72px; height: 56px; }
+.aim-lanes { grid-column: 1 / -1; display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(10, 14, 40, 0.82); border: 2px solid rgba(255, 255, 255, 0.7); }
+.aim-lane { flex: 1; height: 28px; border: 0; border-radius: 7px; background: rgba(255, 255, 255, 0.16); cursor: pointer; position: relative; touch-action: manipulation; padding: 0; }
+.aim-lane.me::after { content: ""; position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35); }
+.aim-lane.on { background: linear-gradient(180deg, #ffe46a, #ffb100); box-shadow: 0 0 10px rgba(255, 200, 0, 0.8); }
+.aim-lane.on.me::after { background: #4a2400; }

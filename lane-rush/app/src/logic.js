@@ -134,7 +134,7 @@ export function runSpeed(kind, s) {
  *   shield    — the next hit (obstacle or zap) just pops the bubble
  *   rocket    — fly over everything at boost speed for a few seconds
  *   ghost     — run straight through obstacles for a few seconds
- *   lightning — everyone ahead of you falls over (unless shielded)
+ *   lightning — everyone ahead of you falls over (unless shielded); power-ups trip and slow, they never cost a heart
  *   banana    — thrown ahead or dropped behind, into a lane you pick; whoever
  *               runs onto it slips
  *   bowling   — rolled ahead or back down a lane you pick; knocks over whoever
@@ -1043,7 +1043,7 @@ function stepCloud(state, t) {
   if (t >= c.until) {
     state.cloud = null;
     addHit(state, "thunder", c.by, holder.id, t);
-    if (holder.bot) botHit(state, holder, t);
+    if (holder.bot) botHit(state, holder, t, true);
     else {
       // the holder's own screen applies the strike (like a zap aimed at one runner)
       state.zapSeq = (state.zapSeq ?? 0) + 1;
@@ -1154,13 +1154,14 @@ function freeName(state, start) {
   return "Bot";
 }
 
-function botHit(state, p, t) {
+/** An obstacle (or, with `power`, someone's power-up) trips a bot. Power-ups never cost a heart. */
+function botHit(state, p, t, power = false) {
   if ((p.shieldUntil ?? 0) > t) {
     p.shieldUntil = 0;
     p.pw = "";
     return;
   }
-  p.hits += 1;
+  if (!(power && state.kind === "survival")) p.hits += 1;
   p.stunUntil = t + STUN_MS;
   p.act = "stumble";
   p.y = 0;
@@ -1192,7 +1193,7 @@ function stepBots(state, t) {
           p.slowUntil = t + 1500;
           p.lane = Math.max(0, Math.min(LANES - 1, p.lane + (roll(state.seed, bi, z.id) < 0.5 ? -1 : 1)));
         }
-      } else if (z.kind === "lightning" && p.d > z.d && (p.rocketUntil ?? 0) <= t) botHit(state, p, t);
+      } else if (z.kind === "lightning" && p.d > z.d && (p.rocketUntil ?? 0) <= t) botHit(state, p, t, true);
     }
     if (p.outAt !== null) return;
     let v = 0;
@@ -1300,7 +1301,7 @@ function stepBots(state, t) {
       if (b.by === id || b.lane !== p.lane) continue;
       state.bananas = state.bananas.filter((x) => x.id !== b.id);
       addHit(state, b.kind ?? "banana", b.by, id, t);
-      botHit(state, p, t);
+      botHit(state, p, t, true);
       break;
     }
     for (const b of state.bowls ?? []) {
@@ -1309,14 +1310,17 @@ function stepBots(state, t) {
       if (Math.abs(at - d1) > 3 || Math.abs(t - b.at) > (BOWL_RANGE_M / BOWL_SPEED) * 1000) continue;
       p.bowled = [...(p.bowled ?? []), b.id].slice(-8);
       addHit(state, "bowling", b.by, id, t);
-      botHit(state, p, t);
+      botHit(state, p, t, true);
     }
     // use the item after a moment's thought
     if (p.item && t - (p.itemAt ?? 0) > 1500 + roll(state.seed, bi, t / 1000) * 2500 && (p.stunUntil ?? 0) <= t) {
       const ahead = runners.filter((o) => o.id !== id && !o.left && o.outAt === null && o.d > p.d);
       if (p.item === "banana" || p.item === "glue" || p.item === "fake") {
+        // throw it into the lane of someone just ahead, or drop it behind
+        const mark = ahead.filter((o) => o.d - d1 > BANANA_AHEAD_M - 12 && o.d - d1 < BANANA_AHEAD_M + 8).sort((a, b) => a.d - b.d)[0];
         state.bananaSeq = (state.bananaSeq ?? 0) + 1;
-        state.bananas = [...(state.bananas ?? []), { id: state.bananaSeq, by: id, lane: p.lane, d: Math.round((d1 - BANANA_BEHIND_M) * 10) / 10, at: t, kind: p.item }].slice(-16);
+        const drop = mark ? { lane: mark.lane, d: d1 + BANANA_AHEAD_M } : { lane: p.lane, d: d1 - BANANA_BEHIND_M };
+        state.bananas = [...(state.bananas ?? []), { id: state.bananaSeq, by: id, lane: drop.lane, d: Math.round(drop.d * 10) / 10, at: t, kind: p.item }].slice(-16);
         p.item = "";
       } else if (p.item === "swap" || p.item === "thunder") {
         if (ahead.length && !(p.item === "thunder" && state.cloud)) {
