@@ -166,3 +166,33 @@ round) and the Grand Tour. Play solo = your own private room with bots.
 * **Boxing glove:** hits the nearest runner within 25 m; with nobody in reach
   it's a whiff (used up), so you're never stuck holding it.
 * Locking in your runner in the lobby marks you Ready (tap again to cancel).
+* **Power-ups never cost a heart.** Lightning, thunder, bananas, bowling balls
+  and fake boxes trip you and slow you down; only obstacles take hearts.
+* **Throwing:** banana, glue, fake box and bowling ball all go ahead or behind,
+  into any lane: the throw pad has a mini track (your lane is the default) above
+  the Ahead / Behind buttons. Bots throw ahead at a runner in reach, else drop
+  behind.
+
+## Maps
+
+Meadow, Farm and Beach use downloaded 3D props. City, Stadium and Space are
+built in code (no download, light on phones), each with a painted track, its
+own edges and two moving obstacles:
+
+| Map | Scenery | Movers |
+|---|---|---|
+| City | skyscrapers, street lamps, concrete barriers | taxi (dodge), pigeons (slide) |
+| Stadium | raked stands full of fans, ad boards, floodlights | football (jump), spidercam (slide) |
+| Space | starry sky, ringed planet, craters, moon-base domes, neon rails | asteroid (jump), UFO beam (dodge) |
+
+No cows or hay bales off the farm/meadow: those obstacle looks fall back to the
+crates and hurdles. *Decision:* the cow stands 2.5 m tall and faces you, so it
+reads as "dodge", never "jump".
+
+## Race screen (phones)
+
+Only what you act on: place, progress, time, hearts / mode counter, the
+power-up button (saved item above it, throw pad beside it), Look back, and the
+PASS button in Hot Potato. The mode tag shows for the first 7 s only. No kill
+feed, combo badge, in-race emote button or "how to" banners; each power-up's
+tip shows the first 3 times you pick it up. Nothing overlaps.
