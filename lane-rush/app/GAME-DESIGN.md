@@ -175,17 +175,19 @@ round) and the Grand Tour. Play solo = your own private room with bots.
 
 ## Maps
 
-Meadow, Farm and Beach use downloaded 3D props. City, Stadium and Space are
-built in code (no download, light on phones), each with a painted track, its
-own edges and two moving obstacles:
+Every map uses Higgsfield 3D models (image → 3D, textures shrunk for phones),
+loaded the first time the map is picked. City, Stadium and Space each have
+their own track tile, roadside props, simple edges and two moving obstacles:
 
 | Map | Scenery | Movers |
 |---|---|---|
-| City | skyscrapers, street lamps, concrete barriers | taxi (dodge), pigeons (slide) |
-| Stadium | raked stands full of fans, ad boards, floodlights | football (jump), spidercam (slide) |
-| Space | starry sky, ringed planet, craters, moon-base domes, neon rails | asteroid (jump), UFO beam (dodge) |
+| City | road tile, skyscrapers, shop houses, street lamps, barriers | taxi (dodge), pigeon (slide) |
+| Stadium | pitch tile, grandstands full of fans, ad boards, floodlights | football (jump), spidercam (slide) |
+| Space | metal walkway tile, starry sky and planets, domes, rockets, dishes, asteroids, neon rails | asteroid (jump), UFO beam (dodge) |
 
-No cows or hay bales off the farm/meadow: those obstacle looks fall back to the
+*Decision:* the first version of these three maps was drawn with plain code
+shapes and looked cheap; they were rebuilt with Higgsfield models. No cows or
+hay bales off the farm/meadow: those obstacle looks fall back to the
 crates and hurdles. *Decision:* the cow stands 2.5 m tall and faces you, so it
 reads as "dodge", never "jump".
 
