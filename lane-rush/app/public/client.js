@@ -1014,18 +1014,6 @@ $("#buyOk").addEventListener("click", () => {
 });
 
 // ── the collection page ──
-let collFilter = "all";
-let collRarity = "";
-const COLL_FILTERS = [
-  ["all", "All"],
-  ["owned", "Owned"],
-  ["locked", "Locked"],
-  ["starter", "Free"],
-  ["coins", "🪙 Coins"],
-  ["medals", "🏅 Medals"],
-  ["pack", "🎁 Packs"],
-  ["pass", "⭐ Pass"],
-];
 /** The collection lives on the home screen's Skins page. */
 function openCollection() {
   showScreen("home");
@@ -1040,41 +1028,30 @@ function renderCollection() {
   $("#collCount").textContent = `${got}/${all.length}`;
   $("#collBar").style.width = `${Math.round((got / all.length) * 100)}%`;
   $("#collPct").textContent = `${Math.round((got / all.length) * 100)}% collected`;
-  const chip = (box, key, label, cur, set) => {
-    const b = el("button", { class: `chip${cur === key ? " on" : ""}`, type: "button", text: label });
-    b.addEventListener("click", () => {
-      set(cur === key && box === "r" ? "" : key);
-      renderCollection();
-    });
+  // no categories: yours first, then everything you can still get, each from common to legendary
+  const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
+  const mine = all.filter((c) => ownsChar(c)).sort(byRarity);
+  const rest = all.filter((c) => !ownsChar(c)).sort(byRarity);
+  const sel = preferredChar();
+  let n = 0;
+  const card = (c) => {
+    const owned = ownsChar(c);
+    const b = el(
+      "button",
+      { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${c.playable && c.idx === sel ? " sel" : ""}`, type: "button", style: `--i:${n++}` },
+      el("span", { class: "rar", text: c.rarity }),
+      el("img", { src: c.img, alt: "" }),
+      el("b", { text: c.name }),
+      el("small", { class: "via", text: owned ? (c.playable ? (c.idx === sel ? "★ Selected" : "Playable") : "Collected") : `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` }),
+      owned ? null : el("i", { class: "padlock", text: "🔒" }),
+    );
+    b.addEventListener("click", () => inspectChar(c));
     return b;
   };
-  $("#collFilters").replaceChildren(...COLL_FILTERS.map(([k, l]) => chip("f", k, l, collFilter, (x) => (collFilter = x || "all"))));
-  $("#collRarity").replaceChildren(...RARITY_ORDER.map((k) => chip("r", k, k, collRarity, (x) => (collRarity = x))));
-  const shown = all.filter((c) => {
-    const owned = ownsChar(c);
-    if (collFilter === "owned" && !owned) return false;
-    if (collFilter === "locked" && owned) return false;
-    if (["starter", "coins", "medals", "pack", "pass"].includes(collFilter) && c.via !== collFilter) return false;
-    if (collRarity && c.rarity !== collRarity) return false;
-    return true;
-  });
-  const sel = preferredChar();
   $("#collGrid").replaceChildren(
-    ...shown.map((c, n) => {
-      const owned = ownsChar(c);
-      const card = el(
-        "button",
-        { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${c.playable && c.idx === sel ? " sel" : ""}`, type: "button", style: `--i:${n}` },
-        el("span", { class: "rar", text: c.rarity }),
-        el("img", { src: c.img, alt: "" }),
-        el("b", { text: owned ? c.name : c.name }),
-        el("small", { class: "via", text: owned ? (c.playable ? (c.idx === sel ? "★ Selected" : "Playable") : "Collected") : `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` }),
-        owned ? null : el("i", { class: "padlock", text: "🔒" }),
-      );
-      card.addEventListener("click", () => inspectChar(c));
-      return card;
-    }),
-    ...(shown.length ? [] : [el("p", { class: "rempty", text: "Nothing here with these filters." })]),
+    el("h3", { class: "coll-head", text: `Your runners · ${mine.length}` }),
+    ...mine.map(card),
+    ...(rest.length ? [el("h3", { class: "coll-head", text: `Still to get · ${rest.length}` }), ...rest.map(card)] : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
   );
   renderWallet();
   renderCollPill();
@@ -1956,7 +1933,7 @@ function renderLobby(v) {
   for (let i = 0; i < 4; i++) {
     const p = v.players[i];
     if (!p) {
-      slots.append(el("div", { class: "rcard empty" }, el("span", { class: "num", text: String(i + 1) }), el("span", { class: "nm", text: "Waiting for player…" })));
+      slots.append(el("div", { class: "rcard empty" }, el("span", { class: "num", text: String(i + 1) }), el("span", { class: "nm", text: botsOn() ? "🤖 Bot" : "Open" })));
       continue;
     }
     const cty = p.country ? `${flagOf(p.country)} ${countryName(p.country)}` : "🌍 No country";
@@ -2047,6 +2024,14 @@ function renderLobby(v) {
       return b;
     }),
   );
+  // the cards only name the mode; the picked one is explained underneath
+  $("#modeDesc").textContent = GAME_MODE_INFO[gm]?.text ?? "";
+  if (modePick.dataset.gm !== gm) {
+    // keep the picked mode in view in the sideways list (only when it changes, so it doesn't fight your scrolling)
+    modePick.dataset.gm = gm;
+    const on = modePick.querySelector(".on");
+    if (on) modePick.scrollLeft = Math.max(0, on.offsetLeft - modePick.offsetLeft - 12);
+  }
   const mp = v.map || "meadow";
   $("#mapPick").replaceChildren(
     ...MAPS.map((key) => {

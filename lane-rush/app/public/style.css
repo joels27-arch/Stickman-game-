@@ -1574,3 +1574,64 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
   .home[data-page="shop"] .top-streak { padding: 0 4px; }
   .home[data-page="shop"] .top-streak b { display: none; }
 }
+
+/* ── lobby on phones: everything on one screen (code, players, mode, map, runner, Lock in) ── */
+.mode-desc { margin: 6px 2px 0; font-size: 13px; font-weight: 600; line-height: 1.3; color: rgba(255, 255, 255, 0.82); }
+@media (max-width: 760px) {
+  #lobby { padding: max(8px, env(safe-area-inset-top)) 8px 0; }
+  #lobby .panel { padding: 10px 12px 0; gap: 0; }
+  #lobby .code-box { display: grid; grid-template-columns: auto auto 1fr; align-items: center; justify-items: start; gap: 2px 10px; padding: 6px 8px 6px 14px; border-radius: 16px; }
+  #lobby .code-box .label { font-size: 10px; line-height: 1.1; width: 46px; }
+  #lobby .code-box .code { font-size: 28px; letter-spacing: 0.16em; line-height: 1; }
+  #lobby .code-box .btn { justify-self: end; padding: 8px 12px; font-size: 13px; }
+  #lobby .code-box #copyMsg { grid-column: 1 / -1; }
+  #lobby .code-box #copyMsg:empty { display: none; }
+  #lobby .topbar { margin: 8px 0 0; }
+  #lobby .topbar .wallet { display: none; }
+  #lobby .country-chip { padding: 5px 12px; font-size: 13px; }
+  #lobby .slots { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+  #lobby .slots .rcard { aspect-ratio: 3 / 3.7; border-radius: 14px; clip-path: none; border-width: 2px; }
+  #lobby .slots .rcard .num { font-size: 17px; top: 3px; left: 6px; }
+  #lobby .slots .rcard .info { padding: 3px 5px 4px; }
+  #lobby .slots .rcard .nm { font-size: 12px; }
+  #lobby .slots .rcard .cty, #lobby .slots .rcard .lg { display: none; }
+  #lobby .slots .rcard .you { top: 22px; left: 5px; font-size: 9px; padding: 0 4px; }
+  #lobby .slots .rcard .crown { font-size: 13px; top: 3px; right: 5px; }
+  #lobby .slots .rcard.empty .nm { font-size: 11px; }
+  #lobby .lobby-emotes { display: none; } /* the line-up has the emotes */
+  #lobby .pick-title { font-size: 14px; margin: 12px 0 6px; }
+  #lobby .mode-pick { display: flex; overflow-x: auto; gap: 6px; margin: 0 -12px; padding: 2px 12px 4px; scrollbar-width: none; }
+  #lobby .mode-pick::-webkit-scrollbar { display: none; }
+  #lobby .mode-card { flex: none; padding: 8px 12px; border-radius: 14px; }
+  #lobby .mode-card em, #lobby .mode-card span { display: none; }
+  #lobby .mode-card b { font-size: 15px; white-space: nowrap; }
+  #lobby .bot-toggle { margin: 8px 0 0; padding: 7px 10px; font-size: 13px; }
+  #lobby .bot-toggle input { width: 18px; height: 18px; }
+  #lobby .map-card { min-height: 54px; padding: 4px 8px; border-radius: 12px; }
+  #lobby .map-card b { font-size: 14px; }
+  #lobby .map-card span { display: none; }
+  #lobby #lobbySpot { display: none; }
+  #lobby .picker { display: flex; overflow-x: auto; gap: 6px; margin: 0 -12px; padding: 2px 12px 6px; scrollbar-width: none; }
+  #lobby .picker::-webkit-scrollbar { display: none; }
+  #lobby .picker .card { flex: none; width: 74px; padding: 4px 4px 5px; border-radius: 14px; }
+  #lobby .picker .card b { font-size: 12px; }
+  #lobby .picker .card small { font-size: 10px; }
+  #lobby .lobby-actions { margin-top: 6px; padding-top: 10px; }
+  #lobby .lobby-actions .btn.big { min-height: 52px; font-size: 22px; }
+  #lobby .panel-foot { display: none; }
+}
+
+/* play solo: the sheet fits the screen, the runner is never cut off */
+#soloModal .sheet { overflow-y: auto; gap: 10px; }
+#soloModal .spotlight { flex: none; height: clamp(170px, 30vh, 280px); }
+#soloModal .solo-picker { display: flex; flex: none; overflow-x: auto; overflow-y: hidden; gap: 6px; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+#soloModal .solo-picker::-webkit-scrollbar { display: none; }
+#soloModal .solo-picker > * { flex: none; width: 74px; }
+#soloModal .solo-modes { flex: none; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#soloModal .solo-mode { padding: 7px 4px; }
+#soloModal .solo-mode b { font-size: 13px; }
+#soloModal .solo-mode small { font-size: 10px; }
+#soloModal #soloGo { flex: none; }
+.coll-grid .coll-head { grid-column: 1 / -1; margin: 10px 0 0; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 18px; letter-spacing: 0.03em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); }
+.coll-grid .coll-head:first-child { margin-top: 0; }
+.coll-grid .rempty { grid-column: 1 / -1; }
