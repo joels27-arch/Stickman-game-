@@ -1463,6 +1463,16 @@ function onState(msg) {
   announce(prev, v);
   applyWarpsAndPunches(v);
 
+  if (v.phase === "lobby" && game.endless) {
+    // endless run: set it up and go, the lobby never shows
+    if (v.host === playerId && !game.endlessSent) {
+      game.endlessSent = true;
+      if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
+      if (v.map !== "random") act({ type: "map", map: "random" });
+      act({ type: "start", bots: false });
+    }
+    return;
+  }
   if (v.phase === "lobby") {
     // hosting from the Tournaments page: open the room in the mode picked there
     if (game.wantMode && v.host === playerId) {
@@ -1551,9 +1561,27 @@ function renderSpotlight(box, cur, { takenBy = () => null, onPick }) {
 // Play solo: your own private room (no invite code) where you pick the mode, map and runner, with bots
 function openSoloRoom(mode = null) {
   game.solo = true;
+  game.endless = false;
   game.wantMode = mode;
   connect(newCode(), true);
 }
+/** Endless run: just you, Subway Surfers style. No lobby, no bots: straight onto the track until your hearts run out. */
+function startEndless() {
+  game.solo = true;
+  game.endless = true;
+  game.endlessSent = false;
+  game.wantMode = null;
+  connect(newCode(), true);
+}
+function renderEndlessBest() {
+  const best = stats.get("bestRun");
+  $("#endlessBest").textContent = best ? `Your best: ${best.toLocaleString()} m` : "How far can you get?";
+}
+$("#endlessBtn").addEventListener("click", () => {
+  sfx.unlock();
+  if (!requireName()) return;
+  startEndless();
+});
 $("#soloBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
@@ -1563,6 +1591,7 @@ $("#createBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
   game.solo = false;
+  game.endless = false;
   game.wantMode = null;
   connect(newCode(), true);
 });
@@ -1570,6 +1599,7 @@ $("#joinBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
   game.solo = false;
+  game.endless = false;
   const code = codeInput.value.trim().toUpperCase();
   if (code.length !== 4) {
     $("#homeMsg").textContent = "Room codes have 4 characters";
@@ -1588,7 +1618,10 @@ let homePage = PAGE.play;
 function setHomePage(i, animate = true) {
   homePage = Math.max(0, Math.min(PAGE_NAMES.length - 1, i));
   screens.home.dataset.page = PAGE_NAMES[homePage];
-  if (homePage === PAGE.play) renderProfile(); // your runner or name may have changed
+  if (homePage === PAGE.play) {
+    renderProfile(); // your runner or name may have changed
+    renderEndlessBest();
+  }
   homePages.classList.toggle("drag", !animate);
   homePages.style.transform = `translateX(${-homePage * 100}vw)`;
   for (const t of document.querySelectorAll(".htab")) {
@@ -2010,6 +2043,7 @@ function playMode(mode, withWho) {
   if (!requireName()) return;
   if (withWho === "bots") return openSoloRoom(mode);
   game.solo = false;
+  game.endless = false;
   game.wantMode = mode;
   connect(newCode(), true);
 }
@@ -2056,6 +2090,8 @@ function leaveToHome(message = "") {
   game.locked = false;
   renderDaily();
   game.solo = false;
+  game.endless = false;
+  renderEndlessBest();
   world.clearRace();
   showScreen("home");
   $("#homeMsg").textContent = message;
@@ -2517,7 +2553,7 @@ function renderResults(v) {
   const isHost = v.host === playerId;
   const hasNext = cup && !cupDone;
   $("#nextBtn").style.display = isHost && hasNext ? "" : "none";
-  $("#againBtn").style.display = isHost && !hasNext ? "" : "none";
+  $("#againBtn").style.display = isHost && !hasNext && !game.endless ? "" : "none"; // an endless run has no lobby
   $("#waitHost2").style.display = !isHost && hasNext ? "block" : "none";
   // rematch: everyone votes, the room goes again when all real players are in
   const voters = v.players.filter((p) => !p.bot && !p.gone);
@@ -2746,17 +2782,20 @@ const world = (() => {
   grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
   grassTex.anisotropy = 4;
   const GROUND_LEN = TRACK_LEN + 900;
-  // the moon's dusty, cratered ground (Higgsfield texture), loaded the first time Space is picked
-  let moonTexture = null;
-  function moonTex() {
-    if (!moonTexture) {
-      moonTexture = texLoader.load("/assets/moon_tile.jpg");
-      moonTexture.colorSpace = THREE.SRGBColorSpace;
-      moonTexture.wrapS = moonTexture.wrapT = THREE.RepeatWrapping;
-      moonTexture.anisotropy = 4;
-      moonTexture.repeat.set(700 / 14, GROUND_LEN / 14);
+  // painted, tiling Higgsfield ground textures per map (loaded the first time a map is picked)
+  const GROUND_TEX = { moon: ["moon_tile.jpg", 14], field: ["tex_field.jpg", 9], sand: ["tex_sand.jpg", 10], pave: ["tex_pave.jpg", 8] };
+  const groundTexs = {};
+  function groundTex(name) {
+    if (!groundTexs[name]) {
+      const [file, metres] = GROUND_TEX[name];
+      const t = texLoader.load(`/assets/${file}`);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = 4;
+      t.repeat.set(700 / metres, GROUND_LEN / metres);
+      groundTexs[name] = t;
     }
-    return moonTexture;
+    return groundTexs[name];
   }
   grassTex.repeat.set(700 / 6, GROUND_LEN / 6);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, GROUND_LEN), new THREE.MeshLambertMaterial({ map: grassTex }));
@@ -3489,10 +3528,10 @@ const world = (() => {
   let activeMap = "";
   const MAP_GROUND = {
     meadow: { color: "#ffffff", tex: true },
-    farm: { color: "#e9d68a", tex: true },
-    beach: { color: "#f0dca4", tex: false },
-    city: { color: "#7d828c", tex: false },
-    stadium: { color: "#8fd06a", tex: true },
+    farm: { color: "#ffffff", tex: "field" },
+    beach: { color: "#ffffff", tex: "sand" },
+    city: { color: "#ffffff", tex: "pave" },
+    stadium: { color: "#ffffff", tex: "field" },
     space: { color: "#ffffff", tex: "moon" },
   };
   function mapReady(map) {
@@ -3513,7 +3552,7 @@ const world = (() => {
     setSky(map);
     const look = MAP_GROUND[map];
     ground.material.color.set(look.color);
-    ground.material.map = look.tex === "moon" ? moonTex() : look.tex ? grassTex : null;
+    ground.material.map = typeof look.tex === "string" ? groundTex(look.tex) : look.tex ? grassTex : null;
     ground.material.needsUpdate = true;
     if (!sharedBuilt) buildShared();
   }
@@ -3521,14 +3560,22 @@ const world = (() => {
 
   // ── city, stadium and space: Higgsfield 3D props, no cows or hay bales ──
   const BUILT_MAPS = new Set(["city", "stadium", "space"]);
-  const spaceSky = new THREE.Group();
-  spaceSky.visible = false;
-  scene.add(spaceSky);
-  let spaceSkyBuilt = false;
-  function buildSpaceSky() {
-    spaceSkyBuilt = true;
-    // a painted Higgsfield panorama (ringed planet, earth, nebulae) wrapped round the world
-    texLoader.load("/assets/space_pano.jpg", (t) => {
+  /**
+   * Maps with their own painted sky (Higgsfield panoramas wrapped round the
+   * world, loaded the first time the map is picked); the rest use the day sky.
+   */
+  const MAP_SKY = {
+    space: { file: "space_pano.jpg", turn: 0.62, drop: 60, bg: "#0b0722", fog: "#1b1240", clouds: false },
+    city: { file: "city_pano.jpg", turn: 0, drop: 46, bg: "#3f9ae6", fog: "#cfe6f5", clouds: true },
+  };
+  const mapSkies = {}; // map -> group
+  function mapSkyGroup(map) {
+    if (mapSkies[map]) return mapSkies[map];
+    const g = new THREE.Group();
+    scene.add(g);
+    mapSkies[map] = g;
+    const sky = MAP_SKY[map];
+    texLoader.load(`/assets/${sky.file}`, (t) => {
       t.colorSpace = THREE.SRGBColorSpace;
       t.wrapS = THREE.RepeatWrapping;
       t.repeat.set(2, 1);
@@ -3538,28 +3585,24 @@ const world = (() => {
         new THREE.CylinderGeometry(R, R, H, 64, 1, true),
         new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, fog: false, depthWrite: false }),
       );
-      cyl.position.y = H / 2 - 60;
-      cyl.rotation.y = Math.PI * 0.62; // the ringed planet and the earth either side of the track ahead
+      cyl.position.y = H / 2 - sky.drop;
+      cyl.rotation.y = Math.PI * sky.turn;
       cyl.renderOrder = -1;
-      spaceSky.add(cyl);
+      g.add(cyl);
     });
+    return g;
   }
-  /** Sky, fog and clouds per map: space is dark and starry, everything else uses the day sky. */
+  /** Sky, fog and clouds per map. */
   let daySky = null;
   function setSky(map) {
     if (!daySky) daySky = { bg: scene.background.clone(), fog: scene.fog.color.clone() };
-    const space = map === "space";
-    if (space && !spaceSkyBuilt) buildSpaceSky();
-    spaceSky.visible = space;
-    skyGroup.visible = !space;
-    clouds.visible = !space;
-    if (space) {
-      scene.background = new THREE.Color("#0b0722");
-      scene.fog.color.set("#1b1240");
-    } else {
-      scene.background = daySky.bg.clone();
-      scene.fog.color.copy(daySky.fog);
-    }
+    const own = MAP_SKY[map];
+    if (own) mapSkyGroup(map);
+    for (const [k, g] of Object.entries(mapSkies)) g.visible = k === map;
+    skyGroup.visible = !own;
+    clouds.visible = !own || own.clouds;
+    scene.background = own ? new THREE.Color(own.bg) : daySky.bg.clone();
+    scene.fog.color.copy(own ? new THREE.Color(own.fog) : daySky.fog);
   }
 
   // city, stadium and space: Higgsfield 3D props along the track, plus simple edges
@@ -3836,7 +3879,7 @@ const world = (() => {
     stepParticles(dt);
     skyGroup.position.z = camZ;
     clouds.position.z = camZ;
-    spaceSky.position.z = camZ;
+    for (const g of Object.values(mapSkies)) g.position.z = camZ;
     for (const c of clouds.children) {
       c.position.x += c.userData.drift * dt;
       if (c.position.x > 170) c.position.x = -170;
@@ -5589,6 +5632,15 @@ const stats = {
   },
 };
 /** Count a finished race once: coins, XP, stats. Returns what it paid. */
+/** Your record against each real friend you've raced: wins (you finished ahead) and losses. */
+function headToHead() {
+  try {
+    const h = JSON.parse(local.getItem("lr:h2h") || "{}");
+    return h && typeof h === "object" ? h : {};
+  } catch {
+    return {};
+  }
+}
 function recordRace(v, place) {
   if (!place) return null;
   let done = [];
@@ -5608,6 +5660,23 @@ function recordRace(v, place) {
   if (real >= 2 && place === 1) stats.add("wins", 1);
   if (real >= 2 && place <= 3) stats.add("podiums", 1);
   if (n < 2 && v.kind === "survival") stats.max("bestRun", d);
+  // the Stats page: places, per mode, and head-to-head against real friends
+  if (n >= 2 && place <= 4) stats.add(`place${place}`, 1);
+  stats.add(`mode_${v.kind}`, 1);
+  if (real >= 2) {
+    const h2h = headToHead();
+    v.standings.forEach((id, i) => {
+      const p = v.players.find((x) => x.id === id);
+      if (!p || p.bot || id === playerId) return;
+      const rec = h2h[id] ?? { name: p.name, char: p.char, w: 0, l: 0 };
+      rec.name = p.name;
+      rec.char = p.char;
+      if (place - 1 < i) rec.w += 1;
+      else rec.l += 1;
+      h2h[id] = rec;
+    });
+    local.setItem("lr:h2h", JSON.stringify(h2h));
+  }
   // coins for every race: by place against everyone (bots too), plus hits you landed
   const kos = game.kos ?? 0;
   stats.max("bestDist", d);
@@ -5742,7 +5811,88 @@ function openRank() {
 }
 $("#rankBadgeBtn").addEventListener("click", openRank);
 $("#leagueCard").addEventListener("click", openRank);
-$("#profileCard").addEventListener("click", openRank);
+$("#profileCard").addEventListener("click", openStats);
+// ── Stats page: places, records, modes, and how you stand among your friends ──
+const statsModal = $("#statsModal");
+const MODE_STAT = [["survival", "❤️ Survival"], ["chase", "🧠 Brain Chase"], ["coinrush", "🪙 Coin Rush"], ["potato", "💣 Hot Potato"]];
+function openStats() {
+  sfx.tap();
+  renderStats();
+  statsModal.hidden = false;
+}
+$("#statsClose").addEventListener("click", () => (statsModal.hidden = true));
+$("#statsBody").addEventListener("click", (e) => {
+  if (!e.target.closest('[data-go="rank"]')) return;
+  statsModal.hidden = true;
+  openRank();
+});
+statsModal.addEventListener("click", (e) => e.target === statsModal && (statsModal.hidden = true));
+function renderStats() {
+  const st = stats.all();
+  const n = (k) => Number(st[k]) || 0;
+  const rp = rank.rp();
+  const r = rankOf(rp);
+  const placed = n("place1") + n("place2") + n("place3") + n("place4");
+  const tile = (icon, label, value, cls = "") => el("div", { class: `stile ${cls}` }, el("i", { text: icon }), el("b", { text: value }), el("small", { text: label }));
+  const big = (img, label, value) => el("div", { class: "splace" }, el("img", { src: img, alt: "" }), el("b", { text: String(value) }), el("small", { text: label }));
+  // friends: everyone you've raced, ranked by league points, with your head-to-head record
+  const h2h = headToHead();
+  const friends = Object.entries(friendsList()).map(([id, f]) => ({ id, ...f, rec: h2h[id] }));
+  const table = [{ id: playerId, name: myName() || "You", char: preferredChar(), rp, me: true }, ...friends].sort((a, b) => (b.rp ?? 0) - (a.rp ?? 0));
+  const myPos = table.findIndex((x) => x.me) + 1;
+  $("#statsBody").replaceChildren(
+    el(
+      "div",
+      { class: "stats-hero" },
+      el("img", { class: "sh-av", src: portrait(preferredChar()), alt: "" }),
+      el("div", {}, el("b", { text: myName() || "Runner" }), el("span", {}, el("img", { src: r.img, alt: "" }), `${r.name} · ${rp.toLocaleString()} pts`)),
+      el("button", { class: "btn small blue", type: "button", "data-go": "rank", text: "Rankings ›" }),
+    ),
+    el("h3", { class: "stats-h", text: "Places" }),
+    el(
+      "div",
+      { class: "splaces" },
+      big(MEDAL_IMG.gold, "1st", n("place1")),
+      big(MEDAL_IMG.silver, "2nd", n("place2")),
+      big(MEDAL_IMG.bronze, "3rd", n("place3")),
+      el("div", { class: "splace rate" }, el("b", { text: placed ? `${Math.round((n("place1") / placed) * 100)}%` : "–" }), el("small", { text: "win rate" })),
+    ),
+    el("h3", { class: "stats-h", text: "Records" }),
+    el(
+      "div",
+      { class: "sgrid" },
+      tile("🏁", "races played", n("races").toLocaleString()),
+      tile("♾️", "best endless run", `${n("bestRun").toLocaleString()} m`, "hot"),
+      tile("📏", "longest race", `${n("bestDist").toLocaleString()} m`),
+      tile("🦶", "run in total", `${(n("dist") / 1000).toFixed(1)} km`),
+      tile("🥇", "gold medals ever", road.gold().toLocaleString()),
+      tile("👥", "wins vs friends", n("wins").toLocaleString()),
+      tile("🧠", "best Brain Chase", `${n("chaseBest")} s`),
+      tile("🪙", "Coin Rush coins", n("rushCoins").toLocaleString()),
+      tile("🥊", "hits landed", n("kos").toLocaleString()),
+      tile("🔥", "best combo", n("bestCombo").toLocaleString()),
+    ),
+    el("h3", { class: "stats-h", text: "By mode" }),
+    el("div", { class: "smodes" }, ...MODE_STAT.map(([k, label]) => el("div", { class: "smode" }, el("span", { text: label }), el("b", { text: `${n(`mode_${k}`)} races` })))),
+    el("h3", { class: "stats-h", text: friends.length ? `Among your friends · you're #${myPos} of ${table.length}` : "Among your friends" }),
+    friends.length
+      ? el(
+          "div",
+          { class: "sfriends" },
+          ...table.slice(0, 12).map((x, i) =>
+            el(
+              "div",
+              { class: `sfriend${x.me ? " me" : ""}` },
+              el("em", { text: `#${i + 1}` }),
+              el("img", { src: portrait(x.char ?? 0), alt: "" }),
+              el("span", {}, el("b", { text: x.me ? `${x.name} (you)` : x.name }), el("small", { text: `${rankOf(x.rp ?? 0).name} · ${(x.rp ?? 0).toLocaleString()} pts` })),
+              x.me ? el("i", { text: "" }) : el("i", { class: "h2h", text: x.rec ? `${x.rec.w}–${x.rec.l}` : "–", title: "Your wins – losses against them" }),
+            ),
+          ),
+        )
+      : el("p", { class: "stats-empty", text: "Race your friends in a room to see how you stack up against them here." }),
+  );
+}
 /** Top-left profile on the Play page: your runner, your name, your league. */
 function renderProfile() {
   const r = rankOf(rank.rp());
@@ -7135,12 +7285,14 @@ function updateHud() {
 const createBtn = $("#createBtn");
 const joinBtn = $("#joinBtn");
 const soloBtn = $("#soloBtn");
-createBtn.disabled = joinBtn.disabled = soloBtn.disabled = true;
+const endlessBtn = $("#endlessBtn");
+createBtn.disabled = joinBtn.disabled = soloBtn.disabled = endlessBtn.disabled = true;
+renderEndlessBest();
 world
   .load((f) => ($("#loadHint").textContent = `Loading 3D runners… ${Math.round(f * 100)}%`))
   .then(() => {
     $("#loadHint").textContent = "";
-    createBtn.disabled = joinBtn.disabled = soloBtn.disabled = false;
+    createBtn.disabled = joinBtn.disabled = soloBtn.disabled = endlessBtn.disabled = false;
     world.buildScenery();
     world.setShowcase(preferredChar());
     if (net.view?.phase === "lobby") renderLobby(net.view);
