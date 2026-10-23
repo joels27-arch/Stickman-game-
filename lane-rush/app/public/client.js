@@ -845,7 +845,7 @@ function askBuy(c) {
     c.via === "coins"
       ? el("span", {}, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }), el("small", { text: ` · you have ${wallet.coins().toLocaleString()}` }))
       : el("span", {}, el("img", { src: MEDAL_IMG[c.price.medal], alt: "" }), el("b", { text: medalText(c.price.medal, c.price.count) }), el("small", { text: spend ? ` · pays with ${MEDALS.filter((k) => spend[k]).map((k) => medalText(k, spend[k])).join(" + ")}` : "" })),
-    can ? null : el("em", { text: c.via === "coins" ? `You need ${(c.coins - wallet.coins()).toLocaleString()} more coins` : "Not enough medals yet" }),
+    ...(can ? [] : [el("em", { text: c.via === "coins" ? `You need ${(c.coins - wallet.coins()).toLocaleString()} more coins` : "Not enough medals yet" })]),
   );
   $("#buyOk").disabled = !can;
   $("#buyOk").textContent = can ? "Unlock" : "Can't afford yet";
@@ -930,7 +930,7 @@ function renderCollection() {
       card.addEventListener("click", () => inspectChar(c));
       return card;
     }),
-    shown.length ? null : el("p", { class: "rempty", text: "Nothing here with these filters." }),
+    ...(shown.length ? [] : [el("p", { class: "rempty", text: "Nothing here with these filters." })]),
   );
   renderWallet();
   renderCollPill();
