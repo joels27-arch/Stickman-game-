@@ -1629,6 +1629,7 @@ function endTut() {
   then?.();
 }
 $("#tutNext").addEventListener("click", nextTut);
+$("#packOdds").addEventListener("click", (e) => e.currentTarget.classList.toggle("open")); // the pack odds: 2 lines, tap for all
 $("#tutSkip").addEventListener("click", endTut);
 $("#tutStep").addEventListener("click", nextTut);
 $("#soloBtn").addEventListener("click", () => {
@@ -4229,8 +4230,15 @@ const world = (() => {
   let coinList = [];
   let looseMeshes = new Map();
   const coinGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.14, 24);
-  const coinMat = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.2, roughness: 0.35, emissive: 0xb07a00, emissiveIntensity: 0.55 });
-  const bigCoinMat = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.2, roughness: 0.3, emissive: 0xc05000, emissiveIntensity: 0.6 });
+  // the Higgsfield "4" coin on both faces, a gold rim round the edge
+  const coinFace = texLoader.load("/assets/coin_face.jpg");
+  coinFace.colorSpace = THREE.SRGBColorSpace;
+  const coinRim = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.2, roughness: 0.35, emissive: 0xb07a00, emissiveIntensity: 0.55 });
+  const coinFaceMat = new THREE.MeshStandardMaterial({ map: coinFace, metalness: 0.1, roughness: 0.4, emissive: 0x6a4400, emissiveIntensity: 0.45 });
+  const bigRim = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.2, roughness: 0.3, emissive: 0xc05000, emissiveIntensity: 0.6 });
+  const bigFaceMat = new THREE.MeshStandardMaterial({ map: coinFace, color: 0xffb46a, metalness: 0.1, roughness: 0.35, emissive: 0x8a3a00, emissiveIntensity: 0.5 });
+  const coinMat = [coinRim, coinFaceMat, coinFaceMat];
+  const bigCoinMat = [bigRim, bigFaceMat, bigFaceMat];
   function makeCoin(big) {
     const m = new THREE.Mesh(coinGeo, big ? bigCoinMat : coinMat);
     m.rotation.x = Math.PI / 2;
