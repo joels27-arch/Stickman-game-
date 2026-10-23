@@ -1474,10 +1474,10 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .ribbon::before, .ribbon::after { content: ""; position: absolute; z-index: -1; top: auto; bottom: -14px; width: 46px; height: 52px; border: 0; clip-path: none; background: var(--tail) center / 100% 100% no-repeat; }
 .ribbon::before { left: -32px; }
 .ribbon::after { right: -32px; transform: scaleX(-1); }
-.ribbon::before, .ribbon::after { --tail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 52'%3E%3Cpath d='M31 37.5 L45 37.5 L31 50.5Z' fill='%237a3200'/%3E%3Cpath d='M1.5 1.5 H31 V50.5 H1.5 L12 26Z' fill='%23e8700a' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E"); background-color: transparent; }
-.ribbon.pink::before, .ribbon.pink::after { --tail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 52'%3E%3Cpath d='M31 37.5 L45 37.5 L31 50.5Z' fill='%235e0830'/%3E%3Cpath d='M1.5 1.5 H31 V50.5 H1.5 L12 26Z' fill='%23d61f78' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E"); background-color: transparent; }
-.ribbon.teal::before, .ribbon.teal::after { --tail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 52'%3E%3Cpath d='M31 37.5 L45 37.5 L31 50.5Z' fill='%2305402e'/%3E%3Cpath d='M1.5 1.5 H31 V50.5 H1.5 L12 26Z' fill='%2311a77b' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E"); background-color: transparent; }
-.ribbon.gold::before, .ribbon.gold::after { --tail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 52'%3E%3Cpath d='M31 37.5 L45 37.5 L31 50.5Z' fill='%237a4600'/%3E%3Cpath d='M1.5 1.5 H31 V50.5 H1.5 L12 26Z' fill='%23f2a20c' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E"); background-color: transparent; }
+.ribbon::before, .ribbon::after { --tail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 52'%3E%3Cpath d='M31 37.5 L45 37.5 L31 50.5Z' fill='%237a3200'/%3E%3Cpath d='M1.5 1.5 H31 V50.5 H1.5 L12 26Z' fill='%23e8700a' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E"); background: var(--tail) center / 100% 100% no-repeat; }
+.ribbon.pink::before, .ribbon.pink::after { --tail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 52'%3E%3Cpath d='M31 37.5 L45 37.5 L31 50.5Z' fill='%235e0830'/%3E%3Cpath d='M1.5 1.5 H31 V50.5 H1.5 L12 26Z' fill='%23d61f78' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E"); background: var(--tail) center / 100% 100% no-repeat; }
+.ribbon.teal::before, .ribbon.teal::after { --tail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 52'%3E%3Cpath d='M31 37.5 L45 37.5 L31 50.5Z' fill='%2305402e'/%3E%3Cpath d='M1.5 1.5 H31 V50.5 H1.5 L12 26Z' fill='%2311a77b' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E"); background: var(--tail) center / 100% 100% no-repeat; }
+.ribbon.gold::before, .ribbon.gold::after { --tail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 52'%3E%3Cpath d='M31 37.5 L45 37.5 L31 50.5Z' fill='%237a4600'/%3E%3Cpath d='M1.5 1.5 H31 V50.5 H1.5 L12 26Z' fill='%23f2a20c' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E"); background: var(--tail) center / 100% 100% no-repeat; }
 .ribbon.gold h2 { -webkit-text-stroke-color: #7a4600; text-shadow: 0 3px 0 #7a4600; }
 .ribbon.gold { box-shadow: 0 5px 0 #a35f00, 0 8px 14px rgba(0, 0, 0, 0.35); }
 
@@ -1511,7 +1511,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .wl-tier em { font-style: normal; font-weight: 800; font-size: 10px; color: #ffd84a; }
 
 .tc-prizes { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
-.tc-prizes > small { font-weight: 800; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.85); margin-right: 2px; }
+.tc-prizes > small { flex-basis: 100%; font-weight: 800; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.85); margin-right: 2px; }
 .prz { display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px 4px 6px; border-radius: 99px; background: rgba(0, 0, 0, 0.28); font-weight: 900; font-size: 14px; }
 .prz b { font-family: var(--display); font-style: italic; font-size: 12px; padding: 1px 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.2); }
 .prz .coin { width: 15px; height: 15px; }
