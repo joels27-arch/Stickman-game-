@@ -630,7 +630,7 @@ if (!local.getItem("lr:named")) {
 }
 // Join room opens the code box inside the same card
 function openJoin(open) {
-  $("#joinOpen").hidden = open;
+  $("#roomRow").hidden = open;
   $("#joinRow").hidden = !open;
   if (open) setTimeout(() => codeInput.focus(), 30);
 }
@@ -639,7 +639,7 @@ $("#joinClose").addEventListener("click", () => openJoin(false));
 const joinParam = new URLSearchParams(location.search).get("join");
 if (joinParam) {
   codeInput.value = joinParam.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
-  $("#joinOpen").hidden = true;
+  $("#roomRow").hidden = true;
   $("#joinRow").hidden = false;
 }
 codeInput.addEventListener("input", () => {
@@ -1587,6 +1587,7 @@ let homePage = PAGE.play;
 function setHomePage(i, animate = true) {
   homePage = Math.max(0, Math.min(PAGE_NAMES.length - 1, i));
   screens.home.dataset.page = PAGE_NAMES[homePage];
+  if (homePage === PAGE.play) renderProfile(); // your runner or name may have changed
   homePages.classList.toggle("drag", !animate);
   homePages.style.transform = `translateX(${-homePage * 100}vw)`;
   for (const t of document.querySelectorAll(".htab")) {
@@ -1879,7 +1880,39 @@ function renderGoldRoad() {
     if (cur) track.scrollLeft = cur.offsetLeft - track.clientWidth / 2 + cur.clientWidth / 2;
   });
   renderMissionDots(); // a reward waiting on the road lights the Missions tab
+  renderRoadMini();
 }
+/** The Gold Road in short, at the top of the Play page: progress to the next reward (tap: the full road). */
+function renderRoadMini() {
+  const box = $("#roadMini");
+  const g = road.gold();
+  const ready = road.ready()[0];
+  const next = ready ?? ROAD.find((r) => r.gold > g);
+  if (!next) {
+    box.replaceChildren(el("img", { class: "rm-medal", src: MEDAL_IMG.gold, alt: "" }), el("span", { class: "rm-mid" }, el("b", { text: "Gold Road" }), el("small", { text: `Complete · ${g.toLocaleString()} gold` })));
+    return;
+  }
+  const i = ROAD.indexOf(next);
+  const prev = i ? ROAD[i - 1].gold : 0;
+  const pct = ready ? 100 : Math.round(((g - prev) / (next.gold - prev)) * 100);
+  const info = roadInfo(next);
+  box.classList.toggle("ready", Boolean(ready));
+  box.replaceChildren(
+    el("img", { class: "rm-medal", src: MEDAL_IMG.gold, alt: "" }),
+    el(
+      "span",
+      { class: "rm-mid" },
+      el("b", { text: "Gold Road" }),
+      el("span", { class: "rm-bar" }, el("i", { style: `width:${pct}%` }), el("em", { text: ready ? "Reward ready!" : `${g} / ${next.gold}` })),
+    ),
+    el("span", { class: "rm-next" }, el("small", { text: ready ? "Claim" : "Next" }), el("img", { src: info.img, alt: info.label })),
+  );
+}
+$("#roadMini").addEventListener("click", () => {
+  sfx.tap();
+  setHomePage(PAGE.missions);
+  setTimeout(() => $("#goldRoad").scrollIntoView({ behavior: "smooth", block: "center" }), 380);
+});
 
 function renderCompete() {
   const w = leagueWindow();
@@ -5555,6 +5588,7 @@ function renderRankPill() {
   const r = rankOf(rp);
   $("#rankPillImg").src = r.img;
   $("#rankBadgeBtn").title = `${r.name} · ${rp} league pts`;
+  renderProfile();
   // the league card on the Tournaments page
   $("#leagueImg").src = r.img;
   $("#leagueName").textContent = r.name;
@@ -5646,6 +5680,15 @@ function openRank() {
 }
 $("#rankBadgeBtn").addEventListener("click", openRank);
 $("#leagueCard").addEventListener("click", openRank);
+$("#profileCard").addEventListener("click", openRank);
+/** Top-left profile on the Play page: your runner, your name, your league. */
+function renderProfile() {
+  const r = rankOf(rank.rp());
+  $("#profAvatar").src = portrait(preferredChar());
+  $("#profName").textContent = local.getItem("lr:name") || "Runner";
+  $("#profLeagueImg").src = r.img;
+  $("#profLeague").textContent = r.name;
+}
 $("#tabFriends").addEventListener("click", () => rankTab(true));
 $("#tabLeagues").addEventListener("click", () => rankTab(false));
 $("#rankClose").addEventListener("click", () => (rankModal.hidden = true));

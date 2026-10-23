@@ -43,6 +43,10 @@
       <div class="home-shade"></div>
       <header class="home-top">
         <button id="rankBadgeBtn" class="rank-badge-btn tb-shop" type="button" aria-label="Your league"><img id="rankPillImg" src="/assets/lg_bronze.webp" alt="" /></button>
+        <button id="profileCard" class="profile-card" type="button" aria-label="Your profile and league">
+          <img id="profAvatar" src="/assets/pp0.webp" alt="" />
+          <span class="pc-txt"><b id="profName">Runner</b><small><img id="profLeagueImg" src="/assets/lg_bronze.webp" alt="" /><i id="profLeague">Bronze I</i></small></span>
+        </button>
         <div class="medal-chip" title="Your medals"></div>
         <div class="topbar-btns">
           <span class="coin-chip tb-coins" title="Coins"><i class="coin"></i><b class="coinCount">0</b></span>
@@ -79,13 +83,16 @@
         </div>
         <!-- PLAY -->
         <div class="hpage hp-play" id="hpPlay" aria-label="Play">
+          <button id="roadMini" class="road-mini" type="button" aria-label="Gold Road"></button>
           <h1 class="logo home-logo"><span class="w1">BRAIN</span><span class="w2">RUN</span></h1>
           <div class="roster" id="homeRoster" hidden></div>
           <div class="home-dock">
             <div class="play-card">
               <button id="soloBtn" class="btn big go"><span class="flagico">❤️</span> Play solo <span class="arrow">→</span></button>
-              <button id="createBtn" class="btn big blue"><span class="flagico">👥</span> Create room <span class="arrow">→</span></button>
-              <button id="joinOpen" class="btn big ghost" type="button"><span class="flagico">🔑</span> Join room <span class="arrow">→</span></button>
+              <div class="room-row" id="roomRow">
+                <button id="createBtn" class="btn room-btn blue" type="button"><span class="flagico">👥</span> Create room</button>
+                <button id="joinOpen" class="btn room-btn green" type="button"><span class="flagico">🔑</span> Join room</button>
+              </div>
               <div class="join-row" id="joinRow" hidden>
                 <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" />
                 <button id="joinBtn" class="btn big go">Join</button>
