@@ -53,9 +53,13 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  * `state.mode` is what the host picked; `state.kind` is the race being run.
  * The host can also pick "random" as the mode or the map: it's drawn when each race starts.
  */
-export const GAME_MODES = ["survival", "chase", "coinrush", "potato", "cup", "grandtour", "random"];
+export const GAME_MODES = ["survival", "chase", "coinrush", "potato", "grandtour", "random"];
 /** Modes played over several rounds with a points table. */
-export const CUP_MODES = ["cup", "grandtour"];
+export const CUP_MODES = ["grandtour"];
+/** How many rounds the host can pick for a match (the Grand Tour is always one of each mode). */
+export const ROUND_OPTIONS = [1, 3, 5];
+/** What the host can put up for 1st / 2nd / 3rd (paid with 2+ real players). */
+export const PRIZES = ["none", "coins", "bigcoins", "pack"];
 /** The modes a single round can be (a Party Cup is three of these). All run on the endless course. */
 export const ROUND_KINDS = ["survival", "chase", "coinrush", "potato"];
 export const isEndless = (kind) => kind !== "sprint";
@@ -96,7 +100,6 @@ export const HEART_EVERY_M = 420;
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
 export const MAPS = ["meadow", "farm", "beach"];
 /** A Party Cup is three rounds; each placing scores points, most points wins. */
-export const CUP_ROUNDS = 3;
 export const CUP_ROUND_BOOST_M = 350;
 export const CUP_POINTS = [10, 5, 3, 1];
 /** Rank points are reported by each player's device (shown to friends in the lobby). */
@@ -805,7 +808,7 @@ function startRace(state, t) {
   state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode === "random" ? ROUND_KINDS[Math.floor(pick() * ROUND_KINDS.length)] : state.mode;
   // later Party Cup rounds open further into the difficulty curve
   state.courseBoost = state.cup ? (state.cup.race - 1) * CUP_ROUND_BOOST_M : 0;
-  state.raceMap = MAPS[(baseMap + (state.cup ? state.cup.race - 1 : 0)) % MAPS.length];
+  state.raceMap = MAPS[baseMap]; // a random map is drawn again every round
   state.phase = "countdown";
   state.startAt = t + COUNTDOWN_MS;
   state.endAt = 0;
@@ -837,18 +840,31 @@ function knockOut(p, t) {
   p.pw = "";
 }
 /**
- * The rounds of a multi-round mode, decided when it starts: Party Cup = three
- * different kinds, Grand Tour = every kind once. Anything else isn't a cup.
+ * The rounds of a match, decided when it starts. The Grand Tour is every kind
+ * once; any other mode over several rounds repeats that mode (Random draws a
+ * different kind each round where it can). A one-round match isn't a cup.
  */
-function newCup(mode, t) {
-  if (!CUP_MODES.includes(mode)) return null;
+function newCup(mode, t, rounds = 1) {
+  if (!CUP_MODES.includes(mode) && rounds <= 1) return null;
   const r = rng(Math.floor(t) % 2147483647);
-  const pool = [...ROUND_KINDS];
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(r() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+  const shuffled = () => {
+    const pool = [...ROUND_KINDS];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool;
+  };
+  if (mode === "grandtour") return { race: 1, points: {}, races: shuffled() };
+  if (mode === "random") {
+    const races = [];
+    while (races.length < rounds) {
+      const next = shuffled().filter((k, i) => i > 0 || k !== races[races.length - 1]);
+      races.push(...next);
+    }
+    return { race: 1, points: {}, races: races.slice(0, rounds) };
   }
-  return { race: 1, points: {}, races: mode === "grandtour" ? pool : pool.slice(0, CUP_ROUNDS) };
+  return { race: 1, points: {}, races: Array(rounds).fill(mode) };
 }
 /** Coin Rush: lines of coins in the gaps between obstacle rows, in a lane that's open on both sides. */
 const coinCache = new Map();
@@ -1424,6 +1440,14 @@ export function validateAction(state, playerId, action) {
       if (!MAPS.includes(action.map) && action.map !== "random") return { ok: false, error: "bad map" };
       return { ok: true };
     }
+    case "rounds":
+    case "prize": {
+      if (state.phase !== "lobby") return { ok: false, error: "only in the lobby" };
+      if (state.host !== playerId) return { ok: false, error: "Only the host can change that" };
+      if (action.type === "rounds" && !ROUND_OPTIONS.includes(action.rounds)) return { ok: false, error: "bad rounds" };
+      if (action.type === "prize" && !PRIZES.includes(action.prize)) return { ok: false, error: "bad prize" };
+      return { ok: true };
+    }
     case "ready": {
       if (!me) return { ok: false, error: "join first" };
       if (state.phase !== "lobby") return { ok: false, error: "not in the lobby" };
@@ -1632,8 +1656,14 @@ export function applyAction(state0, playerId, action) {
     case "map":
       state.map = action.map;
       break;
+    case "rounds":
+      state.rounds = action.rounds;
+      break;
+    case "prize":
+      state.prize = action.prize;
+      break;
     case "start":
-      state.cup = newCup(state.mode, t);
+      state.cup = newCup(state.mode, t, state.rounds ?? 1);
       state.botFill = action.bots !== false;
       if (state.botFill) fillBots(state);
       startRace(state, t);
@@ -1642,7 +1672,7 @@ export function applyAction(state0, playerId, action) {
       state.rematch = [...new Set([...(state.rematch ?? []), playerId])];
       const voters = present(state).filter((id) => !state.players[id].bot);
       if (voters.every((id) => state.rematch.includes(id))) {
-        state.cup = newCup(state.mode, t);
+        state.cup = newCup(state.mode, t, state.rounds ?? 1);
         startRace(state, t);
       }
       break;
@@ -1871,6 +1901,8 @@ export function viewFor(state, playerId) {
     mode: state.mode ?? "survival",
     kind: state.kind ?? "survival",
     map: state.map ?? "meadow",
+    rounds: state.rounds ?? 1,
+    prize: state.prize ?? "none",
     raceMap: state.raceMap ?? state.map ?? "meadow",
     courseBoost: state.courseBoost ?? 0,
     cup: state.cup

@@ -30,7 +30,7 @@ Rules the generator keeps:
   (0.38 s) + starting the next jump (0.25 s) / slide (0.12 s)`. If a pattern
   would be too tight, its gap is widened. `checkCourse` re-checks whole
   courses; the tests run it over 1,200 generated courses.
-* Party Cup rounds 2 and 3 start 350 m / 700 m further along the curve.
+* In a match of several rounds, each later round starts 350 m further along the curve.
 
 Moving obstacles (log, bees, tractor, chicken, wave, crab) sweep across the
 lanes on the shared race clock, one every ~150 m from 150 m on, always in a
@@ -40,7 +40,7 @@ wide gap between rows.
 
 | Source | Coins |
 |---|---|
-| Race (place 1–4) | 60 / 40 / 25 / 15, +10 per hit landed, ×2 in Party Cup |
+| Race (place 1–4) | 60 / 40 / 25 / 15, +10 per hit landed, ×2 in matches of several rounds |
 | Solo endless run | 1 per 25 m (5–60) |
 | Daily missions | 100 / 200 / 400 (claim) |
 | Career missions | 50–600 each + a chapter chest |
@@ -140,9 +140,20 @@ character odds.
 
 ## Modes
 
-Survival (main), Brain Chase, Coin Rush, Hot Potato, Party Cup (3 random rounds
-of the others), and the Grand Tour (`grandtour`). Play solo = Endless Run alone, or any mode against 3 bots.
-Sprint and Tournament were removed at the player's request.
+Survival (main), Brain Chase, Coin Rush, Hot Potato, Random (a mode drawn each
+round) and the Grand Tour. Play solo = your own private room with bots.
+
+### Room settings (host)
+
+* **Rounds:** 1, 3 or 5 for any mode. More than one round is a match with a
+  points table (10 / 5 / 3 / 1 per round); medals and prizes are paid for the
+  final table. Random draws a different mode each round. The Grand Tour is
+  always 4 rounds (one of each mode). *Decision:* the Party Cup was dropped,
+  since Random × 3 rounds is the same thing.
+* **Map:** fixed for the whole match, or Random (drawn every round).
+* **Prize for the top 3:** none, coins (150 / 75 / 40), big coins
+  (300 / 150 / 75) or a Brain Pack for 1st (then 150 / 75 coins). Paid with 2+
+  real players, at most 5 room prizes per player per day.
 
 * **Hot Potato:** the holder taps PASS 💣 to throw the bomb to the nearest
   runner within 12 m (any lane, ahead or behind; not straight back), or bumps

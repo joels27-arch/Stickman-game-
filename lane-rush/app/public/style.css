@@ -1787,3 +1787,14 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .hp-missions .chapter .ch-chest small { font-weight: 800; font-size: 9px; line-height: 1.15; opacity: 0.9; }
 .career-road > .quest { margin-left: 66px; }
 .career-road > .chest-btn { margin-left: 66px; }
+
+/* Room settings: rounds + prize pickers */
+.chip-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-pick .chip:disabled { opacity: 0.55; cursor: default; }
+.chip-pick .chip.on:disabled { opacity: 1; }
+.prize-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chip.prize { display: grid; gap: 2px; padding: 9px 12px; border-radius: 14px; text-align: left; text-transform: none; }
+.chip.prize b { font-size: 14px; }
+.chip.prize small { font-size: 11px; font-weight: 700; opacity: 0.8; }
+.pick-note { margin: 6px 2px 0; font-size: 12px; font-weight: 700; opacity: 0.75; }
+.pick-note:empty { display: none; }

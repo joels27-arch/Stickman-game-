@@ -33,7 +33,7 @@ import {
   runSpeed,
   BANANA_BEHIND_M,
   CUP_POINTS,
-  CUP_MODES,
+  ROUND_OPTIONS,
   ROUND_KINDS,
   MAPS,
   EMOTES,
@@ -121,11 +121,27 @@ const GAME_MODE_INFO = {
   chase: { label: "Brain Chase", icon: "🧠", tag: "Run for it", text: "A giant brain rolls after you and keeps speeding up. Caught = out." },
   coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins. Get hit and you spill coins for the others." },
   potato: { label: "Hot Potato", icon: "💣", tag: "Pass it on", text: "Got the bomb? Tap PASS to throw it to the nearest runner (or bump into someone). Hold it when it blows: lose a heart." },
-  cup: { label: "Party Cup", icon: "🏆", tag: "3 rounds", text: `3 random modes on 3 maps. ${CUP_POINTS.join(" / ")} points per place.` },
   random: { label: "Random", icon: "🎲", tag: "Surprise", text: "A random mode is drawn when each race starts." },
   grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "Every mode once: Survival, Brain Chase, Coin Rush and Hot Potato." },
 };
-const isCupMode = (m) => CUP_MODES.includes(m);
+/** What the host can put up for the top 3 of a match. Paid with 2+ real players, at most PRIZES_PER_DAY a day. */
+const PRIZE_INFO = {
+  none: { label: "Just glory", icon: "🤝", pays: [] },
+  coins: { label: "Coins", icon: "🪙", pays: [150, 75, 40] },
+  bigcoins: { label: "Big coins", icon: "💰", pays: [300, 150, 75] },
+  pack: { label: "Pack", icon: "🎁", pays: ["pack", 150, 75] },
+};
+const PRIZES_PER_DAY = 5;
+const prizeText = (x) => (x === "pack" ? "Brain Pack" : `${x} coins`);
+/** "3 rounds", or the Grand Tour's fixed 4. */
+function roundsOf(v) {
+  return v.mode === "grandtour" ? ROUND_KINDS.length : v.rounds ?? 1;
+}
+function matchLabel(v, gm, endless) {
+  const base = endless ? "Endless run" : GAME_MODE_INFO[gm].label;
+  const r = roundsOf(v);
+  return r > 1 && gm !== "grandtour" ? `${base} · ${r} rounds` : base;
+}
 const KIND_LABEL = { survival: "Survival", chase: "Brain Chase", coinrush: "Coin Rush", potato: "Hot Potato", sprint: "Sprint" };
 /** One line on how to win, shown during the countdown. */
 const KIND_RULE = {
@@ -2002,8 +2018,29 @@ function renderLobby(v) {
     }),
   );
   // start fetching the map's 3D props while everyone is still in the lobby
-  for (const key of isCupMode(gm) || mp === "random" ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
-  const what = isCupMode(gm) ? GAME_MODE_INFO[gm].label : gm === "survival" && n < 2 && !botsOn() ? "endless run" : GAME_MODE_INFO[gm].label;
+  for (const key of mp === "random" ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
+  // rounds (the Grand Tour is always one of each mode) and the prize for the top 3
+  const rounds = roundsOf(v);
+  $("#roundPick").replaceChildren(
+    ...ROUND_OPTIONS.map((r) => {
+      const b = el("button", { class: `chip${rounds === r ? " on" : ""}`, type: "button", text: r === 1 ? "1 round" : `${r} rounds` });
+      b.disabled = !isHost || gm === "grandtour";
+      b.addEventListener("click", () => act({ type: "rounds", rounds: r }));
+      return b;
+    }),
+    ...(gm === "grandtour" ? [el("span", { class: "chip on fixed", text: `${rounds} rounds · fixed` })] : []),
+  );
+  const prize = v.prize ?? "none";
+  $("#prizePick").replaceChildren(
+    ...Object.entries(PRIZE_INFO).map(([key, info]) => {
+      const b = el("button", { class: `chip prize${prize === key ? " on" : ""}`, type: "button" }, el("b", { text: `${info.icon} ${info.label}` }), info.pays.length ? el("small", { text: info.pays.map((x, i) => `${["1st", "2nd", "3rd"][i]} ${x === "pack" ? "🎁" : x}`).join(" · ") }) : el("small", { text: "No prize" }));
+      b.disabled = !isHost;
+      b.addEventListener("click", () => prize !== key && act({ type: "prize", prize: key }));
+      return b;
+    }),
+  );
+  $("#prizeNote").textContent = prize === "none" ? "" : `Paid after the last round, with 2+ real players · up to ${PRIZES_PER_DAY} prizes a day`;
+  const what = matchLabel(v, gm, gm === "survival" && n < 2 && !botsOn()).toLowerCase();
   $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
   renderLineup(v, { isHost, gm, mp, mode, what });
   // once you've locked in your runner, the lobby is the line-up
@@ -2049,8 +2086,9 @@ $("#luGo").addEventListener("click", () => {
 function renderLineup(v, { isHost, gm, mp, mode, what }) {
   $("#lineup").classList.toggle("solo-room", Boolean(game.solo));
   $("#luCode").textContent = net.code;
-  $("#luMode").textContent = isCupMode(gm) ? GAME_MODE_INFO[gm].label : gm === "survival" && v.players.length < 2 && !botsOn() ? "Endless run" : GAME_MODE_INFO[gm].label;
-  $("#luMap").textContent = isCupMode(gm) ? "Meadow · Farm · Beach" : mp === "random" ? `Random map · ${botsOn() && v.players.length < 4 ? "with bots" : mode}` : `${MAP_INFO[mp].label} · ${botsOn() && v.players.length < 4 ? "with bots" : mode}`;
+  $("#luMode").textContent = matchLabel(v, gm, gm === "survival" && v.players.length < 2 && !botsOn());
+  const pz = PRIZE_INFO[v.prize ?? "none"];
+  $("#luMap").textContent = `${MAP_INFO[mp].label} map · ${botsOn() && v.players.length < 4 ? "with bots" : mode}${pz.pays.length ? ` · ${pz.icon} ${pz.label}` : ""}`;
   const qs = dailyChallenges();
   const qd = dailyState();
   $("#luDaily").textContent = `📋 Challenges ${qs.filter((q) => qd.done[q.id]).length}/${qs.length}`;
@@ -2208,8 +2246,8 @@ function renderResults(v) {
   $("#resPlace").innerHTML = myPlace ? `${myPlace}<sup>${ordinal(myPlace)}</sup>` : "–";
   $("#resTitle").textContent = cupDone
     ? myPlace === 1
-      ? "Party Cup champion!"
-      : `Party Cup: ${PLACE[myPlace - 1] ?? myPlace}`
+      ? "Match champion!"
+      : `Match: ${PLACE[myPlace - 1] ?? myPlace}`
     : solo && v.kind === "survival"
       ? `You ran ${Math.round(v.players[0]?.d ?? 0)} m${Math.round(v.players[0]?.d ?? 0) >= personalBest() && (v.players[0]?.d ?? 0) > 50 ? " · new record!" : ` · best ${personalBest()} m`}`
       : myPlace === 1
@@ -2221,6 +2259,8 @@ function renderResults(v) {
   const reward = $("#resReward");
   reward.replaceChildren();
   const rpChange = recordRace(v, v.standings.indexOf(playerId) + 1);
+  // the host's prize for the top 3, once the whole match is over
+  const roomPrize = rpChange && (!cup || cupDone) ? payRoomPrize(v, myPlace) : null;
   if (rpChange && v.standings.length >= 2 && (cupDone ? cup.table[0] === playerId : !cup && myPlace === 1)) setTimeout(() => sfx.cheer(), 300);
   const ptsBefore = rank.points();
   if (mine?.medal) {
@@ -2239,6 +2279,7 @@ function renderResults(v) {
     reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
     if (rpChange.xp) reward.append(el("span", { class: "xpchip", text: `+${rpChange.xp} XP` }));
     if (rpChange.prize) reward.append(el("span", { class: "xpchip prizechip", text: `🏆 Prize +${rpChange.prize}` }));
+    if (roomPrize) reward.append(el("span", { class: "xpchip prizechip", text: roomPrize }));
     if (rpChange.league) reward.append(el("span", { class: "xpchip leaguechip", text: `Weekend League +${rpChange.league.pts} pts · ${rpChange.league.matches}/${LEAGUE_MATCHES}` }));
     if (rpChange.botsOnly) reward.append(el("span", { class: "nomedal", text: "Medals (and league progress) need 2 real players" }));
     else reward.append(rankChip(rank.points() - ptsBefore));
@@ -2271,6 +2312,30 @@ function renderResults(v) {
   }
 }
 
+/** Pay the room's prize for your final place (top 3), with 2+ real players and a daily cap. Returns a label, or null. */
+function payRoomPrize(v, place) {
+  const pays = PRIZE_INFO[v.prize ?? "none"]?.pays ?? [];
+  const x = pays[place - 1];
+  if (x === undefined) return null;
+  if (v.players.filter((p) => !p.bot).length < 2) return "Room prizes need 2+ real players";
+  let log = { day: dayKey(), n: 0 };
+  try {
+    const l = JSON.parse(local.getItem("lr:prizes") || "null");
+    if (l && l.day === dayKey()) log = l;
+  } catch {
+    // fresh log
+  }
+  if (log.n >= PRIZES_PER_DAY) return `Daily room-prize limit reached (${PRIZES_PER_DAY})`;
+  local.setItem("lr:prizes", JSON.stringify({ day: log.day, n: log.n + 1 }));
+  if (x === "pack") {
+    const pk = PACKS.find((p) => p.id === "brain");
+    const items = grantPack(pk);
+    setTimeout(() => openPackAnim(pk, items), 1400);
+    return "🎁 Room prize: Brain Pack!";
+  }
+  wallet.addCoins(x);
+  return `🏆 Room prize +${x}`;
+}
 function renderCup(v) {
   const box = $("#cupBox");
   const cup = v.cup;
@@ -2290,7 +2355,7 @@ function renderCup(v) {
     );
   });
   box.append(
-    el("h4", { text: done ? "🏆 Final Party Cup table" : `🏆 Party Cup · after round ${cup.race} of ${cup.races.length}` }),
+    el("h4", { text: done ? "🏆 Final table" : `🏆 After round ${cup.race} of ${cup.races.length}` }),
     el("table", {}, el("thead", {}, el("tr", {}, el("th", { text: "#" }), el("th", { text: "Runner" }), el("th", { text: "Points" }))), el("tbody", {}, ...rows)),
   );
 }
@@ -4165,7 +4230,7 @@ function enterRace(v) {
   tag.classList.toggle("small", Boolean(v.cup)); // the cup's reel shows the mode instead
   world.setupMode(game.kind, race.course);
   world.setupMovers(race.course, v.seed, game.mapFailed ? "meadow" : map);
-  if (v.cup && v.phase === "countdown") spinReveal(v.cup.race, game.kind);
+  if (v.cup && v.phase === "countdown" && (v.mode === "random" || v.mode === "grandtour")) spinReveal(v.cup.race, game.kind, v.cup.races.length);
   game.lastBlast = Math.max(0, ...(v.blasts || []).map((b) => b.id));
   game.coinGot = new Set();
   renderModeHud();
@@ -5106,7 +5171,7 @@ function recordRace(v, place) {
   if (v.kind === "coinrush") stats.add("rushCoins", mine?.coins ?? 0);
   if (v.kind === "chase") stats.max("chaseBest", Math.round(((mine?.outAt ?? v.endAt ?? Date.now()) - v.startAt) / 1000));
   if (v.cup && v.cup.race >= v.cup.races.length && v.cup.table?.[0] === playerId) stats.add("cupWins", 1);
-  // Party Cup rounds pay double
+  // rounds of a multi-round match pay double
   const coins = ((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1);
   wallet.addCoins(coins);
   const prize = tourneyPrize(v);
@@ -5507,7 +5572,7 @@ const CAREER = [
     chest: { coins: 1000, medal: "gold" },
     missions: [
       { stat: "chaseBest", goal: 120, text: "Survive 2 minutes in Brain Chase", coins: 200, icon: "/assets/ui_watch.webp" },
-      { stat: "cupWins", goal: 1, text: "Win a Party Cup", coins: 250, icon: "/assets/medal_gold.png" },
+      { stat: "cupWins", goal: 1, text: "Win a match of 3+ rounds", coins: 250, icon: "/assets/medal_gold.png" },
       { stat: "packs", goal: 3, text: "Open 3 packs", coins: 200, icon: "/assets/pack_brain.webp" },
       { stat: "rp", goal: 10, text: "Reach the Silver league", coins: 250, icon: "/assets/lg_silver.webp" },
     ],
@@ -5987,8 +6052,8 @@ function checkZaps() {
   }
 }
 
-/** Party Cup: a slot-machine reel lands on this round's mode during the countdown. */
-function spinReveal(round, kind) {
+/** Random / Grand Tour matches: a slot-machine reel lands on this round's mode during the countdown. */
+function spinReveal(round, kind, total) {
   const kinds = ["survival", "chase", "coinrush", "potato"];
   const reel = $("#spinReel");
   const cards = [];
@@ -5996,7 +6061,7 @@ function spinReveal(round, kind) {
   for (let i = 0; i < loops; i++) for (const k of kinds) cards.push(k);
   cards.push(kind);
   reel.replaceChildren(...cards.map((k) => el("div", { class: `spin-card ${k}` }, el("b", { text: `${GAME_MODE_INFO[k].icon} ${KIND_LABEL[k]}` }), el("small", { text: KIND_RULE[k] }))));
-  $("#spinTitle").textContent = `🏆 Party Cup · Round ${round} of 3`;
+  $("#spinTitle").textContent = `🏆 Round ${round} of ${total}`;
   const box = $("#spinWheel");
   box.hidden = false;
   box.classList.remove("done");
