@@ -108,6 +108,22 @@ and trophies) and **Shop** (Season Pass, packs, characters for sale, items).
 * Your name is asked once, the first time the game opens, and can be changed in
   Settings.
 
+## Gold Road
+
+A lifetime path on the Tournaments page, like a trophy road: it counts every
+gold medal you ever win (spending them never moves you back) and pays at
+1 / 3 / 5 / 10 / 15 / 25 / 50 / 75 / 100 / 150 / 250 / 400 / 600 / 800 / 1000
+gold. Coins and packs along the way, and three road-exclusive characters:
+Ace (epic, 50 gold), Titan (legendary, 250) and Aurum (legendary, 1000).
+A red dot on the Tournaments tab means a reward is waiting.
+
+## Power-up odds
+
+Mario Kart style: four columns of odds (1st, 2nd, 3rd, last), blended by your
+standing (half your place, half how far behind the leader you are). The better
+the item, the steeper it rises toward the back: a rocket is about 1 % for the
+leader and 30 % for the last runner. Bots draw with the same odds.
+
 ## Leagues
 
 Leagues are climbed with medals only: every medal earned is worth league

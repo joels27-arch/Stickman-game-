@@ -240,15 +240,19 @@ const wallet = {
   save(m) {
     // every medal earned (never spent ones) moves you up the leagues
     let gained = 0;
+    let goldWon = 0;
     try {
       rank.points();
       const old = this.medals();
       for (const k of MEDALS) gained += Math.max(0, (m[k] ?? 0) - old[k]) * MEDAL_PTS[k];
+      goldWon = Math.max(0, (m.gold ?? 0) - old.gold);
+      if (goldWon) road.gold(); // set up the road from the old wallet first
     } catch {
       gained = 0; // still starting up
     }
     local.setItem("lr:medals", JSON.stringify(m));
     if (gained) rank.add(gained);
+    if (goldWon) road.add(goldWon);
     renderWallet();
   },
   owned() {
@@ -951,17 +955,19 @@ function allChars() {
     ...COLLECTION.map((c) => ({ ...c, img: `/assets/sc_${c.id}.webp`, hero: `/assets/sc_${c.id}.webp` })),
     ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp` })),
     { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp` },
+    ...ROAD_CHARS.map((c) => ({ ...c, via: "road", img: `/assets/rd_${c.id}.webp`, hero: `/assets/rd_${c.id}.webp` })),
   ];
 }
 const ownsChar = (c) => (c.idx !== undefined ? wallet.owns(c.idx) : wallet.has(c.id));
-const VIA_LABEL = { starter: "Free", coins: "Coins", medals: "Medals", pack: "Packs", pass: "Season Pass" };
-const VIA_ICON = { starter: "✅", coins: "🪙", medals: "🏅", pack: "🎁", pass: "⭐" };
+const VIA_LABEL = { starter: "Free", coins: "Coins", medals: "Medals", pack: "Packs", pass: "Season Pass", road: "Gold Road" };
+const VIA_ICON = { starter: "✅", coins: "🪙", medals: "🏅", pack: "🎁", pass: "⭐", road: "🥇" };
 function howToGet(c) {
   if (c.via === "starter") return "A free runner. Race with it any time.";
   if (c.via === "coins") return `Buy it in the Shop for ${c.coins.toLocaleString()} coins.`;
   if (c.via === "medals") return `Medal exclusive: ${medalText(c.price.medal, c.price.count)}. Win medals by placing top 3 against real players. Gold medals only come from winning races.`;
   if (c.via === "pack") return `Only in packs (${c.rarity}). Brain Pack: ${pct(PACK_ODDS.normal[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)} per item. Mega Pack last item: ${pct(PACK_ODDS.boosted[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)}.`;
   if (c.idx in PASS_RUNNERS) return `Season Pass reward: free track, level ${PASS_RUNNERS[c.idx]}. Play races to earn XP.`;
+  if (c.via === "road") return `Gold Road exclusive: win ${ROAD.find((r) => r.char === c.id).gold.toLocaleString()} gold medals in total.`;
   return "Season Pass exclusive: Gold track, level 30.";
 }
 /** The short lock label on a runner card you can't race with yet. */
@@ -1003,7 +1009,7 @@ function charCard(c, n, onClick) {
   return b;
 }
 const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
-const VIA_GROUP = { coins: "🪙 Buy with coins", medals: "🏅 Buy with medals", pack: "🎁 From packs", pass: "⭐ Season Pass" };
+const VIA_GROUP = { coins: "🪙 Buy with coins", medals: "🏅 Buy with medals", pack: "🎁 From packs", pass: "⭐ Season Pass", road: "🥇 Gold Road" };
 /** Characters split by how you get them (in this order), each group sorted common → legendary; empty groups left out. */
 function charGroups(list, order) {
   return order.map((via) => [via, list.filter((c) => c.via === via).sort(byRarity)]).filter(([, l]) => l.length);
@@ -1043,7 +1049,7 @@ function renderSkins() {
       return card;
     }),
     ...(rest.length
-      ? charGroups(rest, ["coins", "medals", "pack", "pass"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: `${VIA_GROUP[via]} · ${list.length}` }), ...list.map((c) => charCard(c, n++, inspectChar))])
+      ? charGroups(rest, ["coins", "medals", "pack", "pass", "road"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: `${VIA_GROUP[via]} · ${list.length}` }), ...list.map((c) => charCard(c, n++, inspectChar))])
       : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
   );
   renderCollPill();
@@ -1739,6 +1745,132 @@ function untilText(ms) {
   return d ? `${d}d ${h}h` : h ? `${h}h ${m % 60}m` : `${m}m`;
 }
 
+// ── Gold Road: a lifetime path (like a trophy road) paid for every gold medal you ever win ──
+
+/** Exclusive characters you can only get on the Gold Road. */
+const ROAD_CHARS = [
+  { id: "ace", name: "Ace", rarity: "epic" },
+  { id: "titan", name: "Titan", rarity: "legendary" },
+  { id: "aurum", name: "Aurum", rarity: "legendary" },
+];
+const ROAD = [
+  { gold: 1, coins: 250 },
+  { gold: 3, pack: "brain" },
+  { gold: 5, coins: 500 },
+  { gold: 10, pack: "mega" },
+  { gold: 15, coins: 1000 },
+  { gold: 25, pack: "mega" },
+  { gold: 50, char: "ace" },
+  { gold: 75, coins: 2500 },
+  { gold: 100, pack: "mega" },
+  { gold: 150, coins: 4000 },
+  { gold: 250, char: "titan" },
+  { gold: 400, coins: 6000 },
+  { gold: 600, pack: "mega" },
+  { gold: 800, coins: 10000 },
+  { gold: 1000, char: "aurum" },
+];
+const roadChar = (id) => ROAD_CHARS.find((c) => c.id === id);
+function roadInfo(step) {
+  if (step.coins) return { label: `${step.coins.toLocaleString()} coins`, img: step.coins >= 2500 ? "/assets/ui_c3.webp" : step.coins >= 1000 ? "/assets/ui_c2.webp" : "/assets/ui_c1.webp" };
+  if (step.pack) return { label: step.pack === "mega" ? "Mega Pack" : "Brain Pack", img: `/assets/pack_${step.pack}.webp` };
+  const c = roadChar(step.char);
+  return { label: c.name, img: `/assets/rd_${c.id}.webp`, rarity: c.rarity };
+}
+/** Gold medals won, ever (spending them never takes you back down the road). */
+const road = {
+  gold() {
+    const n = Number(local.getItem("lr:goldEver"));
+    if (local.getItem("lr:goldEver") !== null && Number.isFinite(n)) return n;
+    // first run with the road: the gold you hold plus the gold spent on characters
+    let start = wallet.medals().gold;
+    for (const c of COLLECTION) if (c.via === "medals" && c.price.medal === "gold" && wallet.has(c.id)) start += c.price.count;
+    local.setItem("lr:goldEver", String(start));
+    return start;
+  },
+  add(n) {
+    local.setItem("lr:goldEver", String(this.gold() + n));
+    renderGoldRoad();
+  },
+  claimed() {
+    try {
+      const a = JSON.parse(local.getItem("lr:road") || "[]");
+      return Array.isArray(a) ? a : [];
+    } catch {
+      return [];
+    }
+  },
+  ready() {
+    const g = this.gold();
+    const done = this.claimed();
+    return ROAD.filter((r) => r.gold <= g && !done.includes(r.gold));
+  },
+};
+function claimRoad(step, node) {
+  if (road.gold() < step.gold || road.claimed().includes(step.gold)) return;
+  local.setItem("lr:road", JSON.stringify([...road.claimed(), step.gold]));
+  const info = roadInfo(step);
+  sfx.finish();
+  if (step.coins) {
+    wallet.addCoins(step.coins);
+    coinRain(node, 14);
+    toast(`Gold Road: +${info.label}!`);
+  } else if (step.pack) {
+    const pk = PACKS.find((x) => x.id === step.pack);
+    openPackAnim(pk, grantPack(pk));
+  } else {
+    giveItem(step.char);
+    renderCollPill();
+    showUnlock({ kind: "char", char: { name: info.label, rarity: info.rarity, img: info.img } });
+  }
+  renderGoldRoad();
+}
+function renderGoldRoad() {
+  const box = $("#goldRoad");
+  if (!box) return;
+  const g = road.gold();
+  const done = road.claimed();
+  const next = ROAD.find((r) => r.gold > g);
+  const nodes = ROAD.map((step, i) => {
+    const info = roadInfo(step);
+    const got = done.includes(step.gold);
+    const ready = step.gold <= g && !got;
+    // how far the road is filled toward this node from the one before
+    const prev = i ? ROAD[i - 1].gold : 0;
+    const fill = Math.max(0, Math.min(1, (g - prev) / (step.gold - prev)));
+    const b = el(
+      "button",
+      { class: `rnode${got ? " got" : ""}${ready ? " ready" : ""}${step.gold > g ? " future" : ""}${step.char ? ` star ${info.rarity}` : ""}`, type: "button" },
+      el("span", { class: "rline" }, el("i", { style: `width:${Math.round(fill * 100)}%` })),
+      el("span", { class: "rgold" }, el("img", { src: MEDAL_IMG.gold, alt: "" }), el("b", { text: String(step.gold) })),
+      el("span", { class: "rbubble" }, el("img", { src: info.img, alt: "" }), got ? el("i", { class: "tick", text: "✓" }) : null),
+      el("small", { text: ready ? "Claim!" : info.label }),
+    );
+    b.disabled = !ready;
+    b.addEventListener("click", () => claimRoad(step, b));
+    return b;
+  });
+  const track = el("div", { class: "road-track" }, ...nodes);
+  box.replaceChildren(
+    el(
+      "div",
+      { class: "road-head" },
+      el("img", { src: MEDAL_IMG.gold, alt: "" }),
+      el("div", {}, el("b", { text: "Gold Road" }), el("span", { text: next ? `${next.gold - g} more gold to ${roadInfo(next).label}` : "Road complete. Legend!" })),
+      el("em", { text: g.toLocaleString() }),
+    ),
+    track,
+    el("p", { class: "road-note", text: "Gold medals come only from winning races against real players. Spending them never moves you back." }),
+  );
+  // keep the next reward in view
+  requestAnimationFrame(() => {
+    const cur = track.querySelector(".rnode.ready") || track.querySelector(".rnode.future");
+    if (cur) track.scrollLeft = cur.offsetLeft - track.clientWidth / 2 + cur.clientWidth / 2;
+  });
+  const dot = document.querySelector(`.htab[data-page="${PAGE.compete}"] .dot`);
+  if (dot) dot.hidden = !road.ready().length;
+}
+
 function renderCompete() {
   const w = leagueWindow();
   const st = leagueState();
@@ -1867,6 +1999,7 @@ function renderStoreDot() {
   dot.hidden = !pass;
 }
 renderCompete();
+renderGoldRoad();
 
 function leaveToHome(message = "") {
   game.mode = "home";
