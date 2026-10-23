@@ -192,7 +192,8 @@ const POWER_INFO = {
 const WAVE_S = 4; // brain wave: controls flipped this long
 const GLUE_SLOW = 0.45; // speed factor while stuck in glue
 const STAGGER_S = 0.7; // after a punch
-const TOUCH = matchMedia("(pointer: coarse)").matches;
+// phones and tablets (iPads can report a fine pointer, so check for touch too)
+const TOUCH = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0 || "ontouchstart" in window;
 const BOOST_S = 1.6;
 const LANE_SWITCH_SPEED = 9; // lanes per second
 const SEND_MS = 100;
@@ -4234,7 +4235,7 @@ function enterRace(v) {
   game.lastBlast = Math.max(0, ...(v.blasts || []).map((b) => b.id));
   game.coinGot = new Set();
   renderModeHud();
-  const touch = matchMedia("(pointer: coarse)").matches;
+  const touch = TOUCH;
   $("#swipeTut").hidden = !(touch && !local.getItem("lr:tutDone"));
   const hint = $("#controlsHint");
   // phones get the swipe card the first time; after that the HUD speaks for itself
@@ -5852,7 +5853,7 @@ function grabBox(kind = rollPower()) {
   me.items.push(kind);
   flyToSlot(kind);
   const aims = kind === "banana" || kind === "bowling";
-  showPowerToast(kind, me.items.length > 1 || me.power ? "Saved for later" : TOUCH ? "Tap the power-up to use it" : aims ? "E ahead · Q behind · 1-4 picks a lane" : "Press E to use it");
+  showPowerToast(kind, me.items.length > 1 || me.power ? "Saved for later" : TOUCH ? "Tap the power-up to use it" : aims ? "E ahead · Q behind" : "Press E to use it");
   renderPower();
   return kind;
 }
