@@ -1343,3 +1343,16 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .chest-btn { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; font-size: 22px; }
 .chest-btn img { width: 44px; height: 40px; object-fit: contain; }
 .career-list .quest { margin-left: 8px; }
+
+/* settings */
+.set-sheet { width: min(400px, 100%); }
+.set-list { display: grid; gap: 8px; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.95); color: #1d1f3a; box-shadow: 0 4px 0 #121c63; cursor: pointer; text-align: left; font: inherit; border: 0; width: 100%; }
+.set-row span { display: grid; }
+.set-row b { font-weight: 900; font-size: 16px; }
+.set-row small { font-weight: 700; font-size: 12px; color: #5a6489; }
+.set-row i { font-style: normal; font-size: 26px; font-weight: 900; color: #3156e0; }
+.set-row input { appearance: none; -webkit-appearance: none; width: 54px; height: 32px; flex: none; border-radius: 999px; background: #c9cfe6; position: relative; cursor: pointer; transition: background 0.2s; }
+.set-row input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); transition: transform 0.2s; }
+.set-row input:checked { background: #2fae52; }
+.set-row input:checked::after { transform: translateX(22px); }

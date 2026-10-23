@@ -269,6 +269,21 @@
       </div>
     </div>
 
+    <!-- SETTINGS -->
+    <div id="setModal" class="modal gmodal" hidden>
+      <div class="gsheet set-sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+        <div class="ribbon"><h2 id="setTitle">Settings</h2></div>
+        <button id="setClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div class="set-list">
+          <label class="set-row"><span><b>🔊 Sound</b><small>Jumps, pickups, countdown</small></span><input type="checkbox" id="setSound" /></label>
+          <label class="set-row"><span><b>📳 Vibration</b><small>Buzz on hits and big moments</small></span><input type="checkbox" id="setBuzz" /></label>
+          <label class="set-row"><span><b>🔋 Battery saver</b><small>Sharper picture off, smoother on older phones</small></span><input type="checkbox" id="setLow" /></label>
+          <button id="setCountry" class="set-row btnrow" type="button"><span><b>🌍 Country</b><small id="setCountryName">Not set</small></span><i>›</i></button>
+          <button id="setTut" class="set-row btnrow" type="button"><span><b>👆 How to run</b><small>Show the swipe guide again next race</small></span><i>›</i></button>
+        </div>
+      </div>
+    </div>
+
     <!-- SEASON PASS -->
     <div id="passModal" class="modal gmodal" hidden>
       <div class="grays" aria-hidden="true"></div>

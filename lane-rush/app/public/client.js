@@ -312,6 +312,21 @@ if (!playerId) {
 
 // ── sound (tiny WebAudio synth, no files) ───────────────────────────────────
 
+/** Player settings (sound, vibration, battery saver), saved on this device. */
+function prefs() {
+  try {
+    return JSON.parse(local.getItem("lr:prefs") || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+function setPref(k, v) {
+  local.setItem("lr:prefs", JSON.stringify({ ...prefs(), [k]: v }));
+}
+function buzz(pattern) {
+  if (prefs().buzz !== false && navigator.vibrate) navigator.vibrate(pattern);
+}
+
 const sfx = (() => {
   let ctx = null;
   const ensure = () => {
@@ -324,6 +339,7 @@ const sfx = (() => {
     return ctx;
   };
   function tone(freq, dur, type = "square", vol = 0.12, slide = 0) {
+    if (prefs().sound === false) return;
     const c = ensure();
     if (!c) return;
     const o = c.createOscillator();
@@ -607,7 +623,41 @@ $("#countryClose").addEventListener("click", closeCountry);
 countryModal.addEventListener("click", (e) => e.target === countryModal && closeCountry());
 window.addEventListener("keydown", (e) => e.key === "Escape" && !countryModal.hidden && closeCountry());
 for (const chip of document.querySelectorAll(".country-chip")) chip.addEventListener("click", () => openCountry("Country you cheer for"));
-$("#settingsBtn").addEventListener("click", () => openCountry("Settings · your country"));
+// settings sheet
+const setModal = $("#setModal");
+function renderSettings() {
+  const p = prefs();
+  $("#setSound").checked = p.sound !== false;
+  $("#setBuzz").checked = p.buzz !== false;
+  $("#setLow").checked = Boolean(p.low);
+  $("#setCountryName").textContent = myCountry() ? `${flagOf(myCountry())} ${countryName(myCountry())}` : "Not set";
+}
+$("#settingsBtn").addEventListener("click", () => {
+  renderSettings();
+  setModal.hidden = false;
+});
+$("#setClose").addEventListener("click", () => (setModal.hidden = true));
+setModal.addEventListener("click", (e) => e.target === setModal && (setModal.hidden = true));
+$("#setSound").addEventListener("change", (e) => {
+  setPref("sound", e.target.checked);
+  if (e.target.checked) sfx.pickup();
+});
+$("#setBuzz").addEventListener("change", (e) => {
+  setPref("buzz", e.target.checked);
+  buzz(40);
+});
+$("#setLow").addEventListener("change", (e) => {
+  setPref("low", e.target.checked);
+  applyQuality();
+});
+$("#setCountry").addEventListener("click", () => {
+  setModal.hidden = true;
+  openCountry("Country you cheer for");
+});
+$("#setTut").addEventListener("click", () => {
+  local.setItem("lr:tutDone", "");
+  toast("The swipe guide shows on your next race");
+});
 renderCountryChips();
 
 // ── cosmetics: trails, celebrations, emotes ──
@@ -1847,7 +1897,7 @@ try {
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 400);
 if (renderer) {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, prefs().low ? 1 : 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
@@ -1860,6 +1910,11 @@ if (renderer) {
  * session, so it can't oscillate.
  */
 const QUALITY_STEPS = [2, 1.6, 1.3, 1];
+function applyQuality() {
+  if (!renderer) return;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, prefs().low ? 1 : QUALITY_STEPS[qualityIdx]));
+  resize();
+}
 let qualityIdx = 0;
 let slowFor = 0;
 function adaptQuality(dt) {
@@ -4055,7 +4110,7 @@ function hit(kind) {
   me.vy = 0;
   shake = 0.4;
   sfx.hit();
-  if (navigator.vibrate) navigator.vibrate(80);
+  buzz(80);
   const hintText = {
     hurdle: "Jump! ↑",
     gate: "Slide! ↓",
@@ -4885,7 +4940,10 @@ function claimPass(level, track, tile) {
   } else if (r.item) {
     giveItem(r.item);
     renderEmoteRows();
-  } else if (r.char) giveItem(r.char);
+  } else if (r.char) {
+    giveItem(r.char);
+    renderCollPill();
+  }
   else if (r.pack) {
     const pk = PACKS.find((x) => x.id === r.pack);
     passModal.hidden = true;
@@ -5242,7 +5300,7 @@ function knockOut(why = "") {
   renderPower();
   shake = 0.5;
   sfx.hit();
-  if (navigator.vibrate) navigator.vibrate([80, 60, 120]);
+  buzz([80, 60, 120]);
   banner(why === "brain" ? "🧠 THE BRAIN GOT YOU!" : why === "bomb" ? "💥 KABOOM! OUT!" : "OUT!", 1600);
   sendPos(true);
   const hint = $("#controlsHint");
@@ -5585,7 +5643,7 @@ function modeView(v) {
     sfx.hit();
     if (b.holder === playerId) {
       shake = 0.6;
-      if (navigator.vibrate) navigator.vibrate([60, 40, 160]);
+      buzz([60, 40, 160]);
       renderHearts(true);
       if (!me.out) {
         me.stumbleT = STUMBLE_S;
@@ -5655,7 +5713,7 @@ function applyWarpsAndPunches(v) {
     me.staggerT = STAGGER_S;
     shake = 0.35;
     sfx.hit();
-    if (navigator.vibrate) navigator.vibrate(60);
+    buzz(60);
     banner("🥊 PUNCHED!", 800);
   }
 }
@@ -5738,7 +5796,7 @@ $("#powerSlot").addEventListener("click", () => useItem());
 for (const [id, dir] of [["#throwAhead", 1], ["#throwBack", -1]]) {
   $(id).addEventListener("click", (e) => {
     e.stopPropagation();
-    if (navigator.vibrate) navigator.vibrate(15);
+    buzz(15);
     useItem(me.lane, dir);
   });
 }
