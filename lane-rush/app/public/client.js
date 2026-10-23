@@ -3313,14 +3313,14 @@ const world = (() => {
     slab.position.y = 0.27;
     barrier.add(slab);
     for (let z = -40; z < TRACK_LEN + 140; z += 20) for (const side of [-1, 1]) add(barrier, side * (edge - 0.1), 0, z, 1, 0);
-    for (let z = -50; z < TRACK_LEN + 160; z += 16) for (const side of [-1, 1]) add(P.cityLamp, side * (edge + 1.2), MEADOW_Y, z, 1, side > 0 ? Math.PI : 0);
+    for (let z = -50; z < TRACK_LEN + 160; z += 22) for (const side of [-1, 1]) add(P.cityLamp, side * (edge + 1.2), MEADOW_Y, z, 1, side > 0 ? Math.PI : 0);
     for (const side of [-1, 1]) {
       const face = side > 0 ? -Math.PI / 2 : Math.PI / 2; // fronts toward the street
       for (let z = -60; z < TRACK_LEN + 170; ) {
         const tall = r() < 0.45;
         add(tall ? P.cityTower : P.cityShop, side * (edge + (tall ? 12 : 8) + r() * 3), MEADOW_Y, z, 0.9 + r() * 0.25, face + (r() - 0.5) * 0.15);
-        if (r() < 0.5) add(P.cityTower, side * (edge + 28 + r() * 10), MEADOW_Y, z + 5, 1.1 + r() * 0.4, face);
-        z += tall ? 13 + r() * 4 : 11 + r() * 4;
+        if (r() < 0.3) add(P.cityTower, side * (edge + 30 + r() * 10), MEADOW_Y, z + 6, 1.1 + r() * 0.4, face);
+        z += tall ? 17 + r() * 5 : 14 + r() * 4;
       }
     }
   }
@@ -3357,7 +3357,7 @@ const world = (() => {
     p1.position.set(0, 0.4, 4.9);
     rail.add(bar, p1);
     for (let z = -40; z < TRACK_LEN + 140; z += 10) for (const side of [-1, 1]) add(rail, side * (edge - 0.1), 0, z, 1, 0);
-    for (let z = -60; z < TRACK_LEN + 170; z += 9 + r() * 8) {
+    for (let z = -60; z < TRACK_LEN + 170; z += 12 + r() * 10) {
       for (const side of [-1, 1]) {
         const roll = r();
         if (roll < 0.22) add(P.spaceDome, side * (edge + 10 + r() * 12), MEADOW_Y, z, 0.8 + r() * 0.5, r() * Math.PI * 2);
