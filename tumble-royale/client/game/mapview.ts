@@ -158,6 +158,50 @@ export class MapView {
     }
 
     this.buildDecor(map, detail, shadows);
+    this.buildWind(map);
+  }
+
+  // Wind zones: drifting streaks show direction and strength (only while the gust is on).
+  private wind: { zone: MapDef['wind'][number]; mesh: THREE.InstancedMesh; seeds: Float32Array }[] = [];
+  private buildWind(map: MapDef) {
+    const geo = new THREE.BoxGeometry(0.06, 0.06, 1.8);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false });
+    for (const zone of map.wind) {
+      const n = 36;
+      const mesh = new THREE.InstancedMesh(geo, mat, n);
+      const seeds = new Float32Array(n * 3);
+      for (let i = 0; i < n * 3; i++) seeds[i] = Math.random();
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+      this.wind.push({ zone, mesh, seeds });
+    }
+  }
+  private updateWind(t: number) {
+    const d = new THREE.Object3D();
+    for (const w of this.wind) {
+      const z = w.zone;
+      let on = true;
+      if (z.cycle) { const per = z.cycle.on + z.cycle.off; const u = (((t + z.cycle.phase) % per) + per) % per; on = u < z.cycle.on; }
+      w.mesh.visible = on;
+      if (!on) continue;
+      const f = z.force, fl = Math.hypot(f.x, f.y, f.z) || 1;
+      const dx = f.x / fl, dy = f.y / fl, dz = f.z / fl;
+      const sx = z.max.x - z.min.x, sy = z.max.y - z.min.y, sz = z.max.z - z.min.z;
+      const speed = 4 + fl * 0.4;
+      for (let i = 0; i < w.mesh.count; i++) {
+        const a = w.seeds[i * 3], b = w.seeds[i * 3 + 1], c = w.seeds[i * 3 + 2];
+        const u = (t * speed / Math.max(sx, sz, 1) + a) % 1;
+        // travel along the force across the zone, spread on the other axes
+        let x = z.min.x + (Math.abs(dx) > 0.5 ? ((dx > 0 ? u : 1 - u) * sx) : b * sx);
+        let y = z.min.y + 0.5 + (Math.abs(dy) > 0.5 ? ((dy > 0 ? u : 1 - u) * sy) : c * Math.min(sy, 3));
+        let zz = z.min.z + (Math.abs(dz) > 0.5 ? ((dz > 0 ? u : 1 - u) * sz) : (Math.abs(dx) > 0.5 ? c : b) * sz);
+        d.position.set(x, y, zz);
+        d.lookAt(x + dx, y + dy, zz + dz);
+        d.updateMatrix();
+        w.mesh.setMatrixAt(i, d.matrix);
+      }
+      w.mesh.instanceMatrix.needsUpdate = true;
+    }
   }
 
   /** Update moving obstacles for round time `tick` (fractional ticks allowed). */
@@ -191,6 +235,7 @@ export class MapView {
         const ft = w.fallTime(b, t);
         if (ft > 0) opacity = Math.max(0, 1 - ft / 2.5);
       }
+      if (d.activeFrom !== undefined && t - d.activeFrom < 1) opacity = Math.max(0.1, t - d.activeFrom);
       if (d.cycle) {
         const c = d.cycle, per = c.on + c.off;
         const u = (((t + c.phase) % per) + per) % per;
@@ -205,6 +250,7 @@ export class MapView {
       m.mesh.matrixWorldNeedsUpdate = true;
     }
     if (this.killPlane) this.killPlane.position.y = killHeight(w.map, t) - 0.6;
+    this.updateWind(t);
     // Shadow camera follows the focus point (snapped to reduce shimmer).
     const snap = 0.5;
     const fx = Math.round(focus.x / snap) * snap, fz = Math.round(focus.z / snap) * snap;

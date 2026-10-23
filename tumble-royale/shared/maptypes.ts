@@ -56,6 +56,8 @@ export interface BodyDef {
   trigger?: { delay: number; respawn?: number };
   /** Drops away this many seconds after GO (scheduled collapse). */
   fallAt?: number;
+  /** Not present until this many seconds after GO (escalating hazards); it rises into place over 1 s. */
+  activeFrom?: number;
   /** Clones of this body travel along a polyline: `count` copies, one every `interval` seconds. */
   path?: { pts: V3[]; speed: number; interval: number; count: number; phase?: number };
   visual: VisualDef;

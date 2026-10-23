@@ -82,7 +82,7 @@ export class World {
     const m = def.motion;
     const body: Body = {
       id: this.bodies.length, def, shape: def.shape, surf: def.surf ?? Surf.Normal, knock: def.knock ?? 0,
-      moving: !!(m?.spin || m?.swing || m?.move || def.path || def.fallAt !== undefined || def.trigger || def.cycle),
+      moving: !!(m?.spin || m?.swing || m?.move || def.path || def.fallAt !== undefined || def.trigger || def.cycle || def.activeFrom !== undefined),
       clone, pathLen, pathCum, baseRot, min: v3(), max: v3(), extent: shapeExtent(def.shape),
       cTick: NaN, cP: v3(), cR: m3(),
     };
@@ -152,6 +152,7 @@ export class World {
       if (u >= c.on) return false;
     }
     if (d.fallAt !== undefined && t > d.fallAt + FALL_DURATION) return false;
+    if (d.activeFrom !== undefined && t < d.activeFrom) return false;
     if (d.trigger) {
       const tt = this.triggered.get(b.id);
       if (tt !== undefined && t > tt * DT + d.trigger.delay + FALL_DURATION) return false;

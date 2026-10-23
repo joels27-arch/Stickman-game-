@@ -1,9 +1,19 @@
 import type { MapDef } from '../maptypes';
 import type { MapMeta } from '../match';
+import { finalArena } from './arena';
+import { iceChaos } from './ice';
+import { lavaPanic } from './lava';
 import { rainbowRush } from './rainbow';
+import { skyFall } from './skyfall';
+import { spinningMadness } from './spinning';
 
 const builders: Record<string, () => MapDef> = {
   rainbow: rainbowRush,
+  spinning: spinningMadness,
+  skyfall: skyFall,
+  ice: iceChaos,
+  lava: lavaPanic,
+  arena: finalArena,
 };
 
 const cache = new Map<string, MapDef>();
