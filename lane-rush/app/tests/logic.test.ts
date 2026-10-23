@@ -476,6 +476,25 @@ describe("fair start", () => {
   });
 });
 
+describe("bot level", () => {
+  it("the host picks easy / normal / hard; easy bots are slower and clumsier than hard ones", () => {
+    expect(reject(lobbyOf(2), "p1", { type: "botlevel", level: "hard" })).toMatch(/host/);
+    expect(reject(lobbyOf(1), "p0", { type: "botlevel", level: "insane" })).toBeTruthy();
+    const run = (level: string) => {
+      let s = act(lobbyOf(1), "p0", { type: "botlevel", level });
+      expect((L.viewFor(s, "p0") as any).botLevel).toBe(level);
+      s = act(s, "p0", { type: "start", bots: true, t: T0 });
+      for (let t = 0; t <= 30_000; t += 250) s = L.applyAction(s, "__system", { type: "tick", t: s.startAt + t });
+      const bots = Object.values(s.players).filter((p: any) => p.bot) as any[];
+      return { d: bots.reduce((a, b) => a + b.d, 0) / bots.length, skill: Math.max(...bots.map((b) => b.skill)) };
+    };
+    const easy = run("easy");
+    const hard = run("hard");
+    expect(easy.skill).toBeLessThan(hard.skill);
+    expect(easy.d).toBeLessThan(hard.d);
+  });
+});
+
 describe("power-ups never cost a heart", () => {
   it("lightning trips the bots ahead in survival but leaves their hearts alone", () => {
     let s = act(lobbyOf(1), "p0", { type: "start", bots: true, t: T0 });

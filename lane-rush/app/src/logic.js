@@ -60,6 +60,15 @@ export const CUP_MODES = ["grandtour"];
 export const ROUND_OPTIONS = [1, 3, 5];
 /** What the host can put up for 1st / 2nd / 3rd (paid with 2+ real players). */
 export const PRIZES = ["none", "coins", "bigcoins", "pack"];
+/**
+ * How good the bots are (the host picks it when bots fill the room).
+ *   skill — chance to clear an obstacle they run into · pace — share of full speed
+ */
+export const BOT_LEVELS = {
+  easy: { skill: [0.8, 0.86], pace: 0.93 },
+  normal: { skill: [0.94, 0.96], pace: 0.985 },
+  hard: { skill: [0.975, 0.99], pace: 1.0 },
+};
 /** The modes a single round can be (a Party Cup is three of these). All run on the endless course. */
 export const ROUND_KINDS = ["survival", "chase", "coinrush", "potato"];
 export const isEndless = (kind) => kind !== "sprint";
@@ -1159,11 +1168,19 @@ function fillBots(state) {
       goneAt: null,
       ready: true,
       bot: true,
-      // better bots for better players
-      skill: Math.min(0.98, 0.94 + Math.min(0.025, avgRp / 100000) + r * 0.02),
+      // the host's pick: easy, normal or hard
+      skill: botSkill(state, r),
     });
     state.order.push(id);
   }
+}
+
+function botLevel(state) {
+  return BOT_LEVELS[state.botLevel] ?? BOT_LEVELS.normal;
+}
+function botSkill(state, r) {
+  const [lo, hi] = botLevel(state).skill;
+  return lo + (hi - lo) * r;
 }
 
 /** The second lane a glue puddle covers. */
@@ -1229,7 +1246,7 @@ function stepBots(state, t) {
     if ((p.stunUntil ?? 0) > t) {
       p.act = "stumble";
     } else {
-      v = runSpeed(state.kind, elapsedS) * (0.97 + roll(state.seed, bi, 1) * 0.03);
+      v = runSpeed(state.kind, elapsedS) * (0.97 + roll(state.seed, bi, 1) * 0.03) * botLevel(state).pace;
       if ((p.rocketUntil ?? 0) > t) v += survival ? SURVIVAL_ROCKET : ROCKET_SPEED - BASE_SPEED;
       if ((p.slowUntil ?? 0) > t) v *= 0.55;
       if (state.bomb?.holder === id) v *= 1.15; // the bomb holder runs a little faster, to catch someone
@@ -1484,11 +1501,13 @@ export function validateAction(state, playerId, action) {
       return { ok: true };
     }
     case "rounds":
-    case "prize": {
+    case "prize":
+    case "botlevel": {
       if (state.phase !== "lobby") return { ok: false, error: "only in the lobby" };
       if (state.host !== playerId) return { ok: false, error: "Only the host can change that" };
       if (action.type === "rounds" && !ROUND_OPTIONS.includes(action.rounds)) return { ok: false, error: "bad rounds" };
       if (action.type === "prize" && !PRIZES.includes(action.prize)) return { ok: false, error: "bad prize" };
+      if (action.type === "botlevel" && !Object.hasOwn(BOT_LEVELS, action.level)) return { ok: false, error: "bad level" };
       return { ok: true };
     }
     case "ready": {
@@ -1704,6 +1723,14 @@ export function applyAction(state0, playerId, action) {
       break;
     case "prize":
       state.prize = action.prize;
+      break;
+    case "botlevel":
+      state.botLevel = action.level;
+      // bots already waiting in the lobby take the new level too
+      ids(state).forEach((id, i) => {
+        const p = state.players[id];
+        if (p.bot) p.skill = botSkill(state, roll(state.seed + state.round, i + 1, 3));
+      });
       break;
     case "start":
       state.cup = newCup(state.mode, t, state.rounds ?? 1);
@@ -1945,6 +1972,7 @@ export function viewFor(state, playerId) {
     kind: state.kind ?? "survival",
     map: state.map ?? "meadow",
     rounds: state.rounds ?? 1,
+    botLevel: state.botLevel ?? "normal",
     prize: state.prize ?? "none",
     raceMap: state.raceMap ?? state.map ?? "meadow",
     courseBoost: state.courseBoost ?? 0,

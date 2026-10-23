@@ -1929,3 +1929,15 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
   .podium li { grid-template-columns: 44px 38px minmax(0, 1fr) auto auto; gap: 6px; }
   .podium .tm { display: grid; font-size: 16px; }
 }
+.chip-pick[hidden], .pick-title[hidden] { display: none; }
+
+/* runners still in it (Survival, Brain Chase, Hot Potato) */
+.alive-chip { flex: none; display: flex; align-items: center; height: 40px; padding: 0 10px; border-radius: 14px; background: rgba(8, 12, 30, 0.78); border: 2px solid #ff8fb8; color: #fff; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 20px; white-space: nowrap; }
+.alive-chip[hidden] { display: none; }
+.alive-chip.drop { animation: aliveDrop 0.9s ease-out; }
+@keyframes aliveDrop { 0% { transform: scale(1.35); background: #c21e3a; } 100% { transform: none; } }
+
+/* crash: a quick red glow round the edges of the screen */
+.hit-fx { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 40, 40, 0.55) 100%); }
+.hit-fx.on { animation: hitFx 0.55s ease-out; }
+@keyframes hitFx { 0% { opacity: 1; } 100% { opacity: 0; } }

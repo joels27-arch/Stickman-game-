@@ -193,6 +193,8 @@
             <h3 class="pick-title">Prize for the top 3</h3>
             <div id="prizePick" class="chip-pick prize-pick"></div>
             <p id="prizeNote" class="pick-note"></p>
+          <h3 class="pick-title" id="botLevelTitle">Bot opponents</h3>
+          <div id="botLevelPick" class="chip-pick"></div>
           </div>
           <h3 class="pick-title">Choose your runner</h3>
           <div id="lobbySpot" class="spotlight"></div>
@@ -244,6 +246,7 @@
         <button id="quitBtn" class="quit-btn" type="button" aria-label="Leave the race">✕</button>
         <div id="place" class="place">1<sup>st</sup></div>
         <div class="track-bar"><div id="dots"></div><div class="flag">🏁</div><div id="distText" class="dist-text"></div></div>
+        <div id="aliveChip" class="alive-chip" hidden title="Runners still in the race"></div>
         <div id="timer" class="timer">0.0</div>
       </div>
       <div id="hearts" class="hearts"></div>
@@ -256,6 +259,7 @@
       <div id="countdown" class="countdown"></div>
       <div id="banner" class="banner"></div>
       <div id="zapFlash" class="zap-flash"></div>
+      <div id="hitFx" class="hit-fx"></div>
       <div id="frostFx" class="frost-fx"></div>
       <div id="cloudHud" class="cloud-hud" hidden></div>
       <div id="modeHud" class="mode-hud" hidden></div>

@@ -391,7 +391,7 @@ const sfx = (() => {
   let ctx = null;
   let loading = false;
   const buffers = new Map();
-  const SAMPLES = ["tap", "coin", "unlock", "boom", "whoosh", "cheer", "slip", "thunder", "pack", "bonk"];
+  const SAMPLES = ["tap", "coin", "unlock", "boom", "whoosh", "cheer", "slip", "thunder", "pack", "bonk", "dizzy"];
   const MUSIC = { menu: 0.3, race1: 0.24, race2: 0.24, race3: 0.24 }; // loop volumes
   const RACE_TRACKS = ["race1", "race2", "race3"]; // a different one each race
   const ensure = () => {
@@ -499,7 +499,8 @@ const sfx = (() => {
     go: () => tone(880, 0.4, "square", 0.12),
     jump: () => tone(300, 0.2, "triangle", 0.15, 500),
     slide: () => tone(240, 0.22, "sawtooth", 0.05, -120),
-    hit: () => sample("bonk", 0.8) || tone(140, 0.35, "sawtooth", 0.18, -90),
+    hit: () => sample("bonk", 0.9) || tone(140, 0.35, "sawtooth", 0.18, -90),
+    dizzy: () => sample("dizzy", 0.55) || true,
     slip: () => sample("slip", 0.8) || tone(140, 0.35, "sawtooth", 0.18, -90),
     boom: () => sample("boom", 0.8) || tone(90, 0.6, "sawtooth", 0.2, -50),
     boost: () => sample("whoosh", 0.6) || tone(400, 0.35, "triangle", 0.14, 900),
@@ -2236,6 +2237,20 @@ function renderLobby(v) {
     }),
     ...(gm === "grandtour" ? [el("span", { class: "chip on fixed", text: `${rounds} rounds · fixed` })] : []),
   );
+  // how good the bots are: only when bots fill the empty spots
+  const withBots = botsOn() && v.players.length < 4;
+  $("#botLevelTitle").hidden = $("#botLevelPick").hidden = !withBots;
+  if (withBots) {
+    const lv = v.botLevel ?? "normal";
+    $("#botLevelPick").replaceChildren(
+      ...[["easy", "😊 Easy"], ["normal", "🙂 Normal"], ["hard", "😈 Hard"]].map(([key, label]) => {
+        const b = el("button", { class: `chip${lv === key ? " on" : ""}`, type: "button", text: label });
+        b.disabled = !isHost;
+        b.addEventListener("click", () => lv !== key && act({ type: "botlevel", level: key }));
+        return b;
+      }),
+    );
+  }
   const prize = v.prize ?? "none";
   $("#prizePick").replaceChildren(
     ...Object.entries(PRIZE_INFO).map(([key, info]) => {
@@ -2416,7 +2431,6 @@ function renderResults(v) {
         : p.finish !== null
           ? `${p.hits} bump${p.hits === 1 ? "" : "s"}`
           : `${Math.round(p.d)} m of ${TRACK_LEN} m`;
-    const extra = p.sc ? ` · ${p.sc} style${p.cb > 1 ? ` · best combo ${p.cb}` : ""}` : "";
     // the number that decides this mode (no more "DNF" for modes without a finish line)
     const outTime = p.outAt !== null ? fmtTime(p.outAt - v.startAt) : "";
     const time = p.left
@@ -2443,7 +2457,7 @@ function renderResults(v) {
         { class: p.id === playerId ? "me" : "" },
         el("span", { class: `pl p${Math.min(i + 1, 4)}`, text: PLACE[i] ?? `${i + 1}th` }),
         el("img", { src: portrait(p.char), alt: "" }),
-        el("span", { class: "who", text: withFlag(p.name, p.country) + (p.bot ? " 🤖" : "") + (p.id === playerId ? " (you)" : "") }, el("small", { text: detail + extra })),
+        el("span", { class: "who", text: withFlag(p.name, p.country) + (p.bot ? " 🤖" : "") + (p.id === playerId ? " (you)" : "") }, el("small", { text: detail })),
         el("span", { class: "tm" }, time, pts),
         earn,
       ),
@@ -2732,6 +2746,18 @@ const world = (() => {
   grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
   grassTex.anisotropy = 4;
   const GROUND_LEN = TRACK_LEN + 900;
+  // the moon's dusty, cratered ground (Higgsfield texture), loaded the first time Space is picked
+  let moonTexture = null;
+  function moonTex() {
+    if (!moonTexture) {
+      moonTexture = texLoader.load("/assets/moon_tile.jpg");
+      moonTexture.colorSpace = THREE.SRGBColorSpace;
+      moonTexture.wrapS = moonTexture.wrapT = THREE.RepeatWrapping;
+      moonTexture.anisotropy = 4;
+      moonTexture.repeat.set(700 / 14, GROUND_LEN / 14);
+    }
+    return moonTexture;
+  }
   grassTex.repeat.set(700 / 6, GROUND_LEN / 6);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, GROUND_LEN), new THREE.MeshLambertMaterial({ map: grassTex }));
   ground.rotation.x = -Math.PI / 2;
@@ -3368,6 +3394,36 @@ const world = (() => {
     }
     return emojiTexCache.get(e);
   }
+  /** After a crash: three stars circle the runner's head until they're back up. */
+  function dizzy(runner, secs) {
+    if (runner.dizzy) runner.group.remove(runner.dizzy);
+    const g = new THREE.Group();
+    for (let i = 0; i < 3; i++) {
+      const st = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex("⭐"), depthTest: false, transparent: true }));
+      st.scale.set(0.4, 0.4, 1);
+      st.renderOrder = 11;
+      g.add(st);
+    }
+    g.position.y = CHAR_H + 0.2;
+    runner.group.add(g);
+    runner.dizzy = g;
+    const t0 = performance.now();
+    const step = () => {
+      if (runner.dizzy !== g) return;
+      const k = (performance.now() - t0) / 1000;
+      if (k > secs) {
+        runner.group.remove(g);
+        runner.dizzy = null;
+        return;
+      }
+      g.children.forEach((st, i) => {
+        const ang = k * 7 + i * 2.094;
+        st.position.set(Math.cos(ang) * 0.45, Math.sin(k * 9 + i) * 0.07, Math.sin(ang) * 0.45);
+      });
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
   /** An emote floats up over a runner's head and fades. */
   function emoteBubble(runner, e) {
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex(e), depthTest: false, transparent: true }));
@@ -3437,7 +3493,7 @@ const world = (() => {
     beach: { color: "#f0dca4", tex: false },
     city: { color: "#7d828c", tex: false },
     stadium: { color: "#8fd06a", tex: true },
-    space: { color: "#9497a8", tex: false },
+    space: { color: "#ffffff", tex: "moon" },
   };
   function mapReady(map) {
     if (BUILT_MAPS.has(map)) return Boolean(assets.props[`${map}Tile`]);
@@ -3457,7 +3513,7 @@ const world = (() => {
     setSky(map);
     const look = MAP_GROUND[map];
     ground.material.color.set(look.color);
-    ground.material.map = look.tex ? grassTex : null;
+    ground.material.map = look.tex === "moon" ? moonTex() : look.tex ? grassTex : null;
     ground.material.needsUpdate = true;
     if (!sharedBuilt) buildShared();
   }
@@ -3471,29 +3527,22 @@ const world = (() => {
   let spaceSkyBuilt = false;
   function buildSpaceSky() {
     spaceSkyBuilt = true;
-    let s = 777;
-    const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-    const pts = new Float32Array(1800 * 3);
-    for (let i = 0; i < 1800; i++) {
-      const th = r() * Math.PI * 2;
-      const ph = Math.acos(r() * 1.6 - 0.6); // mostly above the horizon
-      pts[i * 3] = 260 * Math.sin(ph) * Math.cos(th);
-      pts[i * 3 + 1] = 260 * Math.cos(ph) - 20;
-      pts[i * 3 + 2] = 260 * Math.sin(ph) * Math.sin(th);
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(pts, 3));
-    spaceSky.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: "#ffffff", size: 1.5, sizeAttenuation: true, fog: false })));
-    const planet = new THREE.Mesh(new THREE.SphereGeometry(34, 40, 28), new THREE.MeshBasicMaterial({ color: "#ff9d5c", fog: false }));
-    planet.position.set(-90, 70, -220);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(46, 64, 64), new THREE.MeshBasicMaterial({ color: "#ffd9a8", side: THREE.DoubleSide, transparent: true, opacity: 0.75, fog: false }));
-    ring.position.copy(planet.position);
-    ring.rotation.set(1.2, 0.3, 0.4);
-    const earth = new THREE.Mesh(new THREE.SphereGeometry(14, 32, 24), new THREE.MeshBasicMaterial({ color: "#3d8bff", fog: false }));
-    earth.position.set(110, 46, -200);
-    const glow = new THREE.Mesh(new THREE.SphereGeometry(15.5, 32, 24), new THREE.MeshBasicMaterial({ color: "#8fd0ff", transparent: true, opacity: 0.25, fog: false }));
-    glow.position.copy(earth.position);
-    spaceSky.add(planet, ring, earth, glow);
+    // a painted Higgsfield panorama (ringed planet, earth, nebulae) wrapped round the world
+    texLoader.load("/assets/space_pano.jpg", (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = THREE.RepeatWrapping;
+      t.repeat.set(2, 1);
+      const R = 300;
+      const H = ((2 * Math.PI * R) / 2) * (t.image.height / t.image.width);
+      const cyl = new THREE.Mesh(
+        new THREE.CylinderGeometry(R, R, H, 64, 1, true),
+        new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, fog: false, depthWrite: false }),
+      );
+      cyl.position.y = H / 2 - 60;
+      cyl.rotation.y = Math.PI * 0.62; // the ringed planet and the earth either side of the track ahead
+      cyl.renderOrder = -1;
+      spaceSky.add(cyl);
+    });
   }
   /** Sky, fog and clouds per map: space is dark and starry, everything else uses the day sky. */
   let daySky = null;
@@ -4386,6 +4435,7 @@ const world = (() => {
       return hearts;
     },
     emoteBubble,
+    dizzy,
     setBestMarker,
     ensureChar,
     hasChars,
@@ -4616,6 +4666,8 @@ function enterRace(v) {
   if (v.cup && v.phase === "countdown" && (v.mode === "random" || v.mode === "grandtour")) spinReveal(v.cup.race, game.kind, v.cup.races.length);
   game.lastBlast = Math.max(0, ...(v.blasts || []).map((b) => b.id));
   game.coinGot = new Set();
+  game.aliveShown = null;
+  $("#aliveChip").hidden = true;
   renderModeHud();
   const touch = TOUCH;
   $("#swipeTut").hidden = !(touch && !local.getItem("lr:tutDone"));
@@ -4996,11 +5048,18 @@ function hit(kind) {
   me.boostT = 0;
   me.slideT = 0;
   me.vy = 0;
-  shake = 0.4;
+  shake = 0.55;
   if (kind === "banana") sfx.slip();
   else if (kind === "fake") sfx.boom();
   else sfx.hit();
-  buzz(80);
+  setTimeout(() => sfx.dizzy(), 260);
+  buzz([60, 40, 90]);
+  // a burst of sparks where you hit, and a red flash round the screen edge
+  world.burst(laneX(me.x), 1.1, -me.d - 0.9, ["#ffffff", "#ffd23f", "#ff7a1a"], 34);
+  const hf = $("#hitFx");
+  hf.classList.remove("on");
+  void hf.offsetWidth;
+  hf.classList.add("on");
   const hintText = {
     hurdle: "Jump! ↑",
     gate: "Slide! ↓",
@@ -5033,12 +5092,7 @@ function style(text, points) {
   const mult = Math.min(5, 1 + Math.floor(me.combo / 4)); // x2 from 4 in a row, up to x5
   const gained = points * mult;
   me.score += gained;
-  challenge("style", me.score);
-  const pop = $("#stylePop");
-  pop.replaceChildren(el("b", { text }), el("span", { text: `+${gained}` }));
-  pop.classList.remove("show");
-  void pop.offsetWidth;
-  pop.classList.add("show");
+  challenge("style", me.score); // counted for missions, never shown as "+10" pop-ups
   renderCombo();
 }
 function renderCombo() {
@@ -6824,6 +6878,7 @@ function animateRunner(r, a, speed, dt, pw = "") {
   }
   // hit something: fall over backwards, then get back up
   if (a === "stumble") {
+    if (r.fallT === 0) world.dizzy(r, STUMBLE_S); // stars spin round the head while they're down
     r.fallT += dt;
     if (r.fallT < FALL_S) r.play("fall", 0.06, r.clipDuration("fall") / FALL_S);
     else r.play("getup", 0.2, r.clipDuration("getup") / GETUP_S);
@@ -7039,7 +7094,19 @@ function updateHud() {
     // still running first (furthest ahead), then whoever lasted longest
     entries.sort((a, b) => (b.outAt ?? Infinity) - (a.outAt ?? Infinity) || b.d - a.d);
     const alive = entries.filter((e) => e.outAt === null).length;
-    setText(hudEl.dist, `${Math.round(Math.min(me.d, game.len))} m${entries.length > 1 ? ` · ${alive} still running` : ""}`);
+    setText(hudEl.dist, `${Math.round(Math.min(me.d, game.len))} m`);
+    // how many are still in it, big and clear; it pulses when someone drops out
+    const chip = hudEl.alive ?? (hudEl.alive = $("#aliveChip"));
+    chip.hidden = entries.length < 2;
+    if (game.aliveShown !== alive) {
+      if (game.aliveShown != null && alive < game.aliveShown) {
+        chip.classList.remove("drop");
+        void chip.offsetWidth;
+        chip.classList.add("drop");
+      }
+      game.aliveShown = alive;
+      chip.textContent = `🏃 ${alive}/${entries.length}`;
+    }
   } else {
     entries.sort((a, b) => {
       if (a.finish !== null && b.finish !== null) return a.finish - b.finish;
