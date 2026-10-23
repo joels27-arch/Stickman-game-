@@ -1855,3 +1855,11 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .rnode small { font-size: 11px; font-weight: 800; text-align: center; line-height: 1.1; max-width: 80px; }
 .rnode.ready small { color: #ffd23f; font-family: var(--display); font-size: 14px; text-transform: uppercase; }
 .road-note { margin: 4px 2px 0; font-size: 11px; font-weight: 700; opacity: 0.7; }
+
+/* leave the race: a small ✕ before the place badge, and its confirm sheet */
+.quit-btn { flex: none; width: 40px; height: 40px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.8); background: rgba(8, 12, 30, 0.78); color: #fff; font-size: 18px; font-weight: 900; line-height: 1; cursor: pointer; pointer-events: auto; touch-action: manipulation; }
+.quit-btn:active { transform: scale(0.92); }
+.quit-sheet { width: min(360px, 100%); text-align: center; align-items: stretch; }
+.quit-sheet h2 { margin: 0; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 28px; text-transform: uppercase; }
+.quit-sheet p { margin: 0; font-weight: 700; opacity: 0.85; }
+.quit-btns { display: grid; gap: 10px; }

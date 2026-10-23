@@ -392,7 +392,8 @@ const sfx = (() => {
   let loading = false;
   const buffers = new Map();
   const SAMPLES = ["tap", "coin", "unlock", "boom", "whoosh", "cheer", "slip", "thunder", "pack", "bonk"];
-  const MUSIC = { menu: 0.3, race: 0.24 }; // loop volumes
+  const MUSIC = { menu: 0.3, race1: 0.24, race2: 0.24, race3: 0.24 }; // loop volumes
+  const RACE_TRACKS = ["race1", "race2", "race3"]; // a different one each race
   const ensure = () => {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -447,6 +448,7 @@ const sfx = (() => {
   }
   // music: one loop at a time, cross-faded
   let want = "menu";
+  let lastRace = "";
   let playing = null;
   function syncMusic() {
     if (!ctx) return;
@@ -480,6 +482,13 @@ const sfx = (() => {
   return {
     unlock: ensure,
     music(name) {
+      if (name === "race") {
+        // keep the track for the whole race; a new race draws a different one
+        if (RACE_TRACKS.includes(want)) return;
+        const pick = RACE_TRACKS.filter((n) => n !== lastRace);
+        lastRace = pick[Math.floor(Math.random() * pick.length)];
+        name = lastRace;
+      }
       want = name;
       syncMusic();
     },
@@ -525,6 +534,7 @@ const screens = { home: $("#home"), lobby: $("#lobby"), lineup: $("#lineup"), re
 function showScreen(name) {
   for (const [k, el] of Object.entries(screens)) el.classList.toggle("show", k === name);
   sfx.music(name === "race" ? "race" : "menu");
+  if (name !== "race") $("#quitModal").hidden = true;
   $("#hud").classList.toggle("show", name === "race");
 }
 
@@ -2011,6 +2021,23 @@ function leaveToHome(message = "") {
   $("#homeMsg").textContent = message;
   if (location.search) history.replaceState(null, "", location.pathname);
 }
+
+// leaving mid-race: always possible, from the ✕ in the race HUD
+const quitModal = $("#quitModal");
+$("#quitBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  sfx.tap();
+  $("#quitText").textContent = game.solo
+    ? "Your run ends here and you won't get rewards for it."
+    : "The race keeps going without you, and you won't get rewards for it.";
+  quitModal.hidden = false;
+});
+$("#quitStay").addEventListener("click", () => (quitModal.hidden = true));
+quitModal.addEventListener("click", (e) => e.target === quitModal && (quitModal.hidden = true));
+$("#quitGo").addEventListener("click", () => {
+  quitModal.hidden = true;
+  leaveLobby();
+});
 
 function leaveLobby() {
   act({ type: "leave" });

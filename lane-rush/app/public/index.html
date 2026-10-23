@@ -233,6 +233,7 @@
     <!-- RACE HUD -->
     <section id="hud" class="hud">
       <div class="hud-top">
+        <button id="quitBtn" class="quit-btn" type="button" aria-label="Leave the race">✕</button>
         <div id="place" class="place">1<sup>st</sup></div>
         <div class="track-bar"><div id="dots"></div><div class="flag">🏁</div><div id="distText" class="dist-text"></div></div>
         <div id="timer" class="timer">0.0</div>
@@ -283,6 +284,18 @@
       </div>
       <div id="netWarn" class="net-warn">Reconnecting…</div>
     </section>
+
+    <!-- LEAVE THE RACE: always one tap away -->
+    <div id="quitModal" class="modal" hidden>
+      <div class="sheet quit-sheet" role="dialog" aria-modal="true" aria-labelledby="quitTitle">
+        <h2 id="quitTitle">Leave the race?</h2>
+        <p id="quitText">The race keeps going without you, and you won't get rewards for it.</p>
+        <div class="quit-btns">
+          <button id="quitStay" class="btn big go" type="button">Keep running</button>
+          <button id="quitGo" class="btn big ghost" type="button">Leave race</button>
+        </div>
+      </div>
+    </div>
 
     <!-- RESULTS -->
     <section id="results" class="screen">
