@@ -1832,7 +1832,7 @@ function renderResults(v) {
     reward.append(el("img", { src: MEDAL_IMG[mine.medal], alt: "" }), el("span", { text: `+1 ${mine.medal} medal` }));
     if (fresh) sfx.boost();
   } else if (cup && !cupDone) {
-    reward.append(el("span", { class: "nomedal", text: `+${CUP_POINTS[v.standings.indexOf(playerId)] ?? 0} points · medals are paid after race ${cup.races.length}` }));
+    reward.append(el("span", { class: "nomedal", text: `+${CUP_POINTS[v.standings.indexOf(playerId)] ?? 0} points · medals are paid after round ${cup.races.length}` }));
   } else if (myPlace && v.players.filter((p) => !p.bot).length >= MIN_RACERS_FOR_MEDALS) {
     reward.append(el("span", {
       class: "nomedal",
