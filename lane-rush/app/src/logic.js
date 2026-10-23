@@ -47,11 +47,15 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  *                into someone; it costs whoever holds it a heart (3 = out)
  *   cup        — Party Cup: three different rounds of the above, in a random
  *                order; placings score CUP_POINTS, most points wins
+ *   rushcup    — Coin Rush Cup tournament: three Coin Rush rounds, scored like a cup
+ *   grandtour  — Grand Tour tournament: every round kind once, in a random order
  * Empty spots are filled with bots. (The old 700 m "sprint" race still runs
  * if a kind is "sprint", but no mode starts one any more.)
  * `state.mode` is what the host picked; `state.kind` is the race being run.
  */
-export const GAME_MODES = ["survival", "chase", "coinrush", "potato", "cup"];
+export const GAME_MODES = ["survival", "chase", "coinrush", "potato", "cup", "rushcup", "grandtour"];
+/** Modes played over several rounds with a points table. */
+export const CUP_MODES = ["cup", "rushcup", "grandtour"];
 /** The modes a single round can be (a Party Cup is three of these). All run on the endless course. */
 export const ROUND_KINDS = ["survival", "chase", "coinrush", "potato"];
 export const isEndless = (kind) => kind !== "sprint";
@@ -821,15 +825,21 @@ function knockOut(p, t) {
   p.act = "out";
   p.pw = "";
 }
-/** Three different modes in a random order, decided when the cup starts. */
-function newCup(t) {
+/**
+ * The rounds of a multi-round mode, decided when it starts: Party Cup = three
+ * different kinds, Coin Rush Cup = three Coin Rush rounds, Grand Tour = every
+ * kind once. Anything else isn't a cup.
+ */
+function newCup(mode, t) {
+  if (!CUP_MODES.includes(mode)) return null;
+  if (mode === "rushcup") return { race: 1, points: {}, races: Array(CUP_ROUNDS).fill("coinrush") };
   const r = rng(Math.floor(t) % 2147483647);
   const pool = [...ROUND_KINDS];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(r() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return { race: 1, points: {}, races: pool.slice(0, CUP_ROUNDS) };
+  return { race: 1, points: {}, races: mode === "grandtour" ? pool : pool.slice(0, CUP_ROUNDS) };
 }
 /** Coin Rush: lines of coins in the gaps between obstacle rows, in a lane that's open on both sides. */
 const coinCache = new Map();
@@ -1561,7 +1571,7 @@ export function applyAction(state0, playerId, action) {
       state.map = action.map;
       break;
     case "start":
-      state.cup = state.mode === "cup" ? newCup(t) : null;
+      state.cup = newCup(state.mode, t);
       state.botFill = action.bots !== false;
       if (state.botFill) fillBots(state);
       startRace(state, t);
@@ -1570,7 +1580,7 @@ export function applyAction(state0, playerId, action) {
       state.rematch = [...new Set([...(state.rematch ?? []), playerId])];
       const voters = present(state).filter((id) => !state.players[id].bot);
       if (voters.every((id) => state.rematch.includes(id))) {
-        state.cup = state.mode === "cup" ? newCup(t) : null;
+        state.cup = newCup(state.mode, t);
         startRace(state, t);
       }
       break;

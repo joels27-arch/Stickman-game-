@@ -85,8 +85,29 @@ buying, and can only run once per confirmation.
 All progress lives in the browser (`localStorage`); nothing is lost on update
 because new keys are added alongside the old ones.
 
+## Home pages
+
+The home screen is three pages with a tab bar (swipe or tap): **Tournaments**
+(left), **Play** (middle, the default) and **Shop** (right: Season Pass,
+shop tabs, Collection, Missions).
+
+## Tournaments
+
+| Event | When | Format | Rewards |
+|---|---|---|---|
+| Weekend League | Fri 18:00 → Sun 24:00 (local time) | 10 matches, any mode (a random mode per match from the page); places score 10 / 6 / 3 / 1 | Tiers at 20 / 45 / 70 / 90 pts: 300, 700 + bronze, 1,200 + silver, 2,000 + gold coins |
+| Coin Rush Cup | Always | 3 Coin Rush rounds on 3 maps, cup points | Daily prize 300 / 150 / 75 |
+| Grand Tour | Always | Survival, Brain Chase, Coin Rush and Hot Potato once each | Daily prize 500 / 250 / 120 |
+
+* Any race against at least one other runner (bots count) during the weekend
+  is a league match, until 10 are played. Rewards left unclaimed are paid out
+  automatically when the next weekend starts.
+* Tournament prizes are paid once per day for your best finish; finishing
+  higher later the same day pays the difference. Rounds also pay normal race
+  coins (×2, as in every cup).
+
 ## Modes
 
 Survival (main), Brain Chase, Coin Rush, Hot Potato, Party Cup (3 random rounds
-of the others). Play solo = Endless Run alone, or any mode against 3 bots.
+of the others), and the two tournament formats above (`rushcup`, `grandtour`). Play solo = Endless Run alone, or any mode against 3 bots.
 Sprint and Tournament were removed at the player's request.

@@ -33,6 +33,8 @@ import {
   runSpeed,
   BANANA_BEHIND_M,
   CUP_POINTS,
+  CUP_MODES,
+  ROUND_KINDS,
   MAPS,
   EMOTES,
   BANANA_AHEAD_M,
@@ -110,7 +112,10 @@ const GAME_MODE_INFO = {
   coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins. Get hit and you spill coins for the others." },
   potato: { label: "Hot Potato", icon: "💣", tag: "Pass it on", text: "Bump into someone to pass the bomb. Hold it when it blows: lose a heart." },
   cup: { label: "Party Cup", icon: "🏆", tag: "3 rounds", text: `3 random modes on 3 maps. ${CUP_POINTS.join(" / ")} points per place.` },
+  rushcup: { label: "Coin Rush Cup", icon: "🪙", tag: "Tournament", text: "3 Coin Rush rounds on 3 maps. Most points wins." },
+  grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "Every mode once: Survival, Brain Chase, Coin Rush and Hot Potato." },
 };
+const isCupMode = (m) => CUP_MODES.includes(m);
 const KIND_LABEL = { survival: "Survival", chase: "Brain Chase", coinrush: "Coin Rush", potato: "Hot Potato", sprint: "Sprint" };
 /** One line on how to win, shown during the countdown. */
 const KIND_RULE = {
@@ -1433,6 +1438,8 @@ const SOLO_MODES = [
   { id: "coinrush", icon: "🪙", label: "Coin Rush", sub: "vs 3 bots" },
   { id: "potato", icon: "💣", label: "Hot Potato", sub: "vs 3 bots" },
   { id: "cup", icon: "🏆", label: "Party Cup", sub: "3 rounds vs bots" },
+  { id: "rushcup", icon: "🪙", label: "Coin Rush Cup", sub: "Tournament · 3 rounds" },
+  { id: "grandtour", icon: "🌍", label: "Grand Tour", sub: "Tournament · every mode" },
 ];
 function soloMode() {
   const m = local.getItem("lr:soloMode");
@@ -1533,29 +1540,191 @@ for (const t of document.querySelectorAll(".htab")) {
   homePages.addEventListener("touchcancel", end);
 }
 
-// Tournaments page: every mode, against bots or hosted for friends
+// Tournaments page: the Weekend League and two tournaments with daily prizes
+const TOURNEYS = [
+  { id: "rushcup", label: "Coin Rush Cup", img: "/assets/ui_c3.webp", tag: "Tournament · 3 rounds", text: "Three Coin Rush rounds on three maps. Most points wins.", prize: [300, 150, 75] },
+  { id: "grandtour", label: "Grand Tour", img: "/assets/medal_gold.png", tag: "Tournament · 4 rounds", text: "Every mode once: Survival, Brain Chase, Coin Rush and Hot Potato.", prize: [500, 250, 120] },
+];
+const PLACE_SHORT = ["1st", "2nd", "3rd", "4th"];
+/** Prize coins already paid today, per tournament: the best finish each day pays once (a better finish later pays the difference). */
+function tourneyPaid() {
+  try {
+    const t = JSON.parse(local.getItem("lr:tourney") || "{}");
+    return t && t.day === dayKey() ? t : { day: dayKey() };
+  } catch {
+    return { day: dayKey() };
+  }
+}
+function tourneyPrize(v) {
+  const t = TOURNEYS.find((x) => x.id === v.mode);
+  if (!t || !v.cup || v.cup.race < v.cup.races.length) return 0;
+  const place = (v.cup.table ?? []).indexOf(playerId) + 1;
+  const prize = t.prize[place - 1] ?? 0;
+  const paid = tourneyPaid();
+  const before = paid[t.id]?.coins ?? 0;
+  if (prize <= before) return 0;
+  paid[t.id] = { coins: prize, place };
+  local.setItem("lr:tourney", JSON.stringify(paid));
+  wallet.addCoins(prize - before);
+  return prize - before;
+}
+
+// Weekend League: Friday 18:00 to Sunday midnight, 10 matches, points by place
+const LEAGUE_MATCHES = 10;
+const LEAGUE_PTS = [10, 6, 3, 1];
+const LEAGUE_TIERS = [
+  { pts: 20, coins: 300 },
+  { pts: 45, coins: 700, medal: "bronze" },
+  { pts: 70, coins: 1200, medal: "silver" },
+  { pts: 90, coins: 2000, medal: "gold" },
+];
+function leagueWindow(now = new Date()) {
+  const day = now.getDay();
+  const open = (day === 5 && now.getHours() >= 18) || day === 6 || day === 0;
+  const start = new Date(now);
+  start.setHours(18, 0, 0, 0);
+  start.setDate(start.getDate() - ((day + 2) % 7)); // back to Friday
+  if (!open && start <= now) start.setDate(start.getDate() + 7);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 3);
+  end.setHours(0, 0, 0, 0); // Monday 00:00
+  return { open, start, end, id: dayKey(start) };
+}
+function leagueState() {
+  let st = null;
+  try {
+    st = JSON.parse(local.getItem("lr:league") || "null");
+  } catch {
+    st = null;
+  }
+  if (!st || typeof st !== "object") st = { id: "", matches: 0, pts: 0, claimed: [] };
+  const w = leagueWindow();
+  if (w.open && st.id !== w.id) {
+    // a new weekend: rewards left unclaimed last time are paid out first
+    if (st.id) payLeague(st, true);
+    st = { id: w.id, matches: 0, pts: 0, claimed: [] };
+    local.setItem("lr:league", JSON.stringify(st));
+  }
+  return st;
+}
+function leagueReady(st) {
+  return LEAGUE_TIERS.map((tier, i) => i).filter((i) => st.pts >= LEAGUE_TIERS[i].pts && !st.claimed.includes(i));
+}
+function payLeague(st, quiet = false) {
+  const ready = leagueReady(st);
+  let coins = 0;
+  for (const i of ready) {
+    coins += LEAGUE_TIERS[i].coins;
+    if (LEAGUE_TIERS[i].medal) wallet.claim(`wl:${st.id}:${i}`, LEAGUE_TIERS[i].medal);
+    st.claimed.push(i);
+  }
+  if (coins) wallet.addCoins(coins);
+  local.setItem("lr:league", JSON.stringify(st));
+  if (coins && quiet) toast(`Weekend League rewards: +${coins} coins`);
+  return coins;
+}
+/** A race finished: count it as a league match while the weekend is live. */
+function leagueMatch(n, place) {
+  if (n < 2 || !leagueWindow().open) return null;
+  const st = leagueState();
+  if (st.matches >= LEAGUE_MATCHES) return null;
+  const pts = LEAGUE_PTS[place - 1] ?? 0;
+  st.matches += 1;
+  st.pts += pts;
+  local.setItem("lr:league", JSON.stringify(st));
+  return { pts, matches: st.matches };
+}
+function untilText(ms) {
+  const m = Math.max(1, Math.round(ms / 60000));
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m % 60}m` : `${m}m`;
+}
+
 function renderCompete() {
-  $("#modeCards").replaceChildren(
-    ...["survival", "chase", "coinrush", "potato"].map((key) => {
-      const info = GAME_MODE_INFO[key];
-      return el(
+  const w = leagueWindow();
+  const st = leagueState();
+  const mine = st.id === w.id;
+  const ready = leagueReady(st);
+  const full = mine && st.matches >= LEAGUE_MATCHES;
+  const pct = (x) => Math.min(100, Math.round((x / 100) * 100));
+  const weekend = el(
+    "div",
+    { class: `tcard t-weekend${w.open ? " live" : ""}` },
+    el(
+      "div",
+      { class: "tc-head" },
+      el("img", { src: "/assets/lg_master.webp", alt: "" }),
+      el(
         "div",
-        { class: `mode-tile m-${key}` },
-        el("span", { class: "mt-ico", text: info.icon }),
-        el("em", { text: info.tag }),
-        el("b", { text: info.label }),
-        el("small", { text: info.text }),
+        {},
+        el("em", { class: "tc-status" }, w.open ? el("i", { class: "live-dot" }) : "", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday 18:00 · in ${untilText(w.start - Date.now())}`),
+        el("b", { text: "Weekend League" }),
+        el("span", { text: `${LEAGUE_MATCHES} matches over the weekend, any mode. Places score ${LEAGUE_PTS.join(" / ")} points.` }),
+      ),
+    ),
+    el(
+      "div",
+      { class: "wl-row" },
+      el("span", { class: "wl-pips" }, ...Array.from({ length: LEAGUE_MATCHES }, (_, i) => el("i", { class: mine && i < st.matches ? "on" : "" }))),
+      el("b", { text: `${mine ? st.pts : 0} pts` }),
+    ),
+    el(
+      "div",
+      { class: "wl-track" },
+      el("span", { class: "wl-fill", style: `width:${pct(mine ? st.pts : 0)}%` }),
+      ...LEAGUE_TIERS.map((tier, i) =>
         el(
           "span",
-          { class: "mt-btns" },
-          el("button", { class: "btn small go", type: "button", "data-mode": key, "data-with": "bots", text: "🤖 Bots" }),
-          el("button", { class: "btn small blue", type: "button", "data-mode": key, "data-with": "friends", text: "👥 Host" }),
+          { class: `wl-tier${mine && st.pts >= tier.pts ? " got" : ""}${st.claimed.includes(i) && mine ? " claimed" : ""}`, style: `left:${pct(tier.pts)}%` },
+          el("img", { src: tier.medal ? MEDAL_IMG[tier.medal] : "/assets/ui_c1.webp", alt: "" }),
+          el("small", { text: `${tier.pts}` }),
+          el("em", { text: `${tier.coins}` }),
         ),
-      );
-    }),
+      ),
+    ),
+    el(
+      "div",
+      { class: "tc-btns" },
+      ...(ready.length
+        ? [el("button", { class: "btn big gold-btn", type: "button", "data-league": "claim", text: `🎁 Claim ${ready.reduce((a, i) => a + LEAGUE_TIERS[i].coins, 0)} coins` })]
+        : !w.open
+          ? [el("button", { class: "btn big ghost", type: "button", disabled: "", text: "🔒 Opens on Friday" })]
+          : full
+            ? [el("button", { class: "btn big ghost", type: "button", disabled: "", text: "✓ All matches played" })]
+            : [
+                el("button", { class: "btn big go", type: "button", "data-league": "bots", text: "▶ Play match" }),
+                el("button", { class: "btn big blue", type: "button", "data-league": "host", text: "👥 Host" }),
+              ]),
+    ),
   );
-  const best = personalBest();
-  $("#endlessBest").textContent = best ? `Your best: ${best.toLocaleString()} m` : "Just you · beat your best";
+  const paid = tourneyPaid();
+  const cards = TOURNEYS.map((t) =>
+    el(
+      "div",
+      { class: `tcard t-${t.id}` },
+      el(
+        "div",
+        { class: "tc-head" },
+        el("img", { src: t.img, alt: "" }),
+        el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { text: t.text })),
+      ),
+      el(
+        "div",
+        { class: "tc-prizes" },
+        el("small", { text: "Daily prize" }),
+        ...t.prize.map((c, i) => el("span", { class: `prz${paid[t.id]?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), el("i", { class: "coin" }), String(c))),
+      ),
+      paid[t.id] ? el("p", { class: "tc-note", text: `Today: ${PLACE_SHORT[paid[t.id].place - 1]} place ✓ · finish higher to win the difference` }) : "",
+      el(
+        "div",
+        { class: "tc-btns" },
+        el("button", { class: "btn big go", type: "button", "data-mode": t.id, "data-with": "bots", text: "🤖 Vs bots" }),
+        el("button", { class: "btn big blue", type: "button", "data-mode": t.id, "data-with": "friends", text: "👥 Host" }),
+      ),
+    ),
+  );
+  $("#tourneyList").replaceChildren(weekend, ...cards);
 }
 function playMode(mode, withWho) {
   sfx.unlock();
@@ -1573,8 +1742,25 @@ function playMode(mode, withWho) {
 }
 $("#hpCompete").addEventListener("click", (e) => {
   const b = e.target.closest("[data-mode]");
-  if (b) playMode(b.dataset.mode, b.dataset.with);
+  if (b) return playMode(b.dataset.mode, b.dataset.with);
+  const lg = e.target.closest("[data-league]");
+  if (!lg) return;
+  if (lg.dataset.league === "claim") {
+    const coins = payLeague(leagueState());
+    if (coins) {
+      coinRain(lg, 18);
+      sfx.finish();
+      toast(`Weekend League: +${coins} coins!`);
+    }
+    renderWallet();
+    renderCompete();
+    return;
+  }
+  // a league match is a random mode each time
+  playMode(ROUND_KINDS[Math.floor(Math.random() * ROUND_KINDS.length)], lg.dataset.league === "host" ? "friends" : "bots");
 });
+// keep the countdowns fresh while the page is open
+setInterval(() => game.mode === "home" && homePage === 0 && renderCompete(), 30000);
 /** Red dot on the Shop tab: a pass reward or a mission waiting to be claimed. */
 function renderStoreDot() {
   const dot = document.querySelector('.htab[data-page="2"] .dot');
@@ -1735,8 +1921,8 @@ function renderLobby(v) {
     }),
   );
   // start fetching the map's 3D props while everyone is still in the lobby
-  for (const key of gm === "cup" ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
-  const what = gm === "cup" ? "Party Cup" : gm === "survival" && n < 2 && !botsOn() ? "endless run" : GAME_MODE_INFO[gm].label;
+  for (const key of isCupMode(gm) ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
+  const what = isCupMode(gm) ? GAME_MODE_INFO[gm].label : gm === "survival" && n < 2 && !botsOn() ? "endless run" : GAME_MODE_INFO[gm].label;
   $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
   renderLineup(v, { isHost, gm, mp, mode, what });
   // once you've locked in your runner, the lobby is the line-up
@@ -1778,8 +1964,8 @@ $("#luGo").addEventListener("click", () => {
  */
 function renderLineup(v, { isHost, gm, mp, mode, what }) {
   $("#luCode").textContent = net.code;
-  $("#luMode").textContent = gm === "cup" ? "Party Cup" : gm === "survival" && v.players.length < 2 && !botsOn() ? "Endless run" : GAME_MODE_INFO[gm].label;
-  $("#luMap").textContent = gm === "cup" ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${botsOn() && v.players.length < 4 ? "with bots" : mode}`;
+  $("#luMode").textContent = isCupMode(gm) ? GAME_MODE_INFO[gm].label : gm === "survival" && v.players.length < 2 && !botsOn() ? "Endless run" : GAME_MODE_INFO[gm].label;
+  $("#luMap").textContent = isCupMode(gm) ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${botsOn() && v.players.length < 4 ? "with bots" : mode}`;
   const qs = dailyChallenges();
   const qd = dailyState();
   $("#luDaily").textContent = `📋 Challenges ${qs.filter((q) => qd.done[q.id]).length}/${qs.length}`;
@@ -1964,6 +2150,8 @@ function renderResults(v) {
   if (rpChange) {
     reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
     if (rpChange.xp) reward.append(el("span", { class: "xpchip", text: `+${rpChange.xp} XP` }));
+    if (rpChange.prize) reward.append(el("span", { class: "xpchip prizechip", text: `🏆 Prize +${rpChange.prize}` }));
+    if (rpChange.league) reward.append(el("span", { class: "xpchip leaguechip", text: `Weekend League +${rpChange.league.pts} pts · ${rpChange.league.matches}/${LEAGUE_MATCHES}` }));
     if (rpChange.botsOnly) reward.append(el("span", { class: "nomedal", text: "Medals and rank points need 2 real players" }));
     else reward.append(rankChip(rpChange));
   }
@@ -4773,6 +4961,8 @@ function recordRace(v, place) {
   // Party Cup rounds pay double
   const coins = ((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1);
   wallet.addCoins(coins);
+  const prize = tourneyPrize(v);
+  const league = leagueMatch(n, place);
   // rank points only count against real people; solo runs pay a little for distance
   const delta = real >= 2 ? (RP_TABLE[Math.min(n, 4)]?.[place - 1] ?? 0) : n < 2 && v.kind === "survival" ? Math.min(10, Math.floor(d / 300)) : 0;
   const before = rankOf(rank.rp());
@@ -4781,6 +4971,8 @@ function recordRace(v, place) {
   res.promoted = after.name !== before.name && res.after > res.before ? after : null;
   res.coins = coins;
   res.kos = kos;
+  res.prize = prize;
+  res.league = league;
   // season XP: everyone gets some for racing, more for a good place
   res.xp = passXp(n >= 2 ? 60 + ([60, 40, 20][place - 1] ?? 0) : 40 + Math.min(60, Math.floor(d / 50)));
   res.botsOnly = real < 2 && n >= 2;
