@@ -1321,3 +1321,25 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .buy-price em { font-style: normal; font-weight: 800; color: #ffb3b3; }
 .buy-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; width: 100%; }
 .gbtn.grey { background: linear-gradient(180deg, #9aa6c8, #6c78a0); box-shadow: 0 6px 0 #3a4366; -webkit-text-stroke-color: #2b3350; text-shadow: 0 2px 0 #2b3350; animation: none; font-size: 20px; }
+
+/* ================= missions: daily / career / trophies ================= */
+.quest-sheet .gtabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.gtab .dot[hidden] { display: none; }
+.aclaim span { font-family: var(--display); font-weight: 900; font-size: 12px; color: #fff; -webkit-text-stroke: 1px #2f5c00; paint-order: stroke fill; }
+.quest.ready { background: linear-gradient(180deg, #fffbe0, #ffefa6); box-shadow: 0 5px 0 #a35f00, 0 0 18px rgba(255, 210, 63, 0.6); }
+.quest.locked { filter: grayscale(0.8); opacity: 0.55; }
+.chapter { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 16px; background: linear-gradient(135deg, #ff7ac2, #c21e7a); border: 3px solid #fff; box-shadow: 0 4px 0 #6b0a37; color: #fff; }
+.chapter.locked { background: linear-gradient(135deg, #6c6f8f, #3d405e); box-shadow: 0 4px 0 #23253a; }
+.chapter.finished { background: linear-gradient(135deg, #6fe08a, #2fae52); box-shadow: 0 4px 0 #146b2a; }
+.ch-num { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: #fff; color: #c21e7a; font-family: var(--display); font-weight: 900; font-size: 24px; }
+.chapter.locked .ch-num { color: #3d405e; }
+.chapter.finished .ch-num { color: #2fae52; }
+.ch-name { display: grid; }
+.ch-name b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 22px; text-transform: uppercase; line-height: 1; }
+.ch-name small { font-weight: 800; font-size: 12px; }
+.ch-chest { display: grid; justify-items: center; max-width: 92px; text-align: center; }
+.ch-chest img { width: 40px; height: 36px; object-fit: contain; }
+.ch-chest small { font-weight: 800; font-size: 9px; line-height: 1.1; }
+.chest-btn { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; font-size: 22px; }
+.chest-btn img { width: 44px; height: 40px; object-fit: contain; }
+.career-list .quest { margin-left: 8px; }

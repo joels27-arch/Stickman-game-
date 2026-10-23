@@ -4233,10 +4233,13 @@ function dailyChallenges() {
   });
 }
 function dailyState() {
-  const fresh = { day: todayKey(), best: {}, done: {} };
+  const fresh = { day: todayKey(), best: {}, done: {}, claimed: {} };
   try {
     const s = JSON.parse(local.getItem("lr:daily2") || "{}");
-    return s.day === todayKey() && s.best && s.done ? s : fresh;
+    if (s.day !== todayKey() || !s.best || !s.done) return fresh;
+    // before claiming existed, finished missions were paid straight away
+    if (!s.claimed) s.claimed = { ...s.done };
+    return s;
   } catch {
     return fresh;
   }
@@ -4251,10 +4254,8 @@ function challenge(stat, value) {
     changed = true;
     if (value >= q.goal) {
       st.done[q.id] = true;
-      wallet.addCoins(q.coins);
-      passXp(150);
-      banner("CHALLENGE DONE!", 1600);
-      toast(`✅ ${q.text}: +${q.coins} coins`);
+      banner("MISSION COMPLETE!", 1600);
+      toast(`✅ ${q.text} · claim it in Missions`);
       sfx.finish();
     }
   }
@@ -4262,35 +4263,67 @@ function challenge(stat, value) {
   local.setItem("lr:daily2", JSON.stringify(st));
   renderDaily();
 }
+function claimDaily(q, btn) {
+  const st = dailyState();
+  if (!st.done[q.id] || st.claimed[q.id]) return;
+  st.claimed[q.id] = true;
+  local.setItem("lr:daily2", JSON.stringify(st));
+  wallet.addCoins(q.coins);
+  passXp(150);
+  coinRain(btn, 14);
+  sfx.finish();
+  toast(`+${q.coins} coins · +150 XP`);
+  renderDaily();
+}
+function missionRow({ icon, tier, tierClass, text, have, goal, reward, state, onClaim, extra }) {
+  // state: active | ready | claimed | locked
+  const pct = Math.round((Math.min(have, goal) / goal) * 100);
+  let right;
+  if (state === "ready") {
+    right = el("button", { class: "aclaim", type: "button" }, el("span", { text: "CLAIM" }), el("b", { text: reward }));
+    right.addEventListener("click", () => onClaim(right));
+  } else right = el("div", { class: "qreward" }, el("img", { src: "/assets/ui_c1.webp", alt: "" }), el("b", { text: reward }));
+  return el(
+    "div",
+    { class: `quest ${tierClass}${state === "claimed" ? " done" : ""}${state === "ready" ? " ready" : ""}${state === "locked" ? " locked" : ""}` },
+    el("div", { class: "qicon" }, el("img", { src: icon, alt: "" })),
+    el(
+      "div",
+      { class: "qmain" },
+      el("span", { class: "qtier", text: tier }),
+      el("b", { text }),
+      el("div", { class: "qbar" }, el("i", { style: `width:${state === "claimed" || state === "ready" ? 100 : pct}%` }), el("span", { text: state === "claimed" ? "Claimed ✓" : state === "ready" ? "Complete!" : state === "locked" ? "Locked" : `${Math.min(have, goal).toLocaleString()} / ${goal.toLocaleString()}` })),
+      extra ?? null,
+    ),
+    right,
+    state === "claimed" ? el("span", { class: "qstamp", text: "Done ✓" }) : null,
+  );
+}
 function renderDaily() {
   const qs = dailyChallenges();
   const st = dailyState();
   const n = qs.filter((q) => st.done[q.id]).length;
+  const ready = qs.filter((q) => st.done[q.id] && !st.claimed[q.id]).length;
   $("#questCount").textContent = `${n}/${qs.length}`;
-  $("#questPill").classList.toggle("done", n === qs.length);
-  $("#questSub").textContent = n === qs.length ? "All done! Come back tomorrow." : `${n} of ${qs.length} done`;
+  $("#dailyDot").hidden = ready === 0;
+  $("#questSub").textContent = n === qs.length ? (ready ? "All done! Claim your rewards." : "All done! New missions tomorrow.") : `${n} of ${qs.length} done today`;
   $("#questReset").textContent = untilMidnight();
   $("#questList").replaceChildren(
-    ...qs.map((q) => {
-      const have = Math.min(st.best[q.id] ?? 0, q.goal);
-      const done = Boolean(st.done[q.id]);
-      const pct = Math.round((have / q.goal) * 100);
-      return el(
-        "div",
-        { class: `quest ${q.tier}${done ? " done" : ""}` },
-        el("div", { class: "qicon" }, el("img", { src: STAT_ICON[q.stat], alt: "" })),
-        el(
-          "div",
-          { class: "qmain" },
-          el("span", { class: "qtier", text: q.tier }),
-          el("b", { text: q.text }),
-          el("div", { class: "qbar" }, el("i", { style: `width:${pct}%` }), el("span", { text: done ? "Complete!" : `${have} / ${q.goal}` })),
-        ),
-        el("div", { class: "qreward" }, el("img", { src: "/assets/ui_c1.webp", alt: "" }), el("b", { text: `+${q.coins}` })),
-        done ? el("span", { class: "qstamp", text: "Done ✓" }) : null,
-      );
-    }),
+    ...qs.map((q) =>
+      missionRow({
+        icon: STAT_ICON[q.stat],
+        tier: q.tier,
+        tierClass: q.tier,
+        text: q.text,
+        have: st.best[q.id] ?? 0,
+        goal: q.goal,
+        reward: `+${q.coins}`,
+        state: st.claimed[q.id] ? "claimed" : st.done[q.id] ? "ready" : "active",
+        onClaim: (btn) => claimDaily(q, btn),
+      }),
+    ),
   );
+  renderMissionDots();
 }
 const questModal = $("#questModal");
 $("#questPill").addEventListener("click", () => {
@@ -4498,6 +4531,14 @@ function recordRace(v, place) {
   if (n < 2 && v.kind === "survival") stats.max("bestRun", d);
   // coins for every race: by place against everyone (bots too), plus hits you landed
   const kos = game.kos ?? 0;
+  stats.max("bestDist", d);
+  if (place === 1 && n >= 2) stats.add("winsAny", 1);
+  if (kos) stats.add("kos", kos);
+  const modes = new Set(String(stats.all().modes ?? "").split(",").filter(Boolean));
+  if (!modes.has(v.kind)) stats.set("modes", [...modes, v.kind].join(","));
+  if (v.kind === "coinrush") stats.add("rushCoins", mine?.coins ?? 0);
+  if (v.kind === "chase") stats.max("chaseBest", Math.round(((mine?.outAt ?? v.endAt ?? Date.now()) - v.startAt) / 1000));
+  if (v.cup && v.cup.race >= v.cup.races.length && v.cup.table?.[0] === playerId) stats.add("cupWins", 1);
   // Party Cup rounds pay double
   const coins = ((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1);
   wallet.addCoins(coins);
@@ -4654,7 +4695,20 @@ function achState(a) {
 function renderAchDot() {
   const any = ACHIEVEMENTS.some((a) => achState(a).ready);
   $("#tabAll .dot").hidden = !any;
-  $("#questPill").classList.toggle("has-claim", any);
+  renderMissionDots();
+}
+/** The red dot on Missions: anything ready to claim in any tab. */
+function renderMissionDots() {
+  let career = false;
+  try {
+    career = careerReady() > 0;
+  } catch {
+    return; // still starting up: the career table isn't defined yet
+  }
+  const daily = dailyChallenges().some((q) => dailyState().done[q.id] && !dailyState().claimed[q.id]);
+  const trophies = ACHIEVEMENTS.some((a) => achState(a).ready);
+  $("#careerDot").hidden = !career;
+  $("#questPill").classList.toggle("has-claim", daily || career || trophies);
 }
 function renderAch() {
   $("#achList").replaceChildren(
@@ -4695,15 +4749,21 @@ function renderAch() {
     }),
   );
 }
-function questTab(daily) {
-  $("#tabDaily").classList.toggle("on", daily);
-  $("#tabAll").classList.toggle("on", !daily);
-  $("#questList").hidden = !daily;
-  $("#questHead").hidden = !daily;
-  $("#achList").hidden = daily;
-  if (!daily) renderAch();
+/** Missions tabs: true = daily, "career", false = trophies. */
+function questTab(which) {
+  const tab = which === true ? "daily" : which === false ? "trophies" : which;
+  $("#tabDaily").classList.toggle("on", tab === "daily");
+  $("#tabCareer").classList.toggle("on", tab === "career");
+  $("#tabAll").classList.toggle("on", tab === "trophies");
+  $("#questList").hidden = tab !== "daily";
+  $("#questHead").hidden = tab !== "daily";
+  $("#careerList").hidden = tab !== "career";
+  $("#achList").hidden = tab !== "trophies";
+  if (tab === "trophies") renderAch();
+  if (tab === "career") renderCareer();
 }
 $("#tabDaily").addEventListener("click", () => questTab(true));
+$("#tabCareer").addEventListener("click", () => questTab("career"));
 $("#tabAll").addEventListener("click", () => questTab(false));
 renderAchDot();
 
@@ -4867,6 +4927,190 @@ passModal.addEventListener("click", (e) => e.target === passModal && (passModal.
 renderPassPill();
 renderCollPill();
 
+// ── career: six chapters of missions, each unlocked by finishing the one before ──
+
+const CAREER = [
+  {
+    name: "Rookie",
+    chest: { coins: 300, pack: "brain" },
+    missions: [
+      { stat: "races", goal: 3, text: "Play 3 races", coins: 50, icon: "/assets/ui_star.webp" },
+      { stat: "dist", goal: 1000, text: "Run 1 km in total", coins: 50, icon: "/assets/ui_shoe.webp" },
+      { stat: "boxes", goal: 5, text: "Grab 5 mystery boxes", coins: 50, icon: "/assets/ui_box.webp" },
+      { stat: "used", goal: 5, text: "Use 5 power-ups", coins: 50, icon: "/assets/pw_banana.png" },
+    ],
+  },
+  {
+    name: "Runner",
+    chest: { coins: 600 },
+    missions: [
+      { stat: "races", goal: 10, text: "Play 10 races", coins: 80, icon: "/assets/ui_star.webp" },
+      { stat: "winsAny", goal: 1, text: "Win a race (bots count)", coins: 100, icon: "/assets/medal_gold.png" },
+      { stat: "bestDist", goal: 800, text: "Run 800 m in one race", coins: 100, icon: "/assets/ui_shoe.webp" },
+      { stat: "bestCombo", goal: 10, text: "Reach a 10 combo", coins: 100, icon: "/assets/ui_flame.webp" },
+    ],
+  },
+  {
+    name: "Contender",
+    chest: { coins: 500, pack: "mega" },
+    missions: [
+      { stat: "modes", goal: 4, text: "Play all 4 modes (Survival, Chase, Coin Rush, Potato)", coins: 150, icon: "/assets/ui_chest.webp" },
+      { stat: "winsAny", goal: 3, text: "Win 3 races", coins: 150, icon: "/assets/medal_gold.png" },
+      { stat: "kos", goal: 10, text: "Hit opponents 10 times", coins: 150, icon: "/assets/pw_boxing.png" },
+      { stat: "rushCoins", goal: 100, text: "Collect 100 coins in Coin Rush", coins: 150, icon: "/assets/ui_c2.webp" },
+    ],
+  },
+  {
+    name: "Pro",
+    chest: { coins: 1000, medal: "gold" },
+    missions: [
+      { stat: "chaseBest", goal: 120, text: "Survive 2 minutes in Brain Chase", coins: 200, icon: "/assets/ui_watch.webp" },
+      { stat: "cupWins", goal: 1, text: "Win a Party Cup", coins: 250, icon: "/assets/medal_gold.png" },
+      { stat: "packs", goal: 3, text: "Open 3 packs", coins: 200, icon: "/assets/pack_brain.webp" },
+      { stat: "rp", goal: 350, text: "Reach the Silver league", coins: 250, icon: "/assets/lg_silver.webp" },
+    ],
+  },
+  {
+    name: "Champion",
+    chest: { coins: 2000, pack: "mega" },
+    missions: [
+      { stat: "winsAny", goal: 15, text: "Win 15 races", coins: 300, icon: "/assets/medal_gold.png" },
+      { stat: "dist", goal: 25000, text: "Run 25 km in total", coins: 300, icon: "/assets/ui_shoe.webp" },
+      { stat: "bestCombo", goal: 20, text: "Reach a 20 combo", coins: 300, icon: "/assets/ui_flame.webp" },
+      { stat: "rp", goal: 850, text: "Reach the Gold league", coins: 400, icon: "/assets/lg_gold.webp" },
+    ],
+  },
+  {
+    name: "Legend",
+    chest: { coins: 5000, medal: "gold", medals: 3 },
+    missions: [
+      { stat: "winsAny", goal: 50, text: "Win 50 races", coins: 500, icon: "/assets/medal_gold.png" },
+      { stat: "bestDist", goal: 3000, text: "Run 3,000 m in one race", coins: 500, icon: "/assets/ui_shoe.webp" },
+      { stat: "chars", goal: 12, text: "Collect 12 characters", coins: 500, icon: "/assets/pk_brainz.webp" },
+      { stat: "rp", goal: 1500, text: "Reach the Platinum league", coins: 600, icon: "/assets/lg_platinum.webp" },
+    ],
+  },
+];
+function careerStat(stat) {
+  if (stat === "rp") return rank.rp();
+  if (stat === "chars") return collectionCount().got;
+  if (stat === "modes") return String(stats.all().modes ?? "").split(",").filter(Boolean).length;
+  return stats.get(stat);
+}
+function careerState() {
+  try {
+    const c = JSON.parse(local.getItem("lr:career") || "{}");
+    return { claimed: c.claimed ?? {}, chests: c.chests ?? {} };
+  } catch {
+    return { claimed: {}, chests: {} };
+  }
+}
+/** Chapter n is open once every mission and the chest of chapter n-1 is claimed. */
+function chapterOpen(n, st = careerState()) {
+  return n === 0 || Boolean(st.chests[n - 1]);
+}
+function careerReady() {
+  const st = careerState();
+  let n = 0;
+  CAREER.forEach((ch, ci) => {
+    if (!chapterOpen(ci, st)) return;
+    ch.missions.forEach((m, mi) => {
+      if (!st.claimed[`${ci}:${mi}`] && careerStat(m.stat) >= m.goal) n++;
+    });
+    if (!st.chests[ci] && ch.missions.every((_, mi) => st.claimed[`${ci}:${mi}`])) n++;
+  });
+  return n;
+}
+function claimCareer(ci, mi, btn) {
+  const st = careerState();
+  const m = CAREER[ci].missions[mi];
+  if (!chapterOpen(ci, st) || st.claimed[`${ci}:${mi}`] || careerStat(m.stat) < m.goal) return;
+  st.claimed[`${ci}:${mi}`] = true;
+  local.setItem("lr:career", JSON.stringify(st));
+  wallet.addCoins(m.coins);
+  passXp(100);
+  coinRain(btn, 12);
+  sfx.finish();
+  toast(`+${m.coins} coins · +100 XP`);
+  renderCareer();
+  renderMissionDots();
+}
+function chestLabel(c) {
+  return [c.coins ? `${c.coins.toLocaleString()} coins` : "", c.pack ? (c.pack === "mega" ? "Mega Pack" : "Brain Pack") : "", c.medal ? `${c.medals ?? 1} gold medal${(c.medals ?? 1) > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
+}
+function openChest(ci) {
+  const st = careerState();
+  const ch = CAREER[ci];
+  if (st.chests[ci] || !ch.missions.every((_, mi) => st.claimed[`${ci}:${mi}`])) return;
+  st.chests[ci] = true;
+  local.setItem("lr:career", JSON.stringify(st));
+  const c = ch.chest;
+  if (c.coins) wallet.addCoins(c.coins);
+  if (c.medal) {
+    const m = wallet.medals();
+    m[c.medal] += c.medals ?? 1;
+    wallet.save(m);
+  }
+  passXp(300);
+  questModal.hidden = true;
+  const next = CAREER[ci + 1];
+  const after = () => {
+    toast(next ? `Chapter ${ci + 2} · ${next.name} unlocked!` : "You finished the career. Legend!");
+    renderCareer();
+    renderMissionDots();
+  };
+  if (c.pack) {
+    const pk = PACKS.find((x) => x.id === c.pack);
+    openPackAnim(pk, grantPack(pk));
+    po.onDone = after;
+  } else showUnlock({ kind: "coins", n: c.coins ?? 0 }, after);
+}
+function renderCareer() {
+  const st = careerState();
+  const box = $("#careerList");
+  const out = [];
+  CAREER.forEach((ch, ci) => {
+    const open = chapterOpen(ci, st);
+    const done = ch.missions.filter((_, mi) => st.claimed[`${ci}:${mi}`]).length;
+    const finished = Boolean(st.chests[ci]);
+    const head = el(
+      "div",
+      { class: `chapter${open ? "" : " locked"}${finished ? " finished" : ""}` },
+      el("span", { class: "ch-num", text: String(ci + 1) }),
+      el("span", { class: "ch-name" }, el("b", { text: ch.name }), el("small", { text: finished ? "Complete ✓" : open ? `${done}/${ch.missions.length} missions` : `🔒 Finish chapter ${ci} to unlock` })),
+      el("span", { class: "ch-chest" }, el("img", { src: "/assets/ui_chest.webp", alt: "" }), el("small", { text: chestLabel(ch.chest) })),
+    );
+    out.push(head);
+    // finished chapters fold away; locked ones show what's coming (greyed out)
+    if (finished) return;
+    ch.missions.forEach((m, mi) => {
+      const have = careerStat(m.stat);
+      const claimed = st.claimed[`${ci}:${mi}`];
+      out.push(
+        missionRow({
+          icon: m.icon,
+          tier: `Chapter ${ci + 1}`,
+          tierClass: ["easy", "easy", "medium", "medium", "hard", "hard"][ci],
+          text: m.text,
+          have,
+          goal: m.goal,
+          reward: `+${m.coins}`,
+          state: !open ? "locked" : claimed ? "claimed" : have >= m.goal ? "ready" : "active",
+          onClaim: (btn) => claimCareer(ci, mi, btn),
+        }),
+      );
+    });
+    if (open && done === ch.missions.length) {
+      const b = el("button", { class: "gbtn chest-btn", type: "button" }, el("img", { src: "/assets/ui_chest.webp", alt: "" }), el("span", { text: `Open chapter chest` }));
+      b.addEventListener("click", () => openChest(ci));
+      out.push(b);
+    }
+    // only show the first locked chapter in full; later ones are just headers
+    if (!open) out.splice(out.length - ch.missions.length, ci > 0 && !chapterOpen(ci - 1, st) ? ch.missions.length : 0);
+  });
+  box.replaceChildren(...out);
+}
+
 // first visit of the day: pop the reward open
 setTimeout(() => {
   if (!streakState().claimedToday && game.mode === "home" && countryModal.hidden) openStreak();
@@ -5015,6 +5259,7 @@ function loseBox() {
 function useItem(lane = me.lane, dir = 1) {
   if (!me.items.length || !canControl() || me.stumbleT > 0) return;
   const kind = me.items.shift();
+  stats.add("used", 1);
   if (kind === "banana") {
     game.bananasThrown = (game.bananasThrown ?? 0) + 1;
     stats.add("bananas", 1);
