@@ -625,16 +625,21 @@ $("#nameForm").addEventListener("submit", (e) => {
 });
 // ── first-visit tour: a spotlight on each part of the app, skippable, ending on the endless run ──
 const TOUR = [
-  { sel: null, title: "Welcome to 4 Friends!", text: "A Subway-Surfers-style runner you play against your friends. Quick tour? Takes 20 seconds." },
-  { sel: "#roomRow", title: "Play with friends", text: "Create a room and share the code, or Join a friend's. Up to 4 runners, bots fill empty spots." },
-  { sel: "#soloBtn", title: "Game modes", text: "Survival, Brain Chase, Coin Rush, Hot Potato and more, against bots you can make easy or hard." },
-  { sel: "#profileCard", title: "You", text: "Your name and league. Tap it for your stats: wins, records and how you rank among friends." },
-  { sel: "#roadMini", title: "Gold Road", text: "Every gold medal you win moves you along it: coins, packs and three exclusive characters." },
-  { sel: '.htab[data-page="0"]', title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
-  { sel: '.htab[data-page="1"]', title: "Skins", text: "All your characters. Pick who you race with." },
-  { sel: '.htab[data-page="3"]', title: "Missions", text: "Daily missions, your career and the full Gold Road." },
-  { sel: '.htab[data-page="4"]', title: "Shop", text: "Packs, characters, trails and the Season Pass." },
-  { sel: "#endlessBtn", title: "Start here!", text: "Your first endless run: one life, how far can you get? Tap the button to run.", last: true },
+  { sel: null, welcome: true, title: "Hey {name}, I'm Bolt!", text: "Welcome to 4 Friends: a Subway-Surfers-style runner you race against your friends. Let me show you around, it takes 20 seconds." },
+  { sel: "#roomRow", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room and share the code, or Join a friend's. Up to 4 runners, bots fill empty spots." },
+  { sel: "#soloBtn", img: "/assets/pw_rocket.png", title: "Game modes", text: "Survival, Brain Chase, Coin Rush, Hot Potato and more, against bots you can make easy or hard." },
+  { sel: "#profileCard", img: "/assets/lg_bronze.webp", title: "That's you", text: "Your name and league. Tap it for your stats: wins, records and how you rank among friends." },
+  { sel: "#roadMini", img: "/assets/medal_gold.png", title: "Gold Road", text: "Every gold medal you win moves you along it: coins, packs and three exclusive characters." },
+  { sel: '.htab[data-page="0"]', img: "/assets/tab_trophy.webp", title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
+  { sel: '.htab[data-page="1"]', img: "/assets/tab_skins.webp", title: "Skins", text: "All your characters. Pick who you race with." },
+  { sel: '.htab[data-page="3"]', img: "/assets/tab_missions.webp", title: "Missions", text: "Daily missions, your career and the full Gold Road." },
+  { sel: '.htab[data-page="4"]', img: "/assets/tab_shop.webp", title: "Shop", text: "Packs, characters, trails and the Season Pass." },
+  { sel: "#endlessBtn", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life, how far can you get? I'll teach you the moves while you run. Tap it!", last: true },
+];
+const TOUR_PERKS = [
+  ["/assets/pw_rocket.png", "Wild power-ups"],
+  ["/assets/medal_gold.png", "Win medals"],
+  ["/assets/lg_gold.webp", "Climb leagues"],
 ];
 const tourEl = $("#tour");
 let tourAt = 0;
@@ -646,33 +651,50 @@ function startTour() {
 }
 function renderTour() {
   const st = TOUR[tourAt];
-  $("#tourTitle").textContent = st.title;
+  const name = (local.getItem("lr:name") || "").trim();
+  $("#tourTitle").textContent = st.title.replace("{name}", name || "there");
   $("#tourText").textContent = st.text;
-  $("#tourCount").textContent = `${tourAt + 1} / ${TOUR.length}`;
-  $("#tourNext").textContent = st.last ? "Run! →" : tourAt === 0 ? "Show me" : "Next";
+  $("#tourCount").textContent = st.welcome ? "" : `${tourAt} / ${TOUR.length - 1}`;
+  $("#tourNext").textContent = st.last ? "Run! →" : st.welcome ? "Show me around →" : "Next →";
+  $("#tourBar").replaceChildren(...TOUR.slice(1).map((_, i) => el("i", { class: i + 1 < tourAt ? "done" : i + 1 === tourAt ? "on" : "" })));
+  const img = $("#tourImg");
+  img.hidden = !st.img;
+  if (st.img) img.src = st.img;
+  $("#tourPerks").replaceChildren(...(st.welcome ? TOUR_PERKS.map(([src, t]) => el("span", {}, el("img", { src, alt: "" }), el("b", { text: t }))) : []));
+  tourEl.classList.toggle("welcome", Boolean(st.welcome));
+  tourEl.classList.toggle("last", Boolean(st.last));
   const hole = $("#tourHole");
   const tip = $("#tourTip");
+  const point = $("#tourPoint");
+  // replay the pop-in for every step
+  tip.classList.remove("in");
+  void tip.offsetWidth;
+  tip.classList.add("in");
   const target = st.sel ? document.querySelector(st.sel) : null;
   const r = target?.getBoundingClientRect();
   if (!r || !r.width) {
-    // no target: a dimmed screen with the tip in the middle
+    // no target: a dimmed screen with the card in the middle
     hole.style.cssText = "left:50%;top:45%;width:0;height:0";
-    tip.style.cssText = "left:50%;top:40%;transform:translate(-50%,-50%)";
-  } else {
-    const pad = 6;
-    hole.style.cssText = `left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px`;
-    // the tip goes below the target if there's room, else above it
-    const below = r.bottom + 170 < innerHeight;
-    const left = Math.max(12, Math.min(innerWidth - 12 - Math.min(320, innerWidth - 24), r.left + r.width / 2 - 160));
-    tip.style.cssText = below ? `left:${left}px;top:${r.bottom + 14}px` : `left:${left}px;top:${r.top - 14}px;transform:translateY(-100%)`;
+    tip.style.cssText = "left:50%;top:52%;transform:translate(-50%,-50%)";
+    point.hidden = true;
+    return;
   }
-  tourEl.classList.toggle("last", Boolean(st.last));
+  const pad = 6;
+  hole.style.cssText = `left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px`;
+  // the card goes below the target if there's room, else above it; a bouncing arrow joins them
+  const below = r.bottom + 230 < innerHeight;
+  const w = Math.min(340, innerWidth - 24);
+  const left = Math.max(12, Math.min(innerWidth - 12 - w, r.left + r.width / 2 - w / 2));
+  tip.style.cssText = below ? `left:${left}px;top:${r.bottom + 40}px` : `left:${left}px;top:${r.top - 40}px;transform:translateY(-100%)`;
+  point.hidden = false;
+  point.className = `tour-point ${below ? "up" : "down"}`;
+  point.style.cssText = `left:${r.left + r.width / 2}px;top:${below ? r.bottom + 8 : r.top - 36}px`;
 }
 function endTour(thenRun) {
   tourEl.hidden = true;
   local.setItem("lr:tour", "1");
   if (!thenRun) return;
-  // straight into the run (and its own short how-to), as soon as the runners have loaded
+  // straight into the run (it teaches the moves as you go), as soon as the runners have loaded
   const go = () => ($("#endlessBtn").disabled ? setTimeout(go, 300) : $("#endlessBtn").click());
   go();
 }
@@ -914,7 +936,8 @@ $("#setCountry").addEventListener("click", () => {
 });
 $("#setTut").addEventListener("click", () => {
   local.setItem("lr:tutDone", "");
-  toast("The swipe guide shows on your next race");
+  local.removeItem("lr:endlessTut");
+  toast("The tutorial plays on your next endless run");
 });
 renderCountryChips();
 
@@ -1648,58 +1671,9 @@ function renderEndlessBest() {
 $("#endlessBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
-  if (!local.getItem("lr:endlessTut")) return showTutorial(startEndless);
   startEndless();
 });
-// ── the first-run tutorial: everything you need, a few seconds each, skippable ──
-const TUT_STEPS = [
-  { icon: "👈 👉", title: "Swipe left or right", text: "to change lanes. Dodge crates, cows, taxis and anything else in your lane." },
-  { icon: "👆", title: "Swipe up to jump", text: "over hurdles, rolling barrels, logs and footballs. A tap jumps too." },
-  { icon: "👇", title: "Swipe down to slide", text: "under gates and anything flying at head height: bees, pigeons, drones." },
-  { icon: "🎁", title: "Grab the mystery boxes", text: "for a power-up. Tap the round button bottom left to use it: shield, rocket, lightning…" },
-  { icon: "🍌", title: "Throw things", text: "Bananas, glue and bowling balls: pick a lane on the mini track, then Throw ahead or Drop behind." },
-  { icon: "⚡", title: "Go faster and faster", text: "Run over speed pads for a boost, and hold 👀 Look back to see who's behind. The longer you run, the faster it gets." },
-  { icon: "❤️", title: "One life", text: "In the endless run one hit ends it. How far can you get?" },
-];
-const tutModal = $("#tutModal");
-let tutDone = null;
-let tutAt = 0;
-let tutTimer = null;
-function showTutorial(then) {
-  tutDone = then;
-  tutAt = 0;
-  tutModal.hidden = false;
-  renderTutStep();
-}
-function renderTutStep() {
-  const st = TUT_STEPS[tutAt];
-  $("#tutStep").replaceChildren(el("i", { class: "tut-icon", text: st.icon }), el("b", { text: st.title }), el("p", { text: st.text }));
-  $("#tutDots").replaceChildren(...TUT_STEPS.map((_, i) => el("i", { class: i === tutAt ? "on" : i < tutAt ? "done" : "" })));
-  $("#tutNext").textContent = tutAt === TUT_STEPS.length - 1 ? "Let's run! →" : "Next";
-  // it moves on by itself after a few seconds, so it never holds you up
-  clearTimeout(tutTimer);
-  if (tutAt < TUT_STEPS.length - 1) tutTimer = setTimeout(nextTut, 2600);
-}
-function nextTut() {
-  if (tutModal.hidden) return;
-  if (tutAt >= TUT_STEPS.length - 1) return endTut();
-  tutAt += 1;
-  sfx.tap();
-  renderTutStep();
-}
-function endTut() {
-  clearTimeout(tutTimer);
-  tutModal.hidden = true;
-  local.setItem("lr:endlessTut", "1");
-  local.setItem("lr:tutDone", "1"); // the swipe card isn't needed after this
-  const then = tutDone;
-  tutDone = null;
-  then?.();
-}
-$("#tutNext").addEventListener("click", nextTut);
 $("#packOdds").addEventListener("click", (e) => e.currentTarget.classList.toggle("open")); // the pack odds: 2 lines, tap for all
-$("#tutSkip").addEventListener("click", endTut);
-$("#tutStep").addEventListener("click", nextTut);
 $("#soloBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
@@ -4860,7 +4834,7 @@ function enterRace(v) {
   tag.classList.add("show");
   tag.replaceChildren(
     el("b", { text: game.endless ? "♾️ Endless run" : v.cup ? `🏆 Round ${v.cup.race}/${v.cup.races.length} · ${info.icon} ${KIND_LABEL[game.kind]}` : `${info.icon} ${KIND_LABEL[game.kind] ?? ""}` }),
-    el("small", { text: game.endless ? `3 hearts · how far can you get? Best: ${stats.get("bestRun").toLocaleString()} m` : KIND_RULE[game.kind] ?? "" }),
+    el("small", { text: game.endless ? `One life · how far can you get?${stats.get("bestRun") ? ` Best: ${stats.get("bestRun").toLocaleString()} m` : ""}` : KIND_RULE[game.kind] ?? "" }),
   );
   setTimeout(() => game.round === v.round && tag.classList.remove("show"), 7000); // the mode is only shown at the start
   tag.classList.toggle("small", Boolean(v.cup)); // the cup's reel shows the mode instead
@@ -4873,7 +4847,8 @@ function enterRace(v) {
   $("#aliveChip").hidden = true;
   renderModeHud();
   const touch = TOUCH;
-  $("#swipeTut").hidden = !(touch && !local.getItem("lr:tutDone"));
+  coachStart();
+  $("#swipeTut").hidden = !(touch && !local.getItem("lr:tutDone")) || coach.on;
   const hint = $("#controlsHint");
   // phones get the swipe card the first time; after that the HUD speaks for itself
   hint.textContent = touch ? "" : "↑ jump · ↓ slide · ← → lane · E use power-up · hold C to look back";
@@ -4914,6 +4889,114 @@ function banner(text, ms = 1400) {
   clearTimeout(bannerTimer);
   bannerTimer = setTimeout(() => b.classList.remove("show"), ms);
 }
+
+// ── first endless run: the tutorial happens in the run ──
+// When something you haven't learned yet comes up in your lane, the game drops
+// into slow motion and shows the move; make it and it speeds back up. Then a
+// power-up tip, and you're on your own.
+const COACH = {
+  lane: { title: "Swipe left or right", text: "A crate! Change lanes to dodge it.", keys: "← → on the keyboard", g: "side" },
+  jump: { title: "Swipe up to jump", text: "Jump over the hurdle!", keys: "↑ or Space on the keyboard", g: "up" },
+  slide: { title: "Swipe down to slide", text: "Slide under the gate!", keys: "↓ on the keyboard", g: "down" },
+  item: { title: "Tap to use it", text: "You got a power-up! Tap the round button bottom left.", keys: "E on the keyboard", g: "tap" },
+};
+const COACH_MOVES = ["lane", "jump", "slide"];
+const COACH_SLOW = 0.08; // time runs this fast while a move is shown
+const COACH_UNTIL_M = 1500; // after this, it stops teaching either way
+const coach = { on: false, wait: null, row: null, done: new Set(), scale: 1, items: 0, shownAt: 0 };
+function coachStart() {
+  coach.on = Boolean(game.endless) && !local.getItem("lr:endlessTut");
+  coach.done = new Set();
+  coach.scale = 1;
+  coachHide();
+}
+function coachShow(kind, dir = COACH[kind].g, row = null) {
+  const c = COACH[kind];
+  coach.wait = kind;
+  coach.row = row;
+  coach.items = me.items.length;
+  coach.shownAt = performance.now();
+  $("#coachTitle").textContent = c.title;
+  $("#coachText").textContent = c.text;
+  $("#coachKeys").textContent = TOUCH ? "" : c.keys;
+  $("#coachGesture").className = `coach-gesture ${dir}`;
+  const box = $("#coach");
+  box.classList.toggle("item", kind === "item");
+  box.hidden = false;
+  sfx.tap();
+}
+function coachHide() {
+  coach.wait = null;
+  coach.row = null;
+  $("#coach").hidden = true;
+}
+function coachEnd(learned) {
+  coach.on = false;
+  coachHide();
+  if (!learned) return;
+  local.setItem("lr:endlessTut", "1");
+  local.setItem("lr:tutDone", "1");
+}
+function coachLearned(kind) {
+  coach.done.add(kind);
+  coachHide();
+  sfx.coin();
+  banner(kind === "item" ? "NICE!" : "PERFECT!", 700);
+  if (COACH_MOVES.every((k) => coach.done.has(k)) && coach.done.has("item")) {
+    coachEnd(true);
+    setTimeout(() => {
+      banner("YOU'RE READY!", 1600);
+      toast("One hit ends the run. How far can you get?");
+    }, 800);
+  }
+}
+/** Every frame: eases in and out of slow motion and spots the next thing to teach. Returns the time scale. */
+function coachTick(dt) {
+  if (!coach.on) return 1;
+  if (me.out) {
+    coachEnd(false); // didn't make it: it teaches again next run
+    return 1;
+  }
+  const w = coach.wait;
+  coach.scale += ((w && w !== "item" ? COACH_SLOW : 1) - coach.scale) * Math.min(1, dt * 12);
+  if (me.d > COACH_UNTIL_M) {
+    coachEnd(true);
+    return 1;
+  }
+  if (w === "item" && (me.items.length < coach.items || performance.now() - coach.shownAt > 6000)) coachLearned("item");
+  if (coach.wait || !canControl() || me.stumbleT > 0 || me.power === "rocket") return coach.scale;
+  // holding a power-up (once you've learned a move): how to use it
+  if (!coach.done.has("item") && me.items.length && coach.done.size > 0) {
+    coachShow("item");
+    return coach.scale;
+  }
+  const course = race.course;
+  if (!course) return coach.scale;
+  const reach = Math.max(7, me.speed * 0.75);
+  for (const row of course.rows) {
+    if (row.z <= me.d + 1.5 || row.z > me.d + reach) continue;
+    const k = row.lanes[me.lane];
+    const need = k === "hurdle" ? "jump" : k === "gate" ? "slide" : k === "crate" ? "lane" : null;
+    if (!need || coach.done.has(need)) continue;
+    let dir;
+    if (need === "lane") {
+      const free = [me.lane - 1, me.lane + 1].filter((l) => l >= 0 && l < LANES && !row.lanes[l]);
+      dir = free.length === 1 ? (free[0] < me.lane ? "left" : "right") : "side";
+    }
+    coachShow(need, dir, row);
+    break;
+  }
+  return coach.scale;
+}
+/** A move you just made: does it answer what the coach is showing? */
+function coachInput(kind) {
+  const w = coach.wait;
+  if (!w || w === "item") return;
+  if (w === "lane" && (kind === "left" || kind === "right")) {
+    if (!coach.row?.lanes[me.lane]) coachLearned("lane"); // into a free lane
+  } else if (w === kind) coachLearned(w);
+}
+$("#coachSkip").addEventListener("click", () => coachEnd(true));
 
 // ── input ───────────────────────────────────────────────────────────────────
 
@@ -4959,6 +5042,7 @@ function input(kind) {
       sfx.slide();
     }
   }
+  coachInput(kind);
 }
 
 window.addEventListener("keydown", (e) => {
@@ -6577,7 +6661,8 @@ $("#specNext").addEventListener("click", () => cycleSpectate(1));
 
 function renderHearts(pop) {
   const box = $("#hearts");
-  const shown = game.kind === "survival" || game.kind === "potato";
+  // one life (the endless run) needs no hearts
+  const shown = (game.kind === "survival" && livesNow() > 1) || game.kind === "potato";
   box.style.display = shown ? "" : "none";
   if (!shown) return;
   const lost = game.kind === "potato" ? net.view?.players.find((p) => p.id === playerId)?.booms ?? 0 : me.hits;
@@ -7278,7 +7363,8 @@ function frame(now) {
     world.animateCourse(me.out ? Math.max(me.d, ...[...remote.map.values()].map((r) => r.dispD)) : me.d, raceT, dt);
     checkZaps();
     checkBest();
-    for (let i = 0; i < steps; i++) stepMe(dt / steps);
+    const ts = coachTick(dt); // slow motion while the first-run tutorial shows a move
+    for (let i = 0; i < steps; i++) stepMe((dt * ts) / steps);
     if (game.mode === "race") sendPos(false);
 
     const zMe = -me.d;
@@ -7286,7 +7372,7 @@ function frame(now) {
       me.runner.group.position.set(laneX(me.x), me.y, zMe);
       if (equipped().trail && me.speed > 2 && !me.out) world.trail(equipped().trail, laneX(me.x), me.y, zMe);
       me.runner.group.visible = !(me.invulnT > 0 && me.stumbleT <= 0 && !me.power && Math.floor(now / 90) % 2 === 0);
-      animateRunner(me.runner, currentAct(), me.speed, dt, me.power);
+      animateRunner(me.runner, currentAct(), me.speed, dt * ts, me.power);
       if (me.power) {
         const f = me.powerT / POWER_S[me.power];
         $("#powerSlot .bar i").style.width = `${f * 100}%`;

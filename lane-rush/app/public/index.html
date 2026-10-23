@@ -290,6 +290,16 @@
       <button id="lookBtn" class="look-btn" type="button" aria-label="Hold to look back"><span>👀</span><small>Look back</small></button>
       <div id="powerToast" class="power-toast"></div>
       <div id="controlsHint" class="controls-hint"></div>
+      <!-- first endless run: the tutorial happens in the run (slow motion until you make the move) -->
+      <div id="coach" class="coach" hidden>
+        <div class="coach-card">
+          <div id="coachGesture" class="coach-gesture"><i class="hand"></i></div>
+          <b id="coachTitle"></b>
+          <p id="coachText"></p>
+          <small id="coachKeys" class="coach-keys"></small>
+        </div>
+        <button id="coachSkip" class="coach-skip" type="button">Skip tutorial</button>
+      </div>
       <div id="swipeTut" class="swipe-tut" hidden>
         <div class="st-card">
           <b>How to run</b>
@@ -379,7 +389,7 @@
           <label class="set-row"><span><b>📳 Vibration</b><small>Buzz on hits and big moments</small></span><input type="checkbox" id="setBuzz" /></label>
           <label class="set-row"><span><b>🔋 Battery saver</b><small>Sharper picture off, smoother on older phones</small></span><input type="checkbox" id="setLow" /></label>
           <button id="setCountry" class="set-row btnrow" type="button"><span><b>🌍 Country</b><small id="setCountryName">Not set</small></span><i>›</i></button>
-          <button id="setTut" class="set-row btnrow" type="button"><span><b>👆 How to run</b><small>Show the swipe guide again next race</small></span><i>›</i></button>
+          <button id="setTut" class="set-row btnrow" type="button"><span><b>👆 How to run</b><small>Play the tutorial again on your next endless run</small></span><i>›</i></button>
         </div>
       </div>
     </div>
@@ -419,24 +429,24 @@
     <!-- first visit: a quick tour of the pages, ending on the endless run -->
     <div id="tour" class="tour" hidden>
       <div id="tourHole" class="tour-hole"></div>
+      <div id="tourPoint" class="tour-point" aria-hidden="true"></div>
       <div id="tourTip" class="tour-tip" role="dialog" aria-live="polite">
-        <b id="tourTitle"></b>
-        <p id="tourText"></p>
+        <div id="tourBar" class="tour-bar"></div>
+        <img class="tour-hero" src="/assets/full_c1b.webp" alt="" />
+        <div class="tour-body">
+          <span class="tour-face"><span class="ava"><img src="/assets/full_c1b.webp" alt="" /></span><img id="tourImg" class="tour-sticker" alt="" /></span>
+          <div>
+            <small class="tour-kicker">Bolt</small>
+            <b id="tourTitle"></b>
+            <p id="tourText"></p>
+          </div>
+        </div>
+        <div id="tourPerks" class="tour-perks"></div>
         <div class="tour-foot">
           <button id="tourSkip" class="tour-skip" type="button">Skip tour</button>
           <span id="tourCount"></span>
           <button id="tourNext" class="btn small go" type="button">Next</button>
         </div>
-      </div>
-    </div>
-    <!-- first endless run: a fast, skippable how-to -->
-    <div id="tutModal" class="modal gmodal tut-modal" hidden>
-      <div class="gsheet tut-sheet" role="dialog" aria-modal="true" aria-labelledby="tutTitle">
-        <div class="ribbon teal"><h2 id="tutTitle">How to run</h2></div>
-        <button id="tutSkip" class="tut-skip" type="button">Skip ›</button>
-        <div id="tutStep" class="tut-step"></div>
-        <div id="tutDots" class="tut-dots"></div>
-        <button id="tutNext" class="btn big go" type="button">Next</button>
       </div>
     </div>
     <div id="statsModal" class="modal gmodal" hidden>
