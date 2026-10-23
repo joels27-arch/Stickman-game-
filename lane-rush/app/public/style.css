@@ -1715,3 +1715,75 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 @keyframes bombPulse { 50% { transform: translateX(-50%) scale(1.07); } }
 .bomb-btn[hidden] { display: none; }
 .bomb-btn span { font-size: 30px; }
+
+/* ── Missions page: game-quality look ── */
+.hp-missions { background: radial-gradient(ellipse at 50% 0%, rgba(255, 80, 170, 0.35), transparent 55%), linear-gradient(180deg, #2a1166 0%, #160a3d 45%, #0c0726 100%); }
+.hp-missions .hp-scroll > * + * { margin-top: 12px; }
+.m-hero { position: relative; overflow: hidden; padding: 14px 16px; border-radius: 22px; border: 2px solid rgba(255, 255, 255, 0.75); background: linear-gradient(135deg, #ff4fa3 0%, #a23cff 55%, #5a22d6 100%); box-shadow: 0 6px 0 #2a0f6e, 0 16px 36px rgba(160, 60, 255, 0.35); color: #fff; }
+.m-hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 90% -10%, rgba(255, 255, 255, 0.45), transparent 40%), repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.06) 0 14px, transparent 14px 34px); }
+.m-hero.career { margin-top: 22px; background: linear-gradient(135deg, #18c8e8 0%, #1f7bf0 55%, #2d3fc8 100%); box-shadow: 0 6px 0 #0e2470, 0 16px 36px rgba(30, 140, 255, 0.35); }
+.m-hero-top { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.m-hero em { font-style: normal; font-weight: 900; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.m-hero h3 { position: relative; margin: 0; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 28px; line-height: 1; text-transform: uppercase; text-shadow: 0 3px 0 rgba(0, 0, 0, 0.3); }
+.m-hero h3 .dot { position: absolute; top: -4px; right: -16px; width: 12px; height: 12px; border-radius: 50%; background: #ff3b30; border: 2px solid #fff; }
+.m-hero h3 .dot[hidden] { display: none; }
+.m-hero p { margin: 4px 0 0; font-weight: 700; font-size: 13px; opacity: 0.92; }
+.m-timer { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 12px 6px 6px; border-radius: 14px; background: rgba(10, 6, 40, 0.45); border: 1px solid rgba(255, 255, 255, 0.25); }
+.m-timer img { width: 30px; height: 30px; object-fit: contain; }
+.m-timer span { display: grid; line-height: 1.05; }
+.m-timer small { font-weight: 800; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; }
+.m-timer b { font-family: var(--display); font-weight: 900; font-size: 18px; color: #ffe066; }
+.m-pips { position: relative; z-index: 1; display: flex; gap: 6px; margin-top: 12px; }
+.m-pips i { flex: 1; height: 10px; border-radius: 6px; background: rgba(0, 0, 0, 0.28); box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.3); }
+.m-pips i.done { background: linear-gradient(90deg, #b6f72a, #6fe000); box-shadow: 0 0 12px rgba(182, 247, 42, 0.8); }
+.m-pips i.claimed { background: linear-gradient(90deg, #ffe066, #ffb300); }
+
+/* mission cards */
+.hp-missions .quest-list { gap: 10px; }
+.hp-missions .quest { grid-template-columns: 60px minmax(0, 1fr) auto; gap: 12px; padding: 12px 12px 12px 10px; border-radius: 18px; color: #fff; border: 2px solid rgba(255, 255, 255, 0.12); border-left: 6px solid #3ddc84; background: linear-gradient(180deg, #252e6b 0%, #181f4d 100%); box-shadow: 0 6px 0 #0b0f2c, 0 10px 22px rgba(0, 0, 0, 0.35); }
+.hp-missions .quest.medium { border-left-color: #ffb300; }
+.hp-missions .quest.hard { border-left-color: #ff3d6e; }
+.hp-missions .quest .qicon { width: 60px; height: 60px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, rgba(61, 220, 132, 0.55), rgba(61, 220, 132, 0.1) 65%, transparent 70%); box-shadow: none; }
+.hp-missions .quest.medium .qicon { background: radial-gradient(circle at 50% 35%, rgba(255, 179, 0, 0.55), rgba(255, 179, 0, 0.1) 65%, transparent 70%); }
+.hp-missions .quest.hard .qicon { background: radial-gradient(circle at 50% 35%, rgba(255, 61, 110, 0.55), rgba(255, 61, 110, 0.1) 65%, transparent 70%); }
+.hp-missions .quest .qicon img { width: 48px; height: 48px; }
+.hp-missions .quest .qtier { background: #2fb36a; color: #fff; font-size: 10px; letter-spacing: 0.1em; }
+.hp-missions .quest.medium .qtier { background: #e08a00; }
+.hp-missions .quest.hard .qtier { background: #e02452; }
+.hp-missions .quest .qmain > b { color: #fff; font-size: 16px; }
+.hp-missions .quest .qbar { height: 16px; margin-top: 2px; background: rgba(0, 0, 0, 0.4); box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.45); }
+.hp-missions .quest .qbar i { background: linear-gradient(90deg, #6fe000, #b6f72a); animation: none; box-shadow: 0 0 10px rgba(182, 247, 42, 0.6); }
+.hp-missions .quest .qbar span { font-size: 11px; line-height: 16px; -webkit-text-stroke: 0; text-shadow: 0 1px 2px #000; }
+.hp-missions .quest .qreward { padding: 6px 10px; border-radius: 14px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 216, 74, 0.35); }
+.hp-missions .quest .qreward b { color: #ffd84a; }
+.hp-missions .quest .aclaim { padding: 8px 12px; border: 2px solid #fff; border-radius: 14px; background: linear-gradient(180deg, #d4ff5a, #6fd000); color: #1a2300; box-shadow: 0 4px 0 #2f6b00, 0 0 18px rgba(182, 247, 42, 0.6); animation: btnPulse 1.2s ease-in-out infinite; }
+.hp-missions .quest .aclaim span { font-family: var(--display); font-weight: 900; font-size: 13px; letter-spacing: 0.08em; }
+.hp-missions .quest .aclaim b { color: #1a2300; font-size: 18px; }
+.hp-missions .quest.ready { border-color: rgba(182, 247, 42, 0.7); box-shadow: 0 6px 0 #0b0f2c, 0 0 24px rgba(182, 247, 42, 0.35); }
+.hp-missions .quest.done { background: linear-gradient(180deg, #1c2350, #141a40); opacity: 0.72; }
+.hp-missions .quest.done .qicon img { filter: grayscale(0.6); }
+.hp-missions .quest .qstamp { right: 70px; top: 10px; border-color: #3ddc84; color: #3ddc84; background: rgba(10, 30, 20, 0.6); }
+.hp-missions .quest.locked { opacity: 0.55; }
+
+/* career road: medallions joined by a path */
+.career-road { position: relative; display: grid; gap: 10px; padding: 4px 0 8px; }
+.career-road::before { content: ""; position: absolute; left: 25px; top: 20px; bottom: 20px; width: 6px; border-radius: 3px; background: linear-gradient(180deg, #ffd84a, #1f7bf0 40%, rgba(255, 255, 255, 0.15)); }
+.hp-missions .chapter { position: relative; z-index: 1; display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 0; background: none; border: 0; box-shadow: none; color: #fff; }
+.hp-missions .chapter .ch-num { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 50%; border: 3px solid #fff; background: linear-gradient(180deg, #4a5280, #2a3060); font-family: var(--display); font-style: italic; font-weight: 900; font-size: 24px; color: #fff; box-shadow: 0 4px 0 #0b0f2c; }
+.hp-missions .chapter.finished .ch-num { background: linear-gradient(180deg, #ffe066, #ffb300); color: #6b3a00; }
+.hp-missions .chapter.current .ch-num { background: linear-gradient(180deg, #ff6fb5, #c21e7a); box-shadow: 0 4px 0 #6b0a37, 0 0 0 6px rgba(255, 111, 181, 0.25), 0 0 24px rgba(255, 111, 181, 0.7); animation: btnPulse 1.6s ease-in-out infinite; }
+.hp-missions .chapter.locked .ch-num { font-size: 20px; filter: grayscale(1); opacity: 0.7; }
+.hp-missions .chapter .ch-name { display: grid; gap: 3px; padding: 10px 12px; border-radius: 16px; background: linear-gradient(180deg, #252e6b, #181f4d); border: 2px solid rgba(255, 255, 255, 0.12); box-shadow: 0 5px 0 #0b0f2c; }
+.hp-missions .chapter.current .ch-name { border-color: rgba(255, 111, 181, 0.8); background: linear-gradient(135deg, #3a1f7a, #1f1f5a); }
+.hp-missions .chapter.finished .ch-name { border-color: rgba(255, 216, 74, 0.6); }
+.hp-missions .chapter .ch-name b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 20px; text-transform: uppercase; line-height: 1; }
+.hp-missions .chapter .ch-name small { font-weight: 700; font-size: 12px; opacity: 0.85; }
+.hp-missions .chapter.locked .ch-name { opacity: 0.6; }
+.ch-bar { display: block; height: 8px; border-radius: 5px; background: rgba(0, 0, 0, 0.4); overflow: hidden; }
+.ch-bar i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, #ff6fb5, #ffd84a); }
+.hp-missions .chapter .ch-chest { display: grid; justify-items: center; width: 72px; text-align: center; }
+.hp-missions .chapter .ch-chest img { width: 48px; height: 44px; object-fit: contain; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5)); }
+.hp-missions .chapter.locked .ch-chest img { filter: grayscale(1) brightness(0.7); }
+.hp-missions .chapter .ch-chest small { font-weight: 800; font-size: 9px; line-height: 1.15; opacity: 0.9; }
+.career-road > .quest { margin-left: 66px; }
+.career-road > .chest-btn { margin-left: 66px; }

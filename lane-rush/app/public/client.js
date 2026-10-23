@@ -102,6 +102,13 @@ const COLLECTION = [
   { id: "kai", name: "Kai", color: "#21c7d9", rarity: "epic", via: "medals", price: { medal: "silver", count: 6 } },
   { id: "zed", name: "Zed", color: "#7be3b0", rarity: "legendary", via: "medals", price: { medal: "gold", count: 3 } },
   { id: "aria", name: "Aria", color: "#e03cff", rarity: "legendary", via: "medals", price: { medal: "gold", count: 5 } },
+  { id: "porky", name: "Porky", color: "#ff9ec4", rarity: "common", via: "coins", coins: 900 },
+  { id: "foxy", name: "Flash Fox", color: "#ff7a1a", rarity: "rare", via: "coins", coins: 2200 },
+  { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "coins", coins: 2800 },
+  { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "coins", coins: 5000 },
+  { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "medals", price: { medal: "silver", count: 5 } },
+  { id: "hoops", name: "Big Slam", color: "#ff8a00", rarity: "legendary", via: "medals", price: { medal: "gold", count: 4 } },
+  { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "medals", price: { medal: "gold", count: 6 } },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
 const medalText = (medal, n) => `${n} ${medal} medal${n === 1 ? "" : "s"}`;
@@ -1142,6 +1149,11 @@ const PACK_CHARS = [
   { id: "ra", name: "Pharaoh Ra", rarity: "epic", dupe: 600 },
   { id: "fin", name: "Captain Fin", rarity: "rare", dupe: 300 },
   { id: "mo", name: "Mecha Mo", rarity: "rare", dupe: 300 },
+  { id: "zorp", name: "Zorp", rarity: "rare", dupe: 300 },
+  { id: "glorb", name: "Glorb", rarity: "epic", dupe: 600 },
+  { id: "rapstar", name: "MC Gold", rarity: "epic", dupe: 600 },
+  { id: "magic", name: "Diez", rarity: "legendary", dupe: 1500 },
+  { id: "dancer", name: "Disco Dash", rarity: "legendary", dupe: 1500 },
 ];
 /** Chances per item slot. Normal slots, and the boosted last slot of a Mega Pack. */
 /** Character odds per item (the rest is coins). Packs never contain medals. */
@@ -4841,6 +4853,7 @@ function renderDaily() {
   const ready = qs.filter((q) => st.done[q.id] && !st.claimed[q.id]).length;
   $("#dailyDot").hidden = ready === 0;
   $("#questSub").textContent = n === qs.length ? (ready ? "All done! Claim your rewards." : "All done! New missions tomorrow.") : `${n} of ${qs.length} done today`;
+  $("#dailyPips").replaceChildren(...qs.map((q) => el("i", { class: st.claimed[q.id] ? "claimed" : st.done[q.id] ? "done" : "" })));
   $("#questReset").textContent = untilMidnight();
   $("#questList").replaceChildren(
     ...qs.map((q) =>
@@ -5593,24 +5606,33 @@ function openChest(ci) {
     po.onDone = after;
   } else showUnlock({ kind: "coins", n: c.coins ?? 0 }, after);
 }
+/** Career: a road of chapter medallions; the chapter you're on opens up with its missions. */
 function renderCareer() {
   const st = careerState();
   const box = $("#careerList");
   const out = [];
+  const current = CAREER.findIndex((_, ci) => chapterOpen(ci, st) && !st.chests[ci]);
+  $("#careerSub").textContent = current < 0 ? "Every chapter done. Legend!" : `Chapter ${current + 1} of ${CAREER.length} · ${CAREER[current].name}`;
   CAREER.forEach((ch, ci) => {
     const open = chapterOpen(ci, st);
     const done = ch.missions.filter((_, mi) => st.claimed[`${ci}:${mi}`]).length;
     const finished = Boolean(st.chests[ci]);
     const head = el(
       "div",
-      { class: `chapter${open ? "" : " locked"}${finished ? " finished" : ""}` },
-      el("span", { class: "ch-num", text: String(ci + 1) }),
-      el("span", { class: "ch-name" }, el("b", { text: ch.name }), el("small", { text: finished ? "Complete ✓" : open ? `${done}/${ch.missions.length} missions` : `🔒 Finish chapter ${ci} to unlock` })),
+      { class: `chapter${open ? "" : " locked"}${finished ? " finished" : ""}${ci === current ? " current" : ""}` },
+      el("span", { class: "ch-num", text: finished ? "✓" : open ? String(ci + 1) : "🔒" }),
+      el(
+        "span",
+        { class: "ch-name" },
+        el("b", { text: ch.name }),
+        el("small", { text: finished ? "Complete" : open ? `${done}/${ch.missions.length} missions` : `Finish chapter ${ci} to unlock` }),
+        open && !finished ? el("span", { class: "ch-bar" }, el("i", { style: `width:${Math.round((done / ch.missions.length) * 100)}%` })) : null,
+      ),
       el("span", { class: "ch-chest" }, el("img", { src: "/assets/ui_chest.webp", alt: "" }), el("small", { text: chestLabel(ch.chest) })),
     );
     out.push(head);
-    // finished chapters fold away; locked ones show what's coming (greyed out)
-    if (finished) return;
+    // only the chapter you're on shows its missions
+    if (finished || ci !== current) return;
     ch.missions.forEach((m, mi) => {
       const have = careerStat(m.stat);
       const claimed = st.claimed[`${ci}:${mi}`];
@@ -5633,8 +5655,6 @@ function renderCareer() {
       b.addEventListener("click", () => openChest(ci));
       out.push(b);
     }
-    // only show the first locked chapter in full; later ones are just headers
-    if (!open) out.splice(out.length - ch.missions.length, ci > 0 && !chapterOpen(ci - 1, st) ? ch.missions.length : 0);
   });
   box.replaceChildren(...out);
 }

@@ -59,15 +59,19 @@ connected yet, so for now tapping the button unlocks it.
 |---|---|---|
 | Starters | free, playable in 3D | 7 |
 | Kiko (3D) | Season Pass, free track level 2 (level 1 is a Brain Pack) | 1 |
-| Coin characters | coins only (800–4,500 by rarity) | 6 |
-| Medal exclusives | medals only (4–6 silver, 3–5 gold) | 4 |
-| Pack exclusives | packs only | 5 |
+| Coin characters | coins only (800–5,000 by rarity) | 10 |
+| Medal exclusives | medals only (4–6 silver, 3–6 gold) | 7 |
+| Pack exclusives | packs only | 10 |
 | Season Pass | Gold track level 30 | 1 |
 
 *Decision:* earlier the shop characters could be bought with either coins or
 medals. The overhaul asked for medal-exclusive characters that coins can't
 buy, so the ten were split into six coin and four medal characters.
 Characters already bought under the old prices stay owned.
+
+*Decision:* the sports and music characters (Siete, Diez, Big Slam, Disco
+Dash, MC Gold) are invented archetypes with their own faces and names and no
+team, national or brand marks; they don't depict real people.
 
 *Decision:* the 2D characters (shop, packs, pass) are collectibles and can't
 be raced yet; only the eight 3D starters are playable. The Collection page

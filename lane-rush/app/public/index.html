@@ -99,11 +99,28 @@
         <div class="hpage hp-side hp-missions" id="hpMissions" aria-label="Missions">
           <div class="hp-scroll">
             <div class="ribbon pink hp-ribbon"><h2>Missions</h2></div>
-            <h3 class="mission-head">Daily <i class="dot" id="dailyDot" hidden></i></h3>
-            <div class="gsub" id="questHead"><span class="reset-badge"><img src="/assets/ui_watch.webp" alt="" /><span>New in <b id="questReset">--:--:--</b></span></span><p id="questSub"></p></div>
+            <section class="m-hero">
+              <div class="m-hero-top">
+                <div>
+                  <em>Today</em>
+                  <h3>Daily missions <i class="dot" id="dailyDot" hidden></i></h3>
+                  <p id="questSub"></p>
+                </div>
+                <div class="m-timer"><img src="/assets/ui_watch.webp" alt="" /><span><small>New in</small><b id="questReset">--:--:--</b></span></div>
+              </div>
+              <div id="dailyPips" class="m-pips"></div>
+            </section>
             <div id="questList" class="quest-list"></div>
-            <h3 class="mission-head">Career <i class="dot" id="careerDot" hidden></i></h3>
-            <div id="careerList" class="quest-list career-list"></div>
+            <section class="m-hero career">
+              <div class="m-hero-top">
+                <div>
+                  <em>Your road</em>
+                  <h3>Career <i class="dot" id="careerDot" hidden></i></h3>
+                  <p id="careerSub"></p>
+                </div>
+              </div>
+            </section>
+            <div id="careerList" class="career-road"></div>
           </div>
         </div>
         <!-- RIGHT: shop, season pass and the rest -->
