@@ -4163,7 +4163,6 @@ function enterRace(v) {
   // hearts only exist in modes where you have hearts to win back
   if (v.kind !== "survival") for (const h of world.hearts) h.taken = true;
   game.healed = new Set();
-  game.introsShown = new Set();
   showScreen("race");
 
   const mine = v.players.find((p) => p.id === playerId);
@@ -4233,7 +4232,7 @@ function enterRace(v) {
     el("b", { text: v.cup ? `🏆 Round ${v.cup.race}/${v.cup.races.length} · ${info.icon} ${KIND_LABEL[game.kind]}` : `${info.icon} ${KIND_LABEL[game.kind] ?? ""}` }),
     el("small", { text: KIND_RULE[game.kind] ?? "" }),
   );
-  setTimeout(() => game.round === v.round && tag.classList.add("small"), 7000);
+  setTimeout(() => game.round === v.round && tag.classList.remove("show"), 7000); // the mode is only shown at the start
   tag.classList.toggle("small", Boolean(v.cup)); // the cup's reel shows the mode instead
   world.setupMode(game.kind, race.course);
   world.setupMovers(race.course, v.seed, game.mapFailed ? "meadow" : map);
@@ -4640,7 +4639,7 @@ function hit(kind) {
     chicken: "Hop over the chicken! ↑",
     crab: "Jump the crab! ↑",
   }[kind] || "Ouch!";
-  banner(hintText, 900);
+  if (kind === "fake") banner(hintText, 900); // the rest is plain to see: no banner over the track
 }
 
 const slipped = new Set(); // banana ids you've already run onto
@@ -6101,23 +6100,8 @@ function myCoins() {
   return Math.max(server, game.coinsShown ?? 0);
 }
 /** Per-frame: brain catch, coin pickups. */
-/** The first time an obstacle type shows up, say what to do just before you reach it. */
-const INTRO_HINT = { hurdle: "⬆ JUMP over hurdles", gate: "⬇ SLIDE under gates", crate: "⬅ ➡ CHANGE LANE around crates", roller: "⬆ JUMP the rolling barrel (or dodge it)" };
-function introHints() {
-  const course = race.course;
-  if (!course || !game.introsShown) return;
-  for (const row of course.rows) {
-    if (row.z < me.d) continue;
-    if (row.z > me.d + me.speed * 1.6 + 6) break;
-    if (row.intro && !game.introsShown.has(row.intro)) {
-      game.introsShown.add(row.intro);
-      if (stats.get("races") < 6 || row.intro === "roller") banner(INTRO_HINT[row.intro] ?? "", 1400);
-    }
-  }
-}
 function modeTick(prevD, v) {
   if (me.finished || me.out) return;
-  introHints();
   const elapsed = (serverNow() - v.startAt) / 1000;
   // moving obstacles: jump the low ones, slide under the bees, dodge the rest
   if (me.power !== "rocket") {
