@@ -696,10 +696,10 @@ function giveItem(id) {
 
 // ── shop ───────────────────────────────────────────────────────────────────
 let shopReturn = "home";
-function openShop() {
+function openShop(tab = "chars") {
   shopReturn = game.mode === "lobby" ? "lobby" : game.mode === "results" ? "results" : "home";
   renderShop();
-  shopTab(true);
+  shopTab(tab === "chars" ? true : tab === "packs" ? false : tab);
   showScreen("shop");
 }
 /** Shop tabs: true = characters, false = packs, "items" = trails, celebrations, emotes. */
@@ -1200,7 +1200,7 @@ function showUnlock(item, onDone) {
   packStep();
 }
 
-for (const b of document.querySelectorAll(".shopBtn")) b.addEventListener("click", openShop);
+for (const b of document.querySelectorAll(".shopBtn")) b.addEventListener("click", () => openShop(b.dataset.tab || "chars"));
 $("#shopBack").addEventListener("click", () => {
   showScreen(shopReturn);
   if (shopReturn === "lobby" && net.view) renderLobby(net.view);
@@ -1289,6 +1289,11 @@ function onState(msg) {
         act({ type: "start", bots: sm !== "endless" });
       }
       return;
+    }
+    // hosting from the Tournaments page: open the room in the mode picked there
+    if (game.wantMode && v.host === playerId) {
+      if (v.mode !== game.wantMode) act({ type: "mode", mode: game.wantMode });
+      game.wantMode = null;
     }
     if (game.mode !== "lobby") enterLobby();
     renderLobby(v);
@@ -1451,6 +1456,7 @@ $("#createBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
   game.solo = false;
+  game.wantMode = null;
   connect(newCode(), true);
 });
 $("#joinBtn").addEventListener("click", () => {
@@ -1466,6 +1472,122 @@ $("#joinBtn").addEventListener("click", () => {
   connect(code, false);
 });
 codeInput.addEventListener("keydown", (e) => e.key === "Enter" && $("#joinBtn").click());
+
+// ── home: three pages · Tournaments | Play | Shop ──
+const homePages = $("#homePages");
+let homePage = 1;
+function setHomePage(i, animate = true) {
+  homePage = Math.max(0, Math.min(2, i));
+  homePages.classList.toggle("drag", !animate);
+  homePages.style.transform = `translateX(${-homePage * 100}vw)`;
+  for (const t of document.querySelectorAll(".htab")) {
+    const on = Number(t.dataset.page) === homePage;
+    t.classList.toggle("on", on);
+    t.setAttribute("aria-selected", String(on));
+  }
+  if (homePage === 0) renderCompete();
+}
+for (const t of document.querySelectorAll(".htab")) {
+  t.addEventListener("click", () => {
+    sfx.unlock();
+    setHomePage(Number(t.dataset.page));
+  });
+}
+// swipe sideways between pages; vertical drags scroll the page as usual
+{
+  let x0 = 0;
+  let y0 = 0;
+  let dx = 0;
+  let axis = "";
+  homePages.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches.length !== 1 || e.target.closest("input")) return (axis = "none");
+      x0 = e.touches[0].clientX;
+      y0 = e.touches[0].clientY;
+      dx = 0;
+      axis = "";
+    },
+    { passive: true },
+  );
+  homePages.addEventListener(
+    "touchmove",
+    (e) => {
+      if (axis === "none") return;
+      const mx = e.touches[0].clientX - x0;
+      const my = e.touches[0].clientY - y0;
+      if (!axis && Math.hypot(mx, my) > 10) axis = Math.abs(mx) > Math.abs(my) * 1.2 ? "x" : "none";
+      if (axis !== "x") return;
+      // resist at the outer edges
+      dx = (homePage === 0 && mx > 0) || (homePage === 2 && mx < 0) ? mx * 0.25 : mx;
+      homePages.classList.add("drag");
+      homePages.style.transform = `translateX(calc(${-homePage * 100}vw + ${dx}px))`;
+    },
+    { passive: true },
+  );
+  const end = () => {
+    if (axis === "x") setHomePage(homePage + (dx < -60 ? 1 : dx > 60 ? -1 : 0));
+    axis = "";
+  };
+  homePages.addEventListener("touchend", end);
+  homePages.addEventListener("touchcancel", end);
+}
+
+// Tournaments page: every mode, against bots or hosted for friends
+function renderCompete() {
+  $("#modeCards").replaceChildren(
+    ...["survival", "chase", "coinrush", "potato"].map((key) => {
+      const info = GAME_MODE_INFO[key];
+      return el(
+        "div",
+        { class: `mode-tile m-${key}` },
+        el("span", { class: "mt-ico", text: info.icon }),
+        el("em", { text: info.tag }),
+        el("b", { text: info.label }),
+        el("small", { text: info.text }),
+        el(
+          "span",
+          { class: "mt-btns" },
+          el("button", { class: "btn small go", type: "button", "data-mode": key, "data-with": "bots", text: "🤖 Bots" }),
+          el("button", { class: "btn small blue", type: "button", "data-mode": key, "data-with": "friends", text: "👥 Host" }),
+        ),
+      );
+    }),
+  );
+  const best = personalBest();
+  $("#endlessBest").textContent = best ? `Your best: ${best.toLocaleString()} m` : "Just you · beat your best";
+}
+function playMode(mode, withWho) {
+  sfx.unlock();
+  if (soloBtn.disabled) return toast("Still loading the runners…");
+  if (!requireName()) return setHomePage(1);
+  if (withWho === "bots") {
+    local.setItem("lr:soloMode", mode);
+    renderSoloPicker();
+    soloModal.hidden = false;
+    return;
+  }
+  game.solo = false;
+  game.wantMode = mode;
+  connect(newCode(), true);
+}
+$("#hpCompete").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-mode]");
+  if (b) playMode(b.dataset.mode, b.dataset.with);
+});
+/** Red dot on the Shop tab: a pass reward or a mission waiting to be claimed. */
+function renderStoreDot() {
+  const dot = document.querySelector('.htab[data-page="2"] .dot');
+  if (!dot) return;
+  let pass = false;
+  try {
+    pass = passClaimable() > 0;
+  } catch {
+    // still starting up
+  }
+  dot.hidden = !pass && !$("#questPill").classList.contains("has-claim");
+}
+renderCompete();
 nameInput.addEventListener("keydown", (e) => e.key === "Enter" && (codeInput.value.length === 4 ? $("#joinBtn") : $("#createBtn")).click());
 
 function leaveToHome(message = "") {
@@ -4683,9 +4805,15 @@ function rankChip(res) {
   );
 }
 function renderRankPill() {
-  const r = rankOf(rank.rp());
+  const rp = rank.rp();
+  const r = rankOf(rp);
   $("#rankPillImg").src = r.img;
-  $("#rankBadgeBtn").title = `${r.name} · ${rank.rp()} RP`;
+  $("#rankBadgeBtn").title = `${r.name} · ${rp} RP`;
+  // the league card on the Tournaments page
+  $("#leagueImg").src = r.img;
+  $("#leagueName").textContent = r.name;
+  $("#leagueBar").style.width = r.next == null ? "100%" : `${Math.round(((rp - r.from) / (r.next - r.from)) * 100)}%`;
+  $("#leagueNext").textContent = r.next == null ? `${rp} RP · top league` : `${rp} RP · ${r.next - rp} to ${rankOf(r.next).name}`;
 }
 
 // ── friends: everyone you've been in a room with, and their rank ──
@@ -4760,11 +4888,13 @@ function rankTab(friends) {
   $("#friendList").hidden = !friends;
   $("#leagueList").hidden = friends;
 }
-$("#rankBadgeBtn").addEventListener("click", () => {
+function openRank() {
   renderRank();
   rankTab(true);
   rankModal.hidden = false;
-});
+}
+$("#rankBadgeBtn").addEventListener("click", openRank);
+$("#leagueCard").addEventListener("click", openRank);
 $("#tabFriends").addEventListener("click", () => rankTab(true));
 $("#tabLeagues").addEventListener("click", () => rankTab(false));
 $("#rankClose").addEventListener("click", () => (rankModal.hidden = true));
@@ -4817,6 +4947,7 @@ function renderMissionDots() {
   const trophies = ACHIEVEMENTS.some((a) => achState(a).ready);
   $("#careerDot").hidden = !career;
   $("#questPill").classList.toggle("has-claim", daily || career || trophies);
+  renderStoreDot();
 }
 function renderAch() {
   $("#achList").replaceChildren(
@@ -4969,9 +5100,14 @@ function claimPass(level, track, tile) {
 const passModal = $("#passModal");
 function renderPassPill() {
   const p = passState();
-  $("#passPillLv").textContent = `Lv ${passLevel(p.xp)}`;
+  const lv = passLevel(p.xp);
+  $("#passPillLv").textContent = `Level ${lv}`;
+  const into = lv >= PASS_LEVELS ? PASS_XP : p.xp - (lv - 1) * PASS_XP;
+  $("#passPillBar").style.width = `${Math.round((into / PASS_XP) * 100)}%`;
   const n = passClaimable(p);
+  $("#passPillSub").textContent = n ? `${n} reward${n > 1 ? "s" : ""} ready to claim!` : lv >= PASS_LEVELS ? "Max level reached" : `${into} / ${PASS_XP} XP to level ${lv + 1}`;
   $("#passPill .dot").hidden = n === 0;
+  renderStoreDot();
 }
 function renderPass() {
   const p = passState();
