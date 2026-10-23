@@ -4633,8 +4633,10 @@ function recordRace(v, place) {
   const d = Math.round(mine?.d ?? 0);
   stats.add("races", 1);
   stats.add("dist", d);
-  if (n >= 2 && place === 1) stats.add("wins", 1);
-  if (n >= 2 && place <= 3) stats.add("podiums", 1);
+  // "with friends" trophies only count races with at least two real people
+  const real = v.players.filter((p) => !p.bot).length;
+  if (real >= 2 && place === 1) stats.add("wins", 1);
+  if (real >= 2 && place <= 3) stats.add("podiums", 1);
   if (n < 2 && v.kind === "survival") stats.max("bestRun", d);
   // coins for every race: by place against everyone (bots too), plus hits you landed
   const kos = game.kos ?? 0;
@@ -4650,7 +4652,6 @@ function recordRace(v, place) {
   const coins = ((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1);
   wallet.addCoins(coins);
   // rank points only count against real people; solo runs pay a little for distance
-  const real = v.players.filter((p) => !p.bot).length;
   const delta = real >= 2 ? (RP_TABLE[Math.min(n, 4)]?.[place - 1] ?? 0) : n < 2 && v.kind === "survival" ? Math.min(10, Math.floor(d / 300)) : 0;
   const before = rankOf(rank.rp());
   const res = rank.add(delta);
