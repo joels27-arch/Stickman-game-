@@ -186,6 +186,9 @@ export class GameSession {
     this.setState('closed');
   }
 
+  /** Test hook: drop the socket as if the network failed (the session will reconnect). */
+  debugDrop() { const t = this.transport; if (t) { t.close(); } }
+
   sendJson(m: object) { this.transport?.send(JSON.stringify(m)); }
   setReady(on: boolean) { this.sendJson({ t: 'ready', on }); }
   start() { this.sendJson({ t: 'start' }); }
