@@ -1233,6 +1233,18 @@ function onServerError(error) {
     return;
   }
   if (error === "box gone") return loseBox();
+  // someone (or a bot) got to the coin first: trust the server's count again
+  if (error === "coin gone" || error === "bad coin") {
+    game.coinsShown = net.view?.players.find((p) => p.id === playerId)?.coins ?? 0;
+    return;
+  }
+  // the target moved before the item landed: give the item back
+  if (["nobody ahead", "nobody there", "too far", "a cloud is already out"].includes(error)) {
+    if (me.lastUsed && me.items.length < 2) me.items.unshift(me.lastUsed);
+    me.lastUsed = "";
+    renderPower();
+    return toast(error === "a cloud is already out" ? "A storm is already out: kept your item" : "Missed! You kept your item");
+  }
   if (["not racing", "race not over", "already started", "no banana", "no ball", "too soon"].includes(error)) return; // harmless races
   if (error.startsWith("Waiting for")) return toast(error);
   toast(error);
@@ -5389,6 +5401,7 @@ function useItem(lane = me.lane, dir = 1) {
       renderPower();
       return;
     }
+    me.lastUsed = kind;
     if (kind === "boxing") {
       act({ type: "punch", target: target.id });
       banner("🥊 POW!", 700);
