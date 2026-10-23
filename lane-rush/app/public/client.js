@@ -2764,11 +2764,11 @@ const world = (() => {
         });
       const jobs =
         map === "city"
-          ? [glb("ct_tower", "cityTower", { height: 30 }), glb("ct_shop", "cityShop", { height: 13 }), glb("ct_lamp", "cityLamp", { height: 5.2 }), glb("ct_taxi", "taxi", { width: 2.6 }), glb("ct_pigeon", "pigeon", { width: 1.0 }), loadGLB("/assets/ct_road.glb").then((g) => (P.cityTileNext = fitTile(g.scene)))]
+          ? [glb("ct_tower", "cityTower", { height: 30 }), glb("ct_shop", "cityShop", { height: 13 }), glb("ct_lamp", "cityLamp", { height: 5.2 }), glb("ct_taxi", "taxi", { width: 2.6 }), glb("ct_pigeon", "pigeon", { width: 1.0 }), loadGLB("/assets/ct_road.glb").then((g) => (P.cityTileNext = fitTile(g.scene, true)))]
           : map === "stadium"
           ? [stand(), glb("st_light", "stadiumLight", { height: 30 }), glb("st_ball", "football", { width: 0.8 }), glb("st_cam", "spidercam", { width: 1.1 }), loadGLB("/assets/st_pitch.glb").then((g) => (P.stadiumTileNext = fitTile(g.scene)))]
           : map === "space"
-          ? [glb("sp_dome", "spaceDome", { height: 7 }), glb("sp_rocket", "spaceRocket", { height: 14 }), glb("sp_dish", "spaceDish", { height: 5 }), glb("sp_asteroid", "asteroid", { width: 0.9 }), glb("sp_ufo", "ufo", { width: 2.4 }), loadGLB("/assets/sp_walk.glb").then((g) => (P.spaceTileNext = fitTile(g.scene)))]
+          ? [glb("sp_dome", "spaceDome", { height: 7 }), glb("sp_rocket", "spaceRocket", { height: 14 }), glb("sp_dish", "spaceDish", { height: 5 }), glb("sp_asteroid", "asteroid", { width: 0.9 }), glb("sp_ufo", "ufo", { width: 2.4 }), loadGLB("/assets/sp_walk.glb").then((g) => (P.spaceTileNext = fitTile(g.scene, true)))]
           : map === "farm"
           ? [
               loadGLB("/assets/barn.glb").then((g) => (P.barn = fitProp(g.scene, { height: 7.5 }))),
@@ -2838,8 +2838,8 @@ const world = (() => {
    * The Higgsfield ground slab: scaled to the track's width, with its grassy
    * top (found by casting rays down onto it) at y = 0 so runners stand on it.
    */
-  function fitTile(root) {
-    const holder = fitProp(root, { width: TRACK_W });
+  function fitTile(root, lengthwise = false) {
+    const holder = fitProp(root, { width: TRACK_W, lengthwise });
     holder.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(holder);
     const size = box.getSize(new THREE.Vector3());
