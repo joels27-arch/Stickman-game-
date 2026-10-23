@@ -7313,17 +7313,16 @@ function frame(now) {
     if (intro) {
       const behind = new THREE.Vector3(tx, 3.0, fz + 5.6);
       const ORBIT_END = 1.35; // seconds before the gun when the fly-past hands over
+      // the fly-past stays over the track (never into the stands or buildings at the side)
+      const flyAt = (k) => new THREE.Vector3(3.2 * (2 * k - 1), 2.0 + Math.sin(k * Math.PI) * 1.2, fz - 7.2 + Math.sin(k * Math.PI) * 1.6);
       if (toGo > ORBIT_END) {
-        const k = Math.min(1, (toGo - ORBIT_END) / 2.1); // 1 → 0 across the fly-past
-        const ang = -0.95 * Math.PI * 0.5 + k * 0.95 * Math.PI; // from the right side round to the left, in front
-        const R = 7.6;
-        camPos.set(Math.sin(ang) * R, 2.2 + Math.sin(k * Math.PI) * 1.4, fz - 1.5 - Math.cos(ang) * R);
+        camPos.copy(flyAt(Math.min(1, (toGo - ORBIT_END) / 2.1))); // right → left in front of everyone
       } else {
-        // smooth hand-over to the running camera
+        // smooth hand-over to the running camera, arcing up over the runners' heads
         const u = 1 - (toGo - 0.35) / (ORBIT_END - 0.35);
         const e = u * u * (3 - 2 * u);
-        const from = new THREE.Vector3(Math.sin(-0.475 * Math.PI) * 7.6, 2.2, fz - 1.5 - Math.cos(-0.475 * Math.PI) * 7.6);
-        camPos.copy(from.lerp(behind, e));
+        camPos.copy(flyAt(0).lerp(behind, e));
+        camPos.y += Math.sin(e * Math.PI) * 2.2;
       }
     } else {
       camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
@@ -7334,7 +7333,7 @@ function frame(now) {
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
-    if (intro) camLook.set(toGo > 1.35 ? 0 : tx * 0.5, 1.0, fz - 1.5 - (toGo > 1.35 ? 0 : 3 * (1 - (toGo - 0.35))));
+    if (intro) camLook.set(toGo > 1.35 ? 0 : tx * 0.5, 1.0, toGo > 1.35 ? fz : fz - 9 * (1 - (toGo - 0.35)));
     else if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
     else camLook.set(tx * 0.8, 1.0 + fy * 0.6, fz - 9);
     camera.lookAt(camLook);
