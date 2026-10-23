@@ -1190,7 +1190,8 @@ function renderPacks() {
       { class: `acard ${c.rarity}${wallet.has(c.id) ? " got" : ""}` },
       el("span", { class: "rar", text: c.rarity }),
       el("img", { src: `/assets/pk_${c.id}.webp`, alt: "" }),
-      el("b", { text: wallet.has(c.id) ? c.name : "???" }),
+      el("b", { text: c.name }),
+      wallet.has(c.id) ? null : el("i", { class: "padlock", text: "🔒" }),
     )),
   );
   const n = PACK_ODDS.normal;

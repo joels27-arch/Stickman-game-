@@ -1627,3 +1627,10 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .htab.on:active img { transform: translateY(-18px) scale(0.92); }
 .htab .dot { position: absolute; z-index: 2; top: 2px; right: 4px; width: 14px; height: 14px; border-radius: 50%; background: #ff3b30; border: 2px solid #fff; }
 .htab .dot[hidden] { display: none; }
+/* the shield stays inside the bar on the outer tabs */
+.htab.on:first-child::before { left: -4px; transform: none; }
+.htab.on:last-child::before { left: auto; right: -4px; transform: none; }
+/* pack characters: full colour, locked until you pull them */
+.acard img, .acard:not(.got) img { filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35)); opacity: 1; }
+.acard { position: relative; }
+.acard .padlock { position: absolute; top: 18px; right: 2px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: rgba(10, 14, 40, 0.75); border: 2px solid #fff; font-style: normal; font-size: 10px; }
