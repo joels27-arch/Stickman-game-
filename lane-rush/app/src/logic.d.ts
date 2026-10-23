@@ -71,6 +71,7 @@ export const BANANA_COOLDOWN_MS: number;
 export const GAME_MODES: string[];
 export const CUP_MODES: string[];
 export const MAPS: string[];
+export function livesOf(state: unknown): number;
 export const BOT_LEVELS: Record<string, { skill: [number, number]; pace: number }>;
 export const MAX_EMPTY_M: number;
 export const EMOTES: string[];

@@ -6,8 +6,8 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <title>Brain Run — 4-player party race</title>
-    <meta property="og:title" content="Brain Run" />
+    <title>4 Friends — race your friends</title>
+    <meta property="og:title" content="4 Friends" />
     <meta
       property="og:description"
       content="A cartoon 4-player running game. 3 hearts each, power-ups, last runner standing wins. Play solo or share a lobby code with friends."
@@ -84,13 +84,13 @@
         <!-- PLAY -->
         <div class="hpage hp-play" id="hpPlay" aria-label="Play">
           <button id="roadMini" class="road-mini" type="button" aria-label="Gold Road"></button>
-          <h1 class="logo home-logo"><span class="w1">BRAIN</span><span class="w2">RUN</span></h1>
+          <h1 class="logo home-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
           <div class="roster" id="homeRoster" hidden></div>
           <div class="home-dock">
             <div class="play-card">
               <button id="endlessBtn" class="btn big go endless-btn" type="button"><span class="eb-main"><span class="flagico">♾️</span> Endless run <span class="arrow">→</span></span><small id="endlessBest">How far can you get?</small></button>
               <div class="room-row three" id="roomRow">
-                <button id="soloBtn" class="btn room-btn purple" type="button"><span class="flagico">🤖</span> Vs bots</button>
+                <button id="soloBtn" class="btn room-btn purple" type="button"><span class="flagico">🎮</span> Game modes</button>
                 <button id="createBtn" class="btn room-btn blue" type="button"><span class="flagico">👥</span> Create</button>
                 <button id="joinOpen" class="btn room-btn green" type="button"><span class="flagico">🔑</span> Join</button>
               </div>
@@ -168,7 +168,7 @@
         <div class="panel lobby-panel">
           <div class="lobby-head">
             <div class="brand small-brand">
-              <h1 class="logo"><span class="w1">BRAIN</span><span class="w2">RUN</span></h1>
+              <h1 class="logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
             </div>
             <div class="code-box">
               <div class="label">Lobby code</div>
@@ -409,6 +409,16 @@
     </div>
 
     <!-- RANKING: leagues + friends -->
+    <!-- first endless run: a fast, skippable how-to -->
+    <div id="tutModal" class="modal gmodal tut-modal" hidden>
+      <div class="gsheet tut-sheet" role="dialog" aria-modal="true" aria-labelledby="tutTitle">
+        <div class="ribbon teal"><h2 id="tutTitle">How to run</h2></div>
+        <button id="tutSkip" class="tut-skip" type="button">Skip ›</button>
+        <div id="tutStep" class="tut-step"></div>
+        <div id="tutDots" class="tut-dots"></div>
+        <button id="tutNext" class="btn big go" type="button">Next</button>
+      </div>
+    </div>
     <div id="statsModal" class="modal gmodal" hidden>
       <div class="grays" aria-hidden="true"></div>
       <div class="gsheet stats-sheet" role="dialog" aria-modal="true" aria-labelledby="statsTitle">

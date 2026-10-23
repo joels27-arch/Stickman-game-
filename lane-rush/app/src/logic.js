@@ -19,7 +19,7 @@
  * same constants for its physics.
  */
 
-export const meta = { game: "Brain Run", minPlayers: 1, maxPlayers: 4 };
+export const meta = { game: "4 Friends", minPlayers: 1, maxPlayers: 4 };
 
 // ── shared tuning (client physics reads these too) ──────────────────────────
 
@@ -114,6 +114,10 @@ export const CUP_POINTS = [10, 5, 3, 1];
 /** Rank points are reported by each player's device (shown to friends in the lobby). */
 export const MAX_RP = 999999;
 export const LIVES = 3;
+/** Hearts this race: 3, or 1 in an endless run. */
+export function livesOf(state) {
+  return state.lives ?? LIVES;
+}
 export const SURVIVAL_LEN = 9000; // metres of course generated; nobody lasts this long
 export const SURVIVAL_LIMIT_MS = 10 * 60 * 1000;
 export const SURVIVAL_MAX_SPEED = 24; // the ramp tops out here (after ~3 minutes)…
@@ -1004,7 +1008,7 @@ function stepMode(state, t) {
       holder.booms = (holder.booms ?? 0) + 1;
       state.blastSeq = (state.blastSeq ?? 0) + 1;
       state.blasts = [...(state.blasts ?? []), { id: state.blastSeq, holder: holder.id, d: holder.d, lane: holder.lane, at: t }].slice(-6);
-      if (holder.booms >= LIVES) knockOut(holder, t);
+      if (holder.booms >= livesOf(state)) knockOut(holder, t);
       else {
         holder.stunUntil = t + 1600;
         if (holder.bot) holder.act = "stumble";
@@ -1212,7 +1216,7 @@ function botHit(state, p, t, power = false) {
   p.act = "stumble";
   p.y = 0;
   if (state.kind === "coinrush") spillCoins(state, p, t);
-  if (state.kind === "survival" && p.hits >= LIVES) knockOut(p, t);
+  if (state.kind === "survival" && p.hits >= livesOf(state)) knockOut(p, t);
 }
 
 function stepBots(state, t) {
@@ -1519,6 +1523,9 @@ export function validateAction(state, playerId, action) {
     case "start": {
       if (state.phase !== "lobby") return { ok: false, error: "already started" };
       if (action.bots !== undefined && typeof action.bots !== "boolean") return { ok: false, error: "bad bots" };
+      if (action.endless !== undefined && typeof action.endless !== "boolean") return { ok: false, error: "bad endless" };
+      // the one-life endless run is for one runner alone, without bots
+      if (action.endless && (action.bots !== false || present(state).length !== 1)) return { ok: false, error: "endless runs are solo" };
       if (state.host !== playerId) return { ok: false, error: "Only the host can start" };
       if (present(state).length < 1) return { ok: false, error: "nobody to race" };
       // everyone else has to have locked in their runner
@@ -1733,6 +1740,7 @@ export function applyAction(state0, playerId, action) {
       });
       break;
     case "start":
+      state.lives = action.endless ? 1 : LIVES; // endless run: one hit and it's over
       state.cup = newCup(state.mode, t, state.rounds ?? 1);
       state.botFill = action.bots !== false;
       if (state.botFill) fillBots(state);
@@ -1787,7 +1795,7 @@ export function applyAction(state0, playerId, action) {
       if (action.sc !== undefined) me.sc = action.sc;
       if (action.cb !== undefined) me.cb = Math.max(me.cb ?? 0, action.cb);
       if (survival) {
-        if (state.kind === "survival" && me.hits >= LIVES) knockOut(me, t);
+        if (state.kind === "survival" && me.hits >= livesOf(state)) knockOut(me, t);
         if (state.kind === "chase" && me.d <= brainDistance(elapsed / 1000)) knockOut(me, t);
         maybeEnd(state, t);
         break;
@@ -1984,7 +1992,7 @@ export function viewFor(state, playerId) {
           table: cupStandings(state),
         }
       : null,
-    lives: LIVES,
+    lives: livesOf(state),
     limitAt:
       state.kind === "coinrush"
         ? state.startAt + COINRUSH_MS

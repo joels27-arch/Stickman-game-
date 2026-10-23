@@ -1469,7 +1469,7 @@ function onState(msg) {
       game.endlessSent = true;
       if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
       if (v.map !== "random") act({ type: "map", map: "random" });
-      act({ type: "start", bots: false });
+      act({ type: "start", bots: false, endless: true });
     }
     return;
   }
@@ -1580,8 +1580,57 @@ function renderEndlessBest() {
 $("#endlessBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
+  if (!local.getItem("lr:endlessTut")) return showTutorial(startEndless);
   startEndless();
 });
+// ── the first-run tutorial: everything you need, a few seconds each, skippable ──
+const TUT_STEPS = [
+  { icon: "👈 👉", title: "Swipe left or right", text: "to change lanes. Dodge crates, cows, taxis and anything else in your lane." },
+  { icon: "👆", title: "Swipe up to jump", text: "over hurdles, rolling barrels, logs and footballs. A tap jumps too." },
+  { icon: "👇", title: "Swipe down to slide", text: "under gates and anything flying at head height: bees, pigeons, drones." },
+  { icon: "🎁", title: "Grab the mystery boxes", text: "for a power-up. Tap the round button bottom left to use it: shield, rocket, lightning…" },
+  { icon: "🍌", title: "Throw things", text: "Bananas, glue and bowling balls: pick a lane on the mini track, then Throw ahead or Drop behind." },
+  { icon: "⚡", title: "Go faster and faster", text: "Run over speed pads for a boost, and hold 👀 Look back to see who's behind. The longer you run, the faster it gets." },
+  { icon: "❤️", title: "One life", text: "In the endless run one hit ends it. How far can you get?" },
+];
+const tutModal = $("#tutModal");
+let tutDone = null;
+let tutAt = 0;
+let tutTimer = null;
+function showTutorial(then) {
+  tutDone = then;
+  tutAt = 0;
+  tutModal.hidden = false;
+  renderTutStep();
+}
+function renderTutStep() {
+  const st = TUT_STEPS[tutAt];
+  $("#tutStep").replaceChildren(el("i", { class: "tut-icon", text: st.icon }), el("b", { text: st.title }), el("p", { text: st.text }));
+  $("#tutDots").replaceChildren(...TUT_STEPS.map((_, i) => el("i", { class: i === tutAt ? "on" : i < tutAt ? "done" : "" })));
+  $("#tutNext").textContent = tutAt === TUT_STEPS.length - 1 ? "Let's run! →" : "Next";
+  // it moves on by itself after a few seconds, so it never holds you up
+  clearTimeout(tutTimer);
+  if (tutAt < TUT_STEPS.length - 1) tutTimer = setTimeout(nextTut, 2600);
+}
+function nextTut() {
+  if (tutModal.hidden) return;
+  if (tutAt >= TUT_STEPS.length - 1) return endTut();
+  tutAt += 1;
+  sfx.tap();
+  renderTutStep();
+}
+function endTut() {
+  clearTimeout(tutTimer);
+  tutModal.hidden = true;
+  local.setItem("lr:endlessTut", "1");
+  local.setItem("lr:tutDone", "1"); // the swipe card isn't needed after this
+  const then = tutDone;
+  tutDone = null;
+  then?.();
+}
+$("#tutNext").addEventListener("click", nextTut);
+$("#tutSkip").addEventListener("click", endTut);
+$("#tutStep").addEventListener("click", nextTut);
 $("#soloBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
@@ -2416,10 +2465,10 @@ $("#botToggle").addEventListener("change", (e) => {
 $("#nextBtn").addEventListener("click", () => act({ type: "next" }));
 $("#copyBtn").addEventListener("click", async () => {
   const url = `${location.origin}/?join=${net.code}`;
-  const text = `Race me in Brain Run! Code ${net.code} → ${url}`;
+  const text = `Race me in 4 Friends! Code ${net.code} → ${url}`;
   try {
     if (navigator.share && matchMedia("(pointer: coarse)").matches) {
-      await navigator.share({ title: "Brain Run", text, url });
+      await navigator.share({ title: "4 Friends", text, url });
     } else {
       await navigator.clipboard.writeText(url);
       $("#copyMsg").textContent = "Link copied!";
@@ -2461,9 +2510,9 @@ function renderResults(v) {
         : v.kind === "chase"
           ? `${Math.round(p.d)} m · ${p.outAt != null ? "caught by the brain" : "escaped!"}`
           : v.kind === "potato"
-            ? `${Math.round(p.d)} m · ${Math.max(0, LIVES - (p.booms ?? 0))} ❤️ left`
+            ? `${Math.round(p.d)} m · ${Math.max(0, livesNow() - (p.booms ?? 0))} ❤️ left`
             : survival
-        ? `${Math.round(p.d)} m · ${Math.max(0, LIVES - p.hits)} ❤️ left`
+        ? `${Math.round(p.d)} m · ${Math.max(0, livesNow() - p.hits)} ❤️ left`
         : p.finish !== null
           ? `${p.hits} bump${p.hits === 1 ? "" : "s"}`
           : `${Math.round(p.d)} m of ${TRACK_LEN} m`;
@@ -4501,6 +4550,8 @@ const game = { mode: "home", round: -1, kind: "survival", len: TRACK_LEN };
 // every mode now runs on the endless course; only Survival uses obstacle hearts
 const isSurvival = () => isEndless(game.kind);
 const heartsFromHits = () => game.kind === "survival";
+/** Hearts this race (3, or 1 in an endless run), as the room says. */
+const livesNow = () => net.view?.lives ?? LIVES;
 const POWER_HITS = new Set(["zap", "banana", "bowling", "fake"]);
 /** Hearts the room gave out: gone for everyone, and +1 heart for whoever got it (once). */
 function healFromHearts() {
@@ -4631,7 +4682,7 @@ function enterRace(v) {
   remote.clear();
   race.course = world.buildCourseObjects(v.seed, game.len, v.courseBoost ?? 0);
   // hearts only exist in modes where you have hearts to win back
-  if (v.kind !== "survival") for (const h of world.hearts) h.taken = true;
+  if (v.kind !== "survival" || (v.lives ?? LIVES) < 2) for (const h of world.hearts) h.taken = true; // none in a one-life endless run
   game.healed = new Set();
   showScreen("race");
 
@@ -5081,7 +5132,7 @@ function hit(kind) {
   renderCombo();
   if (heartsFromHits() && !fromPower) {
     renderHearts(true);
-    if (me.hits >= LIVES) {
+    if (me.hits >= livesNow()) {
       knockOut();
       return;
     }
@@ -6408,9 +6459,9 @@ function renderHearts(pop) {
   box.style.display = shown ? "" : "none";
   if (!shown) return;
   const lost = game.kind === "potato" ? net.view?.players.find((p) => p.id === playerId)?.booms ?? 0 : me.hits;
-  const left = Math.max(0, LIVES - lost);
+  const left = Math.max(0, livesNow() - lost);
   box.replaceChildren(
-    ...Array.from({ length: LIVES }, (_, i) => el("i", { class: i < left ? "" : `lost${pop && i === left ? " pop" : ""}`, text: "❤️" })),
+    ...Array.from({ length: livesNow() }, (_, i) => el("i", { class: i < left ? "" : `lost${pop && i === left ? " pop" : ""}`, text: "❤️" })),
   );
 }
 
