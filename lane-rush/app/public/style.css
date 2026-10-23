@@ -2175,3 +2175,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .rnode .rline { top: 88px; }
 .rgold i { font-style: normal; font-size: 12px; }
 .road-head em { font-size: 20px; }
+/* Nia stands still: her poses do the talking */
+.tour-face .pose, .tour.welcome .tour-hero, .tour-sticker, .coach-pose { animation: none; }
+.tour.welcome .tour-hero { transform: translateX(-50%); }

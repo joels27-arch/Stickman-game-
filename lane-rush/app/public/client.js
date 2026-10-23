@@ -602,11 +602,11 @@ const TOUR = [
   { sel: null, welcome: true, title: "Hey {name}, I'm Nia!", text: "Race your friends! Quick tour?" },
   { sel: "#roomRow", pose: "point", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room or join a friend's." },
   { sel: "#soloBtn", pose: "box", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Race bots in any mode." },
-  { sel: "#profileCard", pose: "point", img: "/assets/lg_bronze.webp", title: "That's you", text: "Your name and league. Tap for stats." },
-  { sel: '.htab[data-page="0"]', pose: "cheer", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
-  { sel: '.htab[data-page="1"]', pose: "point", img: "/assets/tab_skins.webp", title: "Skins", text: "All your characters. Pick who you race with." },
-  { sel: '.htab[data-page="3"]', pose: "think", img: "/assets/tab_missions.webp", title: "Missions", text: "Missions and the Trophy Road." },
-  { sel: '.htab[data-page="4"]', pose: "box", img: "/assets/tab_shop.webp", title: "Shop", text: "Packs, characters, trails and the Season Pass." },
+  { sel: ".stats-sheet", open: "stats", pose: "point", img: "/assets/lg_bronze.webp", title: "Your profile", text: "Your stats and how you rank." },
+  { sel: "#tourneyList", page: "compete", pose: "cheer", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "Win coin prizes." },
+  { sel: "#skinGrid .ccard", page: "skins", pose: "point", img: "/assets/tab_skins.webp", title: "Skins", text: "Pick who you race with." },
+  { sel: "#trophyRoad", page: "missions", pose: "think", img: "/assets/tab_missions.webp", title: "Missions", text: "Missions and the Trophy Road." },
+  { sel: "#packRow .pack-card", page: "shop", pose: "box", img: "/assets/tab_shop.webp", title: "Shop", text: "Packs and characters." },
   { sel: "#endlessBtn", pose: "run", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life. I'll teach you as you run!", last: true },
 ];
 const TOUR_PERKS = [
@@ -616,6 +616,7 @@ const TOUR_PERKS = [
 ];
 const tourEl = $("#tour");
 let tourAt = 0;
+let tourWait = 0;
 function startTour() {
   if (homePage !== PAGE.play) setHomePage(PAGE.play);
   tourAt = 0;
@@ -624,6 +625,26 @@ function startTour() {
 }
 function renderTour() {
   const st = TOUR[tourAt];
+  // show what the step talks about: its page, or your profile
+  const page = PAGE[st.page ?? "play"];
+  const opening = st.open === "stats" && statsModal.hidden;
+  if (st.open === "stats") {
+    if (opening) {
+      renderStats();
+      statsModal.hidden = false;
+    }
+  } else statsModal.hidden = true;
+  if (homePage !== page || opening) {
+    if (homePage !== page) setHomePage(page);
+    // wait for the page to slide in before pointing at it
+    $("#tourTip").style.visibility = "hidden";
+    clearTimeout(tourWait);
+    tourWait = setTimeout(() => {
+      $("#tourTip").style.visibility = "";
+      renderTour();
+    }, 450);
+    return;
+  }
   const name = (local.getItem("lr:name") || "").trim();
   $("#tourTitle").textContent = st.title.replace("{name}", name || "there");
   $("#tourText").textContent = st.text;
@@ -666,6 +687,9 @@ function renderTour() {
 }
 function endTour(thenRun) {
   tourEl.hidden = true;
+  clearTimeout(tourWait);
+  statsModal.hidden = true;
+  if (homePage !== PAGE.play) setHomePage(PAGE.play);
   local.setItem("lr:tour", "1");
   if (!thenRun) return;
   // straight into the run (it teaches the moves as you go), as soon as the runners have loaded
@@ -1521,7 +1545,8 @@ function onState(msg) {
     if (v.host === playerId && !game.endlessSent) {
       game.endlessSent = true;
       if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
-      if (v.map !== "random") act({ type: "map", map: "random" });
+      const map = local.getItem("lr:endlessTut") ? "random" : "meadow"; // the tutorial run is on the meadow
+      if (v.map !== map) act({ type: "map", map });
       act({ type: "start", bots: false, endless: true });
     }
     return;
@@ -4960,7 +4985,7 @@ const COACH = {
   item: { title: "Tap to use it", text: "Tap the round button!", keys: "E on the keyboard", g: "tap", pose: "box" },
 };
 const COACH_MOVES = ["lane", "jump", "slide"];
-const COACH_SLOW = 0.08; // time runs this fast while a move is shown
+const COACH_SLOW = 0; // the run waits until you make the move
 const COACH_UNTIL_M = 1500; // after this, it stops teaching either way
 const coach = { on: false, wait: null, row: null, done: new Set(), scale: 1, items: 0, shownAt: 0 };
 function coachStart() {
@@ -5391,7 +5416,8 @@ function hit(kind) {
   if (me.out) return;
   // power-ups trip you and slow you down, but only obstacles cost a heart
   const fromPower = POWER_HITS.has(kind);
-  if (!(fromPower && heartsFromHits())) me.hits += 1;
+  // the tutorial run can't be lost: bumps there cost no heart
+  if (!(fromPower && heartsFromHits()) && !coach.on) me.hits += 1;
   game.lastHitD = me.d;
   me.combo = 0;
   renderCombo();
