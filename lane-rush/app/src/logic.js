@@ -98,7 +98,7 @@ export const EMOTE_COOLDOWN_MS = 1200;
 export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
-export const MAPS = ["meadow", "farm", "beach"];
+export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space"];
 /** A Party Cup is three rounds; each placing scores points, most points wins. */
 export const CUP_ROUND_BOOST_M = 350;
 export const CUP_POINTS = [10, 5, 3, 1];
@@ -616,9 +616,9 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
  * lanes on the shared race clock (seconds since the gun): x = 3 · tri(t /
  * period + phase), in lane units. It covers `half` lanes either side of x.
  * How you get past it:
- *   jump  — low enough to hop over (log, chicken, crab)
- *   slide — flies at head height (bees)
- *   dodge — only by being in another lane (tractor, wave)
+ *   jump  — low enough to hop over (log, chicken, crab, football, asteroid)
+ *   slide — flies at head height (bees, pigeons, spidercam)
+ *   dodge — only by being in another lane (tractor, wave, taxi, UFO beam)
  * A wave doesn't knock you down, it slows you.
  */
 export const MOVER_KINDS = {
@@ -628,6 +628,12 @@ export const MOVER_KINDS = {
   chicken: { map: "farm", half: 0.35, period: 1.9, clear: "jump" },
   wave: { map: "beach", half: 1.0, period: 5.2, clear: "dodge", slows: true },
   crab: { map: "beach", half: 0.4, period: 2.3, clear: "jump" },
+  taxi: { map: "city", half: 0.75, period: 4.4, clear: "dodge" },
+  pigeons: { map: "city", half: 0.5, period: 2.4, clear: "slide" },
+  football: { map: "stadium", half: 0.4, period: 2.0, clear: "jump" },
+  spidercam: { map: "stadium", half: 0.5, period: 3.0, clear: "slide" },
+  asteroid: { map: "space", half: 0.45, period: 2.6, clear: "jump" },
+  ufo: { map: "space", half: 0.6, period: 4.8, clear: "dodge" },
 };
 const tri = (u) => 1 - Math.abs(2 * (u - Math.floor(u)) - 1);
 /** Where mover `m` is (0..3, lane units) `t` seconds into the race. */
