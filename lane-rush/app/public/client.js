@@ -4699,8 +4699,8 @@ function enterRace(v) {
   const info = GAME_MODE_INFO[game.kind] ?? GAME_MODE_INFO.survival;
   tag.classList.add("show");
   tag.replaceChildren(
-    el("b", { text: v.cup ? `🏆 Round ${v.cup.race}/${v.cup.races.length} · ${info.icon} ${KIND_LABEL[game.kind]}` : `${info.icon} ${KIND_LABEL[game.kind] ?? ""}` }),
-    el("small", { text: KIND_RULE[game.kind] ?? "" }),
+    el("b", { text: game.endless ? "♾️ Endless run" : v.cup ? `🏆 Round ${v.cup.race}/${v.cup.races.length} · ${info.icon} ${KIND_LABEL[game.kind]}` : `${info.icon} ${KIND_LABEL[game.kind] ?? ""}` }),
+    el("small", { text: game.endless ? `3 hearts · how far can you get? Best: ${stats.get("bestRun").toLocaleString()} m` : KIND_RULE[game.kind] ?? "" }),
   );
   setTimeout(() => game.round === v.round && tag.classList.remove("show"), 7000); // the mode is only shown at the start
   tag.classList.toggle("small", Boolean(v.cup)); // the cup's reel shows the mode instead
