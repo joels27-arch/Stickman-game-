@@ -2918,17 +2918,17 @@ const world = (() => {
     c.width = c.height = 128;
     const g = c.getContext("2d");
     const grd = g.createRadialGradient(64, 64, 4, 64, 64, 64);
-    grd.addColorStop(0, "rgba(255,255,250,1)");
-    grd.addColorStop(0.18, "rgba(255,250,215,0.95)");
-    grd.addColorStop(0.4, "rgba(255,236,170,0.35)");
+    grd.addColorStop(0, "rgba(255,255,250,0.95)");
+    grd.addColorStop(0.16, "rgba(255,250,215,0.8)");
+    grd.addColorStop(0.35, "rgba(255,236,170,0.18)");
     grd.addColorStop(1, "rgba(255,230,160,0)");
     g.fillStyle = grd;
     g.fillRect(0, 0, 128, 128);
     const sunTex = new THREE.CanvasTexture(c);
     sunTex.colorSpace = THREE.SRGBColorSpace;
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending, toneMapped: false }));
-    glow.scale.set(110, 110, 1);
-    glow.position.set(95, 120, -320);
+    glow.scale.set(70, 70, 1);
+    glow.position.set(150, 165, -300);
     glow.renderOrder = -1;
     skyGroup.add(glow);
     // far mountains (hazy blue) and nearer rolling hills (soft green), as rings round the world
@@ -2943,8 +2943,9 @@ const world = (() => {
       const cBot = new THREE.Color(bottom);
       for (let i = 0; i <= n; i++) {
         const a = (i / n) * Math.PI * 2;
-        let h = 0.5 + 0.22 * Math.sin(3 * a + p[0]) + 0.16 * Math.sin(7 * a + p[1]) + 0.08 * Math.sin(13 * a + p[2]) + 0.05 * Math.sin(29 * a + p[3]);
-        if (sharp) h = Math.pow(Math.max(0, h), 1.6) * 1.5;
+        let h = 0.5 + 0.2 * Math.sin(3 * a + p[0]) + 0.15 * Math.sin(7 * a + p[1]) + 0.1 * Math.sin(13 * a + p[2]) + 0.05 * Math.sin(29 * a + p[3]);
+        // mountains: a jagged range of many peaks, not one big lump
+        if (sharp) h = 0.35 + 0.3 * Math.abs(Math.sin(9 * a + p[0])) + 0.2 * Math.abs(Math.sin(17 * a + p[1])) + 0.15 * Math.sin(5 * a + p[2]);
         const x = Math.sin(a) * radius;
         const z = Math.cos(a) * radius;
         pos.push(x, baseY, z, x, baseY + height * Math.max(0.12, h), z);
@@ -2960,7 +2961,7 @@ const world = (() => {
       m.renderOrder = -1;
       return m;
     };
-    skyGroup.add(ring(340, -14, 78, true, "#8eaee0", SKY.horizon));
+    skyGroup.add(ring(340, -14, 52, true, "#97b6e6", SKY.horizon));
     skyGroup.add(ring(270, -10, 30, false, "#6cbf6a", "#cdebd8"));
   }
 
