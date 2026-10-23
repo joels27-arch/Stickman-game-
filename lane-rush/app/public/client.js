@@ -629,6 +629,7 @@ function serverNow() {
 
 function connect(code, creating) {
   disconnect();
+  game.seen = null; // a new room: nothing seen yet
   net.code = code;
   net.creating = creating;
   net.wantOpen = true;
@@ -1375,17 +1376,6 @@ function onState(msg) {
   applyWarpsAndPunches(v);
 
   if (v.phase === "lobby") {
-    if (game.solo && v.host === playerId) {
-      // solo: skip the lobby and go straight into the run
-      if (!game.soloStarting) {
-        game.soloStarting = true;
-        const sm = soloMode();
-        const mode = sm === "endless" ? "survival" : sm;
-        if (v.mode !== mode) act({ type: "mode", mode });
-        act({ type: "start", bots: sm !== "endless" });
-      }
-      return;
-    }
     // hosting from the Tournaments page: open the room in the mode picked there
     if (game.wantMode && v.host === playerId) {
       if (v.mode !== game.wantMode) act({ type: "mode", mode: game.wantMode });
@@ -1470,81 +1460,16 @@ function renderSpotlight(box, cur, { takenBy = () => null, onPick }) {
   };
 }
 
-// Play solo: pick a runner, then a private room starts an endless survival run straight away
-const soloModal = $("#soloModal");
-function renderSoloPicker() {
-  const cur = preferredChar();
-  $("#soloPicker").replaceChildren(
-    ...RUNNERS.map((r, i) => {
-      const locked = !wallet.owns(i);
-      const sub = locked ? el("small", { class: "lock", text: `🔒 ${lockLabel(i)}` }) : el("small", { text: i === cur ? "Selected" : "" });
-      const card = el(
-        "button",
-        { class: `card${i === cur ? " mine" : ""}${locked ? " locked" : ""}`, type: "button", style: `--team:${r.color}` },
-        el("img", { src: portrait(i), alt: "" }),
-        el("b", { text: r.name, style: `color:${r.color}` }),
-        sub,
-      );
-      card.addEventListener("click", () => {
-        if (locked) {
-          soloModal.hidden = true;
-          return inspectChar(allChars().find((c) => c.idx === i));
-        }
-        local.setItem("lr:char", String(i));
-        world.setShowcase(i);
-        renderSoloPicker();
-      });
-      return card;
-    }),
-  );
-  renderSpotlight($("#soloSpot"), cur, {
-    onPick: (i) => {
-      local.setItem("lr:char", String(i));
-      world.setShowcase(i);
-      renderSoloPicker();
-    },
-  });
-  // what to play: the endless run on your own, or any mode against 3 bots
-  const pick = soloMode();
-  $("#soloModes").replaceChildren(
-    ...SOLO_MODES.map((m) => {
-      const b = el("button", { class: `solo-mode${m.id === pick ? " on" : ""}`, type: "button", role: "radio", "aria-checked": String(m.id === pick) }, el("b", { text: `${m.icon} ${m.label}` }), el("small", { text: m.sub }));
-      b.addEventListener("click", () => {
-        local.setItem("lr:soloMode", m.id);
-        renderSoloPicker();
-      });
-      return b;
-    }),
-  );
-  const m = SOLO_MODES.find((x) => x.id === pick);
-  $("#soloGo").replaceChildren(el("span", { class: "flagico", text: m.icon }), el("span", { text: pick === "endless" ? `Run as ${RUNNERS[cur].name}` : `Play ${m.label}` }), el("span", { class: "arrow", text: "→" }));
-}
-const SOLO_MODES = [
-  { id: "endless", icon: "🏃", label: "Endless Run", sub: "Just you · beat your best" },
-  { id: "survival", icon: "❤️", label: "Survival", sub: "vs 3 bots" },
-  { id: "chase", icon: "🧠", label: "Brain Chase", sub: "vs 3 bots" },
-  { id: "coinrush", icon: "🪙", label: "Coin Rush", sub: "vs 3 bots" },
-  { id: "potato", icon: "💣", label: "Hot Potato", sub: "vs 3 bots" },
-  { id: "cup", icon: "🏆", label: "Party Cup", sub: "3 rounds vs bots" },
-  { id: "grandtour", icon: "🌍", label: "Grand Tour", sub: "Tournament · every mode" },
-];
-function soloMode() {
-  const m = local.getItem("lr:soloMode");
-  return SOLO_MODES.some((x) => x.id === m) ? m : "endless";
+// Play solo: your own private room (no invite code) where you pick the mode, map and runner, with bots
+function openSoloRoom(mode = null) {
+  game.solo = true;
+  game.wantMode = mode;
+  connect(newCode(), true);
 }
 $("#soloBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
-  renderSoloPicker();
-  soloModal.hidden = false;
-});
-$("#soloClose").addEventListener("click", () => (soloModal.hidden = true));
-soloModal.addEventListener("click", (e) => e.target === soloModal && (soloModal.hidden = true));
-$("#soloGo").addEventListener("click", () => {
-  soloModal.hidden = true;
-  game.solo = true;
-  game.soloStarting = false;
-  connect(newCode(), true);
+  openSoloRoom();
 });
 $("#createBtn").addEventListener("click", () => {
   sfx.unlock();
@@ -1833,12 +1758,7 @@ function playMode(mode, withWho) {
   sfx.unlock();
   if (soloBtn.disabled) return toast("Still loading the runners…");
   if (!requireName()) return;
-  if (withWho === "bots") {
-    local.setItem("lr:soloMode", mode);
-    renderSoloPicker();
-    soloModal.hidden = false;
-    return;
-  }
+  if (withWho === "bots") return openSoloRoom(mode);
   game.solo = false;
   game.wantMode = mode;
   connect(newCode(), true);
@@ -1909,6 +1829,7 @@ function enterLobby() {
 
 function renderLobby(v) {
   rememberFriends(v);
+  $("#lobby").classList.toggle("solo-room", Boolean(game.solo));
   $("#lobbyCode").textContent = net.code;
   $("#lobbyCodeStrip").textContent = net.code;
   const slots = $("#slots");
@@ -2064,6 +1985,7 @@ $("#luGo").addEventListener("click", () => {
  * Start once everybody else is ready.
  */
 function renderLineup(v, { isHost, gm, mp, mode, what }) {
+  $("#lineup").classList.toggle("solo-room", Boolean(game.solo));
   $("#luCode").textContent = net.code;
   $("#luMode").textContent = isCupMode(gm) ? GAME_MODE_INFO[gm].label : gm === "survival" && v.players.length < 2 && !botsOn() ? "Endless run" : GAME_MODE_INFO[gm].label;
   $("#luMap").textContent = isCupMode(gm) ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${botsOn() && v.players.length < 4 ? "with bots" : mode}`;
@@ -2264,7 +2186,7 @@ function renderResults(v) {
   const isHost = v.host === playerId;
   const hasNext = cup && !cupDone;
   $("#nextBtn").style.display = isHost && hasNext ? "" : "none";
-  $("#againBtn").style.display = isHost && !hasNext && !game.solo ? "" : "none";
+  $("#againBtn").style.display = isHost && !hasNext ? "" : "none";
   $("#waitHost2").style.display = !isHost && hasNext ? "block" : "none";
   // rematch: everyone votes, the room goes again when all real players are in
   const voters = v.players.filter((p) => !p.bot && !p.gone);
@@ -4050,7 +3972,6 @@ function enterRace(v) {
   game.pendingRace = false;
   game.mode = "race";
   game.round = v.round;
-  game.soloStarting = false;
   game.lookBack = false;
   game.soloRun = v.kind === "survival" && v.players.length === 1;
   game.bestBeaten = false;
@@ -4600,7 +4521,8 @@ const nameOf = (id) => (id === playerId ? "You" : net.view?.players.find((p) => 
 
 /** Turn what changed in the room into callouts (and emote bubbles). */
 function announce(prev, v) {
-  if (!prev || v.round !== prev.round) {
+  // (re)start the "already seen" lists on the first view of a room or a new round
+  if (!prev || !game.seen || v.round !== prev.round) {
     game.seen = { bowls: new Set((v.bowls || []).map((b) => b.id)), bananas: new Set((v.bananas || []).map((b) => b.id)), emotes: new Set((v.emotes || []).map((e) => e.id)), zaps: new Set((v.zaps || []).map((z) => z.id)), hits: new Set((v.hits || []).map((h) => h.id)) };
     return;
   }

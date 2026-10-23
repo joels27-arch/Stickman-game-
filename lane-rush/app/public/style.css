@@ -1554,17 +1554,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
   .home[data-page="shop"] .top-streak b { display: none; }
 }
 
-/* play solo: the sheet fits the screen, the runner is never cut off */
-#soloModal .sheet { overflow-y: auto; gap: 10px; }
-#soloModal .spotlight { flex: none; height: clamp(170px, 30vh, 280px); }
-#soloModal .solo-picker { display: flex; flex: none; overflow-x: auto; overflow-y: hidden; gap: 6px; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
-#soloModal .solo-picker::-webkit-scrollbar { display: none; }
-#soloModal .solo-picker > * { flex: none; width: 74px; }
-#soloModal .solo-modes { flex: none; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-#soloModal .solo-mode { padding: 7px 4px; }
-#soloModal .solo-mode b { font-size: 13px; }
-#soloModal .solo-mode small { font-size: 10px; }
-#soloModal #soloGo { flex: none; }
 .coll-grid .coll-head { grid-column: 1 / -1; margin: 10px 0 0; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 18px; letter-spacing: 0.03em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); }
 .coll-grid .coll-head:first-child { margin-top: 0; }
 .coll-grid .rempty { grid-column: 1 / -1; }
@@ -1691,3 +1680,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .rcard .lg { left: auto; bottom: auto; top: 6px; right: 6px; width: 22px; height: 22px; }
 .rcard .crown { right: 32px; }
 .ped .tag .lgtag img { width: 16px; height: 16px; }
+
+/* a solo room is private: no invite code */
+#lobby.solo-room .code-box { display: none; }
+#lineup.solo-room .lu-code { display: none; }
