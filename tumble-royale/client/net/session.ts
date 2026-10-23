@@ -113,6 +113,7 @@ export class GameSession {
   /** Visual-only correction offset after reconciliation, decays to zero. */
   corr = v3();
   corrections = 0;
+  bigCorrections = 0;
   lastCorrection = 0;
   // remote
   remotes = new Map<number, RemoteTrack>();
@@ -245,8 +246,12 @@ export class GameSession {
     }
   }
 
+  private mySlot = 0;
+
   private beginRound(r: RoundInfo) {
     this.round = r;
+    const k = r.participants.indexOf(this.you);
+    this.mySlot = k >= 0 ? r.slots[k] ?? 0 : 0;
     this.world = new World(getMap(r.map));
     for (const [id, tick] of r.triggered) this.world.setTriggered(id, tick);
     this.qualifiedIds.clear(); this.eliminatedIds.clear();
@@ -319,6 +324,7 @@ export class GameSession {
     const err = Math.hypot(s.x - ox, s.y - oy, s.z - oz);
     if (err > 0.01) {
       this.corrections++;
+      if (err > 0.3) this.bigCorrections++;
       this.lastCorrection = err;
       if (err < 4) { this.corr.x += ox - s.x; this.corr.y += oy - s.y; this.corr.z += oz - s.z; }
       else { this.corr.x = this.corr.y = this.corr.z = 0; } // teleport (respawn etc.)
@@ -330,7 +336,7 @@ export class GameSession {
 
   private ctx(tick: number) {
     const r = this.round!;
-    return { world: this.world!, tick: tick - r.goTick, slot: 0, canMove: tick >= r.goTick, respawn: this.world!.map.mode === 'race' };
+    return { world: this.world!, tick: tick - r.goTick, slot: this.mySlot, canMove: tick >= r.goTick, respawn: this.world!.map.mode === 'race' };
   }
 
   // ------------------------------------------------------------ per frame

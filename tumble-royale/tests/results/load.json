@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-23T20:41:54.237Z",
+  "node": "v22.22.0",
+  "results": [
+    {
+      "clients": 10,
+      "seconds": 20.1,
+      "serverCpuPct": 5.1,
+      "serverRssMB": 111.9,
+      "avgTickMs": 0.2537,
+      "maxTickMs": 9.777,
+      "serverOutKBps": 66.1,
+      "perClientInKBps": 6.61,
+      "avgRttMs": 4.5,
+      "corrections": 182,
+      "bigCorrections": 12,
+      "maxCorrectionM": 0.597,
+      "lateInputs": 60,
+      "minRemotesVisible": 9
+    }
+  ]
+}

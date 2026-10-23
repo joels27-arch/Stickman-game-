@@ -327,7 +327,7 @@ export class Room {
     const goTick = introTick + INTRO_TICKS + COUNTDOWN_TICKS;
     this.round = {
       index: this.roundIdx, map: plan.map, final: plan.final, qualify: Math.min(plan.qualify, ids.length),
-      participants: ids, introTick, goTick, endTick: goTick + map.timeLimit * TICK_RATE, triggered: [],
+      participants: ids, slots: ids.map((id) => this.players.get(id)!.slot), introTick, goTick, endTick: goTick + map.timeLimit * TICK_RATE, triggered: [],
     };
     if (plan.final) this.finalists = [...ids];
     this.phase = 'intro';

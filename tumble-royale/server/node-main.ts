@@ -107,7 +107,10 @@ export async function startServer(opts: ServerOptions) {
     if (req.method === 'OPTIONS') { res.writeHead(204, { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET,POST' }).end(); return; }
     if (!url.pathname.startsWith('/api/')) { serveStatic(req, res); return; }
     try {
-      if (url.pathname === '/api/health') return json(res, 200, { ok: true, ...manager.stats(), uptime: process.uptime() });
+      if (url.pathname === '/api/health') {
+        const detail = url.searchParams.has('detail');
+        return json(res, 200, { ok: true, ...manager.stats(detail), uptime: process.uptime(), ...(detail ? { cpu: process.cpuUsage(), rss: process.memoryUsage().rss } : {}) });
+      }
       if (url.pathname === '/api/rooms' && req.method === 'POST') {
         if (rateLimited(ip, 1, 20)) return json(res, 429, { error: 'Too many rooms created. Try again in a minute.' });
         const room = manager.create(false);

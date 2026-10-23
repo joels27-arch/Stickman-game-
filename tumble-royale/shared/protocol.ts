@@ -34,6 +34,8 @@ export interface RoundInfo {
   final: boolean;
   qualify: number;
   participants: number[];
+  /** Spawn/respawn slot of each participant (same order), so prediction respawns where the server does. */
+  slots: number[];
   introTick: number;      // absolute server tick when the intro started
   goTick: number;         // absolute server tick of GO (round time 0)
   endTick: number;        // absolute server tick at which the timer expires

@@ -55,9 +55,17 @@ export class RoomManager {
     }
   }
 
-  stats() {
+  stats(detail = false) {
     let players = 0, bots = 0;
     for (const r of this.rooms.values()) for (const p of r.players.values()) p.bot ? bots++ : players++;
-    return { rooms: this.rooms.size, players, bots };
+    if (!detail) return { rooms: this.rooms.size, players, bots };
+    return {
+      rooms: this.rooms.size, players, bots,
+      detail: [...this.rooms.values()].map((r) => ({
+        code: r.code, phase: r.phase, players: r.humanCount, ticks: r.stats.ticks,
+        avgTickMs: r.stats.ticks ? +(r.stats.tickMs / r.stats.ticks).toFixed(4) : 0, maxTickMs: +r.stats.maxTickMs.toFixed(3),
+        bytesOut: r.stats.bytesOut, msgsOut: r.stats.msgsOut, lateInputs: r.stats.lateInputs,
+      })),
+    };
   }
 }
