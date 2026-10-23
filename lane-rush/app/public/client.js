@@ -1072,7 +1072,7 @@ function renderCollPill() {
   const { got, all } = collectionCount();
   $("#skinCount").textContent = `${got}/${all}`;
   $("#skinBar").style.width = `${Math.round((got / all) * 100)}%`;
-  $("#skinPct").textContent = `${got} of ${all} characters`;
+  $("#skinPct").textContent = "";
 }
 /** A character card: full colour even when locked (you just can't race with it yet). */
 function charCard(c, n, onClick) {
