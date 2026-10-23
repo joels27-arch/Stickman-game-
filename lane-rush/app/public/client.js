@@ -4989,7 +4989,7 @@ function coachEnd(learned) {
 function coachLearned(kind) {
   coach.done.add(kind);
   coachHide();
-  sfx.coin();
+  sfx.pickup();
   banner(kind === "item" ? "NICE!" : "PERFECT!", 700);
   if (COACH_MOVES.every((k) => coach.done.has(k)) && coach.done.has("item")) {
     coachEnd(true);
