@@ -2105,7 +2105,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .coach:not(.item) .coach-card { margin-top: 64px; }
 @media (prefers-reduced-motion: reduce) { .coach-gesture .hand { animation-duration: 2.4s !important; } }
 
-/* first-visit tour v2: Bolt shows you around */
+/* first-visit tour v2: Nia (the mascot) shows you around */
 .tour-hole { border-radius: 20px; border: 3px solid #ffd23f; box-shadow: 0 0 0 200vmax rgba(5, 8, 25, 0.74), 0 0 24px 4px rgba(255, 210, 63, 0.7); }
 .tour-point { position: fixed; z-index: 2; width: 0; height: 0; margin-left: -14px; border-left: 14px solid transparent; border-right: 14px solid transparent; pointer-events: none; transition: left 0.35s, top 0.35s; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.35)); }
 .tour-point[hidden] { display: none; }
@@ -2122,8 +2122,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .tour-bar i.on { background: #ffd23f; box-shadow: 0 0 8px rgba(255, 210, 63, 0.8); }
 .tour-body { display: grid; grid-template-columns: 68px 1fr; gap: 12px; align-items: center; }
 .tour-face { position: relative; width: 68px; height: 68px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #bfe3ff, #3f8cff 70%); border: 3px solid #fff; box-shadow: 0 3px 0 #121c63; overflow: visible; }
-.tour-face .ava { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; }
-.tour-face .ava img { position: absolute; left: 50%; top: -64px; width: 190%; transform: translateX(-50%); }
 .tour-sticker { position: absolute; right: -8px; bottom: -6px; width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45)); animation: todayBob 1.2s ease-in-out infinite; }
 .tour-sticker[hidden] { display: none; }
 .tour-kicker { display: block; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #ffd23f; }
@@ -2132,7 +2130,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .tour-foot { margin-top: 12px; }
 .tour-foot .btn { min-height: 40px; padding: 0 16px; font-size: 15px; }
 .tour-hero, .tour-perks { display: none; }
-/* the welcome card: Bolt in full, and what the game is about */
+/* the welcome card: Nia in full, and what the game is about */
 .tour.welcome .tour-tip { width: min(340px, calc(100vw - 32px)); padding-top: 96px; text-align: center; }
 .tour.welcome .tour-bar { display: none; }
 .tour.welcome .tour-hero { display: block; position: absolute; left: 50%; top: -96px; height: 190px; transform: translateX(-50%); filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.45)); animation: heroWave 1.6s ease-in-out infinite; pointer-events: none; }
@@ -2183,3 +2181,13 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .tourney-sheet { width: min(440px, 100%); }
 .tourney-body { max-height: min(70vh, 620px); overflow-y: auto; padding-top: 6px; }
 .tourney-body .tcard { margin: 0; }
+
+/* Nia, the mascot, in the tour: a full-body pose standing at the left of the card, popping out of its top */
+.tour-face { width: 68px; height: 72px; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.tour-face .pose { position: absolute; left: 50%; bottom: -4px; height: 112px; max-width: 96px; object-fit: contain; transform: translateX(-50%); filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.4)); animation: todayBob 1.6s ease-in-out infinite; }
+.tour.welcome .tour-hero { height: 200px; top: -110px; }
+/* Nia in the in-run coach: she shows the move next to the card */
+.coach-card { position: relative; padding-left: 92px; }
+.coach-pose { position: absolute; left: -14px; bottom: -8px; height: 132px; max-width: 112px; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.4)); }
+.coach.item .coach-card { padding-left: 64px; }
+.coach.item .coach-pose { height: 92px; max-width: 76px; left: -10px; }

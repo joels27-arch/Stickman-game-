@@ -625,15 +625,15 @@ $("#nameForm").addEventListener("submit", (e) => {
 });
 // ── first-visit tour: a spotlight on each part of the app, skippable, ending on the endless run ──
 const TOUR = [
-  { sel: null, welcome: true, title: "Hey {name}, I'm Bolt!", text: "Welcome to 4 Friends: a Subway-Surfers-style runner you race against your friends. Let me show you around, it takes 20 seconds." },
-  { sel: "#roomRow", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room and share the code, or Join a friend's. Up to 4 runners, bots fill empty spots." },
-  { sel: "#soloBtn", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Survival, Brain Chase, Coin Rush, Hot Potato and more, against bots you can make easy or hard." },
-  { sel: "#profileCard", img: "/assets/lg_bronze.webp", title: "That's you", text: "Your name and league. Tap it for your stats: wins, records and how you rank among friends." },
-  { sel: '.htab[data-page="0"]', img: "/assets/tab_trophy.webp", title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
-  { sel: '.htab[data-page="1"]', img: "/assets/tab_skins.webp", title: "Skins", text: "All your characters. Pick who you race with." },
-  { sel: '.htab[data-page="3"]', img: "/assets/tab_missions.webp", title: "Missions", text: "Daily missions, your career and the Gold Road: every gold medal you win moves you along it, for coins, packs and exclusive characters." },
-  { sel: '.htab[data-page="4"]', img: "/assets/tab_shop.webp", title: "Shop", text: "Packs, characters, trails and the Season Pass." },
-  { sel: "#endlessBtn", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life, how far can you get? I'll teach you the moves while you run. Tap it!", last: true },
+  { sel: null, welcome: true, title: "Hey {name}, I'm Nia!", text: "Welcome to 4 Friends: a Subway-Surfers-style runner you race against your friends. Let me show you around, it takes 20 seconds." },
+  { sel: "#roomRow", pose: "point", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room and share the code, or Join a friend's. Up to 4 runners, bots fill empty spots." },
+  { sel: "#soloBtn", pose: "box", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Survival, Brain Chase, Coin Rush, Hot Potato and more, against bots you can make easy or hard." },
+  { sel: "#profileCard", pose: "point", img: "/assets/lg_bronze.webp", title: "That's you", text: "Your name and league. Tap it for your stats: wins, records and how you rank among friends." },
+  { sel: '.htab[data-page="0"]', pose: "cheer", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
+  { sel: '.htab[data-page="1"]', pose: "point", img: "/assets/tab_skins.webp", title: "Skins", text: "All your characters. Pick who you race with." },
+  { sel: '.htab[data-page="3"]', pose: "think", img: "/assets/tab_missions.webp", title: "Missions", text: "Daily missions, your career and the Gold Road: every gold medal you win moves you along it, for coins, packs and exclusive characters." },
+  { sel: '.htab[data-page="4"]', pose: "box", img: "/assets/tab_shop.webp", title: "Shop", text: "Packs, characters, trails and the Season Pass." },
+  { sel: "#endlessBtn", pose: "run", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life, how far can you get? I'll teach you the moves while you run. Tap it!", last: true },
 ];
 const TOUR_PERKS = [
   ["/assets/pw_rocket.png", "Wild power-ups"],
@@ -656,6 +656,7 @@ function renderTour() {
   $("#tourCount").textContent = st.welcome ? "" : `${tourAt} / ${TOUR.length - 1}`;
   $("#tourNext").textContent = st.last ? "Run! →" : st.welcome ? "Show me around →" : "Next →";
   $("#tourBar").replaceChildren(...TOUR.slice(1).map((_, i) => el("i", { class: i + 1 < tourAt ? "done" : i + 1 === tourAt ? "on" : "" })));
+  $("#tourPose").src = `/assets/m_${st.pose ?? "point"}.webp`;
   const img = $("#tourImg");
   img.hidden = !st.img;
   if (st.img) img.src = st.img;
@@ -4942,10 +4943,10 @@ function banner(text, ms = 1400) {
 // into slow motion and shows the move; make it and it speeds back up. Then a
 // power-up tip, and you're on your own.
 const COACH = {
-  lane: { title: "Swipe left or right", text: "A crate! Change lanes to dodge it.", keys: "← → on the keyboard", g: "side" },
-  jump: { title: "Swipe up to jump", text: "Jump over the hurdle!", keys: "↑ or Space on the keyboard", g: "up" },
-  slide: { title: "Swipe down to slide", text: "Slide under the gate!", keys: "↓ on the keyboard", g: "down" },
-  item: { title: "Tap to use it", text: "You got a power-up! Tap the round button bottom left.", keys: "E on the keyboard", g: "tap" },
+  lane: { title: "Swipe left or right", text: "A crate! Change lanes to dodge it.", keys: "← → on the keyboard", g: "side", pose: "dodge" },
+  jump: { title: "Swipe up to jump", text: "Jump over the hurdle!", keys: "↑ or Space on the keyboard", g: "up", pose: "jump" },
+  slide: { title: "Swipe down to slide", text: "Slide under the gate!", keys: "↓ on the keyboard", g: "down", pose: "slide" },
+  item: { title: "Tap to use it", text: "You got a power-up! Tap the round button bottom left.", keys: "E on the keyboard", g: "tap", pose: "box" },
 };
 const COACH_MOVES = ["lane", "jump", "slide"];
 const COACH_SLOW = 0.08; // time runs this fast while a move is shown
@@ -4963,6 +4964,7 @@ function coachShow(kind, dir = COACH[kind].g, row = null) {
   coach.row = row;
   coach.items = me.items.length;
   coach.shownAt = performance.now();
+  $("#coachPose").src = `/assets/m_${c.pose}.webp`;
   $("#coachTitle").textContent = c.title;
   $("#coachText").textContent = c.text;
   $("#coachKeys").textContent = TOUCH ? "" : c.keys;
