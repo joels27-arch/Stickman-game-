@@ -370,6 +370,21 @@ function showScreen(name) {
   $("#hud").classList.toggle("show", name === "race");
 }
 
+/** Write text/HTML only when it changed: no layout work on frames where nothing moved. */
+const domCache = new WeakMap();
+function setText(node, text) {
+  if (node && domCache.get(node) !== text) {
+    domCache.set(node, text);
+    node.textContent = text;
+  }
+}
+function setHTML(node, html) {
+  if (node && domCache.get(node) !== html) {
+    domCache.set(node, html);
+    node.innerHTML = html;
+  }
+}
+
 let toastTimer = 0;
 function toast(text) {
   const el = $("#toast");
@@ -1838,6 +1853,28 @@ if (renderer) {
   renderer.toneMappingExposure = 1.05;
 }
 
+/**
+ * Adaptive resolution: phones with very sharp screens (DPR 3) can't always
+ * fill every pixel at 60 FPS. If frames run long for a couple of seconds we
+ * step the render scale down (2 → 1.6 → 1.3 → 1); it never goes back up in a
+ * session, so it can't oscillate.
+ */
+const QUALITY_STEPS = [2, 1.6, 1.3, 1];
+let qualityIdx = 0;
+let slowFor = 0;
+function adaptQuality(dt) {
+  if (!renderer || game.mode !== "race" || !Number.isFinite(dt) || dt <= 0) return;
+  slowFor = dt > 1 / 45 ? slowFor + dt : Math.max(0, slowFor - dt * 0.5);
+  if (slowFor < 2.5 || qualityIdx >= QUALITY_STEPS.length - 1) return;
+  slowFor = 0;
+  qualityIdx += 1;
+  const ratio = Math.min(window.devicePixelRatio || 1, QUALITY_STEPS[qualityIdx]);
+  if (ratio < renderer.getPixelRatio()) {
+    renderer.setPixelRatio(ratio);
+    resize();
+  }
+}
+
 // Brain Chase: a little rear-view mirror in the corner, so you can see it coming
 const mirrorCam = new THREE.PerspectiveCamera(55, 1.5, 0.5, 400);
 function renderMirror() {
@@ -2937,7 +2974,7 @@ const world = (() => {
         let obj;
         if (b.kind === "glue") {
           // a sticky green puddle across two lanes
-          obj = new THREE.Mesh(new THREE.CircleGeometry(1, 28), new THREE.MeshBasicMaterial({ color: 0x5ee05e, transparent: true, opacity: 0.85 }));
+          obj = new THREE.Mesh(glueGeo, new THREE.MeshBasicMaterial({ color: 0x5ee05e, transparent: true, opacity: 0.85 }));
           obj.rotation.x = -Math.PI / 2;
           obj.scale.set((laneX(1) - laneX(0)) * 1.15, 1.7, 1);
           obj.position.set((laneX(b.lane) + laneX(glueLane2(b.lane))) / 2, 0.04, -b.d);
@@ -3043,16 +3080,19 @@ const world = (() => {
     spr.scale.set(size, size, 1);
     return spr;
   }
+  // shared by every wave on the course (built once, never per race)
+  const waveGeo = new THREE.CylinderGeometry(1.1, 1.1, LANE_W * 2.1, 24, 1, false, 0, Math.PI);
+  const waveMat = new THREE.MeshStandardMaterial({ color: 0x2fa8ff, transparent: true, opacity: 0.78, roughness: 0.2 });
+  const foamGeo = new THREE.BoxGeometry(LANE_W * 2.1, 0.22, 0.6);
+  const foamMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 });
+  const glueGeo = new THREE.CircleGeometry(1, 28);
   function makeWave() {
     const g = new THREE.Group();
-    const water = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.1, 1.1, LANE_W * 2.1, 24, 1, false, 0, Math.PI),
-      new THREE.MeshStandardMaterial({ color: 0x2fa8ff, transparent: true, opacity: 0.78, roughness: 0.2 }),
-    );
+    const water = new THREE.Mesh(waveGeo, waveMat);
     water.rotation.z = Math.PI / 2;
     water.rotation.y = Math.PI / 2;
     g.add(water);
-    const foam = new THREE.Mesh(new THREE.BoxGeometry(LANE_W * 2.1, 0.22, 0.6), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }));
+    const foam = new THREE.Mesh(foamGeo, foamMat);
     foam.position.y = 1.12;
     g.add(foam);
     return g;
@@ -5564,7 +5604,7 @@ function modeView(v) {
   }
 }
 function renderModeHud() {
-  const box = $("#modeHud");
+  const box = hudEl.mode ?? (hudEl.mode = $("#modeHud"));
   const v = net.view;
   if (!v || game.mode !== "race") {
     box.hidden = true;
@@ -5574,18 +5614,18 @@ function renderModeHud() {
     const gap = me.d - brainDistance((serverNow() - v.startAt) / 1000);
     box.hidden = me.out;
     box.className = `mode-hud chase${gap < 15 ? " danger" : ""}`;
-    box.textContent = `🧠 ${Math.max(0, Math.round(gap))} m behind you`;
+    setText(box, `🧠 ${Math.max(0, Math.round(gap))} m behind you`);
     $("#brainFx").classList.toggle("on", !me.out && gap < 15);
   } else if (game.kind === "coinrush") {
     box.hidden = false;
     box.className = "mode-hud coins";
-    box.textContent = `🪙 ${myCoins()}`;
+    setText(box, `🪙 ${myCoins()}`);
   } else if (game.kind === "potato") {
     const mineBomb = v.bomb?.holder === playerId;
     box.hidden = !mineBomb || me.out;
     box.className = "mode-hud bomb";
     const left = v.bomb ? (v.bomb.until - serverNow()) / 1000 : 0;
-    box.textContent = left < 3.5 ? `💣 ${Math.max(0, left).toFixed(1)} s · PASS IT!` : "💣 You have the bomb! Bump into someone!";
+    setText(box, left < 3.5 ? `💣 ${Math.max(0, left).toFixed(1)} s · PASS IT!` : "💣 You have the bomb! Bump into someone!");
   } else box.hidden = true;
 }
 
@@ -5625,7 +5665,7 @@ function renderCloudHud() {
   const box = $("#cloudHud");
   const mine = c && c.holder === playerId && game.mode === "race";
   box.hidden = !mine;
-  if (mine) box.textContent = `⛈️ ${Math.max(0, (c.until - serverNow()) / 1000).toFixed(1)} s · bump into someone to pass it on!`;
+  if (mine) setText(box, `⛈️ ${Math.max(0, (c.until - serverNow()) / 1000).toFixed(1)} s · bump into someone to pass it on!`);
 }
 
 function frost() {
@@ -5912,8 +5952,10 @@ function frame(now) {
   world.tick(camera.position.z, dt);
   renderer?.render(scene, camera);
   renderMirror();
+  adaptQuality(dt);
 }
 
+const hudEl = { timer: $("#timer"), dist: $("#distText"), place: $("#place"), dots: $("#dots") };
 function updateHud() {
   const v = net.view;
   if (!v) return;
@@ -5939,10 +5981,10 @@ function updateHud() {
   // timer
   const t = Math.max(0, sn - v.startAt);
   const remainingAfterFirst = v.firstFinishAt !== null ? Math.max(0, v.limitAt - sn) : null;
-  $("#timer").textContent =
-    remainingAfterFirst !== null && !me.finished
-      ? `⏱${Math.ceil(remainingAfterFirst / 1000)}`
-      : (t / 1000).toFixed(1);
+  setText(
+    hudEl.timer,
+    remainingAfterFirst !== null && !me.finished ? `⏱${Math.ceil(remainingAfterFirst / 1000)}` : (t / 1000).toFixed(1),
+  );
 
   // places by live distance (finished runners first, by time)
   const entries = v.players
@@ -5958,12 +6000,12 @@ function updateHud() {
     const coinsOf = (id) => (id === playerId ? myCoins() : net.view?.players.find((p) => p.id === id)?.coins ?? 0);
     entries.sort((a, b) => coinsOf(b.id) - coinsOf(a.id) || b.d - a.d);
     const left = Math.max(0, (v.startAt + COINRUSH_MS - sn) / 1000);
-    $("#distText").textContent = `🪙 ${myCoins()} · ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, "0")} left`;
+    setText(hudEl.dist, `🪙 ${myCoins()} · ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, "0")} left`);
   } else if (isSurvival()) {
     // still running first (furthest ahead), then whoever lasted longest
     entries.sort((a, b) => (b.outAt ?? Infinity) - (a.outAt ?? Infinity) || b.d - a.d);
     const alive = entries.filter((e) => e.outAt === null).length;
-    $("#distText").textContent = `${Math.round(Math.min(me.d, game.len))} m${entries.length > 1 ? ` · ${alive} still running` : ""}`;
+    setText(hudEl.dist, `${Math.round(Math.min(me.d, game.len))} m${entries.length > 1 ? ` · ${alive} still running` : ""}`);
   } else {
     entries.sort((a, b) => {
       if (a.finish !== null && b.finish !== null) return a.finish - b.finish;
@@ -5973,14 +6015,17 @@ function updateHud() {
     });
   }
   const place = entries.findIndex((e) => e.id === playerId) + 1 || 1;
-  $("#place").innerHTML = `${place}<sup>${ordinal(place)}</sup>`;
+  setHTML(hudEl.place, `${place}<sup>${ordinal(place)}</sup>`);
 
-  for (const dot of $("#dots").children) {
-    const id = dot.getAttribute("data-id");
-    const e = entries.find((x) => x.id === id);
-    const d = e ? e.d : 0;
-    dot.style.left = `${clamp(d / TRACK_LEN, 0, 1) * 100}%`;
-    dot.style.display = e ? "" : "none";
+  if (!isSurvival()) {
+    for (const dot of hudEl.dots.children) {
+      const id = dot.getAttribute("data-id");
+      const e = entries.find((x) => x.id === id);
+      const d = e ? e.d : 0;
+      const left = `${(clamp(d / TRACK_LEN, 0, 1) * 100).toFixed(1)}%`;
+      if (dot.style.left !== left) dot.style.left = left;
+      dot.style.display = e ? "" : "none";
+    }
   }
 }
 
