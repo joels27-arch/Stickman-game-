@@ -156,7 +156,7 @@ export function runSpeed(kind, s) {
  * You hold one power-up at a time and use it when you want (boxes are
  * ignored while you hold or use one). Zaps and bananas go through the server.
  */
-export const POWERS = ["shield", "rocket", "lightning", "banana", "bowling", "freeze", "glue", "fake", "boxing", "brainwave", "thunder", "swap"];
+export const POWERS = ["shield", "rocket", "lightning", "banana", "bowling", "freeze", "glue", "fake", "boxing", "brainwave", "thunder", "swap", "mud"];
 
 /**
  * Power-up odds by place, Mario Kart style: four columns (1st, 2nd, 3rd,
@@ -166,36 +166,38 @@ export const POWERS = ["shield", "rocket", "lightning", "banana", "bowling", "fr
  * gets one almost 1 time in 3. Each column adds up to 100.
  *
  *              1st  2nd  3rd  last
- *   shield      24   14    7    3
- *   banana      24   14    6    2
- *   bowling     14   10    6    3
- *   glue        12    9    5    2
- *   fake        14    9    4    1
- *   boxing       6    8    7    4    (punches whoever is right next to you)
+ *   shield      24   11    5    1
+ *   banana      24   11    4    1
+ *   bowling     14   10    4    1
+ *   glue        12    9    4    1
+ *   fake        14    9    3    1
+ *   boxing       6    8    6    2    (punches whoever is right next to you)
  *   freeze       2    9   11   10
  *   brainwave    1    7   10    9    (flips controls of everyone ahead)
  *   lightning    1    6   11   14    (hits runners ahead)
  *   thunder      1    5    9   12    (a storm cloud on the leader)
  *   swap         0    3    8   10    (swap places with the runner ahead)
  *   rocket       1    6   16   30
+ *   mud          0    6    9    8    (splats mud over the screens of everyone ahead)
  *
  * Items that only hit runners ahead are taken out for the leader (nobody is
  * ahead), so a leader's rocket ends up at about 1 %.
  * Alone there's nobody to attack, so it's shield 35 · rocket 35 · banana 30.
  */
 const ODDS = {
-  shield: [24, 14, 7, 3],
-  banana: [24, 14, 6, 2],
-  bowling: [14, 10, 6, 3],
-  glue: [12, 9, 5, 2],
-  fake: [14, 9, 4, 1],
-  boxing: [6, 8, 7, 4],
+  shield: [24, 11, 5, 1],
+  banana: [24, 11, 4, 1],
+  bowling: [14, 10, 4, 1],
+  glue: [12, 9, 4, 1],
+  fake: [14, 9, 3, 1],
+  boxing: [6, 8, 6, 2],
   freeze: [2, 9, 11, 10],
   brainwave: [1, 7, 10, 9],
   lightning: [1, 6, 11, 14],
   thunder: [1, 5, 9, 12],
   swap: [0, 3, 8, 10],
   rocket: [1, 6, 16, 30],
+  mud: [0, 6, 9, 8],
 };
 const SOLO_ODDS = { shield: 35, rocket: 35, banana: 30 };
 /** How far behind the leader (metres) counts as "as far back as it gets". */
@@ -232,7 +234,7 @@ export function powerOdds({ rank, alive, gapToLeader = 0, last = "" }) {
     const f = x - c;
     w = {};
     for (const [k, col] of Object.entries(ODDS)) w[k] = col[c] + (col[c + 1] - col[c]) * f;
-    if (rank <= 1) w.lightning = w.brainwave = w.thunder = w.swap = 0;
+    if (rank <= 1) w.lightning = w.brainwave = w.thunder = w.swap = w.mud = 0;
   }
   if (last && w[last] !== undefined) w[last] = 0;
   const total = Object.values(w).reduce((a, b) => a + b, 0);
@@ -255,7 +257,7 @@ export function pickPower(odds, roll) {
 /** The power-up everyone starts a race with: defensive or neutral, same odds for all. */
 export const START_POWERS = ["shield", "banana", "fake"];
 /** Powers relayed to everyone through the server as a "zap" (an area effect). */
-export const ZAP_KINDS = ["lightning", "freeze", "brainwave"];
+export const ZAP_KINDS = ["lightning", "freeze", "brainwave", "mud"];
 /** Things dropped on the track: a banana trips you, glue slows you (2 lanes, stays a while), a fake box trips you. */
 export const DROP_KINDS = ["banana", "glue", "fake"];
 export const GLUE_MS = 8000; // a glue puddle stays this long
@@ -1126,7 +1128,7 @@ function doPunch(state, id, targetId, t) {
 // ── bots: fill empty spots, run the same course, make mistakes ─────────────
 
 export const BOT_NAMES = ["Turbo Tim", "Zippy", "Bolt Bot", "Speedy Sam", "Rocket Rita", "Dash", "Nitro Nia", "Flash Fred", "Sprinty", "Max Speed"];
-const BOT_ITEMS = ["banana", "lightning", "rocket", "shield", "freeze", "glue", "fake", "brainwave", "thunder", "swap", "boxing"];
+const BOT_ITEMS = ["banana", "lightning", "rocket", "shield", "freeze", "glue", "fake", "brainwave", "thunder", "swap", "boxing", "mud"];
 const STUN_MS = 1600; // fall + get up, like a real runner
 const courses = new Map();
 const moverCache = new Map();
@@ -1250,6 +1252,9 @@ function stepBots(state, t) {
           p.slowUntil = t + 1500;
           p.lane = Math.max(0, Math.min(LANES - 1, p.lane + (roll(state.seed, bi, z.id) < 0.5 ? -1 : 1)));
         }
+      } else if (z.kind === "mud") {
+        // a bot can't see through mud either: it eases off for a moment
+        if (p.d > z.d && (p.shieldUntil ?? 0) <= t) p.slowUntil = t + 1200;
       } else if (z.kind === "lightning" && p.d > z.d && (p.rocketUntil ?? 0) <= t) botHit(state, p, t, true);
     }
     if (p.outAt !== null) return;
@@ -1411,7 +1416,7 @@ function stepBots(state, t) {
           doPunch(state, id, near.id, t);
           p.item = "";
         }
-      } else if (p.item === "lightning" || p.item === "freeze" || p.item === "brainwave") {
+      } else if (p.item === "lightning" || p.item === "freeze" || p.item === "brainwave" || p.item === "mud") {
         if (ahead.length) {
           state.zapSeq = (state.zapSeq ?? 0) + 1;
           state.zaps = [...(state.zaps ?? []), { id: state.zapSeq, by: id, d: d1, at: t, kind: p.item }].slice(-6);

@@ -681,7 +681,7 @@ describe("power-up odds", () => {
     expect(lead.rocket).toBeGreaterThan(0.5);
     expect(lead.rocket).toBeLessThan(1.5);
     expect(lead.shield! + lead.banana!).toBeGreaterThan(45);
-    expect(lead.swap! + lead.thunder! + lead.brainwave!).toBe(0);
+    expect(lead.swap! + lead.thunder! + lead.brainwave! + lead.mud!).toBe(0);
     expect(last.rocket).toBe(30);
     expect(last.rocket! + last.lightning! + last.freeze! + last.brainwave! + last.thunder! + last.swap!).toBeGreaterThan(80);
     // the better the item, the more it favours the back of the field

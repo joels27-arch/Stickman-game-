@@ -192,6 +192,7 @@ const POWER_INFO = {
   brainwave: { label: "Brain Wave", hint: "Flips left and right for everyone ahead" },
   thunder: { label: "Thundercloud", hint: "Storms the leader: pass it on or get zapped" },
   swap: { label: "Mind Swap", hint: "Swap places with the runner ahead" },
+  mud: { label: "Mud Splash", hint: "Splats mud over the screens of everyone ahead" },
 };
 const WAVE_S = 4; // brain wave: controls flipped this long
 const GLUE_SLOW = 0.45; // speed factor while stuck in glue
@@ -701,6 +702,8 @@ function openJoin(open) {
   if (open) setTimeout(() => codeInput.focus(), 30);
 }
 $("#joinOpen").addEventListener("click", () => openJoin(true));
+// matchmaking with strangers isn't built yet
+$("#onlineBtn").addEventListener("click", () => toast("🌍 Online races with strangers are coming soon!"));
 $("#joinClose").addEventListener("click", () => openJoin(false));
 const joinParam = new URLSearchParams(location.search).get("join");
 if (joinParam) {
@@ -2649,10 +2652,9 @@ function renderResults(v) {
   } else if (cup && !cupDone) {
     reward.append(el("span", { class: "nomedal", text: `+${CUP_POINTS[v.standings.indexOf(playerId)] ?? 0} points · medals are paid after round ${cup.races.length}` }));
   } else if (myPlace && v.players.filter((p) => !p.bot).length >= MIN_RACERS_FOR_MEDALS) {
-    reward.append(el("span", {
-      class: "nomedal",
-      text: v.players.filter((p) => !p.bot).length < MIN_RACERS_FOR_MEDALS ? "Medals are won in races with 2 or more players" : "No medal this time. Top 3 win medals!",
-    }));
+    // no medal, but every place counts: off the podium is still +1 league point
+    if (rpChange) rank.add(LAST_PLACE_PTS);
+    reward.append(el("span", { class: "nomedal", text: "No medal this time. Top 3 win medals!" }));
   }
   if (rpChange) {
     reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
@@ -5350,7 +5352,7 @@ function announce(prev, v) {
   const fresh = (list, set) => (list || []).filter((x) => !set.has(x.id) && set.add(x.id));
   for (const z of fresh(v.zaps, seen.zaps)) {
     if (z.kind === "thunder") continue; // the hit line covers it
-    feed({ freeze: `❄️ ${nameOf(z.by)} froze everyone`, brainwave: `🌀 ${nameOf(z.by)} sent a brain wave` }[z.kind] ?? `⚡ ${nameOf(z.by)} called lightning`);
+    feed({ freeze: `❄️ ${nameOf(z.by)} froze everyone`, brainwave: `🌀 ${nameOf(z.by)} sent a brain wave`, mud: `🟤 ${nameOf(z.by)} threw mud` }[z.kind] ?? `⚡ ${nameOf(z.by)} called lightning`);
   }
   for (const b of fresh(v.bowls, seen.bowls)) feed(`🎳 ${nameOf(b.by)} rolled a bowling ball ${b.dir > 0 ? "ahead" : "back"}`);
   for (const b of fresh(v.bananas, seen.bananas)) {
@@ -5700,8 +5702,9 @@ streakModal.addEventListener("click", (e) => e.target === streakModal && (streak
 renderStreak();
 // ── ranking: leagues climbed with medal points ──
 
-/** Leagues are climbed with medal points only: every medal you earn counts, spending them doesn't. */
+/** Leagues are climbed with medal points: every medal you earn counts, spending them doesn't. Off the podium still gets 1. */
 const MEDAL_PTS = { gold: 10, silver: 5, bronze: 3 };
+const LAST_PLACE_PTS = 1;
 const LEAGUES = [
   { id: "bronze", name: "Bronze", min: 0, steps: [0, 10, 20] },
   { id: "silver", name: "Silver", min: 40, steps: [40, 60, 80] },
@@ -6754,6 +6757,13 @@ function activatePower(kind) {
     renderPower();
     return;
   }
+  if (kind === "mud") {
+    act({ type: "zap", kind: "mud" });
+    sfx.pop();
+    banner("🟤 MUD SPLASH!", 900);
+    renderPower();
+    return;
+  }
   if (kind === "lightning") {
     act({ type: "zap", kind: "lightning" });
     sfx.zap();
@@ -6810,6 +6820,19 @@ function checkZaps() {
       me.waveT = WAVE_S;
       sfx.zap();
       banner("🌀 BRAIN WAVE! LEFT IS RIGHT!", 1300);
+      continue;
+    }
+    if (z.kind === "mud") {
+      if (me.finished || me.out || me.d <= z.d) continue;
+      if (me.power === "shield") {
+        endPower();
+        sfx.pop();
+        banner("SHIELD BLOCKED THE MUD", 900);
+        continue;
+      }
+      if (me.power === "rocket") continue;
+      mudSplat();
+      sfx.hit();
       continue;
     }
     if (z.kind === "freeze") {
@@ -7041,6 +7064,14 @@ function renderCloudHud() {
   const mine = c && c.holder === playerId && game.mode === "race";
   box.hidden = !mine;
   if (mine) setText(box, `⛈️ ${Math.max(0, (c.until - serverNow()) / 1000).toFixed(1)} s · bump into someone to pass it on!`);
+}
+
+/** Mud from someone behind you: big splats over your screen that slide off after a few seconds. */
+function mudSplat() {
+  const f = $("#mudFx");
+  f.classList.remove("on");
+  void f.offsetWidth;
+  f.classList.add("on");
 }
 
 function frost() {
