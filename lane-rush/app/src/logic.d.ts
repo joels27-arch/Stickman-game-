@@ -114,7 +114,6 @@ export const ROLLER_TRIGGER_M: number;
 export const LOOKS: Record<string, number>;
 export const COUNTRIES: [string, string][];
 export const MEDALS: string[];
-export const MEDAL_WORTH: Record<string, number>;
 export const MIN_RACERS_FOR_MEDALS: number;
 export function rewards(state: unknown): Record<string, { place: number; medal: string | null }>;
 export const MOVER_KINDS: Record<string, { map: string; half: number; period: number; clear: string; slows?: boolean }>;

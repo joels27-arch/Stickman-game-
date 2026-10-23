@@ -55,7 +55,6 @@
         <div class="medal-chip" title="Your medals"></div>
         <div class="topbar-btns">
           <span class="coin-chip tb-coins" title="Coins"><i class="coin"></i><b class="coinCount">0</b></span>
-          <button id="streakPill" class="pill streak top-streak tb-shop" type="button" aria-label="Daily reward"><img class="pi" src="/assets/ui_flame.webp" alt="" /><b id="streakDay">Day 1</b><i class="dot" hidden></i></button>
           <button id="settingsBtn" class="btn small ghost icon-btn" type="button" aria-label="Settings">⚙</button>
         </div>
       </header>
@@ -111,7 +110,7 @@
         <div class="hpage hp-side hp-missions" id="hpMissions" aria-label="Missions">
           <div class="hp-scroll">
             <div class="ribbon pink hp-ribbon"><h2>Missions</h2></div>
-            <div id="goldRoad" class="gold-road"></div>
+            <div id="trophyRoad" class="gold-road"></div>
             <section class="m-hero">
               <div class="m-hero-top">
                 <div>
@@ -362,18 +361,6 @@
       </div>
     </div>
 
-    <!-- DAILY REWARD: 7-day login streak -->
-    <div id="streakModal" class="modal gmodal" hidden>
-      <div class="grays" aria-hidden="true"></div>
-      <div class="gsheet streak-sheet" role="dialog" aria-modal="true" aria-labelledby="streakTitle">
-        <div class="ribbon"><h2 id="streakTitle">Daily reward</h2></div>
-        <button id="streakClose" class="gclose" type="button" aria-label="Close">✕</button>
-        <div class="gsub"><span class="streak-badge"><img src="/assets/ui_flame.webp" alt="" /><b id="streakCount">0</b><small>day streak</small></span><p id="streakSub"></p></div>
-        <div id="streakGrid" class="streak-grid"></div>
-        <button id="streakClaim" class="gbtn" type="button">Claim</button>
-      </div>
-    </div>
-
     <!-- DAILY CHALLENGES: three a day, coins for each -->
     <!-- SETTINGS -->
     <div id="setModal" class="modal gmodal" hidden>
@@ -511,7 +498,7 @@
             </div>
             <h3 class="shop-sec" id="sec-chars"><img src="/assets/sc_luna.webp" alt="" /><span>Characters</span><small id="collCount">0 for sale</small></h3>
             <div id="shopGrid" class="coll-grid shop-chars"></div>
-            <h3 class="shop-sec" id="sec-items"><img src="/assets/ui_shoe.webp" alt="" /><span>Items</span><small>Trails · celebrations · emotes</small></h3>
+            <h3 class="shop-sec" id="sec-items"><img src="/assets/ui_shoe.webp" alt="" /><span>Items</span><small>Trails · emotes</small></h3>
             <div id="itemView" class="pack-view item-view"></div>
           </div>
         </div>
@@ -552,7 +539,7 @@
     <div id="packOpen" class="pack-open" hidden>
       <div class="grays" aria-hidden="true"></div>
       <div class="po-flash"></div>
-      <img id="poPack" class="po-pack" src="/assets/pack_brain.webp" alt="" />
+      <img id="poPack" class="po-pack" src="/assets/pack_mega.webp" alt="" />
       <div id="poCard" class="po-card" hidden></div>
       <p id="poHint" class="po-hint">Tap to open!</p>
       <div id="poSummary" class="po-summary" hidden></div>

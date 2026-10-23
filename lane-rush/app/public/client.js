@@ -23,7 +23,6 @@ import {
   LANES,
   COUNTRIES,
   MEDALS,
-  MEDAL_WORTH,
   MIN_RACERS_FOR_MEDALS,
   POWERS,
   LIVES,
@@ -99,17 +98,17 @@ const COLLECTION = [
   { id: "zara", name: "Zara", color: "#ff6fb5", rarity: "rare", via: "coins", coins: 2400 },
   { id: "jax", name: "Jax", color: "#c98a3c", rarity: "rare", via: "coins", coins: 3000 },
   { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "coins", coins: 4500 },
-  { id: "leo", name: "Sir Leo", color: "#4c8dff", rarity: "epic", via: "medals", price: { medal: "silver", count: 4 } },
-  { id: "kai", name: "Kai", color: "#21c7d9", rarity: "epic", via: "medals", price: { medal: "silver", count: 6 } },
-  { id: "zed", name: "Zed", color: "#7be3b0", rarity: "legendary", via: "medals", price: { medal: "gold", count: 3 } },
-  { id: "aria", name: "Aria", color: "#e03cff", rarity: "legendary", via: "medals", price: { medal: "gold", count: 5 } },
+  { id: "leo", name: "Sir Leo", color: "#4c8dff", rarity: "epic", via: "road", legacy: { medal: "silver", count: 4 } },
+  { id: "kai", name: "Kai", color: "#21c7d9", rarity: "epic", via: "road", legacy: { medal: "silver", count: 6 } },
+  { id: "zed", name: "Zed", color: "#7be3b0", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 3 } },
+  { id: "aria", name: "Aria", color: "#e03cff", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 5 } },
   { id: "porky", name: "Porky", color: "#ff9ec4", rarity: "common", via: "coins", coins: 900 },
   { id: "foxy", name: "Flash Fox", color: "#ff7a1a", rarity: "rare", via: "coins", coins: 2200 },
   { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "coins", coins: 2800 },
   { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "coins", coins: 5000 },
-  { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "medals", price: { medal: "silver", count: 5 } },
-  { id: "hoops", name: "Big Slam", color: "#ff8a00", rarity: "legendary", via: "medals", price: { medal: "gold", count: 4 } },
-  { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "medals", price: { medal: "gold", count: 6 } },
+  { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "road", legacy: { medal: "silver", count: 5 } },
+  { id: "hoops", name: "Big Slam", color: "#ff8a00", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 4 } },
+  { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 6 } },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
 const medalText = (medal, n) => `${n} ${medal} medal${n === 1 ? "" : "s"}`;
@@ -125,15 +124,18 @@ const GAME_MODE_INFO = {
   random: { label: "Random", icon: "🎲", tag: "Surprise", text: "A random mode is drawn when each race starts." },
   grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "Every mode once: Survival, Brain Chase, Coin Rush and Hot Potato." },
 };
-/** What the host can put up for the top 3 of a match. Paid with 2+ real players, at most PRIZES_PER_DAY a day. */
+/**
+ * What the host can put up for the top 3 of a match, paid out of the host's own
+ * coins: the whole pot when the match starts, and the shares of places nobody
+ * real took (bots, or fewer than 2 real players) come back after the last round.
+ */
 const PRIZE_INFO = {
   none: { label: "Just glory", icon: "🤝", pays: [] },
-  coins: { label: "Coins", icon: "🪙", pays: [150, 75, 40] },
-  bigcoins: { label: "Big coins", icon: "💰", pays: [300, 150, 75] },
-  pack: { label: "Pack", icon: "🎁", pays: ["pack", 150, 75] },
+  coins: { label: "Small pot", icon: "🪙", pays: [150, 75, 40] },
+  bigcoins: { label: "Big pot", icon: "💰", pays: [300, 150, 75] },
+  huge: { label: "Huge pot", icon: "👑", pays: [600, 300, 150] },
 };
-const PRIZES_PER_DAY = 5;
-const prizeText = (x) => (x === "pack" ? "Brain Pack" : `${x} coins`);
+const potOf = (prize) => (PRIZE_INFO[prize ?? "none"]?.pays ?? []).reduce((a, b) => a + b, 0);
 /** "3 rounds", or the Grand Tour's fixed 4. */
 function roundsOf(v) {
   return v.mode === "grandtour" ? ROUND_KINDS.length : v.rounds ?? 1;
@@ -248,13 +250,13 @@ const wallet = {
       const old = this.medals();
       for (const k of MEDALS) gained += Math.max(0, (m[k] ?? 0) - old[k]) * MEDAL_PTS[k];
       goldWon = Math.max(0, (m.gold ?? 0) - old.gold);
-      if (goldWon) road.gold(); // set up the road from the old wallet first
+      if (goldWon) goldEver(); // count the old wallet first
     } catch {
       gained = 0; // still starting up
     }
     local.setItem("lr:medals", JSON.stringify(m));
     if (gained) rank.add(gained);
-    if (goldWon) road.add(goldWon);
+    if (goldWon) local.setItem("lr:goldEver", String(goldEver() + goldWon));
     renderWallet();
   },
   owned() {
@@ -267,26 +269,6 @@ const wallet = {
   },
   owns(i) {
     return (i < STARTERS && !(i in PASS_RUNNERS)) || this.owned().includes(i);
-  },
-  /**
-   * How a price would be paid: medals of the asked type first; anything still
-   * missing is covered by higher medals at their worth (gold 10, silver 5,
-   * bronze 3), using the smallest ones first. null when you can't afford it.
-   */
-  plan(price) {
-    const have = this.medals();
-    const spend = { gold: 0, silver: 0, bronze: 0 };
-    const own = Math.min(have[price.medal], price.count);
-    spend[price.medal] = own;
-    let missing = (price.count - own) * MEDAL_WORTH[price.medal];
-    const higher = MEDALS.filter((m) => MEDAL_WORTH[m] > MEDAL_WORTH[price.medal]).sort((a, b) => MEDAL_WORTH[a] - MEDAL_WORTH[b]);
-    for (const m of higher) {
-      while (missing > 0 && have[m] - spend[m] > 0) {
-        spend[m] += 1;
-        missing -= MEDAL_WORTH[m];
-      }
-    }
-    return missing > 0 ? null : spend;
   },
   coins() {
     const c = Number(local.getItem("lr:coins"));
@@ -305,15 +287,6 @@ const wallet = {
   /** Collection characters are owned by id. */
   has(id) {
     return this.owned().includes(id);
-  },
-  buy(item) {
-    const spend = item.price && !this.has(item.id) ? this.plan(item.price) : null;
-    if (!spend) return false;
-    const m = this.medals();
-    for (const k of MEDALS) m[k] -= spend[k];
-    local.setItem("lr:owned", JSON.stringify([...this.owned(), item.id]));
-    this.save(m);
-    return true;
   },
   /** Credit a race's medal once (keyed by the race), so reloads don't pay twice. */
   claim(key, medal) {
@@ -631,7 +604,7 @@ const TOUR = [
   { sel: "#profileCard", pose: "point", img: "/assets/lg_bronze.webp", title: "That's you", text: "Your name and league. Tap it for your stats: wins, records and how you rank among friends." },
   { sel: '.htab[data-page="0"]', pose: "cheer", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
   { sel: '.htab[data-page="1"]', pose: "point", img: "/assets/tab_skins.webp", title: "Skins", text: "All your characters. Pick who you race with." },
-  { sel: '.htab[data-page="3"]', pose: "think", img: "/assets/tab_missions.webp", title: "Missions", text: "Daily missions, your career and the Gold Road: every gold medal you win moves you along it, for coins, packs and exclusive characters." },
+  { sel: '.htab[data-page="3"]', pose: "think", img: "/assets/tab_missions.webp", title: "Missions", text: "Daily missions, your career and the Trophy Road: every medal you win moves you along it, for coins, packs and exclusive characters." },
   { sel: '.htab[data-page="4"]', pose: "box", img: "/assets/tab_shop.webp", title: "Shop", text: "Packs, characters, trails and the Season Pass." },
   { sel: "#endlessBtn", pose: "run", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life, how far can you get? I'll teach you the moves while you run. Tap it!", last: true },
 ];
@@ -939,7 +912,7 @@ $("#setTut").addEventListener("click", () => {
 });
 renderCountryChips();
 
-// ── cosmetics: trails, celebrations, emotes ──
+// ── cosmetics: trails and emotes ──
 const TRAIL_INFO = {
   sparkle: { name: "Sparkle", colors: ["#ffffff", "#fff2b0", "#ffd23f"], price: 300 },
   bubbles: { name: "Bubbles", colors: ["#9fe3ff", "#4fc3ff", "#ffffff"], price: 400 },
@@ -949,19 +922,13 @@ const TRAIL_INFO = {
   gold: { name: "Golden", colors: ["#ffd23f", "#ffb300", "#fff2b0"], pass: "free" },
   neon: { name: "Neon", colors: ["#ff3df5", "#3dfcff", "#b6f72a"], pass: "gold" },
 };
-const CEL_INFO = {
-  confetti: { name: "Confetti", icon: "🎊", price: 300 },
-  hearts: { name: "Love", icon: "💖", price: 400 },
-  goldrain: { name: "Golden rain", icon: "🌟", price: 500 },
-  mega: { name: "Mega fireworks", icon: "🎆", pass: "gold" },
-};
 const EMOTE_PRICE = 200;
 function equipped() {
   try {
     const e = JSON.parse(local.getItem("lr:equip") || "{}") || {};
-    return { trail: TRAILS.includes(e.trail) && wallet.has(`trail:${e.trail}`) ? e.trail : "", cel: CEL_INFO[e.cel] && wallet.has(`cel:${e.cel}`) ? e.cel : "" };
+    return { trail: TRAILS.includes(e.trail) && wallet.has(`trail:${e.trail}`) ? e.trail : "" };
   } catch {
-    return { trail: "", cel: "" };
+    return { trail: "" };
   }
 }
 function equip(slot, id) {
@@ -1039,8 +1006,6 @@ function renderItems() {
   $("#itemView").replaceChildren(
     el("h3", { class: "album-title", text: "Running trails" }),
     el("div", { class: "item-grid" }, ...Object.entries(TRAIL_INFO).map(([k, t]) => card(`trail:${k}`, "trail", t.name, swatch(k), t.price, t.pass))),
-    el("h3", { class: "album-title", text: "Win celebrations" }),
-    el("div", { class: "item-grid" }, ...Object.entries(CEL_INFO).map(([k, c]) => card(`cel:${k}`, "cel", c.name, el("i", { class: "big-emoji", text: c.icon }), c.price, c.pass))),
     el("h3", { class: "album-title", text: "Emotes" }),
     el("div", { class: "item-grid emotes" }, ...SHOP_EMOTES.map((e) => card(`emote:${e}`, null, e, el("i", { class: "big-emoji", text: e }), EMOTE_PRICE))),
   );
@@ -1060,15 +1025,14 @@ function allChars() {
   ];
 }
 const ownsChar = (c) => (c.idx !== undefined ? wallet.owns(c.idx) : wallet.has(c.id));
-const VIA_LABEL = { starter: "Free", coins: "Coins", medals: "Medals", pack: "Packs", pass: "Season Pass", road: "Gold Road" };
-const VIA_ICON = { starter: "✅", coins: "🪙", medals: "🏅", pack: "🎁", pass: "⭐", road: "🥇" };
+const VIA_LABEL = { starter: "Free", coins: "Coins", pack: "Packs", pass: "Season Pass", road: "Trophy Road" };
+const VIA_ICON = { starter: "✅", coins: "🪙", pack: "🎁", pass: "⭐", road: "🏆" };
 function howToGet(c) {
   if (c.via === "starter") return "A free runner. Race with it any time.";
   if (c.via === "coins") return `Buy it in the Shop for ${c.coins.toLocaleString()} coins.`;
-  if (c.via === "medals") return `Medal exclusive: ${medalText(c.price.medal, c.price.count)}. Win medals by placing top 3 against real players. Gold medals only come from winning races.`;
-  if (c.via === "pack") return `Only in packs (${c.rarity}). Brain Pack: ${pct(PACK_ODDS.normal[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)} per item. Mega Pack last item: ${pct(PACK_ODDS.boosted[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)}.`;
+  if (c.via === "pack") return `Only in packs (${c.rarity}). Mega Pack: ${pct(PACK_ODDS.normal[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)} per item, last item: ${pct(PACK_ODDS.boosted[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)}.`;
   if (c.idx in PASS_RUNNERS) return `Season Pass reward: free track, level ${PASS_RUNNERS[c.idx]}. Play races to earn XP.`;
-  if (c.via === "road") return `Gold Road exclusive: win ${ROAD.find((r) => r.char === c.id).gold.toLocaleString()} gold medals in total.`;
+  if (c.via === "road") return `Trophy Road exclusive: reach ${ROAD.find((r) => r.char === c.id).pts.toLocaleString()} league points. Every medal you win moves you along the road.`;
   return "Season Pass exclusive: Gold track, level 30.";
 }
 /** The short lock label on a runner card you can't race with yet. */
@@ -1089,14 +1053,12 @@ function renderCollPill() {
 function charCard(c, n, onClick) {
   const owned = ownsChar(c);
   const sel = preferredChar();
-  const can = c.via === "coins" ? wallet.coins() >= c.coins : c.via === "medals" ? Boolean(wallet.plan(c.price)) : false;
+  const can = c.via === "coins" && wallet.coins() >= c.coins;
   const tag = owned
     ? el("small", { class: "via", text: c.playable ? (c.idx === sel ? "★ Selected" : "Playable") : "Collected" })
     : c.via === "coins"
       ? el("span", { class: `sprice${can ? "" : " short"}` }, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }))
-      : c.via === "medals"
-        ? el("span", { class: `sprice medal${can ? "" : " short"}` }, el("img", { src: MEDAL_IMG[c.price.medal], alt: "" }), el("b", { text: `×${c.price.count}` }))
-        : el("small", { class: "via", text: c.idx in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[c.idx]}` : `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` });
+      : el("small", { class: "via", text: c.idx in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[c.idx]}` : `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` });
   const b = el(
     "button",
     { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${c.playable && c.idx === sel ? " sel" : ""}`, type: "button", style: `--i:${n}` },
@@ -1110,7 +1072,7 @@ function charCard(c, n, onClick) {
   return b;
 }
 const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
-const VIA_GROUP = { coins: "🪙 Buy with coins", medals: "🏅 Buy with medals", pack: "🎁 From packs", pass: "⭐ Season Pass", road: "🥇 Gold Road" };
+const VIA_GROUP = { coins: "🪙 Buy with coins", pack: "🎁 From packs", pass: "⭐ Season Pass", road: "🏆 Trophy Road" };
 /** Characters split by how you get them (in this order), each group sorted common → legendary; empty groups left out. */
 function charGroups(list, order) {
   return order.map((via) => [via, list.filter((c) => c.via === via).sort(byRarity)]).filter(([, l]) => l.length);
@@ -1150,7 +1112,7 @@ function renderSkins() {
       return card;
     }),
     ...(rest.length
-      ? charGroups(rest, ["coins", "medals", "pack", "pass", "road"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: `${VIA_GROUP[via]} · ${list.length}` }), ...list.map((c) => charCard(c, n++, inspectChar))])
+      ? charGroups(rest, ["coins", "pack", "road", "pass"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: `${VIA_GROUP[via]} · ${list.length}` }), ...list.map((c) => charCard(c, n++, inspectChar))])
       : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
   );
   renderCollPill();
@@ -1161,15 +1123,14 @@ function renderSkins() {
  * each from common to legendary) and items, all on one page.
  */
 function renderShop() {
-  // characters for sale: the coin and medal ones you don't have yet (your collection is under Skins)
-  // grouped by what you pay with, each group from common to legendary
-  const sale = allChars().filter((c) => (c.via === "coins" || c.via === "medals") && !ownsChar(c));
+  // characters for sale: the coin ones you don't have yet (your collection is under Skins), from common to legendary
+  const sale = allChars().filter((c) => c.via === "coins" && !ownsChar(c));
   $("#collCount").textContent = `${sale.length} for sale`;
   const buy = (x) => askBuy(COLLECTION.find((y) => y.id === x.id));
   let n = 0;
   $("#shopGrid").replaceChildren(
-    ...charGroups(sale, ["coins", "medals"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: VIA_GROUP[via] }), ...list.map((c) => charCard(c, n++, buy))]),
-    ...(sale.length ? [] : [el("p", { class: "rempty", text: "You own every character in the shop. More come from packs and the Season Pass." })]),
+    ...charGroups(sale, ["coins"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: VIA_GROUP[via] }), ...list.map((c) => charCard(c, n++, buy))]),
+    ...(sale.length ? [] : [el("p", { class: "rempty", text: "You own every character in the shop. More come from packs, the Trophy Road and the Season Pass." })]),
   );
   renderPacks();
   renderItems();
@@ -1184,13 +1145,10 @@ function askBuy(c) {
   buying = c;
   $("#buyTitle").textContent = "Unlock?";
   $("#buyPreview").replaceChildren(el("div", { class: `bp-card ${c.rarity}` }, el("span", { class: "rar", text: c.rarity }), el("img", { src: `/assets/sc_${c.id}.webp`, alt: "" }), el("b", { text: c.name })));
-  const can = c.via === "coins" ? wallet.coins() >= c.coins : Boolean(wallet.plan(c.price));
-  const spend = c.via === "medals" ? wallet.plan(c.price) : null;
+  const can = wallet.coins() >= c.coins;
   $("#buyPrice").replaceChildren(
-    c.via === "coins"
-      ? el("span", {}, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }), el("small", { text: ` · you have ${wallet.coins().toLocaleString()}` }))
-      : el("span", {}, el("img", { src: MEDAL_IMG[c.price.medal], alt: "" }), el("b", { text: medalText(c.price.medal, c.price.count) }), el("small", { text: spend ? ` · pays with ${MEDALS.filter((k) => spend[k]).map((k) => medalText(k, spend[k])).join(" + ")}` : "" })),
-    ...(can ? [] : [el("em", { text: c.via === "coins" ? `You need ${(c.coins - wallet.coins()).toLocaleString()} more coins` : "Not enough medals yet" })]),
+    el("span", {}, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }), el("small", { text: ` · you have ${wallet.coins().toLocaleString()}` })),
+    ...(can ? [] : [el("em", { text: `You need ${(c.coins - wallet.coins()).toLocaleString()} more coins` })]),
   );
   $("#buyOk").disabled = !can;
   $("#buyOk").textContent = can ? "Unlock" : "Can't afford yet";
@@ -1206,7 +1164,7 @@ $("#buyOk").addEventListener("click", () => {
   buying = null; // one purchase per confirmation, however fast you tap
   buyModal.hidden = true;
   if (!c || wallet.has(c.id)) return;
-  const ok = c.via === "coins" ? wallet.buyWithCoins(c) : wallet.buy(c);
+  const ok = wallet.buyWithCoins(c);
   if (!ok) return toast("Not enough to unlock that yet");
   stats.add("bought", 1);
   showUnlock({ kind: "char", char: { ...c, img: `/assets/sc_${c.id}.webp` } }, () => {
@@ -1244,8 +1202,15 @@ function inspectChar(c) {
   } else if (owned) {
     btn.textContent = "In your collection ✓";
     btn.disabled = true;
-  } else if (c.via === "coins" || c.via === "medals") {
-    btn.textContent = c.via === "coins" ? `Unlock · ${c.coins.toLocaleString()} coins` : `Unlock · ${medalText(c.price.medal, c.price.count)}`;
+  } else if (c.via === "road") {
+    btn.textContent = "See the Trophy Road";
+    action = () => {
+      charModal.hidden = true;
+      showScreen("home");
+      setHomePage(PAGE.missions);
+    };
+  } else if (c.via === "coins") {
+    btn.textContent = `Unlock · ${c.coins.toLocaleString()} coins`;
     action = () => {
       charModal.hidden = true;
       askBuy(c);
@@ -1291,10 +1256,8 @@ const PACK_ODDS = {
   boosted: { legendary: 0.05, epic: 0.25, rare: 0.7 }, // the Mega Pack's last item: always a character
 };
 const NEWBIE_PACKS = 3; // your first packs: double character odds, and the very first one always has a new character
-const PACKS = [
-  { id: "brain", name: "Brain Pack", price: 600, slots: ["normal"], img: "/assets/pack_brain.webp", note: "1 item" },
-  { id: "mega", name: "Mega Pack", price: 1800, slots: ["normal", "normal", "boosted"], img: "/assets/pack_mega.webp", note: "3 items · last one boosted" },
-];
+/** One pack type: 3 items, the last one always a character. */
+const PACKS = [{ id: "mega", name: "Mega Pack", price: 1200, slots: ["normal", "normal", "boosted"], img: "/assets/pack_mega.webp", note: "3 items · last one is a character" }];
 const pct = (x) => `${Math.round(x * 1000) / 10}%`;
 /** A character you don't own yet if that rarity has one left, else a duplicate. */
 function packChar(rarity) {
@@ -1318,7 +1281,7 @@ function freePackLeft() {
 }
 /** Pay, roll and credit everything right away (so closing the animation can't lose items). */
 function buyPack(pack) {
-  const free = pack.id === "brain" && freePackLeft();
+  const free = pack.id === "mega" && freePackLeft();
   if (!free && wallet.coins() < pack.price) return null;
   if (free) local.setItem("lr:freePack", "1");
   else wallet.addCoins(-pack.price);
@@ -1348,7 +1311,7 @@ function grantPack(pack) {
 function renderPacks() {
   $("#packRow").replaceChildren(
     ...PACKS.map((pk) => {
-      const free = pk.id === "brain" && freePackLeft();
+      const free = pk.id === "mega" && freePackLeft();
       const btn = el("button", { class: "sbuy", type: "button" }, ...(free ? [el("span", { text: "Free!" })] : [el("i", { class: "coin" }), el("span", { text: pk.price.toLocaleString() })]));
       btn.disabled = !free && wallet.coins() < pk.price;
       btn.addEventListener("click", () => {
@@ -1368,7 +1331,7 @@ function renderPacks() {
   );
   const n = PACK_ODDS.normal;
   const b = PACK_ODDS.boosted;
-  $("#packOdds").textContent = `Odds per item: legendary ${pct(n.legendary)} · epic ${pct(n.epic)} · rare ${pct(n.rare)} · coins ${pct(1 - n.legendary - n.epic - n.rare)}. Mega Pack's last item is always a character (legendary ${pct(b.legendary)} · epic ${pct(b.epic)} · rare ${pct(b.rare)}). Your first pack always has a new character and your first ${NEWBIE_PACKS} packs have double character odds. You get characters you don't have yet first; duplicates turn into coins.`;
+  $("#packOdds").textContent = `Odds per item: legendary ${pct(n.legendary)} · epic ${pct(n.epic)} · rare ${pct(n.rare)} · coins ${pct(1 - n.legendary - n.epic - n.rare)}. The last item is always a character (legendary ${pct(b.legendary)} · epic ${pct(b.epic)} · rare ${pct(b.rare)}). Your first pack always has a new character and your first ${NEWBIE_PACKS} packs have double character odds. You get characters you don't have yet first; duplicates turn into coins.`;
   renderWallet();
 }
 
@@ -1919,104 +1882,124 @@ function untilText(ms) {
   return d ? `${d}d ${h}h` : h ? `${h}h ${m % 60}m` : `${m}m`;
 }
 
-// ── Gold Road (on the Missions page): a lifetime path, like a trophy road, paid for every gold medal you ever win ──
+// ── Trophy Road (top of the Missions page): one road for everything you win in races.
+// Every medal adds league points (gold 10, silver 5, bronze 3, off the podium 1), the
+// leagues are stages along it, and coins, packs and exclusive characters wait on it ──
 
-/** Exclusive characters you can only get on the Gold Road. */
+/** Characters only found on the Trophy Road (the others on it are in COLLECTION, via "road"). */
 const ROAD_CHARS = [
   { id: "ace", name: "Ace", rarity: "epic" },
   { id: "titan", name: "Titan", rarity: "legendary" },
   { id: "aurum", name: "Aurum", rarity: "legendary" },
 ];
+/** Each step: the league points it needs and what it gives. Every league starts with a character. */
 const ROAD = [
-  { gold: 1, coins: 250 },
-  { gold: 3, pack: "brain" },
-  { gold: 5, coins: 500 },
-  { gold: 10, pack: "mega" },
-  { gold: 15, coins: 1000 },
-  { gold: 25, pack: "mega" },
-  { gold: 50, char: "ace" },
-  { gold: 75, coins: 2500 },
-  { gold: 100, pack: "mega" },
-  { gold: 150, coins: 4000 },
-  { gold: 250, char: "titan" },
-  { gold: 400, coins: 6000 },
-  { gold: 600, pack: "mega" },
-  { gold: 800, coins: 10000 },
-  { gold: 1000, char: "aurum" },
+  { pts: 10, coins: 200 },
+  { pts: 20, pack: "mega" },
+  { pts: 30, coins: 300 },
+  { pts: 40, char: "leo" },
+  { pts: 60, coins: 400 },
+  { pts: 80, pack: "mega" },
+  { pts: 110, char: "kai" },
+  { pts: 140, coins: 600 },
+  { pts: 170, pack: "mega" },
+  { pts: 220, char: "unitx" },
+  { pts: 260, coins: 1000 },
+  { pts: 300, pack: "mega" },
+  { pts: 360, char: "zed" },
+  { pts: 420, coins: 1500 },
+  { pts: 480, pack: "mega" },
+  { pts: 560, char: "aria" },
+  { pts: 700, coins: 2500 },
+  { pts: 850, char: "ace" },
+  { pts: 1000, pack: "mega" },
+  { pts: 1300, char: "hoops" },
+  { pts: 1600, coins: 4000 },
+  { pts: 2000, char: "striker" },
+  { pts: 2500, char: "titan" },
+  { pts: 3500, coins: 6000 },
+  { pts: 5000, pack: "mega" },
+  { pts: 7500, coins: 10000 },
+  { pts: 10000, char: "aurum" },
 ];
-const roadChar = (id) => ROAD_CHARS.find((c) => c.id === id);
+/** Coins instead, for a road character you already own (from the old medal shop). */
+const ROAD_DUPE = { epic: 800, legendary: 1500 };
+const roadChar = (id) => ROAD_CHARS.find((c) => c.id === id) ?? COLLECTION.find((c) => c.id === id);
 function roadInfo(step) {
   if (step.coins) return { label: `${step.coins.toLocaleString()} coins`, img: step.coins >= 2500 ? "/assets/ui_c3.webp" : step.coins >= 1000 ? "/assets/ui_c2.webp" : "/assets/ui_c1.webp" };
-  if (step.pack) return { label: step.pack === "mega" ? "Mega Pack" : "Brain Pack", img: `/assets/pack_${step.pack}.webp` };
+  if (step.pack) return { label: "Mega Pack", img: `/assets/pack_${step.pack}.webp` };
   const c = roadChar(step.char);
-  return { label: c.name, img: `/assets/rd_${c.id}.webp`, rarity: c.rarity };
+  return { label: c.name, img: ROAD_CHARS.includes(c) ? `/assets/rd_${c.id}.webp` : `/assets/sc_${c.id}.webp`, rarity: c.rarity };
 }
-/** Gold medals won, ever (spending them never takes you back down the road). */
+/** Gold medals won, ever (a stat: spending them never counted back). */
+function goldEver() {
+  const n = Number(local.getItem("lr:goldEver"));
+  if (local.getItem("lr:goldEver") !== null && Number.isFinite(n)) return n;
+  let start = wallet.medals().gold;
+  for (const c of COLLECTION) if (c.legacy?.medal === "gold" && wallet.has(c.id)) start += c.legacy.count;
+  local.setItem("lr:goldEver", String(start));
+  return start;
+}
 const road = {
-  gold() {
-    const n = Number(local.getItem("lr:goldEver"));
-    if (local.getItem("lr:goldEver") !== null && Number.isFinite(n)) return n;
-    // first run with the road: the gold you hold plus the gold spent on characters
-    let start = wallet.medals().gold;
-    for (const c of COLLECTION) if (c.via === "medals" && c.price.medal === "gold" && wallet.has(c.id)) start += c.price.count;
-    local.setItem("lr:goldEver", String(start));
-    return start;
-  },
-  add(n) {
-    local.setItem("lr:goldEver", String(this.gold() + n));
-    renderGoldRoad();
-  },
   claimed() {
     try {
-      const a = JSON.parse(local.getItem("lr:road") || "[]");
+      const a = JSON.parse(local.getItem("lr:troad") || "[]");
       return Array.isArray(a) ? a : [];
     } catch {
       return [];
     }
   },
   ready() {
-    const g = this.gold();
+    const p = rank.points();
     const done = this.claimed();
-    return ROAD.filter((r) => r.gold <= g && !done.includes(r.gold));
+    return ROAD.filter((r) => r.pts <= p && !done.includes(r.pts));
   },
 };
 function claimRoad(step, node) {
-  if (road.gold() < step.gold || road.claimed().includes(step.gold)) return;
-  local.setItem("lr:road", JSON.stringify([...road.claimed(), step.gold]));
+  if (rank.points() < step.pts || road.claimed().includes(step.pts)) return;
+  local.setItem("lr:troad", JSON.stringify([...road.claimed(), step.pts]));
   const info = roadInfo(step);
   sfx.finish();
   if (step.coins) {
     wallet.addCoins(step.coins);
     coinRain(node, 14);
-    toast(`Gold Road: +${info.label}!`);
+    toast(`Trophy Road: +${info.label}!`);
   } else if (step.pack) {
     const pk = PACKS.find((x) => x.id === step.pack);
     openPackAnim(pk, grantPack(pk));
+  } else if (wallet.has(step.char)) {
+    const n = ROAD_DUPE[info.rarity] ?? 800;
+    wallet.addCoins(n);
+    coinRain(node, 14);
+    toast(`You already have ${info.label}: +${n.toLocaleString()} coins`);
   } else {
     giveItem(step.char);
     renderCollPill();
     showUnlock({ kind: "char", char: { name: info.label, rarity: info.rarity, img: info.img } });
   }
-  renderGoldRoad();
+  renderTrophyRoad();
 }
-function renderGoldRoad() {
-  const box = $("#goldRoad");
+function renderTrophyRoad() {
+  const box = $("#trophyRoad");
   if (!box) return;
-  const g = road.gold();
+  const p = rank.points();
+  const r = rankOf(p);
   const done = road.claimed();
-  const next = ROAD.find((r) => r.gold > g);
+  const next = ROAD.find((x) => x.pts > p);
   const nodes = ROAD.map((step, i) => {
     const info = roadInfo(step);
-    const got = done.includes(step.gold);
-    const ready = step.gold <= g && !got;
+    const got = done.includes(step.pts);
+    const ready = step.pts <= p && !got;
+    const league = LEAGUES.find((l) => l.min === step.pts); // a new league starts here
     // how far the road is filled toward this node from the one before
-    const prev = i ? ROAD[i - 1].gold : 0;
-    const fill = Math.max(0, Math.min(1, (g - prev) / (step.gold - prev)));
+    const prev = i ? ROAD[i - 1].pts : 0;
+    const fill = Math.max(0, Math.min(1, (p - prev) / (step.pts - prev)));
     const b = el(
       "button",
-      { class: `rnode${got ? " got" : ""}${ready ? " ready" : ""}${step.gold > g ? " future" : ""}${step.char ? ` star ${info.rarity}` : ""}`, type: "button" },
+      { class: `rnode${got ? " got" : ""}${ready ? " ready" : ""}${step.pts > p ? " future" : ""}${step.char ? ` star ${info.rarity}` : ""}${league ? " league" : ""}`, type: "button" },
       el("span", { class: "rline" }, el("i", { style: `width:${Math.round(fill * 100)}%` })),
-      el("span", { class: "rgold" }, el("img", { src: MEDAL_IMG.gold, alt: "" }), el("b", { text: String(step.gold) })),
+      league ? el("span", { class: "rleague" }, el("img", { src: `/assets/lg_${league.id}.webp`, alt: "" }), el("small", { text: league.name })) : el("span", { class: "rleague" }),
+      el("span", { class: "rgold" }, el("i", { text: "🏆" }), el("b", { text: step.pts.toLocaleString() })),
       el("span", { class: "rbubble" }, el("img", { src: info.img, alt: "" }), got ? el("i", { class: "tick", text: "✓" }) : null),
       el("small", { text: ready ? "Claim!" : info.label }),
     );
@@ -2029,12 +2012,12 @@ function renderGoldRoad() {
     el(
       "div",
       { class: "road-head" },
-      el("img", { src: MEDAL_IMG.gold, alt: "" }),
-      el("div", {}, el("b", { text: "Gold Road" }), el("span", { text: next ? `${next.gold - g} more gold to ${roadInfo(next).label}` : "Road complete. Legend!" })),
-      el("em", { text: g.toLocaleString() }),
+      el("img", { src: r.img, alt: "" }),
+      el("div", {}, el("b", { text: "Trophy Road" }), el("span", { text: next ? `${r.name} · ${next.pts - p} pts to ${roadInfo(next).label}` : `${r.name} · road complete. Legend!` })),
+      el("em", { text: `${p.toLocaleString()} 🏆` }),
     ),
     track,
-    el("p", { class: "road-note", text: "Gold medals come only from winning races against real players. Spending them never moves you back." }),
+    el("p", { class: "road-note", text: "Win medals in races with friends: gold +10, silver +5, bronze +3, 4th place +1." }),
   );
   // keep the next reward in view
   requestAnimationFrame(() => {
@@ -2223,7 +2206,6 @@ function renderStoreDot() {
   dot.hidden = !pass;
 }
 renderCompete();
-renderGoldRoad();
 
 function leaveToHome(message = "") {
   game.mode = "home";
@@ -2430,13 +2412,15 @@ function renderLobby(v) {
   const prize = v.prize ?? "none";
   $("#prizePick").replaceChildren(
     ...Object.entries(PRIZE_INFO).map(([key, info]) => {
-      const b = el("button", { class: `chip prize${prize === key ? " on" : ""}`, type: "button" }, el("b", { text: `${info.icon} ${info.label}` }), info.pays.length ? el("small", { text: info.pays.map((x, i) => `${["1st", "2nd", "3rd"][i]} ${x === "pack" ? "🎁" : x}`).join(" · ") }) : el("small", { text: "No prize" }));
-      b.disabled = !isHost;
+      const b = el("button", { class: `chip prize${prize === key ? " on" : ""}`, type: "button" }, el("b", { text: `${info.icon} ${info.label}` }), info.pays.length ? el("small", { text: info.pays.map((x, i) => `${["1st", "2nd", "3rd"][i]} ${x}`).join(" · ") }) : el("small", { text: "No prize" }));
+      // the host pays the pot, so they can only pick one they can afford
+      b.disabled = !isHost || (prize !== key && potOf(key) > wallet.coins());
       b.addEventListener("click", () => prize !== key && act({ type: "prize", prize: key }));
       return b;
     }),
   );
-  $("#prizeNote").textContent = prize === "none" ? "" : `Paid after the last round, with 2+ real players · up to ${PRIZES_PER_DAY} prizes a day`;
+  $("#prizeNote").textContent =
+    prize === "none" ? "" : isHost ? `You pay ${potOf(prize).toLocaleString()} coins when the match starts. Places taken by bots are paid back to you.` : `The host pays ${potOf(prize).toLocaleString()} coins for the top 3`;
   const what = matchLabel(v, gm, gm === "survival" && n < 2 && !botsOn()).toLowerCase();
   $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
   renderLineup(v, { isHost, gm, mp, mode, what });
@@ -2471,8 +2455,11 @@ $("#luGo").addEventListener("click", () => {
   const v = net.view;
   if (!v) return;
   const me = v.players.find((p) => p.id === playerId);
-  if (v.host === playerId) act({ type: "start", bots: botsOn() });
-  else act({ type: "ready", ready: !me?.ready });
+  if (v.host === playerId) {
+    const pot = potOf(v.prize);
+    if (pot > wallet.coins()) return toast(`You need ${pot.toLocaleString()} coins for this prize pot`);
+    act({ type: "start", bots: botsOn() });
+  } else act({ type: "ready", ready: !me?.ready });
 });
 
 /**
@@ -2665,6 +2652,7 @@ function renderResults(v) {
   const rpChange = recordRace(v, v.standings.indexOf(playerId) + 1);
   // the host's prize for the top 3, once the whole match is over
   const roomPrize = rpChange && (!cup || cupDone) ? payRoomPrize(v, myPlace) : null;
+  const potBack = rpChange && (!cup || cupDone) ? refundPot(v, order) : null;
   if (rpChange && v.standings.length >= 2 && (cupDone ? cup.table[0] === playerId : !cup && myPlace === 1)) setTimeout(() => sfx.cheer(), 300);
   const ptsBefore = rank.points();
   if (mine?.medal) {
@@ -2683,6 +2671,7 @@ function renderResults(v) {
     if (rpChange.xp) reward.append(el("span", { class: "xpchip", text: `+${rpChange.xp} XP` }));
     if (rpChange.prize) reward.append(el("span", { class: "xpchip prizechip", text: `🏆 Prize +${rpChange.prize}` }));
     if (roomPrize) reward.append(el("span", { class: "xpchip prizechip", text: roomPrize }));
+    if (potBack) reward.append(el("span", { class: "xpchip prizechip", text: potBack }));
     if (rpChange.league) reward.append(el("span", { class: "xpchip leaguechip", text: `Weekend League +${rpChange.league.pts} pts · ${rpChange.league.matches}/${LEAGUE_MATCHES}` }));
     if (rpChange.botsOnly) reward.append(el("span", { class: "nomedal", text: "Medals (and league progress) need 2 real players" }));
     else reward.append(rankChip(rank.points() - ptsBefore));
@@ -2715,29 +2704,29 @@ function renderResults(v) {
   }
 }
 
-/** Pay the room's prize for your final place (top 3), with 2+ real players and a daily cap. Returns a label, or null. */
+/** Your share of the host's prize pot for your final place (top 3, with 2+ real players). Returns a label, or null. */
 function payRoomPrize(v, place) {
-  const pays = PRIZE_INFO[v.prize ?? "none"]?.pays ?? [];
-  const x = pays[place - 1];
-  if (x === undefined) return null;
-  if (v.players.filter((p) => !p.bot).length < 2) return "Room prizes need 2+ real players";
-  let log = { day: dayKey(), n: 0 };
-  try {
-    const l = JSON.parse(local.getItem("lr:prizes") || "null");
-    if (l && l.day === dayKey()) log = l;
-  } catch {
-    // fresh log
-  }
-  if (log.n >= PRIZES_PER_DAY) return `Daily room-prize limit reached (${PRIZES_PER_DAY})`;
-  local.setItem("lr:prizes", JSON.stringify({ day: log.day, n: log.n + 1 }));
-  if (x === "pack") {
-    const pk = PACKS.find((p) => p.id === "brain");
-    const items = grantPack(pk);
-    setTimeout(() => openPackAnim(pk, items), 1400);
-    return "🎁 Room prize: Brain Pack!";
-  }
+  const x = (PRIZE_INFO[v.prize ?? "none"]?.pays ?? [])[place - 1];
+  if (x === undefined || v.players.filter((p) => !p.bot).length < 2) return null;
   wallet.addCoins(x);
-  return `🏆 Room prize +${x}`;
+  return v.host === playerId ? `🏆 Your own prize back +${x}` : `🏆 Prize from ${nameOf(v.host)} +${x}`;
+}
+/** The host paid the whole pot when the match started: whatever nobody real won goes back to them. */
+function chargePot(v) {
+  const key = `${net.code}:${v.startAt}`;
+  if (v.host !== playerId || !potOf(v.prize) || local.getItem("lr:potKey") === key) return;
+  local.setItem("lr:potKey", key);
+  wallet.addCoins(-potOf(v.prize));
+  toast(`Prize pot: -${potOf(v.prize).toLocaleString()} coins`);
+}
+function refundPot(v, order) {
+  if (v.host !== playerId || !potOf(v.prize)) return null;
+  const pays = PRIZE_INFO[v.prize].pays;
+  const real = v.players.filter((p) => !p.bot);
+  const paid = real.length < 2 ? 0 : order.reduce((a, id, i) => a + (real.some((p) => p.id === id) ? pays[i] ?? 0 : 0), 0);
+  const back = potOf(v.prize) - paid;
+  if (back > 0) wallet.addCoins(back);
+  return back > 0 ? `↩ ${back.toLocaleString()} coins of your pot back` : null;
 }
 function renderCup(v) {
   const box = $("#cupBox");
@@ -4220,18 +4209,6 @@ const world = (() => {
     trailGeo.attributes.position.needsUpdate = true;
     trailGeo.attributes.color.needsUpdate = true;
   }
-  /** Your win celebration, over your runner. */
-  function celebrate(kind, x, z) {
-    const at = (ms, fn) => setTimeout(fn, ms);
-    if (kind === "confetti") for (let i = 0; i < 5; i++) at(i * 220, () => spray(x, 3.2, z - 2, ["#ff4d6d", "#ffd23f", "#4cd964", "#4fa8ff", "#c27bff"], 90, { speed: 8, up: 4, life: 1.8, gravity: 5 }));
-    else if (kind === "goldrain") for (let i = 0; i < 8; i++) at(i * 150, () => spray(x + (Math.random() - 0.5) * 3, 6, z - 2, ["#ffd23f", "#ffb300", "#fff2b0"], 50, { speed: 2, life: 2, gravity: 6, size: 0.45 }));
-    else if (kind === "hearts") for (let i = 0; i < 4; i++) at(i * 260, () => spray(x, 2.6, z - 2, ["#ff4d8d", "#ff9fc4", "#ffffff"], 80, { speed: 6, up: 3, life: 1.5, gravity: 3, size: 0.5 }));
-    else if (kind === "mega") {
-      for (let i = 0; i < 4; i++) at(i * 300, () => fireworks(z - 10 - i * 4));
-      at(200, () => spray(x, 3, z - 2, ["#ffd23f", "#c27bff", "#4fa8ff"], 150, { speed: 10, up: 5, life: 2 }));
-    } else fireworks(z - 14);
-  }
-
   // ── moving obstacles: they sweep across the lanes on the race clock ──
   let moverList = [];
   const MOVER_MODEL = {
@@ -4635,7 +4612,6 @@ const world = (() => {
     syncMovers,
     trail,
     stepTrails,
-    celebrate,
     get movers() {
       return moverList;
     },
@@ -4766,6 +4742,7 @@ const race = {
 };
 
 function enterRace(v) {
+  if (!v.cup || v.cup.race === 1) chargePot(v); // the host pays the prize pot as the match starts
   const needed = v.players.map((p) => p.char);
   const map = v.raceMap || "meadow";
   if (world.ready && !world.hasChars(needed)) for (const c of needed) world.ensureChar(c).catch(() => {});
@@ -4917,12 +4894,11 @@ function finishRaceView(v) {
         ? me.out && !won ? "GAME OVER" : "LAST ONE STANDING!"
         : me.finished ? "FINISHED!" : "TIME UP!",
   );
-  // the last runner standing gets fireworks over their head (yours: your celebration)
+  // the last runner standing gets fireworks over their head
   if (isSurvival()) {
     const top = v.standings?.[0];
     const z = top === playerId ? -me.d : -(remote.map.get(top)?.dispD ?? me.d);
-    if (top === playerId && equipped().cel) world.celebrate(equipped().cel, laneX(me.x), z);
-    else world.fireworks(z - 14);
+    world.fireworks(z - 14);
   }
   setTimeout(() => {
     if (game.mode === "results-pending") showResults(net.view ?? v);
@@ -5613,7 +5589,6 @@ function untilMidnight() {
 }
 setInterval(() => {
   if (game.mode === "home" && homePage === PAGE.missions) $("#questReset").textContent = untilMidnight();
-  if (!$("#streakModal").hidden && streakState().claimedToday) $("#streakClaim").textContent = `Next reward in ${untilMidnight()}`;
 }, 1000);
 function dayKey(d = new Date()) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -5727,78 +5702,6 @@ function renderDaily() {
 }
 renderDaily();
 
-// ── login streak: come back every day, day 7 pays big ──
-
-const STREAK_REWARDS = [
-  { coins: 50, img: "/assets/ui_c1.webp" },
-  { coins: 75, img: "/assets/ui_c1.webp" },
-  { coins: 100, img: "/assets/ui_c2.webp" },
-  { coins: 150, img: "/assets/ui_c2.webp" },
-  { coins: 200, img: "/assets/ui_c3.webp" },
-  { coins: 300, img: "/assets/ui_c3.webp" },
-  { coins: 1000, img: "/assets/ui_chest.webp" },
-];
-function streakState() {
-  let s = {};
-  try { s = JSON.parse(local.getItem("lr:streak") || "{}") || {}; } catch { /* fresh streak */ }
-  const day = Number.isInteger(s.day) && s.day >= 1 && s.day <= 7 ? s.day : 0;
-  const yesterday = dayKey(new Date(Date.now() - 864e5));
-  const claimedToday = s.last === todayKey();
-  // the day you'd claim next: keep going if you came yesterday, else back to day 1
-  const next = claimedToday ? day : s.last === yesterday ? (day % 7) + 1 : 1;
-  return { day, last: s.last, claimedToday, next, broken: !claimedToday && Boolean(s.last) && s.last !== yesterday };
-}
-function renderStreak() {
-  const st = streakState();
-  $("#streakDay").textContent = `Day ${st.next}`;
-  $("#streakPill").querySelector(".dot").hidden = st.claimedToday;
-  $("#streakPill").classList.toggle("ready", !st.claimedToday);
-  $("#streakSub").textContent = st.claimedToday
-    ? "See you tomorrow, keep it going!"
-    : st.broken
-      ? "Streak lost. Start again!"
-      : "Every day pays more. Day 7 is the jackpot!";
-  $("#streakCount").textContent = String(st.claimedToday ? st.day : st.next - 1);
-  $("#streakGrid").replaceChildren(
-    ...STREAK_REWARDS.map((r, i) => {
-      const n = i + 1;
-      const claimed = st.claimedToday ? n <= st.day : n < st.next;
-      const today = n === st.next && !st.claimedToday;
-      return el(
-        "div",
-        { class: `sday${claimed ? " claimed" : ""}${today ? " today" : ""}${n === 7 ? " jackpot" : ""}`, style: `--i:${i}` },
-        el("small", { text: today ? "Today" : n === 7 ? "Day 7 · Jackpot" : `Day ${n}` }),
-        el("div", { class: "sart" }, today ? el("i", { class: "rays" }) : null, el("img", { src: r.img, alt: "" })),
-        el("b", { text: r.coins.toLocaleString() }),
-        r.medal ? el("em", {}, el("img", { src: MEDAL_IMG.gold, alt: "" }), el("span", { text: "+ gold medal" })) : null,
-        claimed ? el("span", { class: "tick", text: "✓" }) : null,
-      );
-    }),
-  );
-  const btn = $("#streakClaim");
-  btn.disabled = st.claimedToday;
-  btn.classList.toggle("off", st.claimedToday);
-  btn.textContent = st.claimedToday ? `Next reward in ${untilMidnight()}` : `Claim ${STREAK_REWARDS[st.next - 1].coins.toLocaleString()} coins`;
-}
-function claimStreak() {
-  const st = streakState();
-  if (st.claimedToday) return;
-  const r = STREAK_REWARDS[st.next - 1];
-  local.setItem("lr:streak", JSON.stringify({ day: st.next, last: todayKey() }));
-  stats.add("days", 1);
-  passXp(50);
-  wallet.addCoins(r.coins);
-  if (r.medal) {
-    const m = wallet.medals();
-    m[r.medal] += 1;
-    wallet.save(m);
-  }
-  sfx.finish();
-  coinRain($("#streakGrid .sday.today") || $("#streakClaim"), st.next === 7 ? 36 : 16);
-  toast(st.next === 7 ? `JACKPOT! +${r.coins} coins` : `Day ${st.next}: +${r.coins} coins`);
-  renderStreak();
-  setTimeout(() => ($("#streakModal").hidden = true), 1400);
-}
 /** Little coins flying from a tile up to the coin counter. */
 function coinRain(from, n) {
   const a = from.getBoundingClientRect();
@@ -5823,16 +5726,6 @@ function coinRain(from, n) {
     ).onfinish = () => c.remove();
   }
 }
-const streakModal = $("#streakModal");
-function openStreak() {
-  renderStreak();
-  streakModal.hidden = false;
-}
-$("#streakPill").addEventListener("click", openStreak);
-$("#streakClose").addEventListener("click", () => (streakModal.hidden = true));
-$("#streakClaim").addEventListener("click", claimStreak);
-streakModal.addEventListener("click", (e) => e.target === streakModal && (streakModal.hidden = true));
-renderStreak();
 // ── ranking: leagues climbed with medal points ──
 
 /** Leagues are climbed with medal points: every medal you earn counts, spending them doesn't. Off the podium still gets 1. */
@@ -5844,7 +5737,7 @@ const LEAGUES = [
   { id: "gold", name: "Gold", min: 110, steps: [110, 140, 170] },
   { id: "platinum", name: "Platinum", min: 220, steps: [220, 260, 300] },
   { id: "diamond", name: "Diamond", min: 360, steps: [360, 420, 480] },
-  { id: "master", name: "Brain Master", min: 560, steps: [560] },
+  { id: "master", name: "Legend", min: 560, steps: [560] },
 ];
 /** Points were 3 / 2 / 1 per medal before (leagues 4× smaller): scale old totals once. */
 const LP_VERSION = "2";
@@ -5879,7 +5772,7 @@ const rank = {
       let pts = 0;
       const m = wallet.medals();
       for (const k of MEDALS) pts += m[k] * MEDAL_PTS[k];
-      for (const c of COLLECTION) if (c.via === "medals" && wallet.has(c.id)) pts += c.price.count * MEDAL_PTS[c.price.medal];
+      for (const c of COLLECTION) if (c.legacy && wallet.has(c.id)) pts += c.legacy.count * MEDAL_PTS[c.legacy.medal];
       local.setItem("lr:lp", String(pts));
       // friends' old rank points don't mean anything any more; they update the next time you race them
       const f = friendsList();
@@ -5898,6 +5791,7 @@ const rank = {
     const after = before + n;
     local.setItem("lr:lp", String(after));
     renderRankPill();
+    renderTrophyRoad();
     const a = rankOf(after);
     if (a.name !== rankOf(before).name) {
       setTimeout(() => {
@@ -6172,7 +6066,7 @@ function renderStats() {
       tile("♾️", "best endless run", `${n("bestRun").toLocaleString()} m`, "hot"),
       tile("📏", "longest race", `${n("bestDist").toLocaleString()} m`),
       tile("🦶", "run in total", `${(n("dist") / 1000).toFixed(1)} km`),
-      tile("🥇", "gold medals ever", road.gold().toLocaleString()),
+      tile("🥇", "gold medals ever", goldEver().toLocaleString()),
       tile("👥", "wins vs friends", n("wins").toLocaleString()),
       tile("🧠", "best Brain Chase", `${n("chaseBest")} s`),
       tile("🪙", "Coin Rush coins", n("rushCoins").toLocaleString()),
@@ -6262,6 +6156,7 @@ $("#tabLeagues").addEventListener("click", () => rankTab(false));
 $("#rankClose").addEventListener("click", () => (rankModal.hidden = true));
 rankModal.addEventListener("click", (e) => e.target === rankModal && (rankModal.hidden = true));
 renderRankPill();
+renderTrophyRoad();
 
 // ── all-time challenges: lifetime goals in three tiers ──
 
@@ -6274,8 +6169,7 @@ const ACHIEVEMENTS = [
   { id: "bananas", stat: "bananas", text: (n) => `Throw ${n} bananas`, tiers: [10, 50, 200], coins: [100, 300, 1000], icon: "/assets/pw_banana.png" },
   { id: "boxes", stat: "boxes", text: (n) => `Grab ${n} mystery boxes`, tiers: [25, 100, 500], coins: [100, 300, 1000], icon: "/assets/ui_box.webp" },
   { id: "bestCombo", stat: "bestCombo", text: (n) => `Reach a ${n} combo`, tiers: [10, 20, 30], coins: [100, 400, 1500], icon: "/assets/ui_flame.webp" },
-  { id: "packs", stat: "packs", text: (n) => `Open ${n} pack${n > 1 ? "s" : ""}`, tiers: [1, 10, 50], coins: [100, 400, 1500], icon: "/assets/pack_brain.webp" },
-  { id: "days", stat: "days", text: (n) => `Claim the daily reward ${n} times`, tiers: [3, 7, 30], coins: [100, 300, 1500], icon: "/assets/ui_chest.webp" },
+  { id: "packs", stat: "packs", text: (n) => `Open ${n} pack${n > 1 ? "s" : ""}`, tiers: [1, 10, 50], coins: [100, 400, 1500], icon: "/assets/pack_mega.webp" },
 ];
 function achClaimed() {
   try {
@@ -6362,18 +6256,18 @@ function passXp(n) {
 /** What each level gives. Free: coins, packs, a trail. Gold: more of everything, exclusives, and the level-30 character. Never medals: those are only won in races. */
 function passReward(level, track) {
   if (track === "free") {
-    if (level === 1) return { pack: "brain", label: "Brain Pack", img: "/assets/pack_brain.webp" };
+    if (level === 1) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
     if (level === PASS_RUNNERS[KIKO]) return { runner: KIKO, label: RUNNERS[KIKO].name, img: portrait(KIKO) };
     if (level === 30) return { item: "trail:gold", label: "Golden trail", icon: "✨" };
-    if (level % 10 === 5) return { pack: "brain", label: "Brain Pack", img: "/assets/pack_brain.webp" };
+    if (level % 10 === 5) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
     if (level % 4 === 0) return { coins: 120 + level * 15, label: `${120 + level * 15} coins`, img: "/assets/ui_c2.webp" };
     return { coins: 50 + level * 10, label: `${50 + level * 10} coins`, img: "/assets/ui_c1.webp" };
   }
   if (level === 30) return { char: PASS_CHAR.id, label: PASS_CHAR.name, img: `/assets/pk_${PASS_CHAR.id}.webp` };
   if (level === 10) return { item: "trail:neon", label: "Neon trail", icon: "🌈" };
-  if (level === 20) return { item: "cel:mega", label: "Mega fireworks", icon: "🎆" };
+  if (level === 20) return { coins: 1000, label: "1,000 coins", img: "/assets/ui_c3.webp" };
   if (level === 15 || level === 25) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
-  if (level % 5 === 0) return { pack: "brain", label: "Brain Pack", img: "/assets/pack_brain.webp" };
+  if (level % 5 === 0) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
   return { coins: 150 + level * 15, label: `${150 + level * 15} coins`, img: level > 15 ? "/assets/ui_c3.webp" : "/assets/ui_c2.webp" };
 }
 function passClaimable(p = passState()) {
@@ -6507,7 +6401,7 @@ renderCollPill();
 const CAREER = [
   {
     name: "Rookie",
-    chest: { coins: 300, pack: "brain" },
+    chest: { coins: 300, pack: "mega" },
     missions: [
       { stat: "races", goal: 3, text: "Play 3 races", coins: 50, icon: "/assets/ui_star.webp" },
       { stat: "dist", goal: 1000, text: "Run 1 km in total", coins: 50, icon: "/assets/ui_shoe.webp" },
@@ -6537,11 +6431,11 @@ const CAREER = [
   },
   {
     name: "Pro",
-    chest: { coins: 1000, pack: "brain" },
+    chest: { coins: 1000, pack: "mega" },
     missions: [
       { stat: "chaseBest", goal: 120, text: "Survive 2 minutes in Brain Chase", coins: 200, icon: "/assets/ui_watch.webp" },
       { stat: "cupWins", goal: 1, text: "Win a match of 3+ rounds", coins: 250, icon: "/assets/medal_gold.png" },
-      { stat: "packs", goal: 3, text: "Open 3 packs", coins: 200, icon: "/assets/pack_brain.webp" },
+      { stat: "packs", goal: 3, text: "Open 3 packs", coins: 200, icon: "/assets/pack_mega.webp" },
       { stat: "rp", goal: 40, text: "Reach the Silver league", coins: 250, icon: "/assets/lg_silver.webp" },
     ],
   },
@@ -6611,7 +6505,7 @@ function claimCareer(ci, mi, btn) {
   renderMissionDots();
 }
 function chestLabel(c) {
-  return [c.coins ? `${c.coins.toLocaleString()} coins` : "", c.pack ? (c.pack === "mega" ? "Mega Pack" : "Brain Pack") : "", c.medal ? `${c.medals ?? 1} ${c.medal} medal${(c.medals ?? 1) > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
+  return [c.coins ? `${c.coins.toLocaleString()} coins` : "", c.pack ? "Mega Pack" : "", c.medal ? `${c.medals ?? 1} ${c.medal} medal${(c.medals ?? 1) > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
 }
 function openChest(ci) {
   const st = careerState();
@@ -6691,11 +6585,6 @@ function renderCareer() {
   });
   box.replaceChildren(...out);
 }
-
-// first visit of the day: pop the reward open
-setTimeout(() => {
-  if (!streakState().claimedToday && game.mode === "home" && countryModal.hidden && nameModal.hidden) openStreak();
-}, 900);
 
 // ── personal best (solo endless run) ──
 
@@ -7691,6 +7580,16 @@ function updateHud() {
 
 // ── boot ────────────────────────────────────────────────────────────────────
 
+// win celebrations were taken out of the game: whoever bought one gets its coins back, once
+{
+  const RETIRED = { "cel:confetti": 300, "cel:hearts": 400, "cel:goldrain": 500, "cel:mega": 1000 };
+  const owned = wallet.owned();
+  const back = owned.filter((id) => id in RETIRED);
+  if (back.length) {
+    local.setItem("lr:owned", JSON.stringify(owned.filter((id) => !(id in RETIRED))));
+    wallet.addCoins(back.reduce((a, id) => a + RETIRED[id], 0));
+  }
+}
 const createBtn = $("#createBtn");
 const joinBtn = $("#joinBtn");
 const soloBtn = $("#soloBtn");

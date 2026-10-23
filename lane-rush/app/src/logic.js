@@ -59,7 +59,7 @@ export const CUP_MODES = ["grandtour"];
 /** How many rounds the host can pick for a match (the Grand Tour is always one of each mode). */
 export const ROUND_OPTIONS = [1, 3, 5];
 /** What the host can put up for 1st / 2nd / 3rd (paid with 2+ real players). */
-export const PRIZES = ["none", "coins", "bigcoins", "pack"];
+export const PRIZES = ["none", "coins", "bigcoins", "huge"];
 /**
  * How good the bots are (the host picks it when bots fill the room).
  *   skill — chance to clear an obstacle they run into · pace — share of full speed
@@ -295,10 +295,8 @@ const COUNTRY_CODES = new Set(COUNTRIES.map(([c]) => c));
  * Medals for the podium: 1st gold, 2nd silver, 3rd bronze. 4th place, runners
  * who didn't finish and runners who left get nothing. Medals are only handed
  * out when at least two people raced, so solo practice can't farm them.
- * `worth` is what a medal counts for when paying in the shop.
  */
 export const MEDALS = ["gold", "silver", "bronze"];
-export const MEDAL_WORTH = { gold: 10, silver: 5, bronze: 3 };
 export const MIN_RACERS_FOR_MEDALS = 2;
 
 /** Fastest anyone can legitimately be, plus slack for network jitter. */

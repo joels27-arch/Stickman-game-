@@ -395,9 +395,9 @@ describe("matches over several rounds", () => {
 
   it("lets the host pick 1, 3 or 5 rounds and a prize", () => {
     let s = act(lobbyOf(2), "p0", { type: "rounds", rounds: 5 });
-    s = act(s, "p0", { type: "prize", prize: "pack" });
+    s = act(s, "p0", { type: "prize", prize: "huge" });
     expect((L.viewFor(s, "p1") as S).rounds).toBe(5);
-    expect((L.viewFor(s, "p1") as S).prize).toBe("pack");
+    expect((L.viewFor(s, "p1") as S).prize).toBe("huge");
     expect(reject(s, "p1", { type: "rounds", rounds: 3 })).toMatch(/host/);
     expect(reject(s, "p0", { type: "rounds", rounds: 4 })).toMatch(/bad/);
     expect(reject(s, "p0", { type: "prize", prize: "car" })).toMatch(/bad/);
