@@ -1938,6 +1938,7 @@ function renderLobby(v) {
     if (p.id === playerId) card.append(el("span", { class: "you", text: "YOU" }));
     slots.append(card);
   }
+  paintEmotes();
 
   const me = v.players.find((p) => p.id === playerId);
   const picker = $("#picker");
@@ -2101,6 +2102,7 @@ function renderLineup(v, { isHost, gm, mp, mode, what }) {
     peds.push(el("div", { class: "ped empty" }, el("div", { class: "ghost", text: botsOn() ? "🤖 Bot joins at the start" : `Waiting… code ${net.code}` }), el("div", { class: "disc" })));
   }
   stage.replaceChildren(...peds);
+  paintEmotes();
 
   const waiting = present.filter((p) => p.id !== v.host && !p.ready);
   const go = $("#luGo");
@@ -4665,12 +4667,24 @@ function showEmote(id, e) {
     if (r) world.emoteBubble(r, e);
     feed(`${e} ${nameOf(id)}`);
   } else {
-    const card = [...document.querySelectorAll("#slots .rcard, #luStage .ped")].find((c) => c.dataset.id === id);
-    if (card) {
-      const b = el("span", { class: "emo", text: e });
-      card.append(b);
-      setTimeout(() => b.remove(), 2200);
-    }
+    // remembered for a moment: the lobby redraws its cards on every update, and the emote has to survive that
+    game.liveEmotes = { ...(game.liveEmotes ?? {}), [id]: { e, at: Date.now() } };
+    paintEmotes();
+  }
+}
+const EMOTE_SHOW_MS = 2200;
+/** Put the emotes still floating back onto the (possibly redrawn) lobby cards. */
+function paintEmotes() {
+  const now = Date.now();
+  for (const card of document.querySelectorAll("#slots .rcard, #luStage .ped")) {
+    const x = game.liveEmotes?.[card.dataset.id];
+    const old = card.querySelector(".emo");
+    if (!x || now - x.at > EMOTE_SHOW_MS) continue;
+    if (old && old.textContent === x.e && old.dataset.at === String(x.at)) continue;
+    old?.remove();
+    const b = el("span", { class: "emo", text: x.e, style: `animation-delay:-${now - x.at}ms` });
+    b.dataset.at = String(x.at);
+    card.append(b);
   }
 }
 function renderEmoteRows() {
