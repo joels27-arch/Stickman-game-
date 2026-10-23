@@ -115,7 +115,6 @@ const GAME_MODE_INFO = {
   coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins. Get hit and you spill coins for the others." },
   potato: { label: "Hot Potato", icon: "💣", tag: "Pass it on", text: "Bump into someone to pass the bomb. Hold it when it blows: lose a heart." },
   cup: { label: "Party Cup", icon: "🏆", tag: "3 rounds", text: `3 random modes on 3 maps. ${CUP_POINTS.join(" / ")} points per place.` },
-  rushcup: { label: "Coin Rush Cup", icon: "🪙", tag: "Tournament", text: "3 Coin Rush rounds on 3 maps. Most points wins." },
   grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "Every mode once: Survival, Brain Chase, Coin Rush and Hot Potato." },
 };
 const isCupMode = (m) => CUP_MODES.includes(m);
@@ -972,6 +971,11 @@ function charCard(c, n, onClick) {
   return b;
 }
 const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
+const VIA_GROUP = { coins: "🪙 Buy with coins", medals: "🏅 Buy with medals", pack: "🎁 From packs", pass: "⭐ Season Pass" };
+/** Characters split by how you get them (in this order), each group sorted common → legendary; empty groups left out. */
+function charGroups(list, order) {
+  return order.map((via) => [via, list.filter((c) => c.via === via).sort(byRarity)]).filter(([, l]) => l.length);
+}
 /** Skins: your runners first, then everything still to get, each from common to legendary. */
 function renderSkins() {
   const all = allChars();
@@ -981,7 +985,9 @@ function renderSkins() {
   $("#skinGrid").replaceChildren(
     el("h3", { class: "coll-head", text: `Yours · ${mine.length}` }),
     ...mine.map((c) => charCard(c, n++, inspectChar)),
-    ...(rest.length ? [el("h3", { class: "coll-head", text: `Still to get · ${rest.length}` }), ...rest.map((c) => charCard(c, n++, inspectChar))] : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
+    ...(rest.length
+      ? charGroups(rest, ["coins", "medals", "pack", "pass"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: `${VIA_GROUP[via]} · ${list.length}` }), ...list.map((c) => charCard(c, n++, inspectChar))])
+      : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
   );
   renderCollPill();
 }
@@ -992,10 +998,13 @@ function renderSkins() {
  */
 function renderShop() {
   // characters for sale: the coin and medal ones you don't have yet (your collection is under Skins)
-  const sale = allChars().filter((c) => (c.via === "coins" || c.via === "medals") && !ownsChar(c)).sort(byRarity);
+  // grouped by what you pay with, each group from common to legendary
+  const sale = allChars().filter((c) => (c.via === "coins" || c.via === "medals") && !ownsChar(c));
   $("#collCount").textContent = `${sale.length} for sale`;
+  const buy = (x) => askBuy(COLLECTION.find((y) => y.id === x.id));
+  let n = 0;
   $("#shopGrid").replaceChildren(
-    ...sale.map((c, n) => charCard(c, n, (x) => askBuy(COLLECTION.find((y) => y.id === x.id)))),
+    ...charGroups(sale, ["coins", "medals"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: VIA_GROUP[via] }), ...list.map((c) => charCard(c, n++, buy))]),
     ...(sale.length ? [] : [el("p", { class: "rempty", text: "You own every character in the shop. More come from packs and the Season Pass." })]),
   );
   renderPacks();
@@ -1517,7 +1526,6 @@ const SOLO_MODES = [
   { id: "coinrush", icon: "🪙", label: "Coin Rush", sub: "vs 3 bots" },
   { id: "potato", icon: "💣", label: "Hot Potato", sub: "vs 3 bots" },
   { id: "cup", icon: "🏆", label: "Party Cup", sub: "3 rounds vs bots" },
-  { id: "rushcup", icon: "🪙", label: "Coin Rush Cup", sub: "Tournament · 3 rounds" },
   { id: "grandtour", icon: "🌍", label: "Grand Tour", sub: "Tournament · every mode" },
 ];
 function soloMode() {
@@ -1575,7 +1583,10 @@ function setHomePage(i, animate = true) {
     t.setAttribute("aria-selected", String(on));
   }
   if (homePage === PAGE.compete) renderCompete();
-  if (homePage === PAGE.missions) renderDaily();
+  if (homePage === PAGE.missions) {
+    renderDaily();
+    renderCareer();
+  }
   if (homePage === PAGE.skins) renderSkins();
   if (homePage === PAGE.shop) {
     mountShop($("#shopHome"));
@@ -1635,7 +1646,6 @@ for (const t of document.querySelectorAll(".htab")) {
 
 // Tournaments page: the Weekend League and two tournaments with daily prizes
 const TOURNEYS = [
-  { id: "rushcup", label: "Coin Rush Cup", img: "/assets/ui_c3.webp", tag: "Tournament · 3 rounds", text: "Three Coin Rush rounds on three maps. Most points wins.", prize: [300, 150, 75] },
   { id: "grandtour", label: "Grand Tour", img: "/assets/medal_gold.png", tag: "Tournament · 4 rounds", text: "Every mode once: Survival, Brain Chase, Coin Rush and Hot Potato.", prize: [500, 250, 120] },
 ];
 const PLACE_SHORT = ["1st", "2nd", "3rd", "4th"];
@@ -5223,8 +5233,7 @@ function achState(a) {
   return { tier, have, goal, done: tier >= a.tiers.length, ready: tier < a.tiers.length && have >= goal };
 }
 function renderAchDot() {
-  const any = ACHIEVEMENTS.some((a) => achState(a).ready);
-  $("#tabAll .dot").hidden = !any;
+  // trophies are no longer shown; only the mission dots are kept up to date
   renderMissionDots();
 }
 /** The red dot on Missions: anything ready to claim in any tab. */
@@ -5236,75 +5245,22 @@ function renderMissionDots() {
     return; // still starting up: the career table isn't defined yet
   }
   const daily = dailyChallenges().some((q) => dailyState().done[q.id] && !dailyState().claimed[q.id]);
-  const trophies = ACHIEVEMENTS.some((a) => achState(a).ready);
+  const trophies = false;
   $("#careerDot").hidden = !career;
   const dot = document.querySelector(`.htab[data-page="${PAGE.missions}"] .dot`);
   if (dot) dot.hidden = !(daily || career || trophies);
   $("#dailyDot").hidden = !daily;
   renderStoreDot();
 }
-function renderAch() {
-  $("#achList").replaceChildren(
-    ...ACHIEVEMENTS.map((a) => {
-      const st = achState(a);
-      const pct = st.done ? 100 : Math.round((Math.min(st.have, st.goal) / st.goal) * 100);
-      const stars = el("span", { class: "stars" }, ...a.tiers.map((_, i) => el("i", { class: i < st.tier ? "on" : "", text: "★" })));
-      let right;
-      if (st.done) right = el("div", { class: "qreward done-all" }, el("b", { text: "★★★" }));
-      else if (st.ready) {
-        right = el("button", { class: "aclaim", type: "button" }, el("img", { src: "/assets/ui_c1.webp", alt: "" }), el("b", { text: `+${a.coins[st.tier]}` }));
-        right.addEventListener("click", () => {
-          const c = achClaimed();
-          c[a.id] = st.tier + 1;
-          local.setItem("lr:ach", JSON.stringify(c));
-          wallet.addCoins(a.coins[st.tier]);
-          passXp(100);
-          coinRain(right, 14);
-          sfx.finish();
-          toast(`+${a.coins[st.tier]} coins`);
-          renderAch();
-          renderAchDot();
-        });
-      } else right = el("div", { class: "qreward" }, el("img", { src: "/assets/ui_c1.webp", alt: "" }), el("b", { text: `+${a.coins[st.tier]}` }));
-      return el(
-        "div",
-        { class: `quest ach t${st.tier}${st.ready ? " ready" : ""}${st.done ? " done" : ""}` },
-        el("div", { class: "qicon" }, el("img", { src: a.icon, alt: "" })),
-        el(
-          "div",
-          { class: "qmain" },
-          stars,
-          el("b", { text: a.text(st.goal) }),
-          el("div", { class: "qbar" }, el("i", { style: `width:${pct}%` }), el("span", { text: st.done ? "Complete!" : `${Math.min(st.have, st.goal).toLocaleString()} / ${st.goal.toLocaleString()}` })),
-        ),
-        right,
-      );
-    }),
-  );
-}
-/** Missions tabs: true = daily, "career", false = trophies. */
-function questTab(which) {
-  const tab = which === true ? "daily" : which === false ? "trophies" : which;
-  $("#tabDaily").classList.toggle("on", tab === "daily");
-  $("#tabCareer").classList.toggle("on", tab === "career");
-  $("#tabAll").classList.toggle("on", tab === "trophies");
-  $("#questList").hidden = tab !== "daily";
-  $("#questHead").hidden = tab !== "daily";
-  $("#careerList").hidden = tab !== "career";
-  $("#achList").hidden = tab !== "trophies";
-  if (tab === "trophies") renderAch();
-  if (tab === "career") renderCareer();
-}
-$("#tabDaily").addEventListener("click", () => questTab(true));
-$("#tabCareer").addEventListener("click", () => questTab("career"));
-$("#tabAll").addEventListener("click", () => questTab(false));
+
 renderAchDot();
 
 // ── season pass: 30 levels, a free and a gold track, a new season every month ──
 
 const PASS_LEVELS = 30;
 const PASS_XP = 400; // per level
-const GOLD_PASS_PRICE = 3000;
+/** Shown price of the Gold Pass. Payments aren't wired up yet: tapping the button unlocks it. */
+const GOLD_PASS_PRICE_TEXT = "$4.99";
 const PASS_CHAR = { id: "brainstorm", name: "Captain Brainstorm" };
 function seasonId(d = new Date()) {
   return `${d.getFullYear()}-${d.getMonth() + 1}`;
@@ -5464,13 +5420,12 @@ function renderPass() {
   });
   const buy = $("#passBuy");
   buy.hidden = p.hasGold;
-  buy.replaceChildren(el("span", { text: "Unlock Gold Pass" }), el("i", { class: "coin" }), el("span", { text: GOLD_PASS_PRICE.toLocaleString() }));
-  buy.disabled = wallet.coins() < GOLD_PASS_PRICE;
+  buy.replaceChildren(el("span", { text: "Unlock Gold Pass" }), el("b", { class: "real-price", text: GOLD_PASS_PRICE_TEXT }));
+  buy.disabled = false;
 }
 $("#passBuy").addEventListener("click", () => {
   const p = passState();
-  if (p.hasGold || wallet.coins() < GOLD_PASS_PRICE) return;
-  wallet.addCoins(-GOLD_PASS_PRICE);
+  if (p.hasGold) return;
   p.hasGold = true;
   savePass(p);
   sfx.finish();

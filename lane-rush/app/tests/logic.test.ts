@@ -439,19 +439,8 @@ describe("party cup", () => {
 });
 
 describe("tournaments", () => {
-  it("Coin Rush Cup is three Coin Rush rounds on three maps", () => {
-    let s = act(lobbyOf(2), "p0", { type: "mode", mode: "rushcup" });
-    s = act(s, "p0", { type: "start", bots: true, t: T0 });
-    expect(s.cup.races).toEqual(["coinrush", "coinrush", "coinrush"]);
-    expect(s.kind).toBe("coinrush");
-    const maps = [s.raceMap];
-    for (let r = 2; r <= 3; r++) {
-      s = { ...s, phase: "results", endAt: s.startAt + 1000 };
-      s = act(s, "p0", { type: "next", t: s.endAt + 5000 });
-      expect(s.kind).toBe("coinrush");
-      maps.push(s.raceMap);
-    }
-    expect(new Set(maps).size).toBe(3);
+  it("the Coin Rush Cup is gone", () => {
+    expect(reject(lobbyOf(2), "p0", { type: "mode", mode: "rushcup" })).toBeTruthy();
   });
 
   it("Grand Tour plays every mode once, with harder courses each round", () => {

@@ -99,15 +99,11 @@
         <div class="hpage hp-side hp-missions" id="hpMissions" aria-label="Missions">
           <div class="hp-scroll">
             <div class="ribbon pink hp-ribbon"><h2>Missions</h2></div>
-            <div class="gtabs mission-tabs" role="tablist">
-              <button id="tabDaily" class="gtab on" type="button">Daily <i class="dot" id="dailyDot" hidden></i></button>
-              <button id="tabCareer" class="gtab" type="button">Career <i class="dot" id="careerDot" hidden></i></button>
-              <button id="tabAll" class="gtab" type="button">Trophies <i class="dot" hidden></i></button>
-            </div>
+            <h3 class="mission-head">Daily <i class="dot" id="dailyDot" hidden></i></h3>
             <div class="gsub" id="questHead"><span class="reset-badge"><img src="/assets/ui_watch.webp" alt="" /><span>New in <b id="questReset">--:--:--</b></span></span><p id="questSub"></p></div>
             <div id="questList" class="quest-list"></div>
-            <div id="careerList" class="quest-list career-list" hidden></div>
-            <div id="achList" class="quest-list" hidden></div>
+            <h3 class="mission-head">Career <i class="dot" id="careerDot" hidden></i></h3>
+            <div id="careerList" class="quest-list career-list"></div>
           </div>
         </div>
         <!-- RIGHT: shop, season pass and the rest -->
@@ -357,7 +353,7 @@
         <div class="pass-rows-label"><span>FREE</span><span class="gold">GOLD</span></div>
         <div id="passTrack" class="pass-track"></div>
         <button id="passBuy" class="gbtn gold-buy" type="button">Unlock Gold Pass</button>
-        <p class="pass-note">Earn XP from every race, daily challenges and all-time challenges. A new season starts every month.</p>
+        <p class="pass-note">Earn XP from every race and from missions. A new season starts every month.</p>
       </div>
     </div>
 

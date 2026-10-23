@@ -50,6 +50,9 @@ Medals (gold/silver/bronze) come from top-3 places **against at least one other
 real player**, the day-7 login reward, the Weekend League, the Season Pass and
 chapter chests. Bots never pay medals (they do pay coins).
 
+The **Gold Pass** (the Season Pass's second track) costs $4.99. Payments aren't
+connected yet, so for now tapping the button unlocks it.
+
 ### Characters: one way to unlock each
 
 | Group | Unlock | Count |
@@ -81,7 +84,6 @@ buying, and can only run once per confirmation.
 * **Career:** 6 chapters × 4 missions (Rookie → Legend). A chapter opens when
   the previous chapter's missions and chest are claimed; requirements grow
   with each chapter.
-* **Trophies:** lifetime goals with three ★ tiers.
 
 All progress lives in the browser (`localStorage`); nothing is lost on update
 because new keys are added alongside the old ones.
@@ -114,7 +116,6 @@ or spent on characters.
 | Event | When | Format | Rewards |
 |---|---|---|---|
 | Weekend League | Fri 18:00 → Sun 24:00 (local time) | 10 matches, any mode (a random mode per match from the page); places score 10 / 6 / 3 / 1 | Tiers at 20 / 45 / 70 / 90 pts: 300, 700 + bronze, 1,200 + silver, 2,000 + gold coins |
-| Coin Rush Cup | Always | 3 Coin Rush rounds on 3 maps, cup points | Daily prize 300 / 150 / 75 |
 | Grand Tour | Always | Survival, Brain Chase, Coin Rush and Hot Potato once each | Daily prize 500 / 250 / 120 |
 
 * Any race against at least one other runner (bots count) during the weekend
@@ -127,5 +128,5 @@ or spent on characters.
 ## Modes
 
 Survival (main), Brain Chase, Coin Rush, Hot Potato, Party Cup (3 random rounds
-of the others), and the two tournament formats above (`rushcup`, `grandtour`). Play solo = Endless Run alone, or any mode against 3 bots.
+of the others), and the Grand Tour (`grandtour`). Play solo = Endless Run alone, or any mode against 3 bots.
 Sprint and Tournament were removed at the player's request.

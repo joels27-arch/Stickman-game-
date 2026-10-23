@@ -47,15 +47,14 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  *                into someone; it costs whoever holds it a heart (3 = out)
  *   cup        — Party Cup: three different rounds of the above, in a random
  *                order; placings score CUP_POINTS, most points wins
- *   rushcup    — Coin Rush Cup tournament: three Coin Rush rounds, scored like a cup
  *   grandtour  — Grand Tour tournament: every round kind once, in a random order
  * Empty spots are filled with bots. (The old 700 m "sprint" race still runs
  * if a kind is "sprint", but no mode starts one any more.)
  * `state.mode` is what the host picked; `state.kind` is the race being run.
  */
-export const GAME_MODES = ["survival", "chase", "coinrush", "potato", "cup", "rushcup", "grandtour"];
+export const GAME_MODES = ["survival", "chase", "coinrush", "potato", "cup", "grandtour"];
 /** Modes played over several rounds with a points table. */
-export const CUP_MODES = ["cup", "rushcup", "grandtour"];
+export const CUP_MODES = ["cup", "grandtour"];
 /** The modes a single round can be (a Party Cup is three of these). All run on the endless course. */
 export const ROUND_KINDS = ["survival", "chase", "coinrush", "potato"];
 export const isEndless = (kind) => kind !== "sprint";
@@ -827,12 +826,10 @@ function knockOut(p, t) {
 }
 /**
  * The rounds of a multi-round mode, decided when it starts: Party Cup = three
- * different kinds, Coin Rush Cup = three Coin Rush rounds, Grand Tour = every
- * kind once. Anything else isn't a cup.
+ * different kinds, Grand Tour = every kind once. Anything else isn't a cup.
  */
 function newCup(mode, t) {
   if (!CUP_MODES.includes(mode)) return null;
-  if (mode === "rushcup") return { race: 1, points: {}, races: Array(CUP_ROUNDS).fill("coinrush") };
   const r = rng(Math.floor(t) % 2147483647);
   const pool = [...ROUND_KINDS];
   for (let i = pool.length - 1; i > 0; i--) {
