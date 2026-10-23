@@ -2542,12 +2542,14 @@ const world = (() => {
   trackGroup.add(flatTrack);
 
   const chalk = new THREE.MeshBasicMaterial({ color: "#ffffff", fog: true });
+  const chalkLines = []; // hidden on maps whose track has its own markings
   for (let i = 0; i <= LANES; i++) {
     const w = i === 0 || i === LANES ? 0.16 : 0.09;
     const line = new THREE.Mesh(new THREE.PlaneGeometry(w, TRACK_LEN + 200), chalk);
     line.rotation.x = -Math.PI / 2;
     line.position.set((i - LANES / 2) * LANE_W, 0.06, -TRACK_LEN / 2 - 40);
     trackGroup.add(line);
+    chalkLines.push(line);
   }
 
   // start & finish lines
@@ -3231,6 +3233,7 @@ const world = (() => {
     sceneryCull = mapScenery[map].cull;
     activeMap = map;
     setSky(map);
+    for (const l of chalkLines) l.visible = !BUILT_MAPS.has(map);
     const look = MAP_GROUND[map];
     ground.material.color.set(look.color);
     ground.material.map = look.tex ? grassTex : null;
