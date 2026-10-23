@@ -1674,8 +1674,6 @@ $("#endlessBtn").addEventListener("click", () => {
   startEndless();
 });
 $("#packOdds").addEventListener("click", (e) => e.currentTarget.classList.toggle("open")); // the pack odds: 2 lines, tap for all
-$("#tutSkip").addEventListener("click", endTut);
-$("#tutStep").addEventListener("click", nextTut);
 $("#soloBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
