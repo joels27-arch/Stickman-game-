@@ -409,6 +409,19 @@
     </div>
 
     <!-- RANKING: leagues + friends -->
+    <!-- first visit: a quick tour of the pages, ending on the endless run -->
+    <div id="tour" class="tour" hidden>
+      <div id="tourHole" class="tour-hole"></div>
+      <div id="tourTip" class="tour-tip" role="dialog" aria-live="polite">
+        <b id="tourTitle"></b>
+        <p id="tourText"></p>
+        <div class="tour-foot">
+          <button id="tourSkip" class="tour-skip" type="button">Skip tour</button>
+          <span id="tourCount"></span>
+          <button id="tourNext" class="btn small go" type="button">Next</button>
+        </div>
+      </div>
+    </div>
     <!-- first endless run: a fast, skippable how-to -->
     <div id="tutModal" class="modal gmodal tut-modal" hidden>
       <div class="gsheet tut-sheet" role="dialog" aria-modal="true" aria-labelledby="tutTitle">

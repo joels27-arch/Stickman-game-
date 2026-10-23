@@ -522,6 +522,8 @@ function placeOne(r, kind) {
  * The same pattern never comes twice in a row. `looks[lane]` picks the
  * visual variant of each obstacle; it never changes how it's cleared.
  */
+/** Running over a red slow pad slows you down this long (ms). */
+export const SLOW_PAD_MS = 1300;
 /** The longest run without an obstacle row (metres): about 3 s even at the start. */
 export const MAX_EMPTY_M = 42;
 
@@ -529,6 +531,9 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
   const r = rng(seed);
   // looks and boxes use their own stream, so they don't reshuffle the layout
   const r2 = rng((seed ^ 0x9e3779b9) >>> 0);
+  // slow pads use their own stream, so adding them never moves the obstacles
+  const r3 = rng((seed ^ 0x7f4a7c15) >>> 0);
+  const slows = [];
   const endless = len > TRACK_LEN;
   const kind = endless ? "survival" : "sprint";
   const rows = [];
@@ -628,10 +633,12 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
       lastHeart = z;
     }
     if (r() < 0.3) boosts.push({ z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) });
+    // red slow pads: the opposite of a boost (from 90 m on, so the start stays easy)
+    if (z > 90 && r3() < 0.32) slows.push({ z: Math.round((z + gap * 0.3) * 10) / 10, lane: Math.floor(r3() * 4) });
     else if (z > 60 && (sinceBox >= 4 || r2() < 0.22)) addBox(z + gap * 0.55);
     z += gap;
   }
-  return { rows, boosts, boxes, hearts, len };
+  return { rows, boosts, slows, boxes, hearts, len };
 }
 
 // ── moving obstacles: each map has two, sweeping across the lanes ──────────
@@ -1336,6 +1343,13 @@ function stepBots(state, t) {
         if (roll(state.seed, bi, m.z + 0.7) < sharp) continue;
         if (MOVER_KINDS[m.kind].slows) p.slowUntil = Math.max(p.slowUntil ?? 0, t + 1500);
         else botHit(state, p, t);
+      }
+    }
+    if (!rocketing) {
+      for (const sp of course.slows ?? []) {
+        if (sp.z <= d0 || sp.z > d1 || sp.lane !== p.lane) continue;
+        if (roll(state.seed, bi, sp.z + 0.9) < sharp) continue;
+        p.slowUntil = Math.max(p.slowUntil ?? 0, t + SLOW_PAD_MS);
       }
     }
     // mystery boxes (first come, first served), bananas, bowling balls

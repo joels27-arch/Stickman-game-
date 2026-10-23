@@ -33,6 +33,7 @@ import {
   runSpeed,
   BANANA_BEHIND_M,
   CUP_POINTS,
+  SLOW_PAD_MS,
   ROUND_OPTIONS,
   ROUND_KINDS,
   MAPS,
@@ -619,7 +620,71 @@ $("#nameForm").addEventListener("submit", (e) => {
   }
   sfx.unlock();
   nameModal.hidden = true;
+  if (!local.getItem("lr:tour")) setTimeout(startTour, 450); // first visit: the quick tour
 });
+// ── first-visit tour: a spotlight on each part of the app, skippable, ending on the endless run ──
+const TOUR = [
+  { sel: null, title: "Welcome to 4 Friends!", text: "A Subway-Surfers-style runner you play against your friends. Quick tour? Takes 20 seconds." },
+  { sel: "#roomRow", title: "Play with friends", text: "Create a room and share the code, or Join a friend's. Up to 4 runners, bots fill empty spots." },
+  { sel: "#soloBtn", title: "Game modes", text: "Survival, Brain Chase, Coin Rush, Hot Potato and more, against bots you can make easy or hard." },
+  { sel: "#profileCard", title: "You", text: "Your name and league. Tap it for your stats: wins, records and how you rank among friends." },
+  { sel: "#roadMini", title: "Gold Road", text: "Every gold medal you win moves you along it: coins, packs and three exclusive characters." },
+  { sel: '.htab[data-page="0"]', title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
+  { sel: '.htab[data-page="1"]', title: "Skins", text: "All your characters. Pick who you race with." },
+  { sel: '.htab[data-page="3"]', title: "Missions", text: "Daily missions, your career and the full Gold Road." },
+  { sel: '.htab[data-page="4"]', title: "Shop", text: "Packs, characters, trails and the Season Pass." },
+  { sel: "#endlessBtn", title: "Start here!", text: "Your first endless run: one life, how far can you get? Tap the button to run.", last: true },
+];
+const tourEl = $("#tour");
+let tourAt = 0;
+function startTour() {
+  if (homePage !== PAGE.play) setHomePage(PAGE.play);
+  tourAt = 0;
+  tourEl.hidden = false;
+  renderTour();
+}
+function renderTour() {
+  const st = TOUR[tourAt];
+  $("#tourTitle").textContent = st.title;
+  $("#tourText").textContent = st.text;
+  $("#tourCount").textContent = `${tourAt + 1} / ${TOUR.length}`;
+  $("#tourNext").textContent = st.last ? "Run! →" : tourAt === 0 ? "Show me" : "Next";
+  const hole = $("#tourHole");
+  const tip = $("#tourTip");
+  const target = st.sel ? document.querySelector(st.sel) : null;
+  const r = target?.getBoundingClientRect();
+  if (!r || !r.width) {
+    // no target: a dimmed screen with the tip in the middle
+    hole.style.cssText = "left:50%;top:45%;width:0;height:0";
+    tip.style.cssText = "left:50%;top:40%;transform:translate(-50%,-50%)";
+  } else {
+    const pad = 6;
+    hole.style.cssText = `left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px`;
+    // the tip goes below the target if there's room, else above it
+    const below = r.bottom + 170 < innerHeight;
+    const left = Math.max(12, Math.min(innerWidth - 12 - Math.min(320, innerWidth - 24), r.left + r.width / 2 - 160));
+    tip.style.cssText = below ? `left:${left}px;top:${r.bottom + 14}px` : `left:${left}px;top:${r.top - 14}px;transform:translateY(-100%)`;
+  }
+  tourEl.classList.toggle("last", Boolean(st.last));
+}
+function endTour(thenRun) {
+  tourEl.hidden = true;
+  local.setItem("lr:tour", "1");
+  if (!thenRun) return;
+  // straight into the run (and its own short how-to), as soon as the runners have loaded
+  const go = () => ($("#endlessBtn").disabled ? setTimeout(go, 300) : $("#endlessBtn").click());
+  go();
+}
+$("#tourNext").addEventListener("click", () => {
+  sfx.tap();
+  if (TOUR[tourAt].last) return endTour(true);
+  tourAt += 1;
+  renderTour();
+});
+$("#tourSkip").addEventListener("click", () => endTour(false));
+// on the last step the highlighted Endless run button itself starts the run
+$("#tourHole").addEventListener("click", () => TOUR[tourAt].last && endTour(true));
+addEventListener("resize", () => !tourEl.hidden && renderTour());
 nameInput.addEventListener("change", () => {
   if (!saveName(nameInput.value)) nameInput.value = local.getItem("lr:name") || "";
   else toast("Name saved");
@@ -4003,9 +4068,42 @@ const world = (() => {
       raceGroup.add(pad);
       cullables.push({ obj: pad, z: b.z });
     }
+    // red slow pads: the boost pad turned round (arrows pointing back) and painted red
+    for (const b of course.slows ?? []) {
+      let pad;
+      if (assets.props.boostPad) {
+        pad = assets.props.boostPad.clone();
+        pad.traverse((o) => {
+          if (o.isMesh) o.material = slowPadMat(o.material);
+        });
+        pad.rotation.y = Math.PI;
+        pad.position.set(laneX(b.lane), 0.02, -b.z);
+      } else {
+        pad = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.6), new THREE.MeshBasicMaterial({ map: padTex, color: "#ff3b3b", transparent: true, opacity: 0.95 }));
+        pad.rotation.set(-Math.PI / 2, 0, Math.PI);
+        pad.position.set(laneX(b.lane), 0.075, -b.z);
+      }
+      raceGroup.add(pad);
+      cullables.push({ obj: pad, z: b.z });
+    }
     return course;
   }
 
+  const slowMats = new Map();
+  /** The boost pad's material, recoloured red for a slow pad (made once per source material). */
+  function slowPadMat(m) {
+    if (Array.isArray(m)) return m.map(slowPadMat);
+    if (!slowMats.has(m)) {
+      const c = m.clone();
+      if (c.color) c.color.set("#ff4a3d");
+      if (c.emissive) {
+        c.emissive.set("#a01010");
+        c.emissiveIntensity = 0.6;
+      }
+      slowMats.set(m, c);
+    }
+    return slowMats.get(m);
+  }
   // thrown bananas: they drop out of the sky onto their lane, and vanish once someone slips
   const bananaMeshes = new Map(); // id -> {obj, born}
   function syncBananas(list, gone) {
@@ -4709,6 +4807,7 @@ function enterRace(v) {
     frozenT: 0,
     waveT: 0,
     glueT: 0,
+    slowPadT: 0,
     staggerT: 0,
     warp: mine?.warp ?? 0,
     lastPunch: Math.max(0, ...(v.punches || []).map((x) => x.id)),
@@ -4969,6 +5068,7 @@ function stepMe(dt) {
   me.frozenT = Math.max(0, me.frozenT - dt);
   me.waveT = Math.max(0, (me.waveT ?? 0) - dt);
   me.glueT = Math.max(0, (me.glueT ?? 0) - dt);
+  me.slowPadT = Math.max(0, (me.slowPadT ?? 0) - dt);
   me.staggerT = Math.max(0, (me.staggerT ?? 0) - dt);
   if (me.power) {
     me.powerT = Math.max(0, me.powerT - dt);
@@ -4985,6 +5085,7 @@ function stepMe(dt) {
   let base = runSpeed(game.kind, (serverNow() - v.startAt) / 1000);
   if (me.frozenT > 0) base *= 0.55;
   if (me.glueT > 0) base *= GLUE_SLOW;
+  if (me.slowPadT > 0) base *= 0.55; // ran over a red slow pad
   if (me.staggerT > 0) base *= 0.6;
   if (net.view?.bomb?.holder === playerId) base *= 1.15; // catch someone and pass it on!
   const fast = base + (isSurvival() ? SURVIVAL_BOOST : BOOST_SPEED - BASE_SPEED);
@@ -5110,6 +5211,16 @@ function stepMe(dt) {
       flash();
     }
     hit(b.kind === "fake" ? "fake" : "banana");
+  }
+  for (const b of course.slows ?? []) {
+    if (b.z < prevD - 1 || b.z > me.d + 1) continue;
+    if (Math.abs(me.x - b.lane) < 0.5 && me.y < 0.5 && me.power !== "rocket" && (me.slowPadT ?? 0) <= 0) {
+      me.slowPadT = SLOW_PAD_MS / 1000;
+      me.boostT = 0;
+      sfx.slip();
+      buzz(40);
+      banner("🐢 SLOWED!", 700);
+    }
   }
   for (const b of course.boosts) {
     if (b.z < prevD - 1 || b.z > me.d + 1) continue;
@@ -7041,6 +7152,7 @@ function paintAim() {
 }
 
 function currentAct() {
+  if (net.view && serverNow() < net.view.startAt - 900) return "cheer"; // waving on the line during the fly-past
   if (net.view && serverNow() < net.view.startAt) return "idle";
   if (me.out) return "out";
   if (me.finished && me.speed < 0.5) return "cheer";
@@ -7168,7 +7280,8 @@ function frame(now) {
       r.runner.group.position.set(r.dispX, r.dispY, -r.dispD);
       if (r.p.trail && r.vel > 2 && !r.p.outAt) world.trail(r.p.trail, r.dispX, r.dispY, -r.dispD);
       r.runner.group.visible = !p.left;
-      const ra = !isSurvival() && p.finish !== null && r.dispD > TRACK_LEN - 1 ? "cheer" : p.gone && p.act !== "out" ? "idle" : p.act;
+      const waiting = net.view && serverNow() < net.view.startAt - 900; // the line-up before the gun
+      const ra = waiting ? "cheer" : !isSurvival() && p.finish !== null && r.dispD > TRACK_LEN - 1 ? "cheer" : p.gone && p.act !== "out" ? "idle" : p.act;
       if (!isSurvival() && p.finish !== null && game.cheered && !game.cheered.has(p.id)) {
         game.cheered.add(p.id);
         world.fireworks(-TRACK_LEN);
@@ -7193,12 +7306,25 @@ function frame(now) {
     }
     const tx = laneX(fx) * 0.75;
     const back = game.lookBack && !me.out;
-    // countdown: the camera swings round from in front of your runner to behind them
+    // countdown intro: a sweeping fly-past in front of the whole line-up (everyone
+    // cheering), then a glide in behind your runner just before the gun
     const toGo = net.view ? (net.view.startAt - serverNow()) / 1000 : 0;
-    if (toGo > 0.4 && game.mode === "race") {
-      const k = Math.min(1, (toGo - 0.4) / 3); // 1 → 0 as the gun nears
-      const ang = k * Math.PI;
-      camPos.set(laneX(fx) + Math.sin(ang) * 5.6, 3.0 - k * 1.2, fz + Math.cos(ang) * 5.6);
+    const intro = toGo > 0.35 && game.mode === "race";
+    if (intro) {
+      const behind = new THREE.Vector3(tx, 3.0, fz + 5.6);
+      const ORBIT_END = 1.35; // seconds before the gun when the fly-past hands over
+      if (toGo > ORBIT_END) {
+        const k = Math.min(1, (toGo - ORBIT_END) / 2.1); // 1 → 0 across the fly-past
+        const ang = -0.95 * Math.PI * 0.5 + k * 0.95 * Math.PI; // from the right side round to the left, in front
+        const R = 7.6;
+        camPos.set(Math.sin(ang) * R, 2.2 + Math.sin(k * Math.PI) * 1.4, fz - 1.5 - Math.cos(ang) * R);
+      } else {
+        // smooth hand-over to the running camera
+        const u = 1 - (toGo - 0.35) / (ORBIT_END - 0.35);
+        const e = u * u * (3 - 2 * u);
+        const from = new THREE.Vector3(Math.sin(-0.475 * Math.PI) * 7.6, 2.2, fz - 1.5 - Math.cos(-0.475 * Math.PI) * 7.6);
+        camPos.copy(from.lerp(behind, e));
+      }
     } else {
       camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     }
@@ -7208,7 +7334,7 @@ function frame(now) {
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
-    if (toGo > 0.4 && game.mode === "race") camLook.set(laneX(fx), 1.0, fz - 2);
+    if (intro) camLook.set(toGo > 1.35 ? 0 : tx * 0.5, 1.0, fz - 1.5 - (toGo > 1.35 ? 0 : 3 * (1 - (toGo - 0.35))));
     else if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
     else camLook.set(tx * 0.8, 1.0 + fy * 0.6, fz - 9);
     camera.lookAt(camLook);
@@ -7326,6 +7452,15 @@ function updateHud() {
   }
   const place = entries.findIndex((e) => e.id === playerId) + 1 || 1;
   setHTML(hudEl.place, `${place}<sup>${ordinal(place)}</sup>`);
+  // coloured by place, and it pops whenever you gain or lose one
+  if (hudEl.place.dataset.p !== String(place)) {
+    const before = Number(hudEl.place.dataset.p || 0);
+    hudEl.place.dataset.p = String(place);
+    hudEl.place.classList.remove("up", "down");
+    void hudEl.place.offsetWidth;
+    if (before) hudEl.place.classList.add(place < before ? "up" : "down");
+  }
+  hudEl.place.hidden = entries.length < 2; // an endless run has no places
 
   if (!isSurvival()) {
     for (const dot of hudEl.dots.children) {

@@ -2047,3 +2047,28 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .pack-card small { font-size: 10px; }
 #packOdds { font-size: 10px; line-height: 1.3; opacity: 0.75; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
 #packOdds.open { display: block; }
+
+/* your place, always top left: big, coloured, and it pops when it changes */
+.hud .place { min-width: 64px; font-size: 40px; text-align: center; }
+.hud .place[hidden] { display: none; }
+.hud .place[data-p="1"] { color: #ffd23f; box-shadow: inset 0 0 0 3px #ffd23f; }
+.hud .place[data-p="2"] { color: #e3ebf5; box-shadow: inset 0 0 0 3px #c9d4e2; }
+.hud .place[data-p="3"] { color: #ffb37a; box-shadow: inset 0 0 0 3px #d9884a; }
+.hud .place[data-p="4"] { color: #ff8fa3; box-shadow: inset 0 0 0 3px #ff5d7a; }
+.hud .place.up { animation: placeUp 0.6s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.hud .place.down { animation: placeDown 0.5s ease-out; }
+@keyframes placeUp { 0% { transform: scale(1.45); } 100% { transform: none; } }
+@keyframes placeDown { 0% { transform: scale(0.8); filter: brightness(0.6); } 100% { transform: none; } }
+
+/* first-visit tour: a spotlight on the part being explained */
+.tour { position: fixed; inset: 0; z-index: 80; }
+.tour[hidden] { display: none; }
+.tour-hole { position: fixed; border-radius: 18px; box-shadow: 0 0 0 200vmax rgba(5, 8, 25, 0.72); border: 3px solid #ffd23f; transition: all 0.35s cubic-bezier(0.3, 1.2, 0.4, 1); pointer-events: none; }
+.tour.last .tour-hole { pointer-events: auto; cursor: pointer; animation: btnPulse 1s ease-in-out infinite; }
+.tour-tip { position: fixed; width: min(320px, calc(100vw - 24px)); padding: 12px 14px 10px; border-radius: 18px; border: 3px solid #fff; background: linear-gradient(180deg, #4f86ff, #2236a8); color: #fff; box-shadow: 0 6px 0 #121c63, 0 18px 40px rgba(0, 0, 0, 0.5); transition: top 0.35s, left 0.35s; }
+.tour-tip b { display: block; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 20px; text-transform: uppercase; }
+.tour-tip p { margin: 4px 0 10px; font-size: 14px; font-weight: 700; line-height: 1.3; }
+.tour-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tour-foot span { font-size: 12px; font-weight: 800; opacity: 0.8; }
+.tour-skip { border: 0; background: none; color: rgba(255, 255, 255, 0.85); font: inherit; font-weight: 800; font-size: 13px; text-decoration: underline; cursor: pointer; padding: 4px 0; }
+.tour-foot .btn { min-height: 36px; padding: 0 14px; border-radius: 12px; }
