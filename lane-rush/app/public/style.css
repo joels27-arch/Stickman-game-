@@ -2069,9 +2069,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 }
 @media (prefers-reduced-motion: reduce) { .mud-fx.on i { animation-timing-function: steps(2); } }
 
-/* race strangers online: coming soon */
-.online-btn { width: 100%; min-height: 44px; border-radius: 14px; margin: 0 0 8px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; background: linear-gradient(180deg, #ff9b3d, #f06a1a); color: #fff; border: 0; box-shadow: 0 4px 0 #a8420c; }
-.online-btn .soon { font-size: 10px; letter-spacing: 0.1em; padding: 2px 6px; border-radius: 6px; background: rgba(0, 0, 0, 0.28); }
 
 /* the 3-2-1 always sits on top of the mode card, which waits below it */
 .countdown { z-index: 6; }
@@ -2202,10 +2199,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 /* the logo sits under the (taller) Gold Road */
 .hp-play .home-logo { top: calc(max(12px, env(safe-area-inset-top)) + 160px); }
 @media (max-height: 700px) { .hp-play .home-logo { top: calc(max(10px, env(safe-area-inset-top)) + 146px); font-size: 40px; } }
-/* race strangers online: slim, so the play card stays small */
-.play-card .online-btn { min-height: 36px; margin: 0; font-size: 14px; }
 /* home picture on phones: placed by fitHomeArt() so the runners stand between the logo and the play card */
 @media (max-aspect-ratio: 1/1) {
   .home-art img.fit { right: auto; bottom: auto; transition: top 0.25s, width 0.25s, left 0.25s, height 0.25s; }
-  .home-art img.fit.narrow { -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 5%, #000 86%, transparent), linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent); -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, transparent 0, #000 5%, #000 86%, transparent), linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent); mask-composite: intersect; }
 }

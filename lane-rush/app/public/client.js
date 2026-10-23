@@ -627,7 +627,7 @@ $("#nameForm").addEventListener("submit", (e) => {
 const TOUR = [
   { sel: null, welcome: true, title: "Hey {name}, I'm Bolt!", text: "Welcome to 4 Friends: a Subway-Surfers-style runner you race against your friends. Let me show you around, it takes 20 seconds." },
   { sel: "#roomRow", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room and share the code, or Join a friend's. Up to 4 runners, bots fill empty spots." },
-  { sel: "#soloBtn", img: "/assets/pw_rocket.png", title: "Game modes", text: "Survival, Brain Chase, Coin Rush, Hot Potato and more, against bots you can make easy or hard." },
+  { sel: "#soloBtn", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Survival, Brain Chase, Coin Rush, Hot Potato and more, against bots you can make easy or hard." },
   { sel: "#profileCard", img: "/assets/lg_bronze.webp", title: "That's you", text: "Your name and league. Tap it for your stats: wins, records and how you rank among friends." },
   { sel: "#roadMini", img: "/assets/medal_gold.png", title: "Gold Road", text: "Every gold medal you win moves you along it: coins, packs and three exclusive characters." },
   { sel: '.htab[data-page="0"]', img: "/assets/tab_trophy.webp", title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
@@ -724,8 +724,6 @@ function openJoin(open) {
   if (open) setTimeout(() => codeInput.focus(), 30);
 }
 $("#joinOpen").addEventListener("click", () => openJoin(true));
-// matchmaking with strangers isn't built yet
-$("#onlineBtn").addEventListener("click", () => toast("🌍 Online races with strangers are coming soon!"));
 $("#joinClose").addEventListener("click", () => openJoin(false));
 const joinParam = new URLSearchParams(location.search).get("join");
 if (joinParam) {
@@ -1711,13 +1709,12 @@ let homePage = PAGE.play;
 // the logo and the play card, whatever widgets get added above or below them ──
 const ART_RUNNERS = { top: 0.25, bottom: 0.63 }; // where the runners are in home_tall.jpg, as parts of its height
 const ART_RATIO = 2115 / 1440; // home_tall.jpg height / width
-const ART_MIN_W = 0.6; // never smaller than this part of the screen width
 function fitHomeArt() {
   const img = $(".home-art img");
   const art = $(".home-art");
   if (!img || !art) return;
   if (!matchMedia("(max-aspect-ratio: 1/1)").matches) {
-    img.classList.remove("fit", "narrow");
+    img.classList.remove("fit");
     img.style.cssText = "";
     return;
   }
@@ -1729,14 +1726,13 @@ function fitHomeArt() {
   const top = logo.getBoundingClientRect().top - (logo.getBoundingClientRect().height - logo.offsetHeight) / 2 + logo.offsetHeight - top0 + 4;
   const bottom = dock.getBoundingClientRect().top - top0 - 6;
   if (!dock.offsetHeight) return;
+  // always full width (a squeezed picture looks bad): centred in the gap, but the
+  // runners' feet never go below the top of the play card
   const W = art.clientWidth;
-  const span = ART_RUNNERS.bottom - ART_RUNNERS.top;
-  const w = Math.max(W * ART_MIN_W, Math.min(W, Math.max(0, bottom - top) / (span * ART_RATIO)));
-  const h = w * ART_RATIO;
-  const y = (top + bottom) / 2 - (h * (ART_RUNNERS.top + ART_RUNNERS.bottom)) / 2;
+  const h = W * ART_RATIO;
+  const y = Math.min((top + bottom) / 2 - (h * (ART_RUNNERS.top + ART_RUNNERS.bottom)) / 2, bottom - h * ART_RUNNERS.bottom);
   img.classList.add("fit");
-  img.classList.toggle("narrow", w < W - 1);
-  img.style.cssText = `width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;left:${((W - w) / 2).toFixed(1)}px;top:${y.toFixed(1)}px`;
+  img.style.cssText = `width:${W}px;height:${h.toFixed(1)}px;left:0;top:${y.toFixed(1)}px`;
 }
 addEventListener("resize", fitHomeArt);
 if ("ResizeObserver" in window) {
