@@ -104,9 +104,64 @@ export class Audio {
 
   // ------------------------------------------------------------ music
 
+  // Recorded loops (generated for the game) with the procedural sequencer as fallback.
+  private buffers = new Map<string, AudioBuffer | 'loading' | 'failed'>();
+  private src: { node: AudioBufferSourceNode; gain: GainNode; file: string } | null = null;
+  private static FILES: Partial<Record<Exclude<Track, null>, { file: string; rate: number }>> = {
+    menu: { file: 'lobby', rate: 1 }, lobby: { file: 'lobby', rate: 1 }, race: { file: 'race', rate: 1 },
+    survival: { file: 'race', rate: 0.94 }, final: { file: 'final', rate: 1 },
+  };
+
+  private load(file: string) {
+    if (!this.ctx || this.buffers.has(file)) return;
+    this.buffers.set(file, 'loading');
+    fetch(`/music/${file}.m4a`).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer(); })
+      .then((b) => this.ctx!.decodeAudioData(b))
+      .then((buf) => { this.buffers.set(file, buf); if (this.track && Audio.FILES[this.track]?.file === file) { const t = this.track; this.track = null; this.play(t); } })
+      .catch(() => this.buffers.set(file, 'failed'));
+  }
+
+  private stopFile(fade = 0.6) {
+    if (!this.src || !this.ctx) return;
+    const { node, gain } = this.src;
+    const now = this.ctx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(0.0001, now + fade);
+    try { node.stop(now + fade + 0.05); } catch { /* ignore */ }
+    this.src = null;
+  }
+
   play(track: Track) {
     this.wantTrack = track;
     if (!this.ctx || track === this.track) return;
+    const f = track ? Audio.FILES[track] : undefined;
+    if (f) {
+      for (const x of new Set(Object.values(Audio.FILES).map((v) => v!.file))) this.load(x);
+      const buf = this.buffers.get(f.file);
+      if (buf instanceof AudioBuffer) {
+        this.track = track;
+        if (this.timer) { clearInterval(this.timer); this.timer = null; }
+        if (this.src?.file === f.file) { this.src.node.playbackRate.value = f.rate; return; }
+        this.stopFile();
+        const node = this.ctx.createBufferSource();
+        node.buffer = buf; node.loop = true; node.playbackRate.value = f.rate;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(3.0, this.ctx.currentTime + 0.8);
+        node.connect(gain); gain.connect(this.music);
+        node.start();
+        this.src = { node, gain, file: f.file };
+        return;
+      }
+      if (buf === 'loading' || buf === undefined) { this.track = track; this.stopFile(); this.startSequencer(track); return; }
+    }
+    this.stopFile();
+    this.startSequencer(track);
+  }
+
+  private startSequencer(track: Track) {
+    if (!this.ctx) return;
     this.track = track;
     this.step = 0;
     this.nextTime = this.ctx.currentTime + 0.12;

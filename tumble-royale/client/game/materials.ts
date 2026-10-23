@@ -108,26 +108,7 @@ export function std(color: number, roughness = 0.55, extra: Partial<THREE.MeshSt
   return m;
 }
 
-/** Character body: bean with outfit patterns painted procedurally in the shader. */
-export interface BodyOpts { color: number; color2?: number; outfit: number; o1: number; o2: number }
-
-export function bodyMaterial(o: BodyOpts): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({ color: o.color, roughness: 0.42, metalness: 0.02 });
-  const uniforms = {
-    uBody2: { value: new THREE.Color(o.color2 ?? o.color) },
-    uO1: { value: new THREE.Color(o.o1) },
-    uO2: { value: new THREE.Color(o.o2) },
-    uOutfit: { value: o.outfit },
-    uGrad: { value: o.color2 !== undefined ? 1 : 0 },
-    uTime: time,
-  };
-  m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, uniforms);
-    sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vLP;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLP = position;');
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>
+const OUTFIT_GLSL = `#include <common>
 varying vec3 vLP;
 uniform vec3 uBody2; uniform vec3 uO1; uniform vec3 uO2; uniform int uOutfit; uniform int uGrad; uniform float uTime;
 float aaS(float e, float x) { float w = fwidth(x) * 0.75 + 1e-4; return smoothstep(e - w, e + w, x); }
@@ -175,7 +156,28 @@ vec3 outfit(vec3 skin) {
     c = mix(c, vec3(0.2, 0.45, 1.0), patchM);
   }
   return c;
-}`)
+}`;
+
+/** Character body: bean with outfit patterns painted procedurally in the shader. */
+export interface BodyOpts { color: number; color2?: number; outfit: number; o1: number; o2: number }
+
+export function bodyMaterial(o: BodyOpts): THREE.MeshStandardMaterial {
+  const m = new THREE.MeshStandardMaterial({ color: o.color, roughness: 0.42, metalness: 0.02 });
+  const uniforms = {
+    uBody2: { value: new THREE.Color(o.color2 ?? o.color) },
+    uO1: { value: new THREE.Color(o.o1) },
+    uO2: { value: new THREE.Color(o.o2) },
+    uOutfit: { value: o.outfit },
+    uGrad: { value: o.color2 !== undefined ? 1 : 0 },
+    uTime: time,
+  };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uniforms);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLP;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLP = position;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', OUTFIT_GLSL)
       .replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( outfit(diffuse), opacity );');
   };
   m.customProgramCacheKey = () => 'bean';
@@ -246,5 +248,33 @@ export function floorMaterial(kind: string, color: number): THREE.Material {
       }`,
   });
   void isLava;
+  return m;
+}
+
+/**
+ * One material for a whole skinned bean: vertex colours for every part, plus the
+ * procedural outfit pattern on body vertices (aFlag = 1) and a glow on aFlag = 2.
+ */
+export function beanMaterial(o: BodyOpts): THREE.MeshStandardMaterial {
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.42, metalness: 0.02 });
+  const uniforms = {
+    uBody2: { value: new THREE.Color(o.color2 ?? o.color) },
+    uO1: { value: new THREE.Color(o.o1) },
+    uO2: { value: new THREE.Color(o.o2) },
+    uOutfit: { value: o.outfit },
+    uGrad: { value: o.color2 !== undefined ? 1 : 0 },
+    uTime: time,
+  };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uniforms);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aFlag;\nvarying float vFlag;\nvarying vec3 vLP;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLP = position;\nvFlag = aFlag;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', OUTFIT_GLSL.replace('varying vec3 vLP;', 'varying vec3 vLP;\nvarying float vFlag;'))
+      .replace('#include <color_fragment>', '#include <color_fragment>\nif (vFlag > 0.5 && vFlag < 1.5) diffuseColor.rgb = outfit(diffuseColor.rgb);')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\nif (vFlag > 1.5) totalEmissiveRadiance += diffuseColor.rgb * 0.9;');
+  };
+  m.customProgramCacheKey = () => 'bean2';
   return m;
 }

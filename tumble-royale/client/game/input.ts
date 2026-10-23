@@ -14,6 +14,8 @@ export class InputManager {
   private joyX = 0; private joyY = 0;
   private touchJump = false; private touchDive = false;
   private jumpLatchUntil = 0; private diveLatchUntil = 0;
+  /** A press stays latched until a simulation tick has consumed it (see ack()). */
+  private jumpPending = false; private divePending = false;
   private camDX = 0; private camDY = 0;
   private lastCamInput = 0;
   private dragging = false;
@@ -53,8 +55,8 @@ export class InputManager {
       if (!this.enabled) return;
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Tab'].includes(e.code)) e.preventDefault();
       if (!this.keys.has(e.code)) {
-        if (e.code === 'Space') this.jumpLatchUntil = performance.now() + LATCH_TICKS_MS;
-        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyE') this.diveLatchUntil = performance.now() + LATCH_TICKS_MS;
+        if (e.code === 'Space') { this.jumpLatchUntil = performance.now() + LATCH_TICKS_MS; this.jumpPending = true; }
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyE') { this.diveLatchUntil = performance.now() + LATCH_TICKS_MS; this.divePending = true; }
       }
       this.keys.add(e.code);
       this.onAnyInput?.();
@@ -100,8 +102,8 @@ export class InputManager {
     this.isTouch = true;
     const tgt = (e.target as HTMLElement).closest('.tbtn');
     const now = performance.now();
-    if (tgt === this.jumpBtn) { this.pointerRoles.set(e.pointerId, { role: 'jump', x: e.clientX, y: e.clientY, ox: 0, oy: 0 }); this.touchJump = true; this.jumpLatchUntil = now + LATCH_TICKS_MS; this.jumpBtn.classList.add('on'); }
-    else if (tgt === this.diveBtn) { this.pointerRoles.set(e.pointerId, { role: 'dive', x: e.clientX, y: e.clientY, ox: 0, oy: 0 }); this.touchDive = true; this.diveLatchUntil = now + LATCH_TICKS_MS; this.diveBtn.classList.add('on'); }
+    if (tgt === this.jumpBtn) { this.pointerRoles.set(e.pointerId, { role: 'jump', x: e.clientX, y: e.clientY, ox: 0, oy: 0 }); this.touchJump = true; this.jumpPending = true; this.jumpLatchUntil = now + LATCH_TICKS_MS; this.jumpBtn.classList.add('on'); }
+    else if (tgt === this.diveBtn) { this.pointerRoles.set(e.pointerId, { role: 'dive', x: e.clientX, y: e.clientY, ox: 0, oy: 0 }); this.touchDive = true; this.divePending = true; this.diveLatchUntil = now + LATCH_TICKS_MS; this.diveBtn.classList.add('on'); }
     else if (e.clientX < window.innerWidth * 0.45 && ![...this.pointerRoles.values()].some((r) => r.role === 'joy')) {
       // Floating joystick: the base appears under the thumb (kept away from the edges).
       const ox = Math.max(70, Math.min(window.innerWidth * 0.45, e.clientX));
@@ -172,8 +174,8 @@ export class InputManager {
     else { x = this.joyX; y = this.joyY; }
     const now = performance.now();
     let btn = 0;
-    if (k.has('Space') || this.touchJump || now < this.jumpLatchUntil) btn |= Btn.Jump;
-    if (k.has('ShiftLeft') || k.has('ShiftRight') || k.has('KeyE') || this.touchDive || now < this.diveLatchUntil) btn |= Btn.Dive;
+    if (k.has('Space') || this.touchJump || this.jumpPending || now < this.jumpLatchUntil) btn |= Btn.Jump;
+    if (k.has('ShiftLeft') || k.has('ShiftRight') || k.has('KeyE') || this.touchDive || this.divePending || now < this.diveLatchUntil) btn |= Btn.Dive;
     // Gamepad
     const pads = navigator.getGamepads?.() ?? [];
     for (const gp of pads) {
@@ -191,6 +193,9 @@ export class InputManager {
     }
     return { x, y, btn };
   }
+
+  /** The simulation advanced with the last sampled input: latched presses have been seen. */
+  ack() { this.jumpPending = false; this.divePending = false; }
 
   requestLock() { if (!this.isTouch) this.canvas.requestPointerLock?.(); }
 }

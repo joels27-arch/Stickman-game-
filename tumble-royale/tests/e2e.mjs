@@ -34,7 +34,10 @@ async function device(name, opts) {
   const page = await ctx.newPage();
   page.setDefaultTimeout(60000);
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(`${name}: ${m.text()}`); });
+  page.on('console', (m) => {
+    // The deliberate wrong-code lookup returns 404; that is the expected response, not a page error.
+    if (m.type() === 'error' && !(m.text().includes('404') && m.location().url.includes('/api/rooms/'))) errors.push(`${name}: ${m.text()} @ ${m.location().url}`);
+  });
   await page.goto(BASE + '/');
   await page.waitForSelector('text=PLAY', { timeout: 30000 });
   return { ctx, page };
@@ -74,7 +77,7 @@ try {
   await pb.getByRole('button', { name: /PARTY/ }).tap();
   await pb.locator('.code-input input').fill('ZZZZZZ');
   await pb.getByRole('button', { name: 'Join room' }).tap();
-  check('joining a wrong code shows a friendly error', await pb.locator('text=Room not found').isVisible({ timeout: 5000 }).catch(() => false));
+  check('joining a wrong code shows a friendly error', await pb.locator('text=Room not found').waitFor({ timeout: 5000 }).then(() => true).catch(() => false));
   await pb.locator('.code-input input').fill(code);
   await pb.getByRole('button', { name: 'Join room' }).tap();
   await pb.waitForSelector('text=READY!');
@@ -89,6 +92,8 @@ try {
   // Invite link opens the join dialog prefilled.
   const C = await device('C', { viewport: { width: 1000, height: 600 } });
   await C.page.goto(`${BASE}/?room=${code}`);
+  await C.page.waitForSelector('.code-input input', { timeout: 15000 }).catch(() => {});
+  await C.page.screenshot({ path: `${OUT}/04b-invite.png`, timeout: 120000 });
   const pre = await C.page.locator('.code-input input').inputValue({ timeout: 10000 }).catch(() => '');
   check('invite link pre-fills the room code', pre === code, pre);
   await C.ctx.close();
@@ -98,10 +103,10 @@ try {
   await pa.getByRole('button', { name: 'START' }).click();
   await pa.waitForSelector('.intro-card', { timeout: 15000 });
   check('round intro appears for the host', true);
-  check('round intro appears for the phone', await pb.locator('.intro-card').isVisible({ timeout: 15000 }).catch(() => false));
+  check('round intro appears for the phone', await pb.locator('.intro-card').waitFor({ timeout: 20000 }).then(() => true).catch(() => false));
   await pa.screenshot({ path: `${OUT}/05-intro.png`, timeout: 120000 });
   await sleep(7500); // intro + countdown
-  check('touch controls visible on the phone', await pb.locator('.tbtn-jump').isVisible() && await pb.locator('.tbtn-dive').isVisible());
+  check('touch controls visible on the phone', await pb.locator('.tbtn-jump').waitFor({ timeout: 15000 }).then(() => true).catch(() => false) && await pb.locator('.tbtn-dive').isVisible());
   // A runs with the keyboard; B runs with the on-screen joystick (synthetic touch drag).
   await pa.keyboard.down('KeyW');
   const posBefore = await pa.evaluate(() => { const s = window.__tumble.client.session; const t = [...s.remotes.values()][0]; return t ? { x: t.x, z: t.z } : null; });
@@ -120,10 +125,11 @@ try {
   await pa.keyboard.up('KeyW');
   // Jump button
   const yBefore = await pb.evaluate(() => window.__tumble.client.session.pred.y);
+  await pb.evaluate(() => { window.__ymax = -99; const s = window.__tumble.client.session; const t = setInterval(() => { window.__ymax = Math.max(window.__ymax, s.pred.y); }, 30); setTimeout(() => clearInterval(t), 2500); });
   await pb.locator('.tbtn-jump').tap();
-  await sleep(250);
-  const yAfter = await pb.evaluate(() => window.__tumble.client.session.pred.y);
-  check('JUMP button jumps', yAfter > yBefore + 0.4, `${yBefore.toFixed(2)} → ${yAfter.toFixed(2)}`);
+  await sleep(2600);
+  const yAfter = await pb.evaluate(() => window.__ymax);
+  check('JUMP button jumps', yAfter > yBefore + 0.8, `peak ${yBefore.toFixed(2)} → ${yAfter.toFixed(2)}`);
   // Pause → leave from the phone; host keeps playing.
   await pb.locator('button[aria-label=Pause]').tap();
   await pb.getByRole('button', { name: 'Leave match' }).tap();
