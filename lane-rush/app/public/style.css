@@ -2094,3 +2094,87 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 /* race strangers online: coming soon */
 .online-btn { width: 100%; min-height: 44px; border-radius: 14px; margin: 0 0 8px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; background: linear-gradient(180deg, #ff9b3d, #f06a1a); color: #fff; border: 0; box-shadow: 0 4px 0 #a8420c; }
 .online-btn .soon { font-size: 10px; letter-spacing: 0.1em; padding: 2px 6px; border-radius: 6px; background: rgba(0, 0, 0, 0.28); }
+
+/* the 3-2-1 always sits on top of the mode card, which waits below it */
+.countdown { z-index: 6; }
+.race-tag.show:not(.small) { top: 56%; }
+
+/* first endless run: the in-run coach (slow motion until you make the move) */
+.coach { position: absolute; inset: 0; z-index: 7; pointer-events: none; display: grid; justify-items: center; align-content: start; padding-top: max(120px, calc(env(safe-area-inset-top) + 110px)); background: radial-gradient(ellipse at 50% 60%, rgba(5, 8, 25, 0) 40%, rgba(5, 8, 25, 0.55) 100%); animation: coachIn 0.25s ease-out; }
+.coach[hidden] { display: none; }
+@keyframes coachIn { from { opacity: 0; } }
+.coach-card { display: grid; justify-items: center; gap: 2px; width: min(320px, calc(100vw - 32px)); padding: 12px 16px 14px; border-radius: 22px; border: 3px solid #fff; background: linear-gradient(180deg, rgba(79, 134, 255, 0.95), rgba(34, 54, 168, 0.95)); color: #fff; text-align: center; box-shadow: 0 6px 0 #121c63, 0 18px 40px rgba(0, 0, 0, 0.45); animation: gpop 320ms cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+.coach-card b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 26px; line-height: 1.05; text-transform: uppercase; text-shadow: 0 3px 0 rgba(0, 0, 0, 0.3); }
+.coach-card p { margin: 0; font-weight: 800; font-size: 15px; line-height: 1.25; }
+.coach-keys { font-weight: 800; font-size: 12px; opacity: 0.8; }
+.coach-keys:empty { display: none; }
+.coach-gesture { position: relative; width: 150px; height: 84px; }
+.coach-gesture::before { content: ""; position: absolute; left: 50%; top: 50%; width: 110px; height: 10px; margin: -5px 0 0 -55px; border-radius: 5px; background: rgba(255, 255, 255, 0.25); }
+.coach-gesture .hand { position: absolute; left: 50%; top: 50%; font-style: normal; font-size: 50px; line-height: 1; transform: translate(-50%, -50%); filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.3)); }
+.coach-gesture .hand::before { content: "👆"; }
+.coach-gesture.up::before, .coach-gesture.down::before { width: 10px; height: 76px; margin: -38px 0 0 -5px; }
+.coach-gesture.up .hand { animation: swipeUp 1s ease-in-out infinite; }
+.coach-gesture.down .hand { animation: swipeDown 1s ease-in-out infinite; }
+.coach-gesture.side .hand { animation: swipeSide 1.4s ease-in-out infinite; }
+.coach-gesture.left .hand { animation: swipeLeft 1s ease-in-out infinite; }
+.coach-gesture.right .hand { animation: swipeRight 1s ease-in-out infinite; }
+.coach-gesture.tap::before { display: none; }
+.coach-gesture.tap .hand { animation: tapHand 0.9s ease-in-out infinite; }
+@keyframes swipeUp { 0% { transform: translate(-50%, 0); opacity: 0; } 20% { opacity: 1; } 80% { transform: translate(-50%, -90%); opacity: 1; } 100% { transform: translate(-50%, -90%); opacity: 0; } }
+@keyframes swipeDown { 0% { transform: translate(-50%, -100%); opacity: 0; } 20% { opacity: 1; } 80% { transform: translate(-50%, -10%); opacity: 1; } 100% { transform: translate(-50%, -10%); opacity: 0; } }
+@keyframes swipeSide { 0%, 100% { transform: translate(-110%, -50%); } 50% { transform: translate(10%, -50%); } }
+@keyframes swipeLeft { 0% { transform: translate(0, -50%); opacity: 0; } 20% { opacity: 1; } 80% { transform: translate(-120%, -50%); opacity: 1; } 100% { transform: translate(-120%, -50%); opacity: 0; } }
+@keyframes swipeRight { 0% { transform: translate(-100%, -50%); opacity: 0; } 20% { opacity: 1; } 80% { transform: translate(20%, -50%); opacity: 1; } 100% { transform: translate(20%, -50%); opacity: 0; } }
+@keyframes tapHand { 0%, 100% { transform: translate(-50%, -40%) scale(1); } 50% { transform: translate(-50%, -30%) scale(0.85); } }
+/* the power-up tip: no slow motion, so it stays small and out of the way above the power-up button */
+.coach.item { background: none; align-content: end; justify-items: start; padding: 0 0 calc(var(--safe-b, 14px) + 150px) var(--safe-l, 12px); }
+.coach.item .coach-card { width: min(240px, calc(100vw - 32px)); padding: 8px 12px 10px; }
+.coach.item .coach-card b { font-size: 20px; }
+.coach.item .coach-card p { font-size: 13px; }
+.coach.item .coach-gesture { height: 54px; }
+.coach.item .hand::before { content: "👇"; }
+.coach.item .coach-skip { display: none; }
+.coach-skip { position: absolute; top: max(118px, calc(env(safe-area-inset-top) + 108px)); right: var(--safe-r, 12px); pointer-events: auto; padding: 6px 12px; border-radius: 999px; border: 2px solid rgba(255, 255, 255, 0.7); background: rgba(5, 8, 25, 0.5); color: #fff; font: inherit; font-weight: 900; font-size: 12px; cursor: pointer; }
+.coach:not(.item) .coach-card { margin-top: 64px; }
+@media (prefers-reduced-motion: reduce) { .coach-gesture .hand { animation-duration: 2.4s !important; } }
+
+/* first-visit tour v2: Bolt shows you around */
+.tour-hole { border-radius: 20px; border: 3px solid #ffd23f; box-shadow: 0 0 0 200vmax rgba(5, 8, 25, 0.74), 0 0 24px 4px rgba(255, 210, 63, 0.7); }
+.tour-point { position: fixed; z-index: 2; width: 0; height: 0; margin-left: -14px; border-left: 14px solid transparent; border-right: 14px solid transparent; pointer-events: none; transition: left 0.35s, top 0.35s; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.35)); }
+.tour-point[hidden] { display: none; }
+.tour-point.up { border-bottom: 24px solid #ffd23f; animation: pointUp 0.8s ease-in-out infinite; }
+.tour-point.down { border-top: 24px solid #ffd23f; animation: pointDown 0.8s ease-in-out infinite; }
+@keyframes pointUp { 50% { transform: translateY(6px); } }
+@keyframes pointDown { 50% { transform: translateY(-6px); } }
+.tour-tip { width: min(340px, calc(100vw - 24px)); padding: 10px 14px 12px; border-radius: 22px; background: linear-gradient(180deg, #5b8fff 0%, #3456d6 55%, #2236a8 100%); }
+.tour-tip.in { animation: tourIn 0.38s cubic-bezier(0.2, 1.4, 0.4, 1); }
+@keyframes tourIn { from { opacity: 0; scale: 0.85; } }
+.tour-bar { display: flex; gap: 4px; margin-bottom: 8px; }
+.tour-bar i { flex: 1; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.25); }
+.tour-bar i.done { background: rgba(255, 255, 255, 0.75); }
+.tour-bar i.on { background: #ffd23f; box-shadow: 0 0 8px rgba(255, 210, 63, 0.8); }
+.tour-body { display: grid; grid-template-columns: 68px 1fr; gap: 12px; align-items: center; }
+.tour-face { position: relative; width: 68px; height: 68px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #bfe3ff, #3f8cff 70%); border: 3px solid #fff; box-shadow: 0 3px 0 #121c63; overflow: visible; }
+.tour-face .ava { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; }
+.tour-face .ava img { position: absolute; left: 50%; top: 4px; width: 170%; transform: translateX(-50%); }
+.tour-sticker { position: absolute; right: -8px; bottom: -6px; width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45)); animation: todayBob 1.2s ease-in-out infinite; }
+.tour-sticker[hidden] { display: none; }
+.tour-kicker { display: block; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #ffd23f; }
+.tour-tip b { font-size: 21px; line-height: 1.05; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25); }
+.tour-tip p { margin: 4px 0 0; }
+.tour-foot { margin-top: 12px; }
+.tour-foot .btn { min-height: 40px; padding: 0 16px; font-size: 15px; }
+.tour-hero, .tour-perks { display: none; }
+/* the welcome card: Bolt in full, and what the game is about */
+.tour.welcome .tour-tip { width: min(340px, calc(100vw - 32px)); padding-top: 96px; text-align: center; }
+.tour.welcome .tour-bar { display: none; }
+.tour.welcome .tour-hero { display: block; position: absolute; left: 50%; top: -96px; height: 190px; transform: translateX(-50%); filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.45)); animation: heroWave 1.6s ease-in-out infinite; pointer-events: none; }
+@keyframes heroWave { 50% { transform: translateX(-50%) translateY(-6px) rotate(-2deg); } }
+.tour.welcome .tour-body { grid-template-columns: 1fr; }
+.tour.welcome .tour-face { display: none; }
+.tour.welcome .tour-tip b { font-size: 26px; }
+.tour.welcome .tour-perks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
+.tour-perks span { display: grid; justify-items: center; gap: 4px; padding: 8px 4px; border-radius: 14px; background: rgba(255, 255, 255, 0.14); }
+.tour-perks img { width: 38px; height: 38px; object-fit: contain; }
+.tour-perks b { font-family: var(--body, inherit); font-style: normal; font-size: 12px !important; text-transform: none; text-shadow: none; }
+.tour.welcome .tour-foot .btn { min-height: 46px; font-size: 17px; }
