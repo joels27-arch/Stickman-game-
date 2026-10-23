@@ -42,8 +42,8 @@
       </picture>
       <div class="home-shade"></div>
       <header class="home-top">
+        <button id="rankBadgeBtn" class="rank-badge-btn" type="button" aria-label="Your rank"><img id="rankPillImg" src="/assets/lg_bronze.webp" alt="" /></button>
         <label class="name-chip" title="Your name">
-          <span class="ni">👤</span>
           <input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Your name" />
           <span class="pen">✎</span>
         </label>
@@ -59,7 +59,7 @@
         <div class="quest-row">
           <button id="questPill" class="pill quests" type="button"><img class="pi" src="/assets/ui_star.webp" alt="" /><span><b id="questCount">0/3</b><small>Challenges</small></span></button>
           <button id="passPill" class="pill pass" type="button"><img class="pi" src="/assets/ui_chest.webp" alt="" /><span><b id="passPillLv">Lv 1</b><small>Season</small></span><i class="dot" hidden></i></button>
-          <button id="rankPill" class="pill rank" type="button"><img class="pi" id="rankPillImg" src="/assets/lg_bronze.webp" alt="" /><span><b id="rankPillName">Bronze I</b><small id="rankPillRp">0 RP</small></span></button>
+          <button id="collPill" class="pill coll" type="button"><img class="pi" src="/assets/pk_brainz.webp" alt="" /><span><b id="collPillCount">8/24</b><small>Collection</small></span></button>
           <button class="pill shop shopBtn" type="button"><img class="pi" src="/assets/ui_c3.webp" alt="" /><span><b>Shop</b><small>Characters</small></span></button>
         </div>
         <div class="play-card">
@@ -351,6 +351,45 @@
     <div id="spinWheel" class="spin-wheel" hidden>
       <small id="spinTitle">Round 2</small>
       <div class="spin-window"><div id="spinReel" class="spin-reel"></div></div>
+    </div>
+
+    <!-- COLLECTION: every character, how to get them -->
+    <section id="collection" class="screen coll-screen">
+      <div class="grays" aria-hidden="true"></div>
+      <div class="shop-wrap">
+        <header class="shop-top">
+          <button id="collBack" class="gback" type="button" aria-label="Back">‹</button>
+          <div class="ribbon teal static"><h2>Collection</h2></div>
+        </header>
+        <div class="coll-progress"><b id="collCount">0/0</b><div class="qbar"><i id="collBar"></i><span id="collPct"></span></div></div>
+        <div id="collFilters" class="chip-row" role="tablist"></div>
+        <div id="collRarity" class="chip-row small" role="tablist"></div>
+        <div id="collGrid" class="coll-grid"></div>
+      </div>
+    </section>
+
+    <div id="charModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet char-sheet" role="dialog" aria-modal="true" aria-labelledby="charName">
+        <button id="charClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div id="charHero" class="char-hero"></div>
+        <h2 id="charName" class="char-name"></h2>
+        <div id="charTags" class="char-tags"></div>
+        <p id="charHow" class="char-how"></p>
+        <button id="charAct" class="gbtn" type="button"></button>
+      </div>
+    </div>
+
+    <div id="buyModal" class="modal gmodal" hidden>
+      <div class="gsheet buy-sheet" role="dialog" aria-modal="true" aria-labelledby="buyTitle">
+        <div class="ribbon gold"><h2 id="buyTitle">Unlock?</h2></div>
+        <div id="buyPreview" class="buy-preview"></div>
+        <div id="buyPrice" class="buy-price"></div>
+        <div class="buy-row">
+          <button id="buyCancel" class="gbtn grey" type="button">Cancel</button>
+          <button id="buyOk" class="gbtn" type="button">Buy</button>
+        </div>
+      </div>
     </div>
 
     <!-- PACK OPENING -->

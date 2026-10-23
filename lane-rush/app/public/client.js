@@ -79,17 +79,24 @@ const STARTERS = RUNNERS.length; // every 3D runner is free to play
  * models yet, so owning one shows it in your collection ("coming soon to the
  * track") but you can't race with it.
  */
+/**
+ * Shop characters. Each has exactly one way to unlock:
+ *   coins  — bought with coins (price by rarity)
+ *   medals — medal exclusives: only medals (higher medals can stand in for lower ones)
+ * Pack-only characters live in PACK_CHARS, the Season Pass one in PASS_CHAR.
+ * (Anything bought under the old prices stays owned.)
+ */
 const COLLECTION = [
-  { id: "luna", name: "Luna", color: "#9b5cff", price: { medal: "bronze", count: 5 }, coins: 800 },
-  { id: "toto", name: "Toto", color: "#f2f2f2", price: { medal: "bronze", count: 8 }, coins: 1200 },
-  { id: "blaze", name: "Blaze", color: "#ff4b2b", price: { medal: "silver", count: 3 }, coins: 1800 },
-  { id: "zara", name: "Zara", color: "#ff6fb5", price: { medal: "silver", count: 4 }, coins: 2400 },
-  { id: "jax", name: "Jax", color: "#c98a3c", price: { medal: "silver", count: 6 }, coins: 3000 },
-  { id: "leo", name: "Sir Leo", color: "#4c8dff", price: { medal: "gold", count: 2 }, coins: 3800 },
-  { id: "kai", name: "Kai", color: "#21c7d9", price: { medal: "gold", count: 3 }, coins: 4600 },
-  { id: "momo", name: "Momo", color: "#e9ecef", price: { medal: "gold", count: 4 }, coins: 5400 },
-  { id: "zed", name: "Zed", color: "#7be3b0", price: { medal: "gold", count: 5 }, coins: 6500 },
-  { id: "aria", name: "Aria", color: "#e03cff", price: { medal: "gold", count: 8 }, coins: 8000 },
+  { id: "luna", name: "Luna", color: "#9b5cff", rarity: "common", via: "coins", coins: 800 },
+  { id: "toto", name: "Toto", color: "#f2f2f2", rarity: "common", via: "coins", coins: 1200 },
+  { id: "blaze", name: "Blaze", color: "#ff4b2b", rarity: "rare", via: "coins", coins: 1800 },
+  { id: "zara", name: "Zara", color: "#ff6fb5", rarity: "rare", via: "coins", coins: 2400 },
+  { id: "jax", name: "Jax", color: "#c98a3c", rarity: "rare", via: "coins", coins: 3000 },
+  { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "coins", coins: 4500 },
+  { id: "leo", name: "Sir Leo", color: "#4c8dff", rarity: "epic", via: "medals", price: { medal: "silver", count: 4 } },
+  { id: "kai", name: "Kai", color: "#21c7d9", rarity: "epic", via: "medals", price: { medal: "silver", count: 6 } },
+  { id: "zed", name: "Zed", color: "#7be3b0", rarity: "legendary", via: "medals", price: { medal: "gold", count: 3 } },
+  { id: "aria", name: "Aria", color: "#e03cff", rarity: "legendary", via: "medals", price: { medal: "gold", count: 5 } },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
 const medalText = (medal, n) => `${n} ${medal} medal${n === 1 ? "" : "s"}`;
@@ -357,7 +364,7 @@ const sfx = (() => {
 
 // ── UI helpers ──────────────────────────────────────────────────────────────
 
-const screens = { home: $("#home"), lobby: $("#lobby"), lineup: $("#lineup"), results: $("#results"), shop: $("#shop") };
+const screens = { home: $("#home"), lobby: $("#lobby"), lineup: $("#lineup"), results: $("#results"), shop: $("#shop"), collection: $("#collection") };
 function showScreen(name) {
   for (const [k, el] of Object.entries(screens)) el.classList.toggle("show", k === name);
   $("#hud").classList.toggle("show", name === "race");
@@ -691,38 +698,240 @@ function renderItems() {
   );
   renderWallet();
 }
-const RARITY = { bronze: "common", silver: "rare", gold: "epic" };
+// ── the character catalog: every character, its rarity and how you get it ──
+
+const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
+const STARTER_RARITY = ["common", "common", "common", "rare", "common", "rare", "rare", "epic"];
+function allChars() {
+  return [
+    ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: "starter", img: portrait(i), hero: `/assets/full_${r.file}.webp`, playable: true })),
+    ...COLLECTION.map((c) => ({ ...c, img: `/assets/sc_${c.id}.webp`, hero: `/assets/sc_${c.id}.webp` })),
+    ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp` })),
+    { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp` },
+  ];
+}
+const ownsChar = (c) => c.via === "starter" || wallet.has(c.id);
+const VIA_LABEL = { starter: "Free", coins: "Coins", medals: "Medals", pack: "Packs", pass: "Season Pass" };
+const VIA_ICON = { starter: "✅", coins: "🪙", medals: "🏅", pack: "🎁", pass: "⭐" };
+function howToGet(c) {
+  if (c.via === "starter") return "A free runner. Race with it any time.";
+  if (c.via === "coins") return `Buy it in the Shop for ${c.coins.toLocaleString()} coins.`;
+  if (c.via === "medals") return `Medal exclusive: ${medalText(c.price.medal, c.price.count)}. Win medals by placing top 3 against real players, from the day 7 reward, packs and the Season Pass.`;
+  if (c.via === "pack") return `Only in packs (${c.rarity}). Brain Pack: ${pct(PACK_ODDS.normal[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)} per item. Mega Pack last item: ${pct(PACK_ODDS.boosted[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)}.`;
+  return "Season Pass exclusive: Gold track, level 30.";
+}
+function collectionCount() {
+  const all = allChars();
+  return { got: all.filter(ownsChar).length, all: all.length };
+}
+function renderCollPill() {
+  const { got, all } = collectionCount();
+  $("#collPillCount").textContent = `${got}/${all}`;
+}
+
+// a shop card for a coin or medal character
+function shopCard(c) {
+  const owned = wallet.has(c.id);
+  const can = c.via === "coins" ? wallet.coins() >= c.coins : Boolean(wallet.plan(c.price));
+  const price = owned
+    ? el("span", { class: "owned-tag", text: "Owned ✓" })
+    : c.via === "coins"
+      ? el("span", { class: `sprice${can ? "" : " short"}` }, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }))
+      : el("span", { class: `sprice medal${can ? "" : " short"}` }, el("img", { src: MEDAL_IMG[c.price.medal], alt: "" }), el("b", { text: `×${c.price.count}` }));
+  const card = el(
+    "button",
+    { class: `skin ${c.rarity}${owned ? " owned" : ""}`, type: "button" },
+    el("span", { class: "rar", text: c.rarity }),
+    el("img", { class: "pic", src: `/assets/sc_${c.id}.webp`, alt: "" }),
+    el("b", { text: c.name }),
+    price,
+  );
+  card.addEventListener("click", () => (owned ? inspectChar(allChars().find((x) => x.id === c.id)) : askBuy(c)));
+  return card;
+}
 function renderShop() {
-  const grid = $("#shopGrid");
-  grid.replaceChildren(
-    ...COLLECTION.map((r) => {
-      const owned = wallet.has(r.id);
-      const bought = () => {
-        sfx.finish();
-        toast(`${r.name} is in your collection! Racing with them is coming soon.`);
-        renderShop();
-      };
-      const kids = [
-        el("span", { class: "rar", text: RARITY[r.price.medal] }),
-        el("img", { class: "pic", src: `/assets/sc_${r.id}.webp`, alt: "" }),
-        el("b", { text: r.name }),
-      ];
-      if (owned) {
-        kids.push(el("span", { class: "owned-tag", text: "Owned ✓" }));
-      } else {
-        const coinBtn = el("button", { class: "sbuy", type: "button" }, el("i", { class: "coin" }), el("span", { text: r.coins.toLocaleString() }));
-        coinBtn.disabled = wallet.coins() < r.coins;
-        coinBtn.addEventListener("click", () => wallet.buyWithCoins(r) && bought());
-        const medalBtn = el("button", { class: "smedal", type: "button" }, el("span", { text: "or" }), el("img", { src: MEDAL_IMG[r.price.medal], alt: "" }), el("span", { text: `×${r.price.count}` }));
-        medalBtn.disabled = !wallet.plan(r.price);
-        medalBtn.addEventListener("click", () => wallet.buy(r) && bought());
-        kids.push(coinBtn, medalBtn);
-      }
-      return el("div", { class: `skin ${RARITY[r.price.medal]}${owned ? " owned" : ""}` }, ...kids);
-    }),
+  const coinChars = COLLECTION.filter((c) => c.via === "coins");
+  const medalChars = COLLECTION.filter((c) => c.via === "medals");
+  const packLink = el("button", { class: "shop-link", type: "button" }, el("img", { src: "/assets/pack_brain.webp", alt: "" }), el("span", {}, el("b", { text: "Pack exclusives" }), el("small", { text: `${PACK_CHARS.length} characters you can only pull from packs` })), el("i", { text: "›" }));
+  packLink.addEventListener("click", () => shopTab(false));
+  const collLink = el("button", { class: "shop-link teal", type: "button" }, el("img", { src: "/assets/pk_brainz.webp", alt: "" }), el("span", {}, el("b", { text: "Your collection" }), el("small", { text: `${collectionCount().got} of ${collectionCount().all} characters` })), el("i", { text: "›" }));
+  collLink.addEventListener("click", () => openCollection("shop"));
+  $("#shopGrid").replaceChildren(
+    el("h3", { class: "sec-title" }, el("span", { text: "🪙 Coin characters" }), el("small", { text: "Buy with coins" })),
+    el("div", { class: "char-grid" }, ...coinChars.map(shopCard)),
+    el("h3", { class: "sec-title medal" }, el("span", { text: "🏅 Medal exclusives" }), el("small", { text: "Medals only · win them against real players" })),
+    el("div", { class: "char-grid" }, ...medalChars.map(shopCard)),
+    packLink,
+    collLink,
   );
   renderWallet();
 }
+
+// ── buying, with a confirmation and an unlock reveal ──
+let buying = null;
+const buyModal = $("#buyModal");
+function askBuy(c) {
+  buying = c;
+  $("#buyTitle").textContent = "Unlock?";
+  $("#buyPreview").replaceChildren(el("div", { class: `bp-card ${c.rarity}` }, el("span", { class: "rar", text: c.rarity }), el("img", { src: `/assets/sc_${c.id}.webp`, alt: "" }), el("b", { text: c.name })));
+  const can = c.via === "coins" ? wallet.coins() >= c.coins : Boolean(wallet.plan(c.price));
+  const spend = c.via === "medals" ? wallet.plan(c.price) : null;
+  $("#buyPrice").replaceChildren(
+    c.via === "coins"
+      ? el("span", {}, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }), el("small", { text: ` · you have ${wallet.coins().toLocaleString()}` }))
+      : el("span", {}, el("img", { src: MEDAL_IMG[c.price.medal], alt: "" }), el("b", { text: medalText(c.price.medal, c.price.count) }), el("small", { text: spend ? ` · pays with ${MEDALS.filter((k) => spend[k]).map((k) => medalText(k, spend[k])).join(" + ")}` : "" })),
+    can ? null : el("em", { text: c.via === "coins" ? `You need ${(c.coins - wallet.coins()).toLocaleString()} more coins` : "Not enough medals yet" }),
+  );
+  $("#buyOk").disabled = !can;
+  $("#buyOk").textContent = can ? "Unlock" : "Can't afford yet";
+  buyModal.hidden = false;
+}
+$("#buyCancel").addEventListener("click", () => {
+  buying = null;
+  buyModal.hidden = true;
+});
+buyModal.addEventListener("click", (e) => e.target === buyModal && $("#buyCancel").click());
+$("#buyOk").addEventListener("click", () => {
+  const c = buying;
+  buying = null; // one purchase per confirmation, however fast you tap
+  buyModal.hidden = true;
+  if (!c || wallet.has(c.id)) return;
+  const ok = c.via === "coins" ? wallet.buyWithCoins(c) : wallet.buy(c);
+  if (!ok) return toast("Not enough to unlock that yet");
+  stats.add("bought", 1);
+  showUnlock({ kind: "char", char: { ...c, img: `/assets/sc_${c.id}.webp` } }, () => {
+    if (screens.shop.classList.contains("show")) renderShop();
+    if (screens.collection.classList.contains("show")) renderCollection();
+  });
+  renderCollPill();
+});
+
+// ── the collection page ──
+let collFilter = "all";
+let collRarity = "";
+let collReturn = "home";
+const COLL_FILTERS = [
+  ["all", "All"],
+  ["owned", "Owned"],
+  ["locked", "Locked"],
+  ["starter", "Free"],
+  ["coins", "🪙 Coins"],
+  ["medals", "🏅 Medals"],
+  ["pack", "🎁 Packs"],
+  ["pass", "⭐ Pass"],
+];
+function openCollection(from = "home") {
+  collReturn = from;
+  renderCollection();
+  showScreen("collection");
+}
+function renderCollection() {
+  const all = allChars();
+  const { got } = collectionCount();
+  $("#collCount").textContent = `${got}/${all.length}`;
+  $("#collBar").style.width = `${Math.round((got / all.length) * 100)}%`;
+  $("#collPct").textContent = `${Math.round((got / all.length) * 100)}% collected`;
+  const chip = (box, key, label, cur, set) => {
+    const b = el("button", { class: `chip${cur === key ? " on" : ""}`, type: "button", text: label });
+    b.addEventListener("click", () => {
+      set(cur === key && box === "r" ? "" : key);
+      renderCollection();
+    });
+    return b;
+  };
+  $("#collFilters").replaceChildren(...COLL_FILTERS.map(([k, l]) => chip("f", k, l, collFilter, (x) => (collFilter = x || "all"))));
+  $("#collRarity").replaceChildren(...RARITY_ORDER.map((k) => chip("r", k, k, collRarity, (x) => (collRarity = x))));
+  const shown = all.filter((c) => {
+    const owned = ownsChar(c);
+    if (collFilter === "owned" && !owned) return false;
+    if (collFilter === "locked" && owned) return false;
+    if (["starter", "coins", "medals", "pack", "pass"].includes(collFilter) && c.via !== collFilter) return false;
+    if (collRarity && c.rarity !== collRarity) return false;
+    return true;
+  });
+  const sel = preferredChar();
+  $("#collGrid").replaceChildren(
+    ...shown.map((c, n) => {
+      const owned = ownsChar(c);
+      const card = el(
+        "button",
+        { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${c.playable && c.idx === sel ? " sel" : ""}`, type: "button", style: `--i:${n}` },
+        el("span", { class: "rar", text: c.rarity }),
+        el("img", { src: c.img, alt: "" }),
+        el("b", { text: owned ? c.name : c.name }),
+        el("small", { class: "via", text: owned ? (c.playable ? (c.idx === sel ? "★ Selected" : "Playable") : "Collected") : `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` }),
+        owned ? null : el("i", { class: "padlock", text: "🔒" }),
+      );
+      card.addEventListener("click", () => inspectChar(c));
+      return card;
+    }),
+    shown.length ? null : el("p", { class: "rempty", text: "Nothing here with these filters." }),
+  );
+  renderWallet();
+  renderCollPill();
+}
+$("#collBack").addEventListener("click", () => {
+  showScreen(collReturn === "shop" ? "shop" : "home");
+  if (collReturn === "shop") renderShop();
+});
+$("#collPill").addEventListener("click", () => {
+  sfx.unlock();
+  openCollection("home");
+});
+
+// inspect one character: big picture, rarity, how to get it, and the one action that makes sense
+const charModal = $("#charModal");
+function inspectChar(c) {
+  const owned = ownsChar(c);
+  $("#charHero").replaceChildren(el("i", { class: `glow ${c.rarity}` }), el("img", { class: owned ? "" : "dark", src: c.hero, alt: "" }));
+  $("#charName").textContent = c.name;
+  $("#charTags").replaceChildren(el("span", { class: `tag ${c.rarity}`, text: c.rarity }), el("span", { class: "tag via", text: `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` }), c.playable ? el("span", { class: "tag play", text: "🏃 Playable" }) : el("span", { class: "tag soon", text: "Collectible · playable soon" }));
+  $("#charHow").textContent = owned ? (c.playable ? c.tag ?? "" : "In your collection. 3D racing version coming soon!") : howToGet(c);
+  const btn = $("#charAct");
+  btn.className = "gbtn";
+  btn.disabled = false;
+  let action = null;
+  if (owned && c.playable) {
+    const sel = preferredChar() === c.idx;
+    btn.textContent = sel ? "Selected ✓" : "Select runner";
+    btn.disabled = sel;
+    action = () => {
+      local.setItem("lr:char", String(c.idx));
+      world.setShowcase?.(c.idx);
+      if (net.view?.phase === "lobby" && net.view.joined) act({ type: "pick", char: c.idx });
+      toast(`${c.name} selected`);
+      charModal.hidden = true;
+      if (screens.collection.classList.contains("show")) renderCollection();
+    };
+  } else if (owned) {
+    btn.textContent = "In your collection ✓";
+    btn.disabled = true;
+  } else if (c.via === "coins" || c.via === "medals") {
+    btn.textContent = c.via === "coins" ? `Unlock · ${c.coins.toLocaleString()} coins` : `Unlock · ${medalText(c.price.medal, c.price.count)}`;
+    action = () => {
+      charModal.hidden = true;
+      askBuy(c);
+    };
+  } else if (c.via === "pack") {
+    btn.textContent = "Open packs";
+    action = () => {
+      charModal.hidden = true;
+      openShop();
+      shopTab(false);
+    };
+  } else {
+    btn.textContent = "Go to the Season Pass";
+    action = () => {
+      charModal.hidden = true;
+      showScreen("home");
+      $("#passPill").click();
+    };
+  }
+  btn.onclick = action;
+  charModal.hidden = false;
+}
+$("#charClose").addEventListener("click", () => (charModal.hidden = true));
+charModal.addEventListener("click", (e) => e.target === charModal && (charModal.hidden = true));
 
 // ── packs: open them for pack-only characters, medals and coins ──
 
@@ -848,9 +1057,9 @@ function itemCard(it) {
       { class: `pcard ${it.char.rarity}` },
       el("span", { class: "rar", text: it.char.rarity }),
       el("i", { class: "pglow" }),
-      el("img", { src: `/assets/pk_${it.char.id}.webp`, alt: "" }),
+      el("img", { src: it.char.img ?? `/assets/pk_${it.char.id}.webp`, alt: "" }),
       el("b", { text: it.char.name }),
-      el("small", { text: it.dupe ? `Duplicate → +${it.char.dupe} coins` : "NEW character!" }),
+      el("small", { text: it.dupe ? `Duplicate → +${it.char.dupe} coins` : it.unlocked ? "UNLOCKED!" : "NEW character!" }),
     );
   }
   if (it.kind === "medal") {
@@ -903,11 +1112,28 @@ packOpen.addEventListener("click", (e) => {
 });
 $("#poDone").addEventListener("click", () => {
   packOpen.hidden = true;
+  const done = po?.onDone;
   po = null;
+  renderCollPill();
+  if (done) return done();
   renderPacks();
   renderShop();
   shopTab(false);
 });
+/** A single card reveal (no pack): a purchase or a reward. */
+function showUnlock(item, onDone) {
+  po = { pack: null, items: [{ ...item, unlocked: true }], i: -1, stage: "cards", onDone };
+  $("#poPack").hidden = true;
+  $("#poCard").hidden = true;
+  $("#poSummary").hidden = true;
+  $("#poDone").hidden = true;
+  $("#poHint").hidden = false;
+  packOpen.hidden = false;
+  packOpen.classList.remove("flash");
+  void packOpen.offsetWidth;
+  packOpen.classList.add("flash");
+  packStep();
+}
 
 for (const b of document.querySelectorAll(".shopBtn")) b.addEventListener("click", openShop);
 $("#shopBack").addEventListener("click", () => {
@@ -4310,8 +4536,7 @@ function rankChip(res) {
 function renderRankPill() {
   const r = rankOf(rank.rp());
   $("#rankPillImg").src = r.img;
-  $("#rankPillName").textContent = r.name;
-  $("#rankPillRp").textContent = `${rank.rp()} RP`;
+  $("#rankBadgeBtn").title = `${r.name} · ${rank.rp()} RP`;
 }
 
 // ── friends: everyone you've been in a room with, and their rank ──
@@ -4386,7 +4611,7 @@ function rankTab(friends) {
   $("#friendList").hidden = !friends;
   $("#leagueList").hidden = friends;
 }
-$("#rankPill").addEventListener("click", () => {
+$("#rankBadgeBtn").addEventListener("click", () => {
   renderRank();
   rankTab(true);
   rankModal.hidden = false;
@@ -4640,6 +4865,7 @@ $("#passPill").addEventListener("click", () => {
 $("#passClose").addEventListener("click", () => (passModal.hidden = true));
 passModal.addEventListener("click", (e) => e.target === passModal && (passModal.hidden = true));
 renderPassPill();
+renderCollPill();
 
 // first visit of the day: pop the reward open
 setTimeout(() => {
