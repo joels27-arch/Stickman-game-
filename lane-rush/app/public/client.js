@@ -602,7 +602,7 @@ const TOUR = [
   { sel: null, welcome: true, title: "Hey {name}, I'm Nia!", text: "Race your friends! Quick tour?" },
   { sel: "#roomRow", pose: "point", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room or join a friend's." },
   { sel: "#soloBtn", pose: "box", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Race bots in any mode." },
-  { sel: ".stats-sheet", open: "stats", pose: "point", img: "/assets/lg_bronze.webp", title: "Your profile", text: "Your stats and how you rank." },
+  { sel: ".stats-hero", open: "stats", pose: "point", img: "/assets/lg_bronze.webp", title: "Your profile", text: "Your stats and how you rank." },
   { sel: "#tourneyList", page: "compete", pose: "cheer", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "Win coin prizes." },
   { sel: "#skinGrid .ccard", page: "skins", pose: "point", img: "/assets/tab_skins.webp", title: "Skins", text: "Pick who you race with." },
   { sel: "#trophyRoad", page: "missions", pose: "think", img: "/assets/tab_missions.webp", title: "Missions", text: "Missions and the Trophy Road." },
