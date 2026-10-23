@@ -345,8 +345,17 @@ function buzz(pattern) {
   if (prefs().buzz !== false && navigator.vibrate) navigator.vibrate(pattern);
 }
 
+/**
+ * Sound: recorded effects and two music loops (menu, race), with the old
+ * synth blips as a fallback until the files have loaded (or if they can't).
+ * Effects follow the Sound setting, music its own Music setting.
+ */
 const sfx = (() => {
   let ctx = null;
+  let loading = false;
+  const buffers = new Map();
+  const SAMPLES = ["tap", "coin", "unlock", "boom", "whoosh", "cheer", "slip", "thunder", "pack", "bonk"];
+  const MUSIC = { menu: 0.3, race: 0.24 }; // loop volumes
   const ensure = () => {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -354,8 +363,22 @@ const sfx = (() => {
       ctx = new AC();
     }
     if (ctx.state === "suspended") ctx.resume();
+    if (!loading) {
+      loading = true;
+      // effects first (small), then the music
+      Promise.all(SAMPLES.map((n) => load(n, `/assets/sfx_${n}.mp3`))).then(() =>
+        Promise.all(Object.keys(MUSIC).map((n) => load(`m:${n}`, `/assets/music_${n}.mp3`))).then(syncMusic),
+      );
+    }
     return ctx;
   };
+  function load(name, url) {
+    return fetch(url)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(url))))
+      .then((data) => new Promise((res, rej) => ctx.decodeAudioData(data, res, rej)))
+      .then((buf) => buffers.set(name, buf))
+      .catch(() => {}); // the synth fallback covers it
+  }
   function tone(freq, dur, type = "square", vol = 0.12, slide = 0) {
     if (prefs().sound === false) return;
     const c = ensure();
@@ -371,18 +394,72 @@ const sfx = (() => {
     o.start();
     o.stop(c.currentTime + dur + 0.02);
   }
+  /** Play a recorded effect; false if it isn't loaded (so the caller can fall back). */
+  function sample(name, vol = 0.6, rate = 1) {
+    if (prefs().sound === false) return true;
+    const buf = buffers.get(name);
+    if (!ctx || !buf) return false;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    src.connect(g).connect(ctx.destination);
+    src.start();
+    return true;
+  }
+  // music: one loop at a time, cross-faded
+  let want = "menu";
+  let playing = null;
+  function syncMusic() {
+    if (!ctx) return;
+    const target = prefs().music !== false && !document.hidden ? want : null;
+    if (playing?.name === target) return;
+    const t = ctx.currentTime;
+    if (playing) {
+      const old = playing;
+      old.gain.gain.cancelScheduledValues(t);
+      old.gain.gain.setValueAtTime(old.gain.gain.value, t);
+      old.gain.gain.linearRampToValueAtTime(0, t + 0.6);
+      old.src.stop(t + 0.65);
+      playing = null;
+    }
+    const buf = target && buffers.get(`m:${target}`);
+    if (!buf) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(MUSIC[target], t + 0.9);
+    src.connect(gain).connect(ctx.destination);
+    src.start(t);
+    playing = { name: target, src, gain };
+  }
+  document.addEventListener("visibilitychange", syncMusic);
+  // phones only allow sound after a touch: the first one anywhere wakes the audio
+  window.addEventListener("pointerdown", () => ensure(), { once: true, capture: true });
+  const finish = () => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.22, "square", 0.1), i * 110));
   return {
     unlock: ensure,
+    music(name) {
+      want = name;
+      syncMusic();
+    },
+    syncMusic,
+    tap: () => sample("tap", 0.45) || tone(700, 0.05, "triangle", 0.05),
+    tab: () => sample("whoosh", 0.35, 1.15) || tone(500, 0.08, "triangle", 0.05, 300),
     beep: () => tone(520, 0.18, "square", 0.1),
     go: () => tone(880, 0.4, "square", 0.12),
     jump: () => tone(300, 0.2, "triangle", 0.15, 500),
     slide: () => tone(240, 0.22, "sawtooth", 0.05, -120),
-    hit: () => tone(140, 0.35, "sawtooth", 0.18, -90),
-    boost: () => tone(400, 0.35, "triangle", 0.14, 900),
-    pickup: () => {
-      [660, 880, 1175].forEach((f, i) => setTimeout(() => tone(f, 0.12, "triangle", 0.1), i * 60));
-    },
+    hit: () => sample("bonk", 0.8) || tone(140, 0.35, "sawtooth", 0.18, -90),
+    slip: () => sample("slip", 0.8) || tone(140, 0.35, "sawtooth", 0.18, -90),
+    boom: () => sample("boom", 0.8) || tone(90, 0.6, "sawtooth", 0.2, -50),
+    boost: () => sample("whoosh", 0.6) || tone(400, 0.35, "triangle", 0.14, 900),
+    pickup: () => sample("coin", 0.5, 0.95 + Math.random() * 0.1) || [660, 880, 1175].forEach((f, i) => setTimeout(() => tone(f, 0.12, "triangle", 0.1), i * 60)),
     zap: () => {
+      if (sample("thunder", 0.6)) return;
       tone(1400, 0.4, "sawtooth", 0.12, -1300);
       setTimeout(() => tone(90, 0.5, "square", 0.12, -40), 80);
     },
@@ -390,17 +467,27 @@ const sfx = (() => {
     rocket: () => tone(120, 1.2, "sawtooth", 0.08, 500),
     roll: () => tone(70, 0.6, "triangle", 0.1, 20),
     lane: () => tone(660, 0.06, "triangle", 0.06),
-    finish: () => {
-      [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.22, "square", 0.1), i * 110));
-    },
+    finish: () => sample("unlock", 0.6) || finish(),
+    pack: () => sample("pack", 0.8) || finish(),
+    cheer: () => sample("cheer", 0.6) || finish(),
   };
 })();
+
+document.addEventListener(
+  "click",
+  (e) => {
+    const b = e.target.closest("button");
+    if (b && !b.disabled && !b.closest("#hud") && !b.classList.contains("htab")) sfx.tap();
+  },
+  true,
+);
 
 // ── UI helpers ──────────────────────────────────────────────────────────────
 
 const screens = { home: $("#home"), lobby: $("#lobby"), lineup: $("#lineup"), results: $("#results"), shop: $("#shop") };
 function showScreen(name) {
   for (const [k, el] of Object.entries(screens)) el.classList.toggle("show", k === name);
+  sfx.music(name === "race" ? "race" : "menu");
   $("#hud").classList.toggle("show", name === "race");
 }
 
@@ -675,6 +762,7 @@ const setModal = $("#setModal");
 function renderSettings() {
   const p = prefs();
   $("#setSound").checked = p.sound !== false;
+  $("#setMusic").checked = p.music !== false;
   $("#setBuzz").checked = p.buzz !== false;
   $("#setLow").checked = Boolean(p.low);
   $("#setCountryName").textContent = myCountry() ? `${flagOf(myCountry())} ${countryName(myCountry())}` : "Not set";
@@ -688,6 +776,11 @@ setModal.addEventListener("click", (e) => e.target === setModal && (setModal.hid
 $("#setSound").addEventListener("change", (e) => {
   setPref("sound", e.target.checked);
   if (e.target.checked) sfx.pickup();
+});
+$("#setMusic").addEventListener("change", (e) => {
+  setPref("music", e.target.checked);
+  sfx.unlock();
+  sfx.syncMusic();
 });
 $("#setBuzz").addEventListener("change", (e) => {
   setPref("buzz", e.target.checked);
@@ -1187,7 +1280,7 @@ function packStep() {
     packOpen.classList.remove("flash");
     void packOpen.offsetWidth;
     packOpen.classList.add("flash");
-    sfx.boost();
+    sfx.pack();
     setTimeout(() => {
       $("#poPack").hidden = true;
       packStep();
@@ -1542,6 +1635,7 @@ function setHomePage(i, animate = true) {
 for (const t of document.querySelectorAll(".htab")) {
   t.addEventListener("click", () => {
     sfx.unlock();
+    if (Number(t.dataset.page) !== homePage) sfx.tab();
     setHomePage(Number(t.dataset.page));
   });
 }
@@ -1578,7 +1672,11 @@ for (const t of document.querySelectorAll(".htab")) {
     { passive: true },
   );
   const end = () => {
-    if (axis === "x") setHomePage(homePage + (dx < -60 ? 1 : dx > 60 ? -1 : 0));
+    if (axis === "x") {
+      const to = homePage + (dx < -60 ? 1 : dx > 60 ? -1 : 0);
+      if (to !== homePage && to >= 0 && to < PAGE_NAMES.length) sfx.tab();
+      setHomePage(to);
+    }
     axis = "";
   };
   homePages.addEventListener("touchend", end);
@@ -2179,6 +2277,7 @@ function renderResults(v) {
   const reward = $("#resReward");
   reward.replaceChildren();
   const rpChange = recordRace(v, v.standings.indexOf(playerId) + 1);
+  if (rpChange && v.standings.length >= 2 && (cupDone ? cup.table[0] === playerId : !cup && myPlace === 1)) setTimeout(() => sfx.cheer(), 300);
   const ptsBefore = rank.points();
   if (mine?.medal) {
     const fresh = wallet.claim(`${v.startAt}:${playerId}`, mine.medal);
@@ -4476,7 +4575,9 @@ function hit(kind) {
   me.slideT = 0;
   me.vy = 0;
   shake = 0.4;
-  sfx.hit();
+  if (kind === "banana") sfx.slip();
+  else if (kind === "fake") sfx.boom();
+  else sfx.hit();
   buzz(80);
   const hintText = {
     hurdle: "Jump! ↑",
@@ -6042,7 +6143,7 @@ function modeView(v) {
     game.lastBlast = b.id;
     const at = b.holder === playerId ? -me.d : -(remote.map.get(b.holder)?.dispD ?? b.d);
     world.explode(laneX(b.lane), at);
-    sfx.hit();
+    sfx.boom();
     if (b.holder === playerId) {
       shake = 0.6;
       buzz([60, 40, 160]);
