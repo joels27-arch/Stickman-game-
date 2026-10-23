@@ -1817,7 +1817,7 @@ function renderResults(v) {
       ? "Party Cup champion!"
       : `Party Cup: ${PLACE[myPlace - 1] ?? myPlace}`
     : solo && v.kind === "survival"
-      ? `You ran ${Math.round(v.players[0]?.d ?? 0)} m${Math.round(v.players[0]?.d ?? 0) >= personalBest() ? " · new record!" : ` · best ${personalBest()} m`}`
+      ? `You ran ${Math.round(v.players[0]?.d ?? 0)} m${Math.round(v.players[0]?.d ?? 0) >= personalBest() && (v.players[0]?.d ?? 0) > 50 ? " · new record!" : ` · best ${personalBest()} m`}`
       : myPlace === 1
         ? "You win!"
         : myPlace
