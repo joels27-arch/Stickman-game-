@@ -117,12 +117,12 @@ const withFlag = (name, code) => (code ? `${flagOf(code)} ${name}` : name);
 const countryName = (code) => (COUNTRIES.find(([c]) => c === code) || [])[1] || "";
 const MODES = ["Solo", "Duo", "Trio", "Squad"];
 const GAME_MODE_INFO = {
-  survival: { label: "Survival", icon: "❤️", tag: "Main mode", text: "3 hearts each. Last runner standing wins. Alone it's an endless run." },
-  chase: { label: "Brain Chase", icon: "🧠", tag: "Run for it", text: "A giant brain rolls after you and keeps speeding up. Caught = out." },
-  coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins. Get hit and you spill coins for the others." },
-  potato: { label: "Hot Potato", icon: "💣", tag: "Pass it on", text: "Got the bomb? Tap PASS to throw it to the nearest runner (or bump into someone). Hold it when it blows: lose a heart." },
-  random: { label: "Random", icon: "🎲", tag: "Surprise", text: "A random mode is drawn when each race starts." },
-  grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "Every mode once: Survival, Brain Chase, Coin Rush and Hot Potato." },
+  survival: { label: "Survival", icon: "❤️", tag: "Main mode", text: "3 hearts. Last one standing wins." },
+  chase: { label: "Brain Chase", icon: "🧠", tag: "Run for it", text: "Outrun the giant brain!" },
+  coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins." },
+  potato: { label: "Hot Potato", icon: "💣", tag: "Pass it on", text: "Pass the bomb before it blows!" },
+  random: { label: "Random", icon: "🎲", tag: "Surprise", text: "A surprise mode each race." },
+  grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "One round of every mode." },
 };
 /**
  * What the host can put up for the top 3 of a match, paid out of the host's own
@@ -584,6 +584,7 @@ function saveName(n) {
   nameInput.value = name;
   local.setItem("lr:name", name);
   local.setItem("lr:named", "1");
+  renderProfile(); // the card top left shows the new name right away
   return true;
 }
 $("#nameForm").addEventListener("submit", (e) => {
@@ -598,15 +599,15 @@ $("#nameForm").addEventListener("submit", (e) => {
 });
 // ── first-visit tour: a spotlight on each part of the app, skippable, ending on the endless run ──
 const TOUR = [
-  { sel: null, welcome: true, title: "Hey {name}, I'm Nia!", text: "Welcome to 4 Friends: a Subway-Surfers-style runner you race against your friends. Let me show you around, it takes 20 seconds." },
-  { sel: "#roomRow", pose: "point", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room and share the code, or Join a friend's. Up to 4 runners, bots fill empty spots." },
-  { sel: "#soloBtn", pose: "box", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Survival, Brain Chase, Coin Rush, Hot Potato and more, against bots you can make easy or hard." },
-  { sel: "#profileCard", pose: "point", img: "/assets/lg_bronze.webp", title: "That's you", text: "Your name and league. Tap it for your stats: wins, records and how you rank among friends." },
+  { sel: null, welcome: true, title: "Hey {name}, I'm Nia!", text: "Race your friends! Quick tour?" },
+  { sel: "#roomRow", pose: "point", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room or join a friend's." },
+  { sel: "#soloBtn", pose: "box", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Race bots in any mode." },
+  { sel: "#profileCard", pose: "point", img: "/assets/lg_bronze.webp", title: "That's you", text: "Your name and league. Tap for stats." },
   { sel: '.htab[data-page="0"]', pose: "cheer", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
   { sel: '.htab[data-page="1"]', pose: "point", img: "/assets/tab_skins.webp", title: "Skins", text: "All your characters. Pick who you race with." },
-  { sel: '.htab[data-page="3"]', pose: "think", img: "/assets/tab_missions.webp", title: "Missions", text: "Daily missions, your career and the Trophy Road: every medal you win moves you along it, for coins, packs and exclusive characters." },
+  { sel: '.htab[data-page="3"]', pose: "think", img: "/assets/tab_missions.webp", title: "Missions", text: "Missions and the Trophy Road." },
   { sel: '.htab[data-page="4"]', pose: "box", img: "/assets/tab_shop.webp", title: "Shop", text: "Packs, characters, trails and the Season Pass." },
-  { sel: "#endlessBtn", pose: "run", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life, how far can you get? I'll teach you the moves while you run. Tap it!", last: true },
+  { sel: "#endlessBtn", pose: "run", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life. I'll teach you as you run!", last: true },
 ];
 const TOUR_PERKS = [
   ["/assets/pw_rocket.png", "Wild power-ups"],
@@ -1028,12 +1029,12 @@ const ownsChar = (c) => (c.idx !== undefined ? wallet.owns(c.idx) : wallet.has(c
 const VIA_LABEL = { starter: "Free", coins: "Coins", pack: "Packs", pass: "Season Pass", road: "Trophy Road" };
 const VIA_ICON = { starter: "✅", coins: "🪙", pack: "🎁", pass: "⭐", road: "🏆" };
 function howToGet(c) {
-  if (c.via === "starter") return "A free runner. Race with it any time.";
-  if (c.via === "coins") return `Buy it in the Shop for ${c.coins.toLocaleString()} coins.`;
-  if (c.via === "pack") return `Only in packs (${c.rarity}). Mega Pack: ${pct(PACK_ODDS.normal[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)} per item, last item: ${pct(PACK_ODDS.boosted[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)}.`;
-  if (c.idx in PASS_RUNNERS) return `Season Pass reward: free track, level ${PASS_RUNNERS[c.idx]}. Play races to earn XP.`;
-  if (c.via === "road") return `Trophy Road exclusive: reach ${ROAD.find((r) => r.char === c.id).pts.toLocaleString()} league points. Every medal you win moves you along the road.`;
-  return "Season Pass exclusive: Gold track, level 30.";
+  if (c.via === "starter") return "Free to play.";
+  if (c.via === "coins") return `${c.coins.toLocaleString()} coins in the Shop.`;
+  if (c.via === "pack") return "Only in Mega Packs.";
+  if (c.idx in PASS_RUNNERS) return `Season Pass, level ${PASS_RUNNERS[c.idx]}.`;
+  if (c.via === "road") return `Trophy Road, at ${ROAD.find((r) => r.char === c.id).pts.toLocaleString()} 🏆.`;
+  return "Gold Pass, level 30.";
 }
 /** The short lock label on a runner card you can't race with yet. */
 function lockLabel(i) {
@@ -1130,7 +1131,7 @@ function renderShop() {
   let n = 0;
   $("#shopGrid").replaceChildren(
     ...charGroups(sale, ["coins"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: VIA_GROUP[via] }), ...list.map((c) => charCard(c, n++, buy))]),
-    ...(sale.length ? [] : [el("p", { class: "rempty", text: "You own every character in the shop. More come from packs, the Trophy Road and the Season Pass." })]),
+    ...(sale.length ? [] : [el("p", { class: "rempty", text: "You own every shop character!" })]),
   );
   renderPacks();
   renderItems();
@@ -1331,7 +1332,7 @@ function renderPacks() {
   );
   const n = PACK_ODDS.normal;
   const b = PACK_ODDS.boosted;
-  $("#packOdds").textContent = `Odds per item: legendary ${pct(n.legendary)} · epic ${pct(n.epic)} · rare ${pct(n.rare)} · coins ${pct(1 - n.legendary - n.epic - n.rare)}. The last item is always a character (legendary ${pct(b.legendary)} · epic ${pct(b.epic)} · rare ${pct(b.rare)}). Your first pack always has a new character and your first ${NEWBIE_PACKS} packs have double character odds. You get characters you don't have yet first; duplicates turn into coins.`;
+  $("#packOdds").textContent = `Odds: legendary ${pct(n.legendary)} · epic ${pct(n.epic)} · rare ${pct(n.rare)}. Last item: legendary ${pct(b.legendary)} · epic ${pct(b.epic)} · rare ${pct(b.rare)}.`;
   renderWallet();
 }
 
@@ -1617,7 +1618,7 @@ function openSoloRoom(mode = null) {
   game.wantMode = mode;
   connect(newCode(), true);
 }
-/** Endless run: just you, Subway Surfers style. No lobby, no bots: straight onto the track until your hearts run out. */
+/** Endless run: just you. No lobby, no bots: straight onto the track until your hearts run out. */
 function startEndless() {
   game.solo = true;
   game.endless = true;
@@ -1784,7 +1785,7 @@ for (const t of document.querySelectorAll(".htab")) {
 
 // Tournaments page: the Weekend League and two tournaments with daily prizes
 const TOURNEYS = [
-  { id: "grandtour", label: "Grand Tour", img: "/assets/medal_gold.png", tag: "Tournament · 4 rounds", text: "Every mode once: Survival, Brain Chase, Coin Rush and Hot Potato.", prize: [500, 250, 120] },
+  { id: "grandtour", label: "Grand Tour", img: "/assets/medal_gold.png", tag: "Tournament · 4 rounds", text: "One round of every mode.", prize: [500, 250, 120] },
 ];
 const PLACE_SHORT = ["1st", "2nd", "3rd", "4th"];
 /** Prize coins already paid today, per tournament: the best finish each day pays once (a better finish later pays the difference). */
@@ -2017,7 +2018,7 @@ function renderTrophyRoad() {
       el("em", { text: `${p.toLocaleString()} 🏆` }),
     ),
     track,
-    el("p", { class: "road-note", text: "Win medals in races with friends: gold +10, silver +5, bronze +3, 4th place +1." }),
+    el("p", { class: "road-note", text: "Gold +10 · Silver +5 · Bronze +3 · 4th +1" }),
   );
   // keep the next reward in view
   requestAnimationFrame(() => {
@@ -2050,7 +2051,7 @@ function weekendCard() {
         el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${LEAGUE_TIERS.reduce((a, t) => a + t.coins, 0).toLocaleString()}`),
       ),
     ),
-    el("p", { class: "tc-desc", text: `${LEAGUE_MATCHES} matches from Friday 18:00 to Sunday night, any mode. Each match scores ${LEAGUE_PTS.join(" / ")} points for 1st to 4th. Reach the marks on the bar to unlock coins.` }),
+    el("p", { class: "tc-desc", text: `${LEAGUE_MATCHES} matches, Friday to Sunday. Score points, unlock coins.` }),
     el(
       "div",
       { class: "wl-row" },
@@ -2107,7 +2108,7 @@ function tourneyCard(t) {
       el("small", { text: "Daily prize" }),
       ...t.prize.map((c, i) => el("span", { class: `prz${paid[t.id]?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), el("i", { class: "coin" }), String(c))),
     ),
-    paid[t.id] ? el("p", { class: "tc-note", text: `Today: ${PLACE_SHORT[paid[t.id].place - 1]} place ✓ · finish higher to win the difference` }) : "",
+    paid[t.id] ? el("p", { class: "tc-note", text: `Today: ${PLACE_SHORT[paid[t.id].place - 1]} ✓ · place higher for more` }) : "",
     el(
       "div",
       { class: "tc-btns" },
@@ -2360,7 +2361,7 @@ function renderLobby(v) {
         { class: `mode-card${gm === key ? " on" : ""}`, type: "button" },
         el("em", { text: info.tag }),
         el("b", { text: `${info.icon} ${key === "survival" && n < 2 && !botsOn() ? "Endless run" : info.label}` }),
-        el("span", { text: key === "survival" && n < 2 && !botsOn() ? "Alone: 3 hearts, see how far you get. With friends: last one standing." : info.text }),
+        el("span", { text: key === "survival" && n < 2 && !botsOn() ? "Alone: how far can you get?" : info.text }),
       );
       b.disabled = !isHost;
       b.addEventListener("click", () => gm !== key && act({ type: "mode", mode: key }));
@@ -2420,7 +2421,7 @@ function renderLobby(v) {
     }),
   );
   $("#prizeNote").textContent =
-    prize === "none" ? "" : isHost ? `You pay ${potOf(prize).toLocaleString()} coins when the match starts. Places taken by bots are paid back to you.` : `The host pays ${potOf(prize).toLocaleString()} coins for the top 3`;
+    prize === "none" ? "" : isHost ? `You pay ${potOf(prize).toLocaleString()} coins. Bot places come back to you.` : `The host pays ${potOf(prize).toLocaleString()} coins for the top 3`;
   const what = matchLabel(v, gm, gm === "survival" && n < 2 && !botsOn()).toLowerCase();
   $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
   renderLineup(v, { isHost, gm, mp, mode, what });
@@ -2429,7 +2430,7 @@ function renderLobby(v) {
   $("#lobbyCount").textContent = `${mode} · ${GAME_MODE_INFO[gm].label} · ${n}/4 players`;
   $("#readyCount").textContent = `👥 ${n}/4 players ready`;
   $("#lobbyMsg").textContent =
-    isHost && n < 2 ? "Share the code with friends. Empty spots get bots (toggle below). Medals and rank points need 2+ real players." : "";
+    isHost && n < 2 ? "Share the code. Bots fill empty spots." : "";
   world.setShowcase(me?.char ?? 0);
   if (world.ready) for (const p of v.players) world.ensureChar(p.char).catch(() => {});
   renderWallet();
@@ -4956,7 +4957,7 @@ const COACH = {
   lane: { title: "Swipe left or right", text: "A crate! Change lanes to dodge it.", keys: "← → on the keyboard", g: "side", pose: "dodge" },
   jump: { title: "Swipe up to jump", text: "Jump over the hurdle!", keys: "↑ or Space on the keyboard", g: "up", pose: "jump" },
   slide: { title: "Swipe down to slide", text: "Slide under the gate!", keys: "↓ on the keyboard", g: "down", pose: "slide" },
-  item: { title: "Tap to use it", text: "You got a power-up! Tap the round button bottom left.", keys: "E on the keyboard", g: "tap", pose: "box" },
+  item: { title: "Tap to use it", text: "Tap the round button!", keys: "E on the keyboard", g: "tap", pose: "box" },
 };
 const COACH_MOVES = ["lane", "jump", "slide"];
 const COACH_SLOW = 0.08; // time runs this fast while a move is shown
@@ -6014,7 +6015,7 @@ function renderRank() {
         el("b", { class: "rrp", text: f.rp.toLocaleString() }),
       );
     }),
-    ...(rows.length < 2 ? [el("p", { class: "rempty", text: "Play with friends: everyone you race with shows up here, so you can compare ranks." })] : []),
+    ...(rows.length < 2 ? [el("p", { class: "rempty", text: "Race friends to see them here." })] : []),
   );
   $("#leagueList").replaceChildren(
     ...[...LEAGUES].reverse().map((l) => el(
@@ -6029,7 +6030,7 @@ function renderRank() {
       { class: "rhow-pts" },
       ...[["gold", 10, "1st"], ["silver", 5, "2nd"], ["bronze", 3, "3rd"]].map(([m, pts, place]) => el("span", {}, el("img", { src: MEDAL_IMG[m], alt: "" }), el("b", { text: `+${pts}` }), el("small", { text: place }))),
     ),
-    el("p", { class: "rhow", text: "Place top 3 in a race with at least one other real player to win a medal. Every medal adds league points; spending medals never moves you down." }),
+    el("p", { class: "rhow", text: "Top 3 against real players wins medals." }),
   );
 }
 function rankTab(friends) {
@@ -6125,7 +6126,7 @@ function renderStats() {
             ),
           ),
         )
-      : el("p", { class: "stats-empty", text: "Race your friends in a room to see how you stack up against them here." }),
+      : el("p", { class: "stats-empty", text: "Race friends to compare here." }),
   );
 }
 /** Top-left profile on the Play page: your runner, your name, your league. */

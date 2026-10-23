@@ -1,7 +1,7 @@
 {
   "name": "4 Friends",
   "short_name": "4 Friends",
-  "description": "Race your friends in a Subway-Surfers-style runner.",
+  "description": "Race your friends in a cartoon running game.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
