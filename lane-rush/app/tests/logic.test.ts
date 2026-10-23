@@ -438,6 +438,30 @@ describe("party cup", () => {
   });
 });
 
+describe("random mode and map", () => {
+  it("draws a real mode and map when the race starts", () => {
+    const kinds = new Set<string>();
+    const maps = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      let s = act(lobbyOf(2), "p0", { type: "mode", mode: "random" });
+      s = act(s, "p0", { type: "map", map: "random" });
+      s = act(s, "p0", { type: "start", bots: true, t: T0 + i * 7919 });
+      expect(L.ROUND_KINDS).toContain(s.kind);
+      expect(L.MAPS).toContain(s.raceMap);
+      expect(s.mode).toBe("random");
+      expect(s.cup).toBeNull();
+      kinds.add(s.kind);
+      maps.add(s.raceMap);
+    }
+    expect(kinds.size).toBeGreaterThan(1);
+    expect(maps.size).toBeGreaterThan(1);
+  });
+  it("only the host picks, and only real choices", () => {
+    expect(reject(lobbyOf(2), "p1", { type: "map", map: "random" })).toMatch(/host/);
+    expect(reject(lobbyOf(2), "p0", { type: "map", map: "moon" })).toBeTruthy();
+  });
+});
+
 describe("tournaments", () => {
   it("the Coin Rush Cup is gone", () => {
     expect(reject(lobbyOf(2), "p0", { type: "mode", mode: "rushcup" })).toBeTruthy();

@@ -115,6 +115,7 @@ const GAME_MODE_INFO = {
   coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins. Get hit and you spill coins for the others." },
   potato: { label: "Hot Potato", icon: "💣", tag: "Pass it on", text: "Bump into someone to pass the bomb. Hold it when it blows: lose a heart." },
   cup: { label: "Party Cup", icon: "🏆", tag: "3 rounds", text: `3 random modes on 3 maps. ${CUP_POINTS.join(" / ")} points per place.` },
+  random: { label: "Random", icon: "🎲", tag: "Surprise", text: "A random mode is drawn when each race starts." },
   grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "Every mode once: Survival, Brain Chase, Coin Rush and Hot Potato." },
 };
 const isCupMode = (m) => CUP_MODES.includes(m);
@@ -131,6 +132,7 @@ const MAP_INFO = {
   meadow: { label: "Meadow", text: "Trees, bushes and a picket fence" },
   farm: { label: "Farm", text: "Wheat fields, barns and windmills" },
   beach: { label: "Beach", text: "Boardwalk by the sea, palms and huts" },
+  random: { label: "Random", text: "A different map every race" },
 };
 const LANE_W = 2.0; // metres between lane centres
 const CHAR_H = 1.55; // runner height in metres
@@ -977,15 +979,40 @@ const VIA_GROUP = { coins: "🪙 Buy with coins", medals: "🏅 Buy with medals"
 function charGroups(list, order) {
   return order.map((via) => [via, list.filter((c) => c.via === via).sort(byRarity)]).filter(([, l]) => l.length);
 }
-/** Skins: your runners first, then everything still to get, each from common to legendary. */
+/** Favourite skins (starred on the Skins page) come first. */
+function favs() {
+  try {
+    const f = JSON.parse(local.getItem("lr:favs") || "[]");
+    return Array.isArray(f) ? f : [];
+  } catch {
+    return [];
+  }
+}
+function toggleFav(id) {
+  const f = favs();
+  local.setItem("lr:favs", JSON.stringify(f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
+}
+/** Skins: your runners first (favourites on top), then everything still to get, each from common to legendary. */
 function renderSkins() {
   const all = allChars();
-  const mine = all.filter(ownsChar).sort(byRarity);
+  const fav = favs();
+  const mine = all.filter(ownsChar).sort((a, b) => Number(fav.includes(b.id)) - Number(fav.includes(a.id)) || byRarity(a, b));
   const rest = all.filter((c) => !ownsChar(c)).sort(byRarity);
   let n = 0;
   $("#skinGrid").replaceChildren(
     el("h3", { class: "coll-head", text: `Yours · ${mine.length}` }),
-    ...mine.map((c) => charCard(c, n++, inspectChar)),
+    ...mine.map((c) => {
+      const card = charCard(c, n++, inspectChar);
+      const on = fav.includes(c.id);
+      const star = el("button", { class: `fav${on ? " on" : ""}`, type: "button", "aria-label": on ? "Remove from favourites" : "Add to favourites", text: on ? "★" : "☆" });
+      star.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleFav(c.id);
+        renderSkins();
+      });
+      card.append(star);
+      return card;
+    }),
     ...(rest.length
       ? charGroups(rest, ["coins", "medals", "pack", "pass"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: `${VIA_GROUP[via]} · ${list.length}` }), ...list.map((c) => charCard(c, n++, inspectChar))])
       : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
@@ -1057,7 +1084,7 @@ $("#buyOk").addEventListener("click", () => {
 const charModal = $("#charModal");
 function inspectChar(c) {
   const owned = ownsChar(c);
-  $("#charHero").replaceChildren(el("i", { class: `glow ${c.rarity}` }), el("img", { src: c.hero, alt: "" }));
+  $("#charHero").replaceChildren(el("i", { class: `glow ${c.rarity}` }), el("img", { class: owned ? "" : "dark", src: c.hero, alt: "" }));
   $("#charName").textContent = c.name;
   $("#charTags").replaceChildren(el("span", { class: `tag ${c.rarity}`, text: c.rarity }), el("span", { class: "tag via", text: `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` }), c.playable ? el("span", { class: "tag play", text: "🏃 Playable" }) : el("span", { class: "tag soon", text: "Collectible · playable soon" }));
   $("#charHow").textContent = owned ? (c.playable ? c.tag ?? "" : "In your collection. 3D racing version coming soon!") : howToGet(c);
@@ -1886,6 +1913,17 @@ function renderLobby(v) {
     });
     picker.append(card);
   });
+  // 🎲 a random runner you own that nobody else has
+  const dice = el("button", { class: "card random-card", type: "button" }, el("i", { class: "dice", text: "🎲" }), el("b", { text: "Random" }), el("small", { text: "Surprise me" }));
+  dice.addEventListener("click", () => {
+    const pool = RUNNERS.map((_, i) => i).filter((i) => wallet.owns(i) && i !== me?.char && !v.players.some((p) => p.char === i));
+    if (!pool.length) return toast("No other free runner right now");
+    const i = pool[Math.floor(Math.random() * pool.length)];
+    local.setItem("lr:char", String(i));
+    act({ type: "pick", char: i });
+    toast(`🎲 ${RUNNERS[i].name}!`);
+  });
+  picker.append(dice);
   if (me) {
     renderSpotlight($("#lobbySpot"), me.char, {
       takenBy: (i) => v.players.find((p) => p.char === i && p.id !== playerId)?.name ?? null,
@@ -1929,11 +1967,11 @@ function renderLobby(v) {
   );
   const mp = v.map || "meadow";
   $("#mapPick").replaceChildren(
-    ...MAPS.map((key) => {
+    ...[...MAPS, "random"].map((key) => {
       const info = MAP_INFO[key];
       const b = el(
         "button",
-        { class: `map-card${mp === key ? " on" : ""}`, type: "button", style: `--pic:url(/assets/map_${key}.webp)` },
+        { class: `map-card${mp === key ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style: key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)` },
         el("b", { text: info.label }),
         el("span", { text: info.text }),
       );
@@ -1943,7 +1981,7 @@ function renderLobby(v) {
     }),
   );
   // start fetching the map's 3D props while everyone is still in the lobby
-  for (const key of isCupMode(gm) ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
+  for (const key of isCupMode(gm) || mp === "random" ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
   const what = isCupMode(gm) ? GAME_MODE_INFO[gm].label : gm === "survival" && n < 2 && !botsOn() ? "endless run" : GAME_MODE_INFO[gm].label;
   $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
   renderLineup(v, { isHost, gm, mp, mode, what });
@@ -1988,7 +2026,7 @@ function renderLineup(v, { isHost, gm, mp, mode, what }) {
   $("#lineup").classList.toggle("solo-room", Boolean(game.solo));
   $("#luCode").textContent = net.code;
   $("#luMode").textContent = isCupMode(gm) ? GAME_MODE_INFO[gm].label : gm === "survival" && v.players.length < 2 && !botsOn() ? "Endless run" : GAME_MODE_INFO[gm].label;
-  $("#luMap").textContent = isCupMode(gm) ? "Meadow · Farm · Beach" : `${MAP_INFO[mp].label} · ${botsOn() && v.players.length < 4 ? "with bots" : mode}`;
+  $("#luMap").textContent = isCupMode(gm) ? "Meadow · Farm · Beach" : mp === "random" ? `Random map · ${botsOn() && v.players.length < 4 ? "with bots" : mode}` : `${MAP_INFO[mp].label} · ${botsOn() && v.players.length < 4 ? "with bots" : mode}`;
   const qs = dailyChallenges();
   const qd = dailyState();
   $("#luDaily").textContent = `📋 Challenges ${qs.filter((q) => qd.done[q.id]).length}/${qs.length}`;

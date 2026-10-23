@@ -1684,3 +1684,19 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 /* a solo room is private: no invite code */
 #lobby.solo-room .code-box { display: none; }
 #lineup.solo-room .lu-code { display: none; }
+
+/* locked skins: only their name and silhouette (the shop still shows what you're buying) */
+.hp-skins .ccard.locked img, .card.locked img { filter: brightness(0) opacity(0.5); }
+.char-hero img.dark { filter: brightness(0) opacity(0.65); }
+/* favourite star on your own skins */
+.ccard .fav { position: absolute; z-index: 2; top: 20px; left: 4px; width: 28px; height: 28px; padding: 0; border: 2px solid #fff; border-radius: 50%; background: rgba(10, 14, 40, 0.65); color: #fff; font-size: 16px; line-height: 1; cursor: pointer; }
+.ccard .fav.on { background: linear-gradient(180deg, #ffe066, #ffb300); color: #7a4600; }
+
+/* room: 4 map cards (3 maps + random) in a 2 × 2 grid, big */
+#lobby .map-pick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#lobby .map-card { aspect-ratio: 16 / 10; }
+#lobby .map-card.random { background: radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.25), transparent 45%), linear-gradient(135deg, #8f3cff, #3a1aa8); }
+#lobby .map-card.random::before { content: "🎲"; position: absolute; top: 12%; right: 12%; font-size: 40px; }
+/* random runner card */
+.picker .random-card { display: grid; justify-items: center; align-content: center; background: linear-gradient(180deg, #8f3cff, #3a1aa8); }
+.picker .random-card .dice { font-style: normal; font-size: 38px; line-height: 1.2; }

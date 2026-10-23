@@ -51,8 +51,9 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  * Empty spots are filled with bots. (The old 700 m "sprint" race still runs
  * if a kind is "sprint", but no mode starts one any more.)
  * `state.mode` is what the host picked; `state.kind` is the race being run.
+ * The host can also pick "random" as the mode or the map: it's drawn when each race starts.
  */
-export const GAME_MODES = ["survival", "chase", "coinrush", "potato", "cup", "grandtour"];
+export const GAME_MODES = ["survival", "chase", "coinrush", "potato", "cup", "grandtour", "random"];
 /** Modes played over several rounds with a points table. */
 export const CUP_MODES = ["cup", "grandtour"];
 /** The modes a single round can be (a Party Cup is three of these). All run on the endless course. */
@@ -792,10 +793,13 @@ function startRace(state, t) {
   for (const id of ids(state)) if (state.players[id].gone) removePlayer(state, id);
   state.round += 1;
   state.seed = ((Math.floor(t) % 2147483647) ^ Math.imul(state.round, 2654435761)) >>> 0;
-  state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode;
+  // "random" mode or map: drawn now, from the race's seed
+  const pick = rng((state.seed + 7919) >>> 0);
+  const baseMap = state.map === "random" ? Math.floor(pick() * MAPS.length) : Math.max(0, MAPS.indexOf(state.map ?? "meadow"));
+  state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode === "random" ? ROUND_KINDS[Math.floor(pick() * ROUND_KINDS.length)] : state.mode;
   // later Party Cup rounds open further into the difficulty curve
   state.courseBoost = state.cup ? (state.cup.race - 1) * CUP_ROUND_BOOST_M : 0;
-  state.raceMap = state.cup ? MAPS[(MAPS.indexOf(state.map ?? "meadow") + state.cup.race - 1) % MAPS.length] : state.map ?? "meadow";
+  state.raceMap = MAPS[(baseMap + (state.cup ? state.cup.race - 1 : 0)) % MAPS.length];
   state.phase = "countdown";
   state.startAt = t + COUNTDOWN_MS;
   state.endAt = 0;
@@ -1373,7 +1377,7 @@ export function validateAction(state, playerId, action) {
     case "map": {
       if (state.phase !== "lobby") return { ok: false, error: "can only change map in the lobby" };
       if (state.host !== playerId) return { ok: false, error: "Only the host can pick the map" };
-      if (!MAPS.includes(action.map)) return { ok: false, error: "bad map" };
+      if (!MAPS.includes(action.map) && action.map !== "random") return { ok: false, error: "bad map" };
       return { ok: true };
     }
     case "ready": {
