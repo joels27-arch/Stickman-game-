@@ -94,9 +94,8 @@
           <div class="home-dock">
             <div class="play-card">
               <button id="endlessBtn" class="btn big go endless-btn" type="button"><span class="eb-main"><span class="flagico">♾️</span> Endless run <span class="arrow">→</span></span><small id="endlessBest">How far can you get?</small></button>
-              <button id="onlineBtn" class="btn online-btn" type="button"><span class="flagico">🌍</span> Race strangers online <span class="soon">SOON</span></button>
               <div class="room-row three" id="roomRow">
-                <button id="soloBtn" class="btn room-btn purple" type="button"><span class="flagico">🎮</span> Game modes</button>
+                <button id="soloBtn" class="btn room-btn purple" type="button"><span class="flagico">🤖</span> Versus bots</button>
                 <button id="createBtn" class="btn room-btn blue" type="button"><span class="flagico">👥</span> Create</button>
                 <button id="joinOpen" class="btn room-btn green" type="button"><span class="flagico">🔑</span> Join</button>
               </div>
@@ -455,6 +454,15 @@
         <div class="ribbon teal"><h2 id="statsTitle">Your stats</h2></div>
         <button id="statsClose" class="gclose" type="button" aria-label="Close">✕</button>
         <div id="statsBody" class="stats-body"></div>
+      </div>
+    </div>
+    <div id="avatarModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet avatar-sheet" role="dialog" aria-modal="true" aria-labelledby="avatarTitle">
+        <div class="ribbon teal"><h2 id="avatarTitle">Profile picture</h2></div>
+        <button id="avatarClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <p class="avatar-hint">Pick any character you own. Unlock more characters for more pictures.</p>
+        <div id="avatarGrid" class="avatar-grid"></div>
       </div>
     </div>
     <div id="rankModal" class="modal gmodal" hidden>
