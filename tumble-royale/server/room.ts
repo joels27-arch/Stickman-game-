@@ -394,7 +394,7 @@ export class Room {
       }
       if ((ev & Ev.FellOut) && !respawn) this.eliminate(p, 'fell');
       // Step-triggered tiles.
-      if (p.state.grounded && p.state.groundId >= 0) {
+      if (canMove && p.state.grounded && p.state.groundId >= 0) {
         const b = world.bodies[p.state.groundId];
         if (b.def.trigger && !world.triggered.has(b.id)) {
           world.setTriggered(b.id, rel);

@@ -81,6 +81,7 @@ export class MapView {
   /** Static solids the camera should not pass through. */
   readonly cameraBlockers: Body[] = [];
   private owned: THREE.BufferGeometry[] = [];
+  private tiles: { mesh: THREE.InstancedMesh; bodies: Body[]; tint: Float32Array }[] = [];
 
   constructor(readonly world: World, shadows: boolean, detail: number) {
     const map = world.map, th = map.theme;
@@ -121,6 +122,7 @@ export class MapView {
 
     // Bodies: merge statics per material, keep movers as individual meshes.
     const staticByMat = new Map<THREE.Material, THREE.BufferGeometry[]>();
+    const tileGroups = new Map<string, { mat: THREE.Material; geo: THREE.BufferGeometry; bodies: Body[] }>();
     for (const b of world.bodies) {
       const o = matOpts(b.def);
       if (!o) continue;
@@ -136,8 +138,14 @@ export class MapView {
         const s = b.shape;
         const big = s.kind === 'box' ? Math.max(s.hx, s.hz) > 2.5 && s.hy > 0.3 : s.kind === 'cyl' ? s.r > 2.5 : false;
         if (big) this.cameraBlockers.push(b);
+      } else if (b.def.trigger && !b.def.motion && !b.def.path && !b.def.cycle && b.def.fallAt === undefined && b.def.activeFrom === undefined) {
+        // Step-triggered tiles: one instanced draw call per material instead of one mesh each.
+        const key = JSON.stringify(o) + '|' + JSON.stringify(b.def.shape) + b.def.visual.style;
+        let g = tileGroups.get(key);
+        if (!g) { g = { mat, geo: bodyGeometry(b.def), bodies: [] }; tileGroups.set(key, g); }
+        g.bodies.push(b);
       } else {
-        const mesh = new THREE.Mesh(bodyGeometry(b.def), b.def.visual.style === 'tile' || b.def.cycle || b.def.trigger || b.def.fallAt !== undefined ? mat.clone() : mat);
+        const mesh = new THREE.Mesh(bodyGeometry(b.def), b.def.visual.style === 'tile' || b.def.cycle || b.def.trigger || b.def.fallAt !== undefined || b.def.activeFrom !== undefined ? mat.clone() : mat);
         mesh.castShadow = shadows && !b.def.visual.noShadow;
         mesh.receiveShadow = shadows;
         mesh.matrixAutoUpdate = false;
@@ -145,6 +153,16 @@ export class MapView {
         this.moving.push({ body: b, mesh, baseOpacity: (mesh.material as THREE.MeshStandardMaterial).opacity });
         if (b.def.trigger || b.def.cycle || b.def.fallAt !== undefined) (mesh.material as THREE.MeshStandardMaterial).transparent = true;
       }
+    }
+    for (const g of tileGroups.values()) {
+      const inst = new THREE.InstancedMesh(g.geo, g.mat, g.bodies.length);
+      inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      const white = new THREE.Color(1, 1, 1);
+      g.bodies.forEach((_, i) => inst.setColorAt(i, white));
+      inst.castShadow = shadows; inst.receiveShadow = shadows;
+      inst.frustumCulled = false;
+      this.group.add(inst);
+      this.tiles.push({ mesh: inst, bodies: g.bodies, tint: new Float32Array(g.bodies.length).fill(-1) });
     }
     for (const [mat, list] of staticByMat) {
       const g = mergeGeometries(list, false);
@@ -211,8 +229,10 @@ export class MapView {
     for (const m of this.moving) {
       const b = m.body, d = b.def;
       const active = w.isActive(b, Math.floor(tick));
-      m.mesh.visible = active;
-      if (!active) continue;
+      // Late hazards flash as a ghost for 2 s before they become solid.
+      const ghost = !active && d.activeFrom !== undefined && t > d.activeFrom - 2 && t < d.activeFrom;
+      m.mesh.visible = active || ghost;
+      if (!active && !ghost) continue;
       w.pose(b, tick, P, R);
       let ox = 0, oz = 0, opacity = m.baseOpacity;
       // Warnings: tiles shake before dropping; cycling bridges blink before vanishing.
@@ -235,7 +255,8 @@ export class MapView {
         const ft = w.fallTime(b, t);
         if (ft > 0) opacity = Math.max(0, 1 - ft / 2.5);
       }
-      if (d.activeFrom !== undefined && t - d.activeFrom < 1) opacity = Math.max(0.1, t - d.activeFrom);
+      if (ghost) opacity = Math.sin(t * 14) > 0 ? 0.45 : 0.15;
+      if (d.activeFrom !== undefined && (ghost || t - d.activeFrom < 0.3)) (m.mesh.material as THREE.MeshStandardMaterial).transparent = true;
       if (d.cycle) {
         const c = d.cycle, per = c.on + c.off;
         const u = (((t + c.phase) % per) + per) % per;
@@ -248,6 +269,30 @@ export class MapView {
       MAT4.set(R[0], R[1], R[2], P.x + ox, R[3], R[4], R[5], P.y, R[6], R[7], R[8], P.z + oz, 0, 0, 0, 1);
       m.mesh.matrix.copy(MAT4);
       m.mesh.matrixWorldNeedsUpdate = true;
+    }
+    const col = new THREE.Color();
+    for (const g of this.tiles) {
+      let colorDirty = false;
+      g.bodies.forEach((b, i) => {
+        const d = b.def;
+        if (!w.isActive(b, Math.floor(tick))) { MAT4.makeScale(0, 0, 0); g.mesh.setMatrixAt(i, MAT4); return; }
+        w.pose(b, tick, P, R);
+        const tt = w.triggered.get(b.id);
+        let ox = 0, oz = 0, k = 1, tint = 0;
+        if (tt !== undefined) {
+          const since = t - tt * DT;
+          tint = Math.min(1, since / d.trigger!.delay);
+          if (since < d.trigger!.delay) { const a = 0.07 * tint; ox = Math.sin(t * 60 + i) * a; oz = Math.cos(t * 53 + i) * a; }
+          const ft = w.fallTime(b, t);
+          if (ft > 0) k = Math.max(0.05, 1 - ft / 2.2);
+        }
+        MAT4.set(R[0] * k, R[1] * k, R[2] * k, P.x + ox, R[3] * k, R[4] * k, R[5] * k, P.y, R[6] * k, R[7] * k, R[8] * k, P.z + oz, 0, 0, 0, 1);
+        g.mesh.setMatrixAt(i, MAT4);
+        const q = Math.round(tint * 20) / 20;
+        if (g.tint[i] !== q) { g.tint[i] = q; col.setRGB(1, 1 - q * 0.55, 1 - q * 0.5); g.mesh.setColorAt(i, col); colorDirty = true; }
+      });
+      g.mesh.instanceMatrix.needsUpdate = true;
+      if (colorDirty && g.mesh.instanceColor) g.mesh.instanceColor.needsUpdate = true;
     }
     if (this.killPlane) this.killPlane.position.y = killHeight(w.map, t) - 0.6;
     this.updateWind(t);

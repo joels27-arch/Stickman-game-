@@ -341,9 +341,10 @@ export function stepPlayer(s: PState, inp: Input, ctx: StepCtx): number {
           if (b.knock > 0 && bn - vn > KNOCK_THRESHOLD && s.mode !== Mode.Respawn) {
             const hl = Math.hypot(nrm.x, nrm.z) || 1;
             const hx = nrm.x / hl, hz = nrm.z / hl;
-            const launch = Math.min(16, (bn * 1.25 + 3) * b.knock);
-            s.vx = hx * launch + bvx * 0.3; s.vz = hz * launch + bvz * 0.3;
-            s.vy = Math.max(s.vy, 4 + 2.5 * b.knock);
+            // A funny shove of a few metres, not a cannon shot: you should usually be able to recover.
+            const launch = Math.min(10.5, (bn * 0.8 + 2.5) * b.knock);
+            s.vx = hx * launch + bvx * 0.15; s.vz = hz * launch + bvz * 0.15;
+            s.vy = Math.max(s.vy, 3.5 + 2 * b.knock);
             if (s.mode !== Mode.Knock) ev |= Ev.Knock;
             s.mode = Mode.Knock; s.modeT = 0;
             s.grounded = 0;

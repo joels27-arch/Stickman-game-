@@ -73,6 +73,9 @@ function Results({ client }: { client: GameClient }) {
   const s = client.session!;
   const r = h.results!;
   const meQ = r.qualified.includes(s.you), meIn = r.qualified.includes(s.you) || r.eliminated.includes(s.you);
+  const place = (id: number) => r.ranking.find((x) => x.id === id)?.place ?? 99;
+  const byPlace = (a: number, b: number) => place(a) - place(b);
+  const qualified = [...r.qualified].sort(byPlace), eliminated = [...r.eliminated].sort(byPlace);
   const row = (id: number, i: number) => {
     const p = s.player(id);
     return (
@@ -88,8 +91,8 @@ function Results({ client }: { client: GameClient }) {
       <div className="card">
         <h1 className="pop-in">{!meIn ? 'Round over' : meQ ? (r.next ? 'You qualified!' : 'You won!') : 'Eliminated!'}</h1>
         <div className="res-grid">
-          <div className="panel res-col q"><h3>{r.next ? 'QUALIFIED' : 'WINNER'} · {r.qualified.length}</h3><div className="res-list scroll">{r.qualified.map(row)}</div></div>
-          <div className="panel res-col e"><h3>ELIMINATED · {r.eliminated.length}</h3><div className="res-list scroll">{r.eliminated.map(row)}</div></div>
+          <div className="panel res-col q"><h3>{r.next ? 'QUALIFIED' : 'WINNER'} · {r.qualified.length}</h3><div className="res-list scroll">{qualified.map(row)}</div></div>
+          <div className="panel res-col e"><h3>ELIMINATED · {r.eliminated.length}</h3><div className="res-list scroll">{eliminated.map(row)}</div></div>
         </div>
         <div style={{ textAlign: 'center', color: '#fff', fontWeight: 800 }}>{r.next ? 'Next round starting soon…' : 'Crowning the champion…'}</div>
       </div>

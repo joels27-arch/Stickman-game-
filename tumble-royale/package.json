@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Tumble Royale — a 3D multiplayer obstacle-course party game (up to 30 players)",
+  "description": "Tumble Royale \u2014 a 3D multiplayer obstacle-course party game (up to 30 players)",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:server": "tsx watch server/node-main.ts",
@@ -13,7 +13,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:load": "tsx tests/load.ts",
-    "test:e2e": "node tests/e2e.mjs"
+    "test:e2e": "node tests/e2e.mjs",
+    "build:cf": "node scripts/build-cf.mjs",
+    "deploy:cf": "npm run build && npm run build:cf && npx wrangler deploy"
   },
   "dependencies": {
     "ws": "^8.22.0"

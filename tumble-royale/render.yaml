@@ -1,0 +1,15 @@
+# Render.com blueprint: New → Blueprint → point at this repo (root: tumble-royale)
+services:
+  - type: web
+    name: tumble-royale
+    runtime: docker
+    rootDir: tumble-royale
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATA_DIR
+        value: /data
+    disk:
+      name: tumble-data
+      mountPath: /data
+      sizeGB: 1
