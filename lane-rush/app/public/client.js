@@ -5409,7 +5409,7 @@ function claimPass(level, track, tile) {
       giveItem(r.runner);
       renderCollPill();
       passModal.hidden = true;
-      showUnlock({ kind: "char", char: { name: r.label, rarity: STARTER_RARITY[r.runner], img: portrait(r.runner) } });
+      showUnlock({ kind: "char", char: { name: r.label, rarity: STARTER_RARITY[r.runner], img: `/assets/full_${RUNNERS[r.runner].file}.webp` } });
     }
   }
   else if (r.pack) {

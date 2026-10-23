@@ -1623,3 +1623,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .ccard.locked { box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35); }
 .ccard .padlock { top: 20px; right: 4px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: rgba(10, 14, 40, 0.75); border: 2px solid #fff; font-size: 13px; }
 .card .lock { color: #ffd85a; font-size: 10px; }
+/* reveal cards: the character always sits in the middle */
+.pcard img { justify-self: center; margin-inline: auto; display: block; object-position: center; }
+.pcard .pglow { left: 50%; }
