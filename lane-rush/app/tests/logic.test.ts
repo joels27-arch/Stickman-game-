@@ -174,6 +174,15 @@ describe("course", () => {
 });
 
 describe("difficulty manager", () => {
+  it("never leaves a long empty stretch, not even at the start", () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const z = L.buildCourse(seed * 7919, L.SURVIVAL_LEN).rows.map((r) => r.z).filter((x) => x < 2000);
+      expect(z[0]).toBeLessThanOrEqual(L.MAX_EMPTY_M);
+      for (let i = 1; i < z.length; i++) expect(z[i]! - z[i - 1]!).toBeLessThanOrEqual(L.MAX_EMPTY_M + 12); // + a fairness widening at most
+      expect(z.filter((x) => x < 800).length).toBeGreaterThanOrEqual(28);
+    }
+  });
+
   it("every course is fair: from any lane you could be in, the next way through is reachable in time", () => {
     for (let seed = 0; seed < 400; seed++) {
       for (const len of [L.TRACK_LEN, L.SURVIVAL_LEN]) {

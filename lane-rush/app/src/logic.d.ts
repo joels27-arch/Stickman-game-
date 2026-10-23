@@ -71,6 +71,7 @@ export const BANANA_COOLDOWN_MS: number;
 export const GAME_MODES: string[];
 export const CUP_MODES: string[];
 export const MAPS: string[];
+export const MAX_EMPTY_M: number;
 export const EMOTES: string[];
 export const EMOTE_COOLDOWN_MS: number;
 export const HEART_EVERY_M: number;

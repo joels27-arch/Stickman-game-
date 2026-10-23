@@ -408,9 +408,9 @@ function slalom(r, n) {
  *   Master        2.4 km zigzags, everything, tightest (but always fair) timing
  */
 export const STAGES = [
-  { name: "Warm-up", from: 0, react: 1.7, mix: { hurdleOne: 4, gateOne: 3, hurdleWall: 1.5, gateWall: 1.5, crateOne: 2 } },
-  { name: "Getting going", from: 250, react: 1.4, mix: { hurdleOne: 1, gateOne: 1, crateOne: 1, hurdleWall: 1, gateWall: 1, split: 2.5, barrels: 1.2, breather: 0.7 } },
-  { name: "In the zone", from: 700, react: 1.2, mix: { split: 2, mixedWall: 1.6, barrels: 1, tunnel: 1.2, slalom2: 1.5, hurdleWall: 0.5, gateWall: 0.5, breather: 0.55 } },
+  { name: "Warm-up", from: 0, react: 1.3, mix: { hurdleOne: 4, gateOne: 3, hurdleWall: 1.5, gateWall: 1.5, crateOne: 2 } },
+  { name: "Getting going", from: 250, react: 1.15, mix: { hurdleOne: 1, gateOne: 1, crateOne: 1, hurdleWall: 1, gateWall: 1, split: 2.5, barrels: 1.2, breather: 0.7 } },
+  { name: "In the zone", from: 700, react: 1.02, mix: { split: 2, mixedWall: 1.6, barrels: 1, tunnel: 1.2, slalom2: 1.5, hurdleWall: 0.5, gateWall: 0.5, breather: 0.55 } },
   { name: "Pro", from: 1400, react: 1.05, mix: { split: 1.2, mixedWall: 1.5, tunnel: 1, slalom2: 1, slalom3: 1.3, combo: 1.2, barrels2: 1, breather: 0.45 } },
   { name: "Master", from: 2400, react: 0.92, mix: { mixedWall: 1.3, tunnel: 1, slalom3: 1.5, combo: 1.3, zigzag: 1.2, barrels2: 1, split: 1, breather: 0.35 } },
 ];
@@ -509,6 +509,9 @@ function placeOne(r, kind) {
  * The same pattern never comes twice in a row. `looks[lane]` picks the
  * visual variant of each obstacle; it never changes how it's cleared.
  */
+/** The longest run without an obstacle row (metres): about 3 s even at the start. */
+export const MAX_EMPTY_M = 42;
+
 export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
   const r = rng(seed);
   // looks and boxes use their own stream, so they don't reshuffle the layout
@@ -522,7 +525,7 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
   const seen = new Set();
   const taught = new Set();
   let lastHeart = 0;
-  let z = 45;
+  let z = 32;
   let last = "";
   let sinceBox = 0;
   let sinceRest = 0;
@@ -568,7 +571,7 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
     if (name === "breather") {
       addBox(z + step * 0.3);
       boosts.push({ z: Math.round((z + step * 0.8) * 10) / 10, lane: Math.floor(r() * 4) });
-      z += step * 1.6;
+      z += step * 1.2;
       sinceRest = 0;
       continue;
     }
@@ -588,11 +591,15 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
         row.intro = fresh;
         if (rows.length) z += step * 0.6;
       }
+      // never a long empty stretch (breathers, barrels and first-time hints included)
+      if (rows.length && z - prevZ > MAX_EMPTY_M) z = prevZ + MAX_EMPTY_M;
       // fairness: widen the gap if this row can't be reached from every lane you might be in
       const need = worstNeed(reach, row) * speedAtDistance(kind, prevZ);
       if (z - prevZ < need) z = prevZ + need + 0.5;
-      row.z = Math.round(z * 10) / 10;
-      reach = nextReach(reach, row, (row.z - prevZ) / speedAtDistance(kind, prevZ));
+      // round up, never down: a gap that's just long enough must stay long enough
+      row.z = Math.ceil(z * 10) / 10;
+      const dt = (row.z - prevZ) / speedAtDistance(kind, prevZ);
+      reach = nextReach(reach, row, Math.max(dt, need / speedAtDistance(kind, prevZ)));
       prevZ = row.z;
       rows.push(row);
       if (i < out.length - 1) z += step;
@@ -600,7 +607,8 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
     if (stop) break;
     // room to land and line up for the next pattern (more slack early on)
     const k = Math.min(1, dz / 2400);
-    const gap = step * (1.15 + r() * 0.5 * (1 - k)) + (pat.tail ?? 0);
+    // (kept short: there's never a long empty stretch, even in the warm-up)
+    const gap = step * (0.75 + 0.4 * k + r() * 0.35 * (1 - k)) + (pat.tail ?? 0);
     sinceBox += 1;
     if (endless && z - lastHeart > HEART_EVERY_M) {
       hearts.push({ z: Math.round((z + gap * 0.45) * 10) / 10, lane: Math.floor(r2() * 4) });
