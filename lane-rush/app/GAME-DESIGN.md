@@ -176,8 +176,13 @@ round) and the Grand Tour. Play solo = your own private room with bots.
 * **Hot Potato:** the holder taps PASS 💣 to throw the bomb to the nearest
   runner within 12 m (any lane, ahead or behind; not straight back), or bumps
   into someone. Bots pass it on too.
-* **Coin Rush:** a taken coin comes back 5 s later, so the runners at the back
-  don't run dry.
+* **Coin Rush:** coin lines fill every gap between obstacle rows (a coin every
+  1.8 m, up to two lanes per gap, a 5-coin bonus every few rows: about 190 coins
+  per 1000 m, up from 70). A taken coin comes back 5 s later, so the runners at
+  the back don't run dry.
+* **Results:** no "DNF". Each row shows the number that decides the mode
+  (coins, time caught by the brain, time the bomb got you, survived), plus
+  the points scored in a match of several rounds.
 * **Hearts** (Survival only): first come, first served, and gone for everyone.
 * **Boxing glove:** hits the nearest runner within 25 m; with nobody in reach
   it's a whiff (used up), so you're never stuck holding it.
