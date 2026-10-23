@@ -455,6 +455,18 @@ describe("matches over several rounds", () => {
   });
 });
 
+describe("fair start", () => {
+  it("bots speed up from the line like a player, no head start", () => {
+    let s = act(lobbyOf(1), "p0", { type: "start", bots: true, t: T0 });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt + 300 });
+    const bots = Object.values(s.players).filter((p: any) => p.bot) as any[];
+    expect(bots.length).toBe(3);
+    // a player accelerating at 14 m/s² covers 0.63 m in 0.3 s
+    for (const b of bots) expect(b.d).toBeLessThanOrEqual(0.64);
+  });
+});
+
 describe("power-ups never cost a heart", () => {
   it("lightning trips the bots ahead in survival but leaves their hearts alone", () => {
     let s = act(lobbyOf(1), "p0", { type: "start", bots: true, t: T0 });
@@ -622,12 +634,17 @@ describe("power-up odds", () => {
     const lead = L.powerOdds({ rank: 1, alive: 4, gapToLeader: 0 });
     const last = L.powerOdds({ rank: 4, alive: 4, gapToLeader: 120 });
     expect(lead.lightning).toBe(0);
-    expect(lead.rocket).toBe(0);
-    expect(lead.shield! + lead.banana!).toBe(50);
+    // Mario Kart style: the leader can still draw a rocket, about 1 in 100
+    expect(lead.rocket).toBeGreaterThan(0.5);
+    expect(lead.rocket).toBeLessThan(1.5);
+    expect(lead.shield! + lead.banana!).toBeGreaterThan(45);
     expect(lead.swap! + lead.thunder! + lead.brainwave!).toBe(0);
-    expect(last.bowling).toBe(0); // nobody behind to roll it at
-    expect(last.glue! + last.fake!).toBe(0);
+    expect(last.rocket).toBe(30);
     expect(last.rocket! + last.lightning! + last.freeze! + last.brainwave! + last.thunder! + last.swap!).toBeGreaterThan(80);
+    // the better the item, the more it favours the back of the field
+    const mid = L.powerOdds({ rank: 2, alive: 4, gapToLeader: 20 });
+    expect(lead.rocket).toBeLessThan(mid.rocket!);
+    expect(mid.rocket).toBeLessThan(last.rocket!);
   });
 
   it("treats a close second more like a leader than someone far behind", () => {
@@ -638,8 +655,9 @@ describe("power-up odds", () => {
   });
 
   it("only counts runners still in the race, and never repeats your last item", () => {
-    // 2 of 4 knocked out: 2nd of the 2 left is last place, so no bowling
-    expect(L.powerOdds({ rank: 2, alive: 2, gapToLeader: 40 }).bowling).toBe(0);
+    // 2 of 4 knocked out: 2nd of the 2 left is last place, and gets last-place odds
+    const back = L.powerOdds({ rank: 2, alive: 2, gapToLeader: 80 });
+    expect(back.rocket).toBe(30);
     expect(L.powerOdds({ rank: 1, alive: 3, last: "shield" }).shield).toBe(0);
     const solo = L.powerOdds({ rank: 1, alive: 1 });
     expect([solo.lightning, solo.bowling, solo.freeze]).toEqual([0, 0, 0]);

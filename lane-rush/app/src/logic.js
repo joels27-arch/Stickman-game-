@@ -146,40 +146,43 @@ export function runSpeed(kind, s) {
 export const POWERS = ["shield", "rocket", "lightning", "banana", "bowling", "freeze", "glue", "fake", "boxing", "brainwave", "thunder", "swap"];
 
 /**
- * Mystery-box odds, in percent. Each item has a chance for the leader and a
- * chance for the runner in last place; everyone in between is blended by
- * their `standing` (0 = leading … 1 = last). Leaders get mostly defence,
- * runners at the back get the big catch-up items. Each column adds up to 100.
+ * Power-up odds by place, Mario Kart style: four columns (1st, 2nd, 3rd,
+ * last) and everyone is blended between them by their `standing` (0 =
+ * leading … 1 = last). The better the item, the steeper it climbs toward the
+ * back: the leader can still get a rocket (about 1 in 100), the last runner
+ * gets one almost 1 time in 3. Each column adds up to 100.
  *
- *              leader  last
- *   shield       25      5
- *   banana       25      5
- *   bowling      15      5    (rolls back: needs someone behind you)
- *   glue         15      0    (dropped behind you)
- *   fake         15      5    (a fake mystery box, dropped behind you)
- *   boxing        5      5    (punches whoever is right next to you)
- *   freeze        0     15
- *   rocket        0     20
- *   lightning     0     10    (hits runners ahead: needs someone ahead)
- *   brainwave     0     10    (flips controls of everyone ahead)
- *   thunder       0     10    (a storm cloud on the leader; pass it on by touching)
- *   swap          0     10    (swap places with the runner ahead; back half only)
+ *              1st  2nd  3rd  last
+ *   shield      24   14    7    3
+ *   banana      24   14    6    2
+ *   bowling     14   10    6    3
+ *   glue        12    9    5    2
+ *   fake        14    9    4    1
+ *   boxing       6    8    7    4    (punches whoever is right next to you)
+ *   freeze       2    9   11   10
+ *   brainwave    1    7   10    9    (flips controls of everyone ahead)
+ *   lightning    1    6   11   14    (hits runners ahead)
+ *   thunder      1    5    9   12    (a storm cloud on the leader)
+ *   swap         0    3    8   10    (swap places with the runner ahead)
+ *   rocket       1    6   16   30
  *
+ * Items that only hit runners ahead are taken out for the leader (nobody is
+ * ahead), so a leader's rocket ends up at about 1 %.
  * Alone there's nobody to attack, so it's shield 35 · rocket 35 · banana 30.
  */
 const ODDS = {
-  shield: [25, 5],
-  banana: [25, 5],
-  bowling: [15, 5],
-  glue: [15, 0],
-  fake: [15, 5],
-  boxing: [5, 5],
-  freeze: [0, 15],
-  rocket: [0, 20],
-  lightning: [0, 10],
-  brainwave: [0, 10],
-  thunder: [0, 10],
-  swap: [0, 10],
+  shield: [24, 14, 7, 3],
+  banana: [24, 14, 6, 2],
+  bowling: [14, 10, 6, 3],
+  glue: [12, 9, 5, 2],
+  fake: [14, 9, 4, 1],
+  boxing: [6, 8, 7, 4],
+  freeze: [2, 9, 11, 10],
+  brainwave: [1, 7, 10, 9],
+  lightning: [1, 6, 11, 14],
+  thunder: [1, 5, 9, 12],
+  swap: [0, 3, 8, 10],
+  rocket: [1, 6, 16, 30],
 };
 const SOLO_ODDS = { shield: 35, rocket: 35, banana: 30 };
 /** How far behind the leader (metres) counts as "as far back as it gets". */
@@ -202,20 +205,21 @@ export function standingFor(rank, alive, gapToLeader) {
  * Percent chance of each power-up for a runner at `rank` (1 = leading) of
  * `alive` runners, `gapToLeader` metres behind the first. `last` is the item
  * you got last time: you never get the same one twice in a row. Items that
- * would be useless right now (lightning in 1st, bowling in last) are left
- * out, and the rest scaled back up to 100.
+ * would be useless right now (lightning, thunder, brain wave or swap in 1st)
+ * are left out, and the rest scaled back up to 100.
  */
 export function powerOdds({ rank, alive, gapToLeader = 0, last = "" }) {
   let w;
   if (alive <= 1) {
     w = { ...SOLO_ODDS };
   } else {
-    const t = standingFor(rank, alive, gapToLeader);
+    // blend between the two place columns either side of your standing
+    const x = standingFor(rank, alive, gapToLeader) * 3;
+    const c = Math.min(2, Math.floor(x));
+    const f = x - c;
     w = {};
-    for (const [k, [lead, back]] of Object.entries(ODDS)) w[k] = lead + (back - lead) * t;
+    for (const [k, col] of Object.entries(ODDS)) w[k] = col[c] + (col[c + 1] - col[c]) * f;
     if (rank <= 1) w.lightning = w.brainwave = w.thunder = w.swap = 0;
-    if (t < 0.5) w.swap = 0;
-    if (rank >= alive) w.bowling = w.glue = w.fake = 0;
   }
   if (last && w[last] !== undefined) w[last] = 0;
   const total = Object.values(w).reduce((a, b) => a + b, 0);
@@ -691,7 +695,7 @@ function humans(state) {
 }
 
 function freshRunner(p) {
-  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, emoteAt: null, sc: 0, cb: 0, left: false, item: "", warp: 0, coins: 0, booms: 0 };
+  return { ...p, d: 0, lane: p.slot, y: 0, act: "idle", pw: "", finish: null, hits: 0, outAt: null, zapAt: null, bananaAt: null, emoteAt: null, sc: 0, cb: 0, left: false, item: "", warp: 0, coins: 0, booms: 0, v: 0 };
 }
 
 function pickHost(state) {
@@ -1161,6 +1165,9 @@ function freeName(state, start) {
 }
 
 /** An obstacle (or, with `power`, someone's power-up) trips a bot. Power-ups never cost a heart. */
+/** Bots accelerate like a player's runner (m/s²), so nobody leaves the line early. */
+const BOT_ACCEL = 14;
+
 function botHit(state, p, t, power = false) {
   if ((p.shieldUntil ?? 0) > t) {
     p.shieldUntil = 0;
@@ -1212,8 +1219,12 @@ function stepBots(state, t) {
       if (state.bomb?.holder === id) v *= 1.15; // the bomb holder runs a little faster, to catch someone
       if (p.act === "stumble") p.act = "run";
     }
+    // speed up from a standstill like a player does (start, after a fall)
+    const v0 = p.v ?? 0;
+    const v1 = v > v0 ? Math.min(v, v0 + BOT_ACCEL * dt) : v;
+    p.v = v1;
     const d0 = p.d;
-    const d1 = Math.min(len, d0 + v * dt);
+    const d1 = Math.min(len, d0 + ((v0 + v1) / 2) * dt);
     // gets a little sloppier as the course speeds up
     const sharp = (p.skill ?? 0.95) - 0.05 * Math.min(1, elapsedS / 150);
     const rocketing = (p.rocketUntil ?? 0) > t;
@@ -1294,7 +1305,13 @@ function stepBots(state, t) {
     course.boxes.forEach((b, i) => {
       if (b.z <= d0 || b.z > d1 || b.lane !== p.lane || p.item || (state.taken ?? []).includes(i)) return;
       state.taken = [...(state.taken ?? []), i];
-      p.item = BOT_ITEMS[Math.floor(roll(state.seed, bi, b.z + 0.3) * BOT_ITEMS.length)];
+      // same place-based odds as the players get (bots don't bowl: a banana instead)
+      const field = runners.filter((o) => !o.left && o.outAt === null);
+      const lead = Math.max(...field.map((o) => o.d));
+      const odds = powerOdds({ rank: 1 + field.filter((o) => o.d > d1).length, alive: field.length, gapToLeader: lead - d1, last: p.lastItem ?? "" });
+      const got = pickPower(odds, roll(state.seed, bi, b.z + 0.3));
+      p.item = BOT_ITEMS.includes(got) ? got : "banana";
+      p.lastItem = p.item;
       p.itemAt = t;
     });
     for (const b of state.bananas ?? []) {
@@ -1363,7 +1380,7 @@ function stepBots(state, t) {
     if (p.pw === "rocket" && (p.rocketUntil ?? 0) <= t) p.pw = "";
     if (p.pw === "shield" && (p.shieldUntil ?? 0) <= t) p.pw = "";
     p.d = d1;
-    p.v = v;
+    p.v = v1; // the speed it actually reached (it accelerates from a standstill)
     p.at = t;
     if (p.outAt === null) {
       p.act = (p.stunUntil ?? 0) > t ? "stumble" : act;
