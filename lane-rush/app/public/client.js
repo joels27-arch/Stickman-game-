@@ -1072,7 +1072,7 @@ function renderCollPill() {
   const { got, all } = collectionCount();
   $("#skinCount").textContent = `${got}/${all}`;
   $("#skinBar").style.width = `${Math.round((got / all) * 100)}%`;
-  $("#skinPct").textContent = `${Math.round((got / all) * 100)}% collected`;
+  $("#skinPct").textContent = `${got} of ${all} characters`;
 }
 /** A character card: full colour even when locked (you just can't race with it yet). */
 function charCard(c, n, onClick) {
@@ -1277,12 +1277,12 @@ const PACK_CHARS = [
 /** Chances per item slot. Normal slots, and the boosted last slot of a Mega Pack. */
 /** Character odds per item (the rest is coins). Packs never contain medals. */
 const PACK_ODDS = {
-  normal: { legendary: 0.01, epic: 0.06, rare: 0.2 },
+  normal: { legendary: 0, epic: 0, rare: 0 }, // the first two items are coins: one character per pack, at most
   boosted: { legendary: 0.05, epic: 0.25, rare: 0.7 }, // the Mega Pack's last item: always a character
 };
 const NEWBIE_PACKS = 3; // your first packs: double character odds, and the very first one always has a new character
 /** One pack type: 3 items, the last one always a character. */
-const PACKS = [{ id: "mega", name: "Mega Pack", price: 1200, slots: ["normal", "normal", "boosted"], img: "/assets/pack_mega.webp", note: "3 items · last one is a character" }];
+const PACKS = [{ id: "mega", name: "Mega Pack", price: 1200, slots: ["normal", "normal", "boosted"], img: "/assets/pack_mega.webp", note: "Coins + 1 character" }];
 const pct = (x) => `${Math.round(x * 1000) / 10}%`;
 /** A character you don't own yet if that rarity has one left, else a duplicate. */
 function packChar(rarity) {
@@ -1322,6 +1322,9 @@ function grantPack(pack) {
     const left = PACK_CHARS.filter((c) => !wallet.has(c.id) && c.rarity !== "legendary");
     if (left.length) items[0] = { kind: "char", char: left[Math.floor(Math.random() * left.length)] };
   }
+  // one character per pack at most: the best one stays, any other becomes coins
+  const chars = items.filter((it) => it.kind === "char").sort((a, b) => RARITY_ORDER.indexOf(b.char.rarity) - RARITY_ORDER.indexOf(a.char.rarity));
+  for (const extra of chars.slice(1)) items[items.indexOf(extra)] = { kind: "coins", n: 300 };
   for (const it of items) {
     if (it.kind === "char") {
       if (wallet.has(it.char.id)) {
@@ -1354,9 +1357,8 @@ function renderPacks() {
       );
     }),
   );
-  const n = PACK_ODDS.normal;
   const b = PACK_ODDS.boosted;
-  $("#packOdds").textContent = `Odds: legendary ${pct(n.legendary)} · epic ${pct(n.epic)} · rare ${pct(n.rare)}. Last item: legendary ${pct(b.legendary)} · epic ${pct(b.epic)} · rare ${pct(b.rare)}.`;
+  $("#packOdds").textContent = `Character odds: legendary ${pct(b.legendary)} · epic ${pct(b.epic)} · rare ${pct(b.rare)}`;
   renderWallet();
 }
 
@@ -1412,6 +1414,7 @@ function packStep() {
   po.i += 1;
   if (po.i >= po.items.length) {
     po.stage = "done";
+    delete packOpen.dataset.reveal;
     $("#poCard").hidden = true;
     $("#poHint").hidden = true;
     $("#poSummary").replaceChildren(...po.items.map((it) => itemCard(it)));
@@ -1421,23 +1424,66 @@ function packStep() {
   }
   const it = po.items[po.i];
   const card = itemCard(it);
-  card.classList.add("flip");
-  $("#poCard").replaceChildren(card);
+  const fresh = it.kind === "char" && !it.dupe;
+  delete packOpen.dataset.reveal;
   $("#poCard").hidden = false;
   $("#poHint").textContent = po.i < po.items.length - 1 ? `Tap for the next one (${po.i + 1}/${po.items.length})` : "Tap to continue";
-  if (it.kind === "char" && !it.dupe) {
-    sfx.finish();
-    coinRain(card, it.char.rarity === "legendary" ? 30 : 14);
-  } else sfx.boost();
+  if (!fresh) {
+    card.classList.add("flip");
+    $("#poCard").replaceChildren(card);
+    sfx.boost();
+    po.busy = true;
+    setTimeout(() => po && (po.busy = false), 450);
+    return;
+  }
+  // a new character: the card back glows and shakes in its rarity colour, then bursts open
+  const rarity = it.char.rarity;
+  const back = el("div", { class: `pcard-back ${rarity}` }, el("b", { text: "?" }));
+  $("#poCard").replaceChildren(back);
+  $("#poHint").textContent = "";
   po.busy = true;
-  setTimeout(() => po && (po.busy = false), 450);
+  sfx.pack();
+  setTimeout(() => {
+    if (!po) return;
+    packOpen.dataset.reveal = rarity;
+    packOpen.classList.remove("flash");
+    void packOpen.offsetWidth;
+    packOpen.classList.add("flash");
+    card.classList.add("hero");
+    card.append(el("em", { class: "pnew", text: "NEW!" }));
+    $("#poCard").replaceChildren(card);
+    confetti($("#poFx"), rarity === "legendary" ? 90 : rarity === "epic" ? 60 : 40, rarity);
+    sfx.finish();
+    if (rarity === "legendary") setTimeout(() => sfx.cheer(), 250);
+    buzz([30, 40, 80]);
+    $("#poHint").textContent = po.i < po.items.length - 1 ? `Tap for the next one (${po.i + 1}/${po.items.length})` : "Tap to continue";
+    setTimeout(() => po && (po.busy = false), 700);
+  }, 900);
 }
 packOpen.addEventListener("click", (e) => {
   if (e.target.closest("#poDone")) return;
   packStep();
 });
+/** Confetti bursting out from the middle of the screen, in a rarity's colours. */
+function confetti(box, n, rarity) {
+  const cols = { legendary: ["#ffd23f", "#fff2a8", "#ff9f1c", "#ffffff"], epic: ["#c27bff", "#ff7ad9", "#ffffff", "#7ab8ff"], rare: ["#4fc3ff", "#7cf2c8", "#ffffff"], common: ["#ffffff", "#b6f72a"] }[rarity] ?? ["#ffffff"];
+  for (let i = 0; i < n; i++) {
+    const c = el("i", { class: "conf", style: `background:${cols[i % cols.length]}` });
+    box.append(c);
+    const a = Math.random() * Math.PI * 2;
+    const d = 140 + Math.random() * 260;
+    c.animate(
+      [
+        { transform: "translate(-50%, -50%) rotate(0deg) scale(1)", opacity: 1 },
+        { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d + 160}px)) rotate(${(Math.random() - 0.5) * 900}deg) scale(0.6)`, opacity: 0 },
+      ],
+      { duration: 1100 + Math.random() * 900, easing: "cubic-bezier(.15,.7,.3,1)", fill: "forwards" },
+    ).onfinish = () => c.remove();
+  }
+}
 $("#poDone").addEventListener("click", () => {
   packOpen.hidden = true;
+  delete packOpen.dataset.reveal;
   const done = po?.onDone;
   po = null;
   renderCollPill();
@@ -2029,8 +2075,11 @@ function renderTrophyRoad() {
       el("span", { class: "rbubble" }, el("img", { src: info.img, alt: "" }), got ? el("i", { class: "tick", text: "✓" }) : null),
       el("small", { text: ready ? "Claim!" : info.label }),
     );
-    b.disabled = !ready;
-    b.addEventListener("click", () => claimRoad(step, b));
+    b.addEventListener("click", (e) => {
+      if (!ready) return; // anything but a reward to claim opens the whole road
+      e.stopPropagation();
+      claimRoad(step, b);
+    });
     return b;
   });
   const track = el("div", { class: "road-track" }, ...nodes);
@@ -2043,6 +2092,7 @@ function renderTrophyRoad() {
       el("em", { text: `${p.toLocaleString()} 🏆` }),
     ),
     track,
+    el("span", { class: "road-all", text: "See the whole road ›" }),
     el("p", { class: "road-note", text: "Gold +10 · Silver +5 · Bronze +3 · 4th +1" }),
   );
   // keep the next reward in view
@@ -2051,7 +2101,55 @@ function renderTrophyRoad() {
     if (cur) track.scrollLeft = cur.offsetLeft - track.clientWidth / 2 + cur.clientWidth / 2;
   });
   renderMissionDots(); // a reward waiting on the road lights the Missions tab
+  if (!roadModal.hidden) renderRoadFull();
 }
+/** The whole Trophy Road, top to bottom: every reward, where each league starts, and where you are. */
+const roadModal = $("#roadModal");
+function renderRoadFull() {
+  const p = rank.points();
+  const done = road.claimed();
+  const rows = [];
+  let youShown = false;
+  for (const step of ROAD) {
+    const league = LEAGUES.find((l) => l.min === step.pts);
+    if (!youShown && step.pts > p) {
+      youShown = true;
+      rows.push(el("div", { class: "rf-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: `You · ${p.toLocaleString()} 🏆` })));
+    }
+    if (league) rows.push(el("div", { class: `rf-league lg-${league.id}` }, el("img", { src: `/assets/lg_${league.id}.webp`, alt: "" }), el("b", { text: league.name })));
+    const info = roadInfo(step);
+    const got = done.includes(step.pts);
+    const ready = step.pts <= p && !got;
+    const btn = el("button", { class: `rf-btn${ready ? " ready" : ""}`, type: "button", text: got ? "✓" : ready ? "Claim!" : "🔒" });
+    btn.disabled = !ready;
+    btn.addEventListener("click", () => claimRoad(step, btn));
+    rows.push(
+      el(
+        "div",
+        { class: `rf-row${got ? " got" : ""}${ready ? " ready" : ""}${step.char ? ` star ${info.rarity}` : ""}` },
+        el("span", { class: "rf-pts", text: `${step.pts.toLocaleString()} 🏆` }),
+        el("span", { class: "rf-pic" }, el("img", { src: info.img, alt: "" })),
+        el("b", { class: "rf-label", text: info.label }),
+        btn,
+      ),
+    );
+  }
+  if (!youShown) rows.push(el("div", { class: "rf-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: `You · ${p.toLocaleString()} 🏆` })));
+  const list = $("#roadFull");
+  list.replaceChildren(...rows);
+  requestAnimationFrame(() => {
+    const you = list.querySelector(".rf-you");
+    if (you) list.scrollTop = you.offsetTop - list.clientHeight / 2;
+  });
+}
+function openRoad() {
+  sfx.tap();
+  renderRoadFull();
+  roadModal.hidden = false;
+}
+$("#trophyRoad").addEventListener("click", openRoad);
+$("#roadClose").addEventListener("click", () => (roadModal.hidden = true));
+roadModal.addEventListener("click", (e) => e.target === roadModal && (roadModal.hidden = true));
 
 /** Full Weekend League card (shown in the detail sheet). */
 function weekendCard() {

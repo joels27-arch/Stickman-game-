@@ -380,15 +380,19 @@
     </div>
 
     <!-- FIRST RUN: pick a name once (changeable later in Settings) -->
-    <div id="nameModal" class="modal gmodal" hidden>
-      <div class="grays" aria-hidden="true"></div>
-      <form id="nameForm" class="gsheet name-sheet" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
-        <div class="ribbon teal"><h2 id="nameTitle">Welcome!</h2></div>
-        <p class="name-lead">What should other runners call you?</p>
-        <input id="firstName" maxlength="14" autocomplete="nickname" placeholder="Your name" required />
+    <!-- first visit: Nia asks your name -->
+    <div id="nameModal" class="modal gmodal name-modal" hidden>
+      <div class="name-rays" aria-hidden="true"></div>
+      <form id="nameForm" class="name-card" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
+        <h1 class="logo name-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+        <div class="name-hero">
+          <img src="/assets/m_wave.webp" alt="" />
+          <div class="name-bubble"><b id="nameTitle">Hi, I'm Nia!</b><span>What's your name?</span></div>
+        </div>
+        <label class="name-field"><span aria-hidden="true">✏️</span><input id="firstName" maxlength="14" autocomplete="nickname" placeholder="Your name" required /></label>
         <p id="nameMsg" class="name-msg"></p>
-        <button class="gbtn" type="submit">Let's run!</button>
-        <small class="name-note">You can change it any time in ⚙ Settings.</small>
+        <button class="gbtn name-go" type="submit">Let's run! →</button>
+        <small class="name-note">Change it any time in ⚙ Settings</small>
       </form>
     </div>
 
@@ -448,6 +452,14 @@
         <div class="ribbon teal"><h2 id="tourneyTitle">Tournament</h2></div>
         <button id="tourneyClose" class="gclose" type="button" aria-label="Close">✕</button>
         <div id="tourneyBody" class="tourney-body"></div>
+      </div>
+    </div>
+    <div id="roadModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet road-sheet" role="dialog" aria-modal="true" aria-labelledby="roadTitle">
+        <div class="ribbon gold"><h2 id="roadTitle">Trophy Road</h2></div>
+        <button id="roadClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div id="roadFull" class="road-full"></div>
       </div>
     </div>
     <div id="avatarModal" class="modal gmodal" hidden>
@@ -538,7 +550,9 @@
     <!-- PACK OPENING -->
     <div id="packOpen" class="pack-open" hidden>
       <div class="grays" aria-hidden="true"></div>
+      <div class="po-rays" aria-hidden="true"></div>
       <div class="po-flash"></div>
+      <div id="poFx" class="po-fx" aria-hidden="true"></div>
       <img id="poPack" class="po-pack" src="/assets/pack_mega.webp" alt="" />
       <div id="poCard" class="po-card" hidden></div>
       <p id="poHint" class="po-hint">Tap to open!</p>
