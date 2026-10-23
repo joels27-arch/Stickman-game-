@@ -74,7 +74,10 @@ const RUNNERS = [
   { name: "Dino", color: "#14b8a6", file: "c6", tag: "Rawr Runner" },
   { name: "Nova", color: "#8fa3bf", file: "c7", tag: "Space Cadet" },
 ];
-const STARTERS = RUNNERS.length; // every 3D runner is free to play
+const STARTERS = RUNNERS.length;
+/** 3D runners you don't start with: Kiko is the Season Pass reward (free track, level 2). */
+const KIKO = 5;
+const PASS_RUNNERS = { [KIKO]: 2 };
 
 /**
  * Collectible characters: bought in the shop with medals. They don't have 3D
@@ -227,7 +230,7 @@ const wallet = {
     }
   },
   owns(i) {
-    return i < STARTERS || this.owned().includes(i);
+    return (i < STARTERS && !(i in PASS_RUNNERS)) || this.owned().includes(i);
   },
   /**
    * How a price would be paid: medals of the asked type first; anything still
@@ -913,13 +916,13 @@ const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
 const STARTER_RARITY = ["common", "common", "common", "rare", "common", "rare", "rare", "epic"];
 function allChars() {
   return [
-    ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: "starter", img: portrait(i), hero: `/assets/full_${r.file}.webp`, playable: true })),
+    ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : "starter", img: portrait(i), hero: `/assets/full_${r.file}.webp`, playable: true })),
     ...COLLECTION.map((c) => ({ ...c, img: `/assets/sc_${c.id}.webp`, hero: `/assets/sc_${c.id}.webp` })),
     ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp` })),
     { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp` },
   ];
 }
-const ownsChar = (c) => c.via === "starter" || wallet.has(c.id);
+const ownsChar = (c) => (c.idx !== undefined ? wallet.owns(c.idx) : wallet.has(c.id));
 const VIA_LABEL = { starter: "Free", coins: "Coins", medals: "Medals", pack: "Packs", pass: "Season Pass" };
 const VIA_ICON = { starter: "✅", coins: "🪙", medals: "🏅", pack: "🎁", pass: "⭐" };
 function howToGet(c) {
@@ -927,7 +930,12 @@ function howToGet(c) {
   if (c.via === "coins") return `Buy it in the Shop for ${c.coins.toLocaleString()} coins.`;
   if (c.via === "medals") return `Medal exclusive: ${medalText(c.price.medal, c.price.count)}. Win medals by placing top 3 against real players, from the day 7 reward, packs and the Season Pass.`;
   if (c.via === "pack") return `Only in packs (${c.rarity}). Brain Pack: ${pct(PACK_ODDS.normal[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)} per item. Mega Pack last item: ${pct(PACK_ODDS.boosted[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)}.`;
+  if (c.idx in PASS_RUNNERS) return `Season Pass reward: free track, level ${PASS_RUNNERS[c.idx]}. Play races to earn XP.`;
   return "Season Pass exclusive: Gold track, level 30.";
+}
+/** The short lock label on a runner card you can't race with yet. */
+function lockLabel(i) {
+  return i in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[i]}` : "Locked";
 }
 function collectionCount() {
   const all = allChars();
@@ -935,7 +943,47 @@ function collectionCount() {
 }
 function renderCollPill() {
   const { got, all } = collectionCount();
-  $("#collCount").textContent = `${got}/${all}`;
+  $("#skinCount").textContent = `${got}/${all}`;
+  $("#skinBar").style.width = `${Math.round((got / all) * 100)}%`;
+  $("#skinPct").textContent = `${Math.round((got / all) * 100)}% collected`;
+}
+/** A character card: full colour even when locked (you just can't race with it yet). */
+function charCard(c, n, onClick) {
+  const owned = ownsChar(c);
+  const sel = preferredChar();
+  const can = c.via === "coins" ? wallet.coins() >= c.coins : c.via === "medals" ? Boolean(wallet.plan(c.price)) : false;
+  const tag = owned
+    ? el("small", { class: "via", text: c.playable ? (c.idx === sel ? "★ Selected" : "Playable") : "Collected" })
+    : c.via === "coins"
+      ? el("span", { class: `sprice${can ? "" : " short"}` }, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }))
+      : c.via === "medals"
+        ? el("span", { class: `sprice medal${can ? "" : " short"}` }, el("img", { src: MEDAL_IMG[c.price.medal], alt: "" }), el("b", { text: `×${c.price.count}` }))
+        : el("small", { class: "via", text: c.idx in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[c.idx]}` : `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` });
+  const b = el(
+    "button",
+    { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${c.playable && c.idx === sel ? " sel" : ""}`, type: "button", style: `--i:${n}` },
+    el("span", { class: "rar", text: c.rarity }),
+    el("img", { src: c.img, alt: "" }),
+    el("b", { text: c.name }),
+    tag,
+    owned ? null : el("i", { class: "padlock", text: "🔒" }),
+  );
+  b.addEventListener("click", () => onClick(c));
+  return b;
+}
+const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
+/** Skins: your runners first, then everything still to get, each from common to legendary. */
+function renderSkins() {
+  const all = allChars();
+  const mine = all.filter(ownsChar).sort(byRarity);
+  const rest = all.filter((c) => !ownsChar(c)).sort(byRarity);
+  let n = 0;
+  $("#skinGrid").replaceChildren(
+    el("h3", { class: "coll-head", text: `Yours · ${mine.length}` }),
+    ...mine.map((c) => charCard(c, n++, inspectChar)),
+    ...(rest.length ? [el("h3", { class: "coll-head", text: `Still to get · ${rest.length}` }), ...rest.map((c) => charCard(c, n++, inspectChar))] : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
+  );
+  renderCollPill();
 }
 
 /**
@@ -943,39 +991,12 @@ function renderCollPill() {
  * each from common to legendary) and items, all on one page.
  */
 function renderShop() {
-  const all = allChars();
-  const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
-  const mine = all.filter((c) => ownsChar(c)).sort(byRarity);
-  const rest = all.filter((c) => !ownsChar(c)).sort(byRarity);
-  const sel = preferredChar();
-  let n = 0;
-  const card = (c) => {
-    const owned = ownsChar(c);
-    const buyable = !owned && (c.via === "coins" || c.via === "medals");
-    const can = c.via === "coins" ? wallet.coins() >= c.coins : c.via === "medals" ? Boolean(wallet.plan(c.price)) : false;
-    const tag = owned
-      ? el("small", { class: "via", text: c.playable ? (c.idx === sel ? "★ Selected" : "Playable") : "Collected" })
-      : c.via === "coins"
-        ? el("span", { class: `sprice${can ? "" : " short"}` }, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }))
-        : c.via === "medals"
-          ? el("span", { class: `sprice medal${can ? "" : " short"}` }, el("img", { src: MEDAL_IMG[c.price.medal], alt: "" }), el("b", { text: `×${c.price.count}` }))
-          : el("small", { class: "via", text: `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` });
-    const b = el(
-      "button",
-      { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${buyable ? " buyable" : ""}${c.playable && c.idx === sel ? " sel" : ""}`, type: "button", style: `--i:${n++}` },
-      el("span", { class: "rar", text: c.rarity }),
-      el("img", { src: c.img, alt: "" }),
-      el("b", { text: c.name }),
-      tag,
-    );
-    const item = COLLECTION.find((x) => x.id === c.id);
-    b.addEventListener("click", () => (buyable && item ? askBuy(item) : inspectChar(c)));
-    return b;
-  };
+  // characters for sale: the coin and medal ones you don't have yet (your collection is under Skins)
+  const sale = allChars().filter((c) => (c.via === "coins" || c.via === "medals") && !ownsChar(c)).sort(byRarity);
+  $("#collCount").textContent = `${sale.length} for sale`;
   $("#shopGrid").replaceChildren(
-    el("h3", { class: "coll-head", text: `Yours · ${mine.length}` }),
-    ...mine.map(card),
-    ...(rest.length ? [el("h3", { class: "coll-head", text: `Unlock · ${rest.length}` }), ...rest.map(card)] : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
+    ...sale.map((c, n) => charCard(c, n, (x) => askBuy(COLLECTION.find((y) => y.id === x.id)))),
+    ...(sale.length ? [] : [el("p", { class: "rempty", text: "You own every character in the shop. More come from packs and the Season Pass." })]),
   );
   renderPacks();
   renderItems();
@@ -1017,6 +1038,7 @@ $("#buyOk").addEventListener("click", () => {
   stats.add("bought", 1);
   showUnlock({ kind: "char", char: { ...c, img: `/assets/sc_${c.id}.webp` } }, () => {
     if (shopShown()) renderShop();
+    if (homePage === PAGE.skins) renderSkins();
   });
   renderCollPill();
 });
@@ -1025,7 +1047,7 @@ $("#buyOk").addEventListener("click", () => {
 const charModal = $("#charModal");
 function inspectChar(c) {
   const owned = ownsChar(c);
-  $("#charHero").replaceChildren(el("i", { class: `glow ${c.rarity}` }), el("img", { class: owned ? "" : "dark", src: c.hero, alt: "" }));
+  $("#charHero").replaceChildren(el("i", { class: `glow ${c.rarity}` }), el("img", { src: c.hero, alt: "" }));
   $("#charName").textContent = c.name;
   $("#charTags").replaceChildren(el("span", { class: `tag ${c.rarity}`, text: c.rarity }), el("span", { class: "tag via", text: `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` }), c.playable ? el("span", { class: "tag play", text: "🏃 Playable" }) : el("span", { class: "tag soon", text: "Collectible · playable soon" }));
   $("#charHow").textContent = owned ? (c.playable ? c.tag ?? "" : "In your collection. 3D racing version coming soon!") : howToGet(c);
@@ -1044,6 +1066,7 @@ function inspectChar(c) {
       toast(`${c.name} selected`);
       charModal.hidden = true;
       if (shopShown()) renderShop();
+      if (homePage === PAGE.skins) renderSkins();
     };
   } else if (owned) {
     btn.textContent = "In your collection ✓";
@@ -1456,9 +1479,7 @@ function renderSoloPicker() {
   $("#soloPicker").replaceChildren(
     ...RUNNERS.map((r, i) => {
       const locked = !wallet.owns(i);
-      const sub = locked
-        ? el("small", { class: "lock" }, el("span", { text: "🔒" }), el("img", { src: MEDAL_IMG[r.price.medal], alt: "" }), el("span", { text: `×${r.price.count}` }))
-        : el("small", { text: i === cur ? "Selected" : "" });
+      const sub = locked ? el("small", { class: "lock", text: `🔒 ${lockLabel(i)}` }) : el("small", { text: i === cur ? "Selected" : "" });
       const card = el(
         "button",
         { class: `card${i === cur ? " mine" : ""}${locked ? " locked" : ""}`, type: "button", style: `--team:${r.color}` },
@@ -1469,7 +1490,7 @@ function renderSoloPicker() {
       card.addEventListener("click", () => {
         if (locked) {
           soloModal.hidden = true;
-          return openShop();
+          return inspectChar(allChars().find((c) => c.idx === i));
         }
         local.setItem("lr:char", String(i));
         world.setShowcase(i);
@@ -1551,7 +1572,7 @@ codeInput.addEventListener("keydown", (e) => e.key === "Enter" && $("#joinBtn").
 
 // ── home: three pages · Tournaments | Play | Shop ──
 const homePages = $("#homePages");
-const PAGE = { compete: 0, missions: 1, play: 2, shop: 3 };
+const PAGE = { compete: 0, skins: 1, play: 2, missions: 3, shop: 4 };
 const PAGE_NAMES = Object.keys(PAGE);
 let homePage = PAGE.play;
 function setHomePage(i, animate = true) {
@@ -1566,6 +1587,7 @@ function setHomePage(i, animate = true) {
   }
   if (homePage === PAGE.compete) renderCompete();
   if (homePage === PAGE.missions) renderDaily();
+  if (homePage === PAGE.skins) renderSkins();
   if (homePage === PAGE.shop) {
     mountShop($("#shopHome"));
     renderShop();
@@ -1925,9 +1947,7 @@ function renderLobby(v) {
     const owner = v.players.find((p) => p.char === i);
     const mine = owner?.id === playerId;
     const locked = !wallet.owns(i);
-    const sub = locked
-      ? el("small", { class: "lock" }, el("span", { text: "🔒" }), el("img", { src: MEDAL_IMG[r.price.medal], alt: "" }), el("span", { text: `×${r.price.count}` }))
-      : el("small", { text: mine ? "You" : owner ? owner.name : "" });
+    const sub = locked ? el("small", { class: "lock", text: `🔒 ${lockLabel(i)}` }) : el("small", { text: mine ? "You" : owner ? owner.name : "" });
     const card = el(
       "button",
       { class: `card${mine ? " mine" : ""}${owner && !mine ? " taken" : ""}${locked ? " locked" : ""}`, type: "button", style: `--team:${r.color}` },
@@ -1936,7 +1956,7 @@ function renderLobby(v) {
       sub,
     );
     card.addEventListener("click", () => {
-      if (locked) return openShop();
+      if (locked) return inspectChar(allChars().find((c) => c.idx === i));
       if (owner && !mine) return toast(`${r.name} is taken by ${owner.name}`);
       if (!mine) {
         local.setItem("lr:char", String(i));
@@ -5316,6 +5336,11 @@ function savePass(p) {
   local.setItem("lr:pass", JSON.stringify(p));
   renderPassPill();
 }
+// Kiko moved to the Season Pass: anyone who already claimed that level this season gets him now
+if (!local.getItem("lr:kikoMove")) {
+  local.setItem("lr:kikoMove", "1");
+  if (passState().free.includes(PASS_RUNNERS[KIKO])) giveItem(KIKO);
+}
 function passLevel(xp) {
   return Math.min(PASS_LEVELS, Math.floor(xp / PASS_XP) + 1);
 }
@@ -5332,6 +5357,8 @@ function passXp(n) {
 /** What each level gives. Free: coins, medals, packs, a trail. Gold: more of everything, exclusives, and the level-30 character. */
 function passReward(level, track) {
   if (track === "free") {
+    if (level === 1) return { pack: "brain", label: "Brain Pack", img: "/assets/pack_brain.webp" };
+    if (level === PASS_RUNNERS[KIKO]) return { runner: KIKO, label: RUNNERS[KIKO].name, img: portrait(KIKO) };
     if (level === 30) return { item: "trail:gold", label: "Golden trail", icon: "✨" };
     if (level % 10 === 5) return { pack: "brain", label: "Brain Pack", img: "/assets/pack_brain.webp" };
     if (level % 4 === 0) return { medal: level >= 20 ? "silver" : "bronze", label: `${level >= 20 ? "Silver" : "Bronze"} medal`, img: MEDAL_IMG[level >= 20 ? "silver" : "bronze"] };
@@ -5372,6 +5399,18 @@ function claimPass(level, track, tile) {
   } else if (r.char) {
     giveItem(r.char);
     renderCollPill();
+  } else if (r.runner !== undefined) {
+    // Kiko again in a later season: you already have him, so it pays coins
+    if (wallet.owns(r.runner)) {
+      wallet.addCoins(500);
+      coinRain(tile, 12);
+      toast(`${r.label} is already yours: +500 coins`);
+    } else {
+      giveItem(r.runner);
+      renderCollPill();
+      passModal.hidden = true;
+      showUnlock({ kind: "char", char: { name: r.label, rarity: STARTER_RARITY[r.runner], img: portrait(r.runner) } });
+    }
   }
   else if (r.pack) {
     const pk = PACKS.find((x) => x.id === r.pack);

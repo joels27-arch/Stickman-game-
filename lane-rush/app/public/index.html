@@ -68,19 +68,12 @@
             <div id="tourneyList" class="tourney-list"></div>
           </div>
         </div>
-        <!-- MISSIONS: daily, career and trophies, open right on the page -->
-        <div class="hpage hp-side hp-missions" id="hpMissions" aria-label="Missions">
+        <!-- SKINS: your runners first, then every one still to get -->
+        <div class="hpage hp-side hp-skins" id="hpSkins" aria-label="Skins">
           <div class="hp-scroll">
-            <div class="ribbon pink hp-ribbon"><h2>Missions</h2></div>
-            <div class="gtabs mission-tabs" role="tablist">
-              <button id="tabDaily" class="gtab on" type="button">Daily <i class="dot" id="dailyDot" hidden></i></button>
-              <button id="tabCareer" class="gtab" type="button">Career <i class="dot" id="careerDot" hidden></i></button>
-              <button id="tabAll" class="gtab" type="button">Trophies <i class="dot" hidden></i></button>
-            </div>
-            <div class="gsub" id="questHead"><span class="reset-badge"><img src="/assets/ui_watch.webp" alt="" /><span>New in <b id="questReset">--:--:--</b></span></span><p id="questSub"></p></div>
-            <div id="questList" class="quest-list"></div>
-            <div id="careerList" class="quest-list career-list" hidden></div>
-            <div id="achList" class="quest-list" hidden></div>
+            <div class="ribbon teal hp-ribbon"><h2>Skins</h2></div>
+            <div class="coll-progress"><b id="skinCount">0/0</b><div class="qbar"><i id="skinBar"></i><span id="skinPct"></span></div></div>
+            <div id="skinGrid" class="coll-grid"></div>
           </div>
         </div>
         <!-- PLAY -->
@@ -100,6 +93,21 @@
               <p id="homeMsg" class="msg" role="alert"></p>
               <p class="hint" id="loadHint">Loading 3D runners…</p>
             </div>
+          </div>
+        </div>
+        <!-- MISSIONS: daily, career and trophies, open right on the page -->
+        <div class="hpage hp-side hp-missions" id="hpMissions" aria-label="Missions">
+          <div class="hp-scroll">
+            <div class="ribbon pink hp-ribbon"><h2>Missions</h2></div>
+            <div class="gtabs mission-tabs" role="tablist">
+              <button id="tabDaily" class="gtab on" type="button">Daily <i class="dot" id="dailyDot" hidden></i></button>
+              <button id="tabCareer" class="gtab" type="button">Career <i class="dot" id="careerDot" hidden></i></button>
+              <button id="tabAll" class="gtab" type="button">Trophies <i class="dot" hidden></i></button>
+            </div>
+            <div class="gsub" id="questHead"><span class="reset-badge"><img src="/assets/ui_watch.webp" alt="" /><span>New in <b id="questReset">--:--:--</b></span></span><p id="questSub"></p></div>
+            <div id="questList" class="quest-list"></div>
+            <div id="careerList" class="quest-list career-list" hidden></div>
+            <div id="achList" class="quest-list" hidden></div>
           </div>
         </div>
         <!-- RIGHT: shop, season pass and the rest -->
@@ -123,9 +131,10 @@
       </div>
       <nav class="home-tabs" role="tablist" aria-label="Home pages">
         <button class="htab" type="button" role="tab" data-page="0"><img src="/assets/tab_trophy.webp" alt="" /><span>Tournaments</span></button>
-        <button class="htab" type="button" role="tab" data-page="1"><img src="/assets/tab_missions.webp" alt="" /><span>Missions</span><i class="dot" hidden></i></button>
+        <button class="htab" type="button" role="tab" data-page="1"><img src="/assets/tab_skins.webp" alt="" /><span>Skins</span></button>
         <button class="htab on" type="button" role="tab" data-page="2"><img src="/assets/tab_play.webp" alt="" /><span>Play</span></button>
-        <button class="htab" type="button" role="tab" data-page="3"><img src="/assets/tab_shop.webp" alt="" /><span>Shop</span><i class="dot" hidden></i></button>
+        <button class="htab" type="button" role="tab" data-page="3"><img src="/assets/tab_missions.webp" alt="" /><span>Missions</span><i class="dot" hidden></i></button>
+        <button class="htab" type="button" role="tab" data-page="4"><img src="/assets/tab_shop.webp" alt="" /><span>Shop</span><i class="dot" hidden></i></button>
       </nav>
     </section>
 
@@ -406,7 +415,7 @@
               <div id="packAlbum" class="pack-album"></div>
               <p class="shop-note" id="packOdds"></p>
             </div>
-            <h3 class="shop-sec" id="sec-chars"><img src="/assets/sc_luna.webp" alt="" /><span>Characters</span><small id="collCount">0/24</small></h3>
+            <h3 class="shop-sec" id="sec-chars"><img src="/assets/sc_luna.webp" alt="" /><span>Characters</span><small id="collCount">0 for sale</small></h3>
             <div id="shopGrid" class="coll-grid shop-chars"></div>
             <h3 class="shop-sec" id="sec-items"><img src="/assets/ui_shoe.webp" alt="" /><span>Items</span><small>Trails · celebrations · emotes</small></h3>
             <div id="itemView" class="pack-view item-view"></div>

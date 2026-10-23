@@ -54,7 +54,8 @@ chapter chests. Bots never pay medals (they do pay coins).
 
 | Group | Unlock | Count |
 |---|---|---|
-| Starters | free, playable in 3D | 8 |
+| Starters | free, playable in 3D | 7 |
+| Kiko (3D) | Season Pass, free track level 2 (level 1 is a Brain Pack) | 1 |
 | Coin characters | coins only (800–4,500 by rarity) | 6 |
 | Medal exclusives | medals only (4–6 silver, 3–5 gold) | 4 |
 | Pack exclusives | packs only | 5 |
@@ -87,14 +88,13 @@ because new keys are added alongside the old ones.
 
 ## Home pages
 
-The home screen is four pages with a tab bar (swipe or tap): **Tournaments**,
-**Missions** (daily, career and trophies, open on the page), **Play** (the
-default) and **Shop**.
+The home screen is five pages with a tab bar (swipe or tap): **Tournaments**,
+**Skins** (your runners first, then every one still to get, common to
+legendary), **Play** (the default, in the middle), **Missions** (daily, career
+and trophies) and **Shop** (Season Pass, packs, characters for sale, items).
 
-* The Shop page shows everything at once, with no category tiles: the Season
-  Pass, packs, every character (yours first, then the ones still to get, from
-  common to legendary; coin and medal ones show their price) and items. Opened
-  from the lobby or results, the same shop appears on its own screen.
+* Characters you don't have are shown in full colour with a lock; you just
+  can't race with them yet.
 * The top bar shows only your medals and Settings; the Shop page adds coins,
   the daily reward and your league badge.
 * Your name is asked once, the first time the game opens, and can be changed in
