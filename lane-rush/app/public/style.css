@@ -1632,3 +1632,43 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .acard img, .acard:not(.got) img { filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35)); opacity: 1; }
 .acard { position: relative; }
 .acard .padlock { position: absolute; top: 18px; right: 2px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: rgba(10, 14, 40, 0.75); border: 2px solid #fff; font-style: normal; font-size: 10px; }
+
+/* shop: section names as plain titles, no boxes */
+.shop-sec { margin: 16px 2px 0; padding: 0; border: 0; border-radius: 0; background: none; gap: 8px; }
+.shop-sec img { width: 30px; height: 30px; }
+.shop-sec span { font-size: 21px; }
+
+/* skins: the "% collected" text fits inside its bar */
+.hp-skins .coll-progress .qbar { height: 22px; margin: 0; }
+.hp-skins .coll-progress .qbar span { line-height: 22px; font-size: 13px; }
+.hp-skins .coll-progress > b { font-size: 22px; white-space: nowrap; }
+
+/* tournaments: compact cards */
+.hp-compete .hp-scroll > * + * { margin-top: 10px; }
+.league-card { padding: 8px 12px; gap: 10px; grid-template-columns: 46px minmax(0, 1fr) auto; }
+.league-card img { width: 46px; height: 46px; }
+.league-card b { font-size: 20px; }
+.tourney-list { gap: 10px; }
+.tcard { padding: 10px 12px 12px; border-radius: 18px; }
+.tc-head { grid-template-columns: 46px minmax(0, 1fr); gap: 10px; }
+.tc-head img { width: 46px; height: 46px; }
+.tc-head b { font-size: 21px; }
+.tc-head em { font-size: 10px; }
+.tc-head span { font-size: 12px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.wl-row { margin-top: 8px; }
+.wl-pips i { width: 11px; height: 11px; border-width: 2px; border-radius: 3px; }
+.wl-row b { font-size: 17px; }
+.wl-track { height: 9px; margin: 14px 12px 30px 4px; }
+.wl-tier img { width: 24px; height: 24px; }
+.wl-tier small { font-size: 10px; }
+.wl-tier em { font-size: 9px; }
+.tc-prizes { margin-top: 8px; gap: 5px; }
+.tc-prizes > small { flex-basis: auto; font-size: 10px; }
+.prz { padding: 2px 7px 2px 4px; font-size: 12px; }
+.prz b { font-size: 10px; }
+.prz .coin { width: 12px; height: 12px; }
+.tc-note { margin-top: 5px; font-size: 11px; }
+.tc-btns { margin-top: 10px; gap: 8px; }
+.tc-btns .btn.big { min-height: 40px; font-size: 16px; border-width: 2px; border-radius: 12px; }
+.tc-btns .btn.go { box-shadow: 0 3px 0 #3f7a00; }
+.tc-btns .btn.blue { box-shadow: 0 3px 0 #123a8a; }

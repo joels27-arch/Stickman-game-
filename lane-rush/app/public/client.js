@@ -1182,18 +1182,6 @@ function renderPacks() {
       );
     }),
   );
-  const owned = PACK_CHARS.filter((c) => wallet.has(c.id)).length;
-  $("#albumCount").textContent = `${owned}/${PACK_CHARS.length}`;
-  $("#packAlbum").replaceChildren(
-    ...PACK_CHARS.map((c) => el(
-      "div",
-      { class: `acard ${c.rarity}${wallet.has(c.id) ? " got" : ""}` },
-      el("span", { class: "rar", text: c.rarity }),
-      el("img", { src: `/assets/pk_${c.id}.webp`, alt: "" }),
-      el("b", { text: c.name }),
-      wallet.has(c.id) ? null : el("i", { class: "padlock", text: "🔒" }),
-    )),
-  );
   const n = PACK_ODDS.normal;
   $("#packOdds").textContent = `Odds per item: legendary ${pct(n.legendary)} · epic ${pct(n.epic)} · rare ${pct(n.rare)} · medal ${pct(n.gold + n.silver + n.bronze)} · coins ${pct(1 - Object.values(n).reduce((a, b) => a + b, 0))}. Mega Pack's last item: legendary 3% · epic 15% · rare 40%. Duplicates turn into coins. Pack characters are collectibles for now.`;
   renderWallet();
