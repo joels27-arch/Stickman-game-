@@ -1399,3 +1399,19 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 #soloModal .sheet { overflow-y: auto; }
 #soloModal .spotlight { border-radius: 18px; overflow: hidden; }
 #soloModal .card { border-radius: 14px; clip-path: none; }
+
+/* results on phones: stack the header, keep rewards and buttons inside the card */
+#results .res-head > div { min-width: 0; }
+#results .res-reward { max-width: 100%; }
+#results .lobby-actions { flex-wrap: wrap; }
+@media (max-width: 560px) {
+  #results .res-head { flex-direction: column; text-align: center; gap: 10px; }
+  #results .res-place { width: 76px; height: 76px; font-size: 40px; }
+  #results .title { font-size: 24px; }
+  #results .res-reward { justify-content: center; font-size: 18px; }
+  #results .lobby-actions .btn.big { flex: 1 1 100%; order: -1; }
+  #results .lobby-actions .btn.small { flex: 1 1 0; }
+}
+/* line-up name tags never spill into the next runner */
+.ped .tag { max-width: 100%; grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 560px) { .ped .tag b { font-size: 13px; } .ped .tag span { font-size: 10px; letter-spacing: 0.06em; } }
