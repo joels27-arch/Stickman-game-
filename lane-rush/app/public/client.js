@@ -33,6 +33,7 @@ import {
   runSpeed,
   BANANA_BEHIND_M,
   CUP_POINTS,
+  SLOW_PAD_MS,
   ROUND_OPTIONS,
   ROUND_KINDS,
   MAPS,
@@ -191,6 +192,7 @@ const POWER_INFO = {
   brainwave: { label: "Brain Wave", hint: "Flips left and right for everyone ahead" },
   thunder: { label: "Thundercloud", hint: "Storms the leader: pass it on or get zapped" },
   swap: { label: "Mind Swap", hint: "Swap places with the runner ahead" },
+  mud: { label: "Mud Splash", hint: "Splats mud over the screens of everyone ahead" },
 };
 const WAVE_S = 4; // brain wave: controls flipped this long
 const GLUE_SLOW = 0.45; // speed factor while stuck in glue
@@ -619,7 +621,71 @@ $("#nameForm").addEventListener("submit", (e) => {
   }
   sfx.unlock();
   nameModal.hidden = true;
+  if (!local.getItem("lr:tour")) setTimeout(startTour, 450); // first visit: the quick tour
 });
+// ── first-visit tour: a spotlight on each part of the app, skippable, ending on the endless run ──
+const TOUR = [
+  { sel: null, title: "Welcome to 4 Friends!", text: "A Subway-Surfers-style runner you play against your friends. Quick tour? Takes 20 seconds." },
+  { sel: "#roomRow", title: "Play with friends", text: "Create a room and share the code, or Join a friend's. Up to 4 runners, bots fill empty spots." },
+  { sel: "#soloBtn", title: "Game modes", text: "Survival, Brain Chase, Coin Rush, Hot Potato and more, against bots you can make easy or hard." },
+  { sel: "#profileCard", title: "You", text: "Your name and league. Tap it for your stats: wins, records and how you rank among friends." },
+  { sel: "#roadMini", title: "Gold Road", text: "Every gold medal you win moves you along it: coins, packs and three exclusive characters." },
+  { sel: '.htab[data-page="0"]', title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
+  { sel: '.htab[data-page="1"]', title: "Skins", text: "All your characters. Pick who you race with." },
+  { sel: '.htab[data-page="3"]', title: "Missions", text: "Daily missions, your career and the full Gold Road." },
+  { sel: '.htab[data-page="4"]', title: "Shop", text: "Packs, characters, trails and the Season Pass." },
+  { sel: "#endlessBtn", title: "Start here!", text: "Your first endless run: one life, how far can you get? Tap the button to run.", last: true },
+];
+const tourEl = $("#tour");
+let tourAt = 0;
+function startTour() {
+  if (homePage !== PAGE.play) setHomePage(PAGE.play);
+  tourAt = 0;
+  tourEl.hidden = false;
+  renderTour();
+}
+function renderTour() {
+  const st = TOUR[tourAt];
+  $("#tourTitle").textContent = st.title;
+  $("#tourText").textContent = st.text;
+  $("#tourCount").textContent = `${tourAt + 1} / ${TOUR.length}`;
+  $("#tourNext").textContent = st.last ? "Run! →" : tourAt === 0 ? "Show me" : "Next";
+  const hole = $("#tourHole");
+  const tip = $("#tourTip");
+  const target = st.sel ? document.querySelector(st.sel) : null;
+  const r = target?.getBoundingClientRect();
+  if (!r || !r.width) {
+    // no target: a dimmed screen with the tip in the middle
+    hole.style.cssText = "left:50%;top:45%;width:0;height:0";
+    tip.style.cssText = "left:50%;top:40%;transform:translate(-50%,-50%)";
+  } else {
+    const pad = 6;
+    hole.style.cssText = `left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px`;
+    // the tip goes below the target if there's room, else above it
+    const below = r.bottom + 170 < innerHeight;
+    const left = Math.max(12, Math.min(innerWidth - 12 - Math.min(320, innerWidth - 24), r.left + r.width / 2 - 160));
+    tip.style.cssText = below ? `left:${left}px;top:${r.bottom + 14}px` : `left:${left}px;top:${r.top - 14}px;transform:translateY(-100%)`;
+  }
+  tourEl.classList.toggle("last", Boolean(st.last));
+}
+function endTour(thenRun) {
+  tourEl.hidden = true;
+  local.setItem("lr:tour", "1");
+  if (!thenRun) return;
+  // straight into the run (and its own short how-to), as soon as the runners have loaded
+  const go = () => ($("#endlessBtn").disabled ? setTimeout(go, 300) : $("#endlessBtn").click());
+  go();
+}
+$("#tourNext").addEventListener("click", () => {
+  sfx.tap();
+  if (TOUR[tourAt].last) return endTour(true);
+  tourAt += 1;
+  renderTour();
+});
+$("#tourSkip").addEventListener("click", () => endTour(false));
+// on the last step the highlighted Endless run button itself starts the run
+$("#tourHole").addEventListener("click", () => TOUR[tourAt].last && endTour(true));
+addEventListener("resize", () => !tourEl.hidden && renderTour());
 nameInput.addEventListener("change", () => {
   if (!saveName(nameInput.value)) nameInput.value = local.getItem("lr:name") || "";
   else toast("Name saved");
@@ -636,6 +702,8 @@ function openJoin(open) {
   if (open) setTimeout(() => codeInput.focus(), 30);
 }
 $("#joinOpen").addEventListener("click", () => openJoin(true));
+// matchmaking with strangers isn't built yet
+$("#onlineBtn").addEventListener("click", () => toast("🌍 Online races with strangers are coming soon!"));
 $("#joinClose").addEventListener("click", () => openJoin(false));
 const joinParam = new URLSearchParams(location.search).get("join");
 if (joinParam) {
@@ -1469,7 +1537,7 @@ function onState(msg) {
       game.endlessSent = true;
       if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
       if (v.map !== "random") act({ type: "map", map: "random" });
-      act({ type: "start", bots: false });
+      act({ type: "start", bots: false, endless: true });
     }
     return;
   }
@@ -1580,8 +1648,58 @@ function renderEndlessBest() {
 $("#endlessBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
+  if (!local.getItem("lr:endlessTut")) return showTutorial(startEndless);
   startEndless();
 });
+// ── the first-run tutorial: everything you need, a few seconds each, skippable ──
+const TUT_STEPS = [
+  { icon: "👈 👉", title: "Swipe left or right", text: "to change lanes. Dodge crates, cows, taxis and anything else in your lane." },
+  { icon: "👆", title: "Swipe up to jump", text: "over hurdles, rolling barrels, logs and footballs. A tap jumps too." },
+  { icon: "👇", title: "Swipe down to slide", text: "under gates and anything flying at head height: bees, pigeons, drones." },
+  { icon: "🎁", title: "Grab the mystery boxes", text: "for a power-up. Tap the round button bottom left to use it: shield, rocket, lightning…" },
+  { icon: "🍌", title: "Throw things", text: "Bananas, glue and bowling balls: pick a lane on the mini track, then Throw ahead or Drop behind." },
+  { icon: "⚡", title: "Go faster and faster", text: "Run over speed pads for a boost, and hold 👀 Look back to see who's behind. The longer you run, the faster it gets." },
+  { icon: "❤️", title: "One life", text: "In the endless run one hit ends it. How far can you get?" },
+];
+const tutModal = $("#tutModal");
+let tutDone = null;
+let tutAt = 0;
+let tutTimer = null;
+function showTutorial(then) {
+  tutDone = then;
+  tutAt = 0;
+  tutModal.hidden = false;
+  renderTutStep();
+}
+function renderTutStep() {
+  const st = TUT_STEPS[tutAt];
+  $("#tutStep").replaceChildren(el("i", { class: "tut-icon", text: st.icon }), el("b", { text: st.title }), el("p", { text: st.text }));
+  $("#tutDots").replaceChildren(...TUT_STEPS.map((_, i) => el("i", { class: i === tutAt ? "on" : i < tutAt ? "done" : "" })));
+  $("#tutNext").textContent = tutAt === TUT_STEPS.length - 1 ? "Let's run! →" : "Next";
+  // it moves on by itself after a few seconds, so it never holds you up
+  clearTimeout(tutTimer);
+  if (tutAt < TUT_STEPS.length - 1) tutTimer = setTimeout(nextTut, 2600);
+}
+function nextTut() {
+  if (tutModal.hidden) return;
+  if (tutAt >= TUT_STEPS.length - 1) return endTut();
+  tutAt += 1;
+  sfx.tap();
+  renderTutStep();
+}
+function endTut() {
+  clearTimeout(tutTimer);
+  tutModal.hidden = true;
+  local.setItem("lr:endlessTut", "1");
+  local.setItem("lr:tutDone", "1"); // the swipe card isn't needed after this
+  const then = tutDone;
+  tutDone = null;
+  then?.();
+}
+$("#tutNext").addEventListener("click", nextTut);
+$("#packOdds").addEventListener("click", (e) => e.currentTarget.classList.toggle("open")); // the pack odds: 2 lines, tap for all
+$("#tutSkip").addEventListener("click", endTut);
+$("#tutStep").addEventListener("click", nextTut);
 $("#soloBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
@@ -2416,10 +2534,10 @@ $("#botToggle").addEventListener("change", (e) => {
 $("#nextBtn").addEventListener("click", () => act({ type: "next" }));
 $("#copyBtn").addEventListener("click", async () => {
   const url = `${location.origin}/?join=${net.code}`;
-  const text = `Race me in Brain Run! Code ${net.code} → ${url}`;
+  const text = `Race me in 4 Friends! Code ${net.code} → ${url}`;
   try {
     if (navigator.share && matchMedia("(pointer: coarse)").matches) {
-      await navigator.share({ title: "Brain Run", text, url });
+      await navigator.share({ title: "4 Friends", text, url });
     } else {
       await navigator.clipboard.writeText(url);
       $("#copyMsg").textContent = "Link copied!";
@@ -2461,9 +2579,9 @@ function renderResults(v) {
         : v.kind === "chase"
           ? `${Math.round(p.d)} m · ${p.outAt != null ? "caught by the brain" : "escaped!"}`
           : v.kind === "potato"
-            ? `${Math.round(p.d)} m · ${Math.max(0, LIVES - (p.booms ?? 0))} ❤️ left`
+            ? `${Math.round(p.d)} m · ${Math.max(0, livesNow() - (p.booms ?? 0))} ❤️ left`
             : survival
-        ? `${Math.round(p.d)} m · ${Math.max(0, LIVES - p.hits)} ❤️ left`
+        ? `${Math.round(p.d)} m · ${Math.max(0, livesNow() - p.hits)} ❤️ left`
         : p.finish !== null
           ? `${p.hits} bump${p.hits === 1 ? "" : "s"}`
           : `${Math.round(p.d)} m of ${TRACK_LEN} m`;
@@ -2534,10 +2652,9 @@ function renderResults(v) {
   } else if (cup && !cupDone) {
     reward.append(el("span", { class: "nomedal", text: `+${CUP_POINTS[v.standings.indexOf(playerId)] ?? 0} points · medals are paid after round ${cup.races.length}` }));
   } else if (myPlace && v.players.filter((p) => !p.bot).length >= MIN_RACERS_FOR_MEDALS) {
-    reward.append(el("span", {
-      class: "nomedal",
-      text: v.players.filter((p) => !p.bot).length < MIN_RACERS_FOR_MEDALS ? "Medals are won in races with 2 or more players" : "No medal this time. Top 3 win medals!",
-    }));
+    // no medal, but every place counts: off the podium is still +1 league point
+    if (rpChange) rank.add(LAST_PLACE_PTS);
+    reward.append(el("span", { class: "nomedal", text: "No medal this time. Top 3 win medals!" }));
   }
   if (rpChange) {
     reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
@@ -3953,9 +4070,42 @@ const world = (() => {
       raceGroup.add(pad);
       cullables.push({ obj: pad, z: b.z });
     }
+    // red slow pads: the boost pad turned round (arrows pointing back) and painted red
+    for (const b of course.slows ?? []) {
+      let pad;
+      if (assets.props.boostPad) {
+        pad = assets.props.boostPad.clone();
+        pad.traverse((o) => {
+          if (o.isMesh) o.material = slowPadMat(o.material);
+        });
+        pad.rotation.y = Math.PI;
+        pad.position.set(laneX(b.lane), 0.02, -b.z);
+      } else {
+        pad = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.6), new THREE.MeshBasicMaterial({ map: padTex, color: "#ff3b3b", transparent: true, opacity: 0.95 }));
+        pad.rotation.set(-Math.PI / 2, 0, Math.PI);
+        pad.position.set(laneX(b.lane), 0.075, -b.z);
+      }
+      raceGroup.add(pad);
+      cullables.push({ obj: pad, z: b.z });
+    }
     return course;
   }
 
+  const slowMats = new Map();
+  /** The boost pad's material, recoloured red for a slow pad (made once per source material). */
+  function slowPadMat(m) {
+    if (Array.isArray(m)) return m.map(slowPadMat);
+    if (!slowMats.has(m)) {
+      const c = m.clone();
+      if (c.color) c.color.set("#ff4a3d");
+      if (c.emissive) {
+        c.emissive.set("#a01010");
+        c.emissiveIntensity = 0.6;
+      }
+      slowMats.set(m, c);
+    }
+    return slowMats.get(m);
+  }
   // thrown bananas: they drop out of the sky onto their lane, and vanish once someone slips
   const bananaMeshes = new Map(); // id -> {obj, born}
   function syncBananas(list, gone) {
@@ -4180,8 +4330,15 @@ const world = (() => {
   let coinList = [];
   let looseMeshes = new Map();
   const coinGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.14, 24);
-  const coinMat = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.2, roughness: 0.35, emissive: 0xb07a00, emissiveIntensity: 0.55 });
-  const bigCoinMat = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.2, roughness: 0.3, emissive: 0xc05000, emissiveIntensity: 0.6 });
+  // the Higgsfield "4" coin on both faces, a gold rim round the edge
+  const coinFace = texLoader.load("/assets/coin_face.jpg");
+  coinFace.colorSpace = THREE.SRGBColorSpace;
+  const coinRim = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.2, roughness: 0.35, emissive: 0xb07a00, emissiveIntensity: 0.55 });
+  const coinFaceMat = new THREE.MeshStandardMaterial({ map: coinFace, metalness: 0.1, roughness: 0.4, emissive: 0x6a4400, emissiveIntensity: 0.45 });
+  const bigRim = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.2, roughness: 0.3, emissive: 0xc05000, emissiveIntensity: 0.6 });
+  const bigFaceMat = new THREE.MeshStandardMaterial({ map: coinFace, color: 0xffb46a, metalness: 0.1, roughness: 0.35, emissive: 0x8a3a00, emissiveIntensity: 0.5 });
+  const coinMat = [coinRim, coinFaceMat, coinFaceMat];
+  const bigCoinMat = [bigRim, bigFaceMat, bigFaceMat];
   function makeCoin(big) {
     const m = new THREE.Mesh(coinGeo, big ? bigCoinMat : coinMat);
     m.rotation.x = Math.PI / 2;
@@ -4501,6 +4658,8 @@ const game = { mode: "home", round: -1, kind: "survival", len: TRACK_LEN };
 // every mode now runs on the endless course; only Survival uses obstacle hearts
 const isSurvival = () => isEndless(game.kind);
 const heartsFromHits = () => game.kind === "survival";
+/** Hearts this race (3, or 1 in an endless run), as the room says. */
+const livesNow = () => net.view?.lives ?? LIVES;
 const POWER_HITS = new Set(["zap", "banana", "bowling", "fake"]);
 /** Hearts the room gave out: gone for everyone, and +1 heart for whoever got it (once). */
 function healFromHearts() {
@@ -4631,7 +4790,7 @@ function enterRace(v) {
   remote.clear();
   race.course = world.buildCourseObjects(v.seed, game.len, v.courseBoost ?? 0);
   // hearts only exist in modes where you have hearts to win back
-  if (v.kind !== "survival") for (const h of world.hearts) h.taken = true;
+  if (v.kind !== "survival" || (v.lives ?? LIVES) < 2) for (const h of world.hearts) h.taken = true; // none in a one-life endless run
   game.healed = new Set();
   showScreen("race");
 
@@ -4650,6 +4809,7 @@ function enterRace(v) {
     frozenT: 0,
     waveT: 0,
     glueT: 0,
+    slowPadT: 0,
     staggerT: 0,
     warp: mine?.warp ?? 0,
     lastPunch: Math.max(0, ...(v.punches || []).map((x) => x.id)),
@@ -4910,6 +5070,7 @@ function stepMe(dt) {
   me.frozenT = Math.max(0, me.frozenT - dt);
   me.waveT = Math.max(0, (me.waveT ?? 0) - dt);
   me.glueT = Math.max(0, (me.glueT ?? 0) - dt);
+  me.slowPadT = Math.max(0, (me.slowPadT ?? 0) - dt);
   me.staggerT = Math.max(0, (me.staggerT ?? 0) - dt);
   if (me.power) {
     me.powerT = Math.max(0, me.powerT - dt);
@@ -4926,6 +5087,7 @@ function stepMe(dt) {
   let base = runSpeed(game.kind, (serverNow() - v.startAt) / 1000);
   if (me.frozenT > 0) base *= 0.55;
   if (me.glueT > 0) base *= GLUE_SLOW;
+  if (me.slowPadT > 0) base *= 0.55; // ran over a red slow pad
   if (me.staggerT > 0) base *= 0.6;
   if (net.view?.bomb?.holder === playerId) base *= 1.15; // catch someone and pass it on!
   const fast = base + (isSurvival() ? SURVIVAL_BOOST : BOOST_SPEED - BASE_SPEED);
@@ -5052,6 +5214,16 @@ function stepMe(dt) {
     }
     hit(b.kind === "fake" ? "fake" : "banana");
   }
+  for (const b of course.slows ?? []) {
+    if (b.z < prevD - 1 || b.z > me.d + 1) continue;
+    if (Math.abs(me.x - b.lane) < 0.5 && me.y < 0.5 && me.power !== "rocket" && (me.slowPadT ?? 0) <= 0) {
+      me.slowPadT = SLOW_PAD_MS / 1000;
+      me.boostT = 0;
+      sfx.slip();
+      buzz(40);
+      banner("🐢 SLOWED!", 700);
+    }
+  }
   for (const b of course.boosts) {
     if (b.z < prevD - 1 || b.z > me.d + 1) continue;
     if (Math.abs(me.x - b.lane) < 0.5 && me.y < 0.5 && me.boostT < BOOST_S - 0.2) {
@@ -5081,7 +5253,7 @@ function hit(kind) {
   renderCombo();
   if (heartsFromHits() && !fromPower) {
     renderHearts(true);
-    if (me.hits >= LIVES) {
+    if (me.hits >= livesNow()) {
       knockOut();
       return;
     }
@@ -5180,7 +5352,7 @@ function announce(prev, v) {
   const fresh = (list, set) => (list || []).filter((x) => !set.has(x.id) && set.add(x.id));
   for (const z of fresh(v.zaps, seen.zaps)) {
     if (z.kind === "thunder") continue; // the hit line covers it
-    feed({ freeze: `❄️ ${nameOf(z.by)} froze everyone`, brainwave: `🌀 ${nameOf(z.by)} sent a brain wave` }[z.kind] ?? `⚡ ${nameOf(z.by)} called lightning`);
+    feed({ freeze: `❄️ ${nameOf(z.by)} froze everyone`, brainwave: `🌀 ${nameOf(z.by)} sent a brain wave`, mud: `🟤 ${nameOf(z.by)} threw mud` }[z.kind] ?? `⚡ ${nameOf(z.by)} called lightning`);
   }
   for (const b of fresh(v.bowls, seen.bowls)) feed(`🎳 ${nameOf(b.by)} rolled a bowling ball ${b.dir > 0 ? "ahead" : "back"}`);
   for (const b of fresh(v.bananas, seen.bananas)) {
@@ -5530,8 +5702,9 @@ streakModal.addEventListener("click", (e) => e.target === streakModal && (streak
 renderStreak();
 // ── ranking: leagues climbed with medal points ──
 
-/** Leagues are climbed with medal points only: every medal you earn counts, spending them doesn't. */
+/** Leagues are climbed with medal points: every medal you earn counts, spending them doesn't. Off the podium still gets 1. */
 const MEDAL_PTS = { gold: 10, silver: 5, bronze: 3 };
+const LAST_PLACE_PTS = 1;
 const LEAGUES = [
   { id: "bronze", name: "Bronze", min: 0, steps: [0, 10, 20] },
   { id: "silver", name: "Silver", min: 40, steps: [40, 60, 80] },
@@ -6408,9 +6581,9 @@ function renderHearts(pop) {
   box.style.display = shown ? "" : "none";
   if (!shown) return;
   const lost = game.kind === "potato" ? net.view?.players.find((p) => p.id === playerId)?.booms ?? 0 : me.hits;
-  const left = Math.max(0, LIVES - lost);
+  const left = Math.max(0, livesNow() - lost);
   box.replaceChildren(
-    ...Array.from({ length: LIVES }, (_, i) => el("i", { class: i < left ? "" : `lost${pop && i === left ? " pop" : ""}`, text: "❤️" })),
+    ...Array.from({ length: livesNow() }, (_, i) => el("i", { class: i < left ? "" : `lost${pop && i === left ? " pop" : ""}`, text: "❤️" })),
   );
 }
 
@@ -6584,6 +6757,13 @@ function activatePower(kind) {
     renderPower();
     return;
   }
+  if (kind === "mud") {
+    act({ type: "zap", kind: "mud" });
+    sfx.pop();
+    banner("🟤 MUD SPLASH!", 900);
+    renderPower();
+    return;
+  }
   if (kind === "lightning") {
     act({ type: "zap", kind: "lightning" });
     sfx.zap();
@@ -6640,6 +6820,19 @@ function checkZaps() {
       me.waveT = WAVE_S;
       sfx.zap();
       banner("🌀 BRAIN WAVE! LEFT IS RIGHT!", 1300);
+      continue;
+    }
+    if (z.kind === "mud") {
+      if (me.finished || me.out || me.d <= z.d) continue;
+      if (me.power === "shield") {
+        endPower();
+        sfx.pop();
+        banner("SHIELD BLOCKED THE MUD", 900);
+        continue;
+      }
+      if (me.power === "rocket") continue;
+      mudSplat();
+      sfx.hit();
       continue;
     }
     if (z.kind === "freeze") {
@@ -6873,6 +7066,14 @@ function renderCloudHud() {
   if (mine) setText(box, `⛈️ ${Math.max(0, (c.until - serverNow()) / 1000).toFixed(1)} s · bump into someone to pass it on!`);
 }
 
+/** Mud from someone behind you: big splats over your screen that slide off after a few seconds. */
+function mudSplat() {
+  const f = $("#mudFx");
+  f.classList.remove("on");
+  void f.offsetWidth;
+  f.classList.add("on");
+}
+
 function frost() {
   const f = $("#frostFx");
   f.classList.remove("on");
@@ -6982,6 +7183,7 @@ function paintAim() {
 }
 
 function currentAct() {
+  if (net.view && serverNow() < net.view.startAt - 900) return "cheer"; // waving on the line during the fly-past
   if (net.view && serverNow() < net.view.startAt) return "idle";
   if (me.out) return "out";
   if (me.finished && me.speed < 0.5) return "cheer";
@@ -7109,7 +7311,8 @@ function frame(now) {
       r.runner.group.position.set(r.dispX, r.dispY, -r.dispD);
       if (r.p.trail && r.vel > 2 && !r.p.outAt) world.trail(r.p.trail, r.dispX, r.dispY, -r.dispD);
       r.runner.group.visible = !p.left;
-      const ra = !isSurvival() && p.finish !== null && r.dispD > TRACK_LEN - 1 ? "cheer" : p.gone && p.act !== "out" ? "idle" : p.act;
+      const waiting = net.view && serverNow() < net.view.startAt - 900; // the line-up before the gun
+      const ra = waiting ? "cheer" : !isSurvival() && p.finish !== null && r.dispD > TRACK_LEN - 1 ? "cheer" : p.gone && p.act !== "out" ? "idle" : p.act;
       if (!isSurvival() && p.finish !== null && game.cheered && !game.cheered.has(p.id)) {
         game.cheered.add(p.id);
         world.fireworks(-TRACK_LEN);
@@ -7134,12 +7337,24 @@ function frame(now) {
     }
     const tx = laneX(fx) * 0.75;
     const back = game.lookBack && !me.out;
-    // countdown: the camera swings round from in front of your runner to behind them
+    // countdown intro: a sweeping fly-past in front of the whole line-up (everyone
+    // cheering), then a glide in behind your runner just before the gun
     const toGo = net.view ? (net.view.startAt - serverNow()) / 1000 : 0;
-    if (toGo > 0.4 && game.mode === "race") {
-      const k = Math.min(1, (toGo - 0.4) / 3); // 1 → 0 as the gun nears
-      const ang = k * Math.PI;
-      camPos.set(laneX(fx) + Math.sin(ang) * 5.6, 3.0 - k * 1.2, fz + Math.cos(ang) * 5.6);
+    const intro = toGo > 0.35 && game.mode === "race";
+    if (intro) {
+      const behind = new THREE.Vector3(tx, 3.0, fz + 5.6);
+      const ORBIT_END = 1.35; // seconds before the gun when the fly-past hands over
+      // the fly-past stays over the track (never into the stands or buildings at the side)
+      const flyAt = (k) => new THREE.Vector3(3.2 * (2 * k - 1), 2.0 + Math.sin(k * Math.PI) * 1.2, fz - 7.2 + Math.sin(k * Math.PI) * 1.6);
+      if (toGo > ORBIT_END) {
+        camPos.copy(flyAt(Math.min(1, (toGo - ORBIT_END) / 2.1))); // right → left in front of everyone
+      } else {
+        // smooth hand-over to the running camera, arcing up over the runners' heads
+        const u = 1 - (toGo - 0.35) / (ORBIT_END - 0.35);
+        const e = u * u * (3 - 2 * u);
+        camPos.copy(flyAt(0).lerp(behind, e));
+        camPos.y += Math.sin(e * Math.PI) * 2.2;
+      }
     } else {
       camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     }
@@ -7149,7 +7364,7 @@ function frame(now) {
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
-    if (toGo > 0.4 && game.mode === "race") camLook.set(laneX(fx), 1.0, fz - 2);
+    if (intro) camLook.set(toGo > 1.35 ? 0 : tx * 0.5, 1.0, toGo > 1.35 ? fz : fz - 9 * (1 - (toGo - 0.35)));
     else if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
     else camLook.set(tx * 0.8, 1.0 + fy * 0.6, fz - 9);
     camera.lookAt(camLook);
@@ -7267,6 +7482,15 @@ function updateHud() {
   }
   const place = entries.findIndex((e) => e.id === playerId) + 1 || 1;
   setHTML(hudEl.place, `${place}<sup>${ordinal(place)}</sup>`);
+  // coloured by place, and it pops whenever you gain or lose one
+  if (hudEl.place.dataset.p !== String(place)) {
+    const before = Number(hudEl.place.dataset.p || 0);
+    hudEl.place.dataset.p = String(place);
+    hudEl.place.classList.remove("up", "down");
+    void hudEl.place.offsetWidth;
+    if (before) hudEl.place.classList.add(place < before ? "up" : "down");
+  }
+  hudEl.place.hidden = entries.length < 2; // an endless run has no places
 
   if (!isSurvival()) {
     for (const dot of hudEl.dots.children) {

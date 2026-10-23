@@ -495,6 +495,21 @@ describe("bot level", () => {
   });
 });
 
+describe("endless run", () => {
+  it("is solo without bots and ends on the first hit", () => {
+    expect(reject(lobbyOf(2), "p0", { type: "start", bots: false, endless: true })).toMatch(/solo/);
+    expect(reject(lobbyOf(1), "p0", { type: "start", bots: true, endless: true })).toMatch(/solo/);
+    let s = act(lobbyOf(1), "p0", { type: "start", bots: false, endless: true, t: T0 });
+    expect((L.viewFor(s, "p0") as any).lives).toBe(1);
+    s = L.applyAction(s, "__system", { type: "tick", t: s.startAt });
+    s = act(s, "p0", { type: "pos", d: 120, lane: 0, y: 0, act: "run", hits: 1, t: s.startAt + 9000 });
+    expect(s.players.p0.outAt).toBe(s.startAt + 9000);
+    expect(s.phase).toBe("results");
+    // a normal race still has 3 hearts
+    expect((L.viewFor(act(lobbyOf(1), "p0", { type: "start", bots: false, t: T0 }), "p0") as any).lives).toBe(3);
+  });
+});
+
 describe("power-ups never cost a heart", () => {
   it("lightning trips the bots ahead in survival but leaves their hearts alone", () => {
     let s = act(lobbyOf(1), "p0", { type: "start", bots: true, t: T0 });
@@ -666,7 +681,7 @@ describe("power-up odds", () => {
     expect(lead.rocket).toBeGreaterThan(0.5);
     expect(lead.rocket).toBeLessThan(1.5);
     expect(lead.shield! + lead.banana!).toBeGreaterThan(45);
-    expect(lead.swap! + lead.thunder! + lead.brainwave!).toBe(0);
+    expect(lead.swap! + lead.thunder! + lead.brainwave! + lead.mud!).toBe(0);
     expect(last.rocket).toBe(30);
     expect(last.rocket! + last.lightning! + last.freeze! + last.brainwave! + last.thunder! + last.swap!).toBeGreaterThan(80);
     // the better the item, the more it favours the back of the field

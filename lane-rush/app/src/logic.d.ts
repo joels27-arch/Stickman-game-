@@ -33,6 +33,7 @@ export function standings(state: unknown): string[];
 export function buildCourse(seed: number, len?: number, boost?: number): {
   rows: { z: number; lanes: (string | null)[]; looks: number[]; intro?: string }[];
   boosts: { z: number; lane: number }[];
+  slows: { z: number; lane: number }[];
   boxes: { z: number; lane: number }[];
   hearts: { z: number; lane: number }[];
   len: number;
@@ -71,6 +72,8 @@ export const BANANA_COOLDOWN_MS: number;
 export const GAME_MODES: string[];
 export const CUP_MODES: string[];
 export const MAPS: string[];
+export const SLOW_PAD_MS: number;
+export function livesOf(state: unknown): number;
 export const BOT_LEVELS: Record<string, { skill: [number, number]; pace: number }>;
 export const MAX_EMPTY_M: number;
 export const EMOTES: string[];

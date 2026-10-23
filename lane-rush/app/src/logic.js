@@ -19,7 +19,7 @@
  * same constants for its physics.
  */
 
-export const meta = { game: "Brain Run", minPlayers: 1, maxPlayers: 4 };
+export const meta = { game: "4 Friends", minPlayers: 1, maxPlayers: 4 };
 
 // ── shared tuning (client physics reads these too) ──────────────────────────
 
@@ -114,6 +114,10 @@ export const CUP_POINTS = [10, 5, 3, 1];
 /** Rank points are reported by each player's device (shown to friends in the lobby). */
 export const MAX_RP = 999999;
 export const LIVES = 3;
+/** Hearts this race: 3, or 1 in an endless run. */
+export function livesOf(state) {
+  return state.lives ?? LIVES;
+}
 export const SURVIVAL_LEN = 9000; // metres of course generated; nobody lasts this long
 export const SURVIVAL_LIMIT_MS = 10 * 60 * 1000;
 export const SURVIVAL_MAX_SPEED = 24; // the ramp tops out here (after ~3 minutes)…
@@ -152,7 +156,7 @@ export function runSpeed(kind, s) {
  * You hold one power-up at a time and use it when you want (boxes are
  * ignored while you hold or use one). Zaps and bananas go through the server.
  */
-export const POWERS = ["shield", "rocket", "lightning", "banana", "bowling", "freeze", "glue", "fake", "boxing", "brainwave", "thunder", "swap"];
+export const POWERS = ["shield", "rocket", "lightning", "banana", "bowling", "freeze", "glue", "fake", "boxing", "brainwave", "thunder", "swap", "mud"];
 
 /**
  * Power-up odds by place, Mario Kart style: four columns (1st, 2nd, 3rd,
@@ -162,36 +166,38 @@ export const POWERS = ["shield", "rocket", "lightning", "banana", "bowling", "fr
  * gets one almost 1 time in 3. Each column adds up to 100.
  *
  *              1st  2nd  3rd  last
- *   shield      24   14    7    3
- *   banana      24   14    6    2
- *   bowling     14   10    6    3
- *   glue        12    9    5    2
- *   fake        14    9    4    1
- *   boxing       6    8    7    4    (punches whoever is right next to you)
+ *   shield      24   11    5    1
+ *   banana      24   11    4    1
+ *   bowling     14   10    4    1
+ *   glue        12    9    4    1
+ *   fake        14    9    3    1
+ *   boxing       6    8    6    2    (punches whoever is right next to you)
  *   freeze       2    9   11   10
  *   brainwave    1    7   10    9    (flips controls of everyone ahead)
  *   lightning    1    6   11   14    (hits runners ahead)
  *   thunder      1    5    9   12    (a storm cloud on the leader)
  *   swap         0    3    8   10    (swap places with the runner ahead)
  *   rocket       1    6   16   30
+ *   mud          0    6    9    8    (splats mud over the screens of everyone ahead)
  *
  * Items that only hit runners ahead are taken out for the leader (nobody is
  * ahead), so a leader's rocket ends up at about 1 %.
  * Alone there's nobody to attack, so it's shield 35 · rocket 35 · banana 30.
  */
 const ODDS = {
-  shield: [24, 14, 7, 3],
-  banana: [24, 14, 6, 2],
-  bowling: [14, 10, 6, 3],
-  glue: [12, 9, 5, 2],
-  fake: [14, 9, 4, 1],
-  boxing: [6, 8, 7, 4],
+  shield: [24, 11, 5, 1],
+  banana: [24, 11, 4, 1],
+  bowling: [14, 10, 4, 1],
+  glue: [12, 9, 4, 1],
+  fake: [14, 9, 3, 1],
+  boxing: [6, 8, 6, 2],
   freeze: [2, 9, 11, 10],
   brainwave: [1, 7, 10, 9],
   lightning: [1, 6, 11, 14],
   thunder: [1, 5, 9, 12],
   swap: [0, 3, 8, 10],
   rocket: [1, 6, 16, 30],
+  mud: [0, 6, 9, 8],
 };
 const SOLO_ODDS = { shield: 35, rocket: 35, banana: 30 };
 /** How far behind the leader (metres) counts as "as far back as it gets". */
@@ -228,7 +234,7 @@ export function powerOdds({ rank, alive, gapToLeader = 0, last = "" }) {
     const f = x - c;
     w = {};
     for (const [k, col] of Object.entries(ODDS)) w[k] = col[c] + (col[c + 1] - col[c]) * f;
-    if (rank <= 1) w.lightning = w.brainwave = w.thunder = w.swap = 0;
+    if (rank <= 1) w.lightning = w.brainwave = w.thunder = w.swap = w.mud = 0;
   }
   if (last && w[last] !== undefined) w[last] = 0;
   const total = Object.values(w).reduce((a, b) => a + b, 0);
@@ -251,7 +257,7 @@ export function pickPower(odds, roll) {
 /** The power-up everyone starts a race with: defensive or neutral, same odds for all. */
 export const START_POWERS = ["shield", "banana", "fake"];
 /** Powers relayed to everyone through the server as a "zap" (an area effect). */
-export const ZAP_KINDS = ["lightning", "freeze", "brainwave"];
+export const ZAP_KINDS = ["lightning", "freeze", "brainwave", "mud"];
 /** Things dropped on the track: a banana trips you, glue slows you (2 lanes, stays a while), a fake box trips you. */
 export const DROP_KINDS = ["banana", "glue", "fake"];
 export const GLUE_MS = 8000; // a glue puddle stays this long
@@ -518,6 +524,8 @@ function placeOne(r, kind) {
  * The same pattern never comes twice in a row. `looks[lane]` picks the
  * visual variant of each obstacle; it never changes how it's cleared.
  */
+/** Running over a red slow pad slows you down this long (ms). */
+export const SLOW_PAD_MS = 1300;
 /** The longest run without an obstacle row (metres): about 3 s even at the start. */
 export const MAX_EMPTY_M = 42;
 
@@ -525,6 +533,9 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
   const r = rng(seed);
   // looks and boxes use their own stream, so they don't reshuffle the layout
   const r2 = rng((seed ^ 0x9e3779b9) >>> 0);
+  // slow pads use their own stream, so adding them never moves the obstacles
+  const r3 = rng((seed ^ 0x7f4a7c15) >>> 0);
+  const slows = [];
   const endless = len > TRACK_LEN;
   const kind = endless ? "survival" : "sprint";
   const rows = [];
@@ -624,10 +635,12 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
       lastHeart = z;
     }
     if (r() < 0.3) boosts.push({ z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) });
+    // red slow pads: the opposite of a boost (from 90 m on, so the start stays easy)
+    if (z > 90 && r3() < 0.32) slows.push({ z: Math.round((z + gap * 0.3) * 10) / 10, lane: Math.floor(r3() * 4) });
     else if (z > 60 && (sinceBox >= 4 || r2() < 0.22)) addBox(z + gap * 0.55);
     z += gap;
   }
-  return { rows, boosts, boxes, hearts, len };
+  return { rows, boosts, slows, boxes, hearts, len };
 }
 
 // ── moving obstacles: each map has two, sweeping across the lanes ──────────
@@ -1004,7 +1017,7 @@ function stepMode(state, t) {
       holder.booms = (holder.booms ?? 0) + 1;
       state.blastSeq = (state.blastSeq ?? 0) + 1;
       state.blasts = [...(state.blasts ?? []), { id: state.blastSeq, holder: holder.id, d: holder.d, lane: holder.lane, at: t }].slice(-6);
-      if (holder.booms >= LIVES) knockOut(holder, t);
+      if (holder.booms >= livesOf(state)) knockOut(holder, t);
       else {
         holder.stunUntil = t + 1600;
         if (holder.bot) holder.act = "stumble";
@@ -1115,7 +1128,7 @@ function doPunch(state, id, targetId, t) {
 // ── bots: fill empty spots, run the same course, make mistakes ─────────────
 
 export const BOT_NAMES = ["Turbo Tim", "Zippy", "Bolt Bot", "Speedy Sam", "Rocket Rita", "Dash", "Nitro Nia", "Flash Fred", "Sprinty", "Max Speed"];
-const BOT_ITEMS = ["banana", "lightning", "rocket", "shield", "freeze", "glue", "fake", "brainwave", "thunder", "swap", "boxing"];
+const BOT_ITEMS = ["banana", "lightning", "rocket", "shield", "freeze", "glue", "fake", "brainwave", "thunder", "swap", "boxing", "mud"];
 const STUN_MS = 1600; // fall + get up, like a real runner
 const courses = new Map();
 const moverCache = new Map();
@@ -1212,7 +1225,7 @@ function botHit(state, p, t, power = false) {
   p.act = "stumble";
   p.y = 0;
   if (state.kind === "coinrush") spillCoins(state, p, t);
-  if (state.kind === "survival" && p.hits >= LIVES) knockOut(p, t);
+  if (state.kind === "survival" && p.hits >= livesOf(state)) knockOut(p, t);
 }
 
 function stepBots(state, t) {
@@ -1239,6 +1252,9 @@ function stepBots(state, t) {
           p.slowUntil = t + 1500;
           p.lane = Math.max(0, Math.min(LANES - 1, p.lane + (roll(state.seed, bi, z.id) < 0.5 ? -1 : 1)));
         }
+      } else if (z.kind === "mud") {
+        // a bot can't see through mud either: it eases off for a moment
+        if (p.d > z.d && (p.shieldUntil ?? 0) <= t) p.slowUntil = t + 1200;
       } else if (z.kind === "lightning" && p.d > z.d && (p.rocketUntil ?? 0) <= t) botHit(state, p, t, true);
     }
     if (p.outAt !== null) return;
@@ -1334,6 +1350,13 @@ function stepBots(state, t) {
         else botHit(state, p, t);
       }
     }
+    if (!rocketing) {
+      for (const sp of course.slows ?? []) {
+        if (sp.z <= d0 || sp.z > d1 || sp.lane !== p.lane) continue;
+        if (roll(state.seed, bi, sp.z + 0.9) < sharp) continue;
+        p.slowUntil = Math.max(p.slowUntil ?? 0, t + SLOW_PAD_MS);
+      }
+    }
     // mystery boxes (first come, first served), bananas, bowling balls
     course.boxes.forEach((b, i) => {
       if (b.z <= d0 || b.z > d1 || b.lane !== p.lane || p.item || (state.taken ?? []).includes(i)) return;
@@ -1393,7 +1416,7 @@ function stepBots(state, t) {
           doPunch(state, id, near.id, t);
           p.item = "";
         }
-      } else if (p.item === "lightning" || p.item === "freeze" || p.item === "brainwave") {
+      } else if (p.item === "lightning" || p.item === "freeze" || p.item === "brainwave" || p.item === "mud") {
         if (ahead.length) {
           state.zapSeq = (state.zapSeq ?? 0) + 1;
           state.zaps = [...(state.zaps ?? []), { id: state.zapSeq, by: id, d: d1, at: t, kind: p.item }].slice(-6);
@@ -1519,6 +1542,9 @@ export function validateAction(state, playerId, action) {
     case "start": {
       if (state.phase !== "lobby") return { ok: false, error: "already started" };
       if (action.bots !== undefined && typeof action.bots !== "boolean") return { ok: false, error: "bad bots" };
+      if (action.endless !== undefined && typeof action.endless !== "boolean") return { ok: false, error: "bad endless" };
+      // the one-life endless run is for one runner alone, without bots
+      if (action.endless && (action.bots !== false || present(state).length !== 1)) return { ok: false, error: "endless runs are solo" };
       if (state.host !== playerId) return { ok: false, error: "Only the host can start" };
       if (present(state).length < 1) return { ok: false, error: "nobody to race" };
       // everyone else has to have locked in their runner
@@ -1733,6 +1759,7 @@ export function applyAction(state0, playerId, action) {
       });
       break;
     case "start":
+      state.lives = action.endless ? 1 : LIVES; // endless run: one hit and it's over
       state.cup = newCup(state.mode, t, state.rounds ?? 1);
       state.botFill = action.bots !== false;
       if (state.botFill) fillBots(state);
@@ -1787,7 +1814,7 @@ export function applyAction(state0, playerId, action) {
       if (action.sc !== undefined) me.sc = action.sc;
       if (action.cb !== undefined) me.cb = Math.max(me.cb ?? 0, action.cb);
       if (survival) {
-        if (state.kind === "survival" && me.hits >= LIVES) knockOut(me, t);
+        if (state.kind === "survival" && me.hits >= livesOf(state)) knockOut(me, t);
         if (state.kind === "chase" && me.d <= brainDistance(elapsed / 1000)) knockOut(me, t);
         maybeEnd(state, t);
         break;
@@ -1984,7 +2011,7 @@ export function viewFor(state, playerId) {
           table: cupStandings(state),
         }
       : null,
-    lives: LIVES,
+    lives: livesOf(state),
     limitAt:
       state.kind === "coinrush"
         ? state.startAt + COINRUSH_MS
