@@ -1892,17 +1892,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .home[data-page="play"] .home-top .medal-chip { margin-left: auto; }
 
 .road-mini { position: absolute; z-index: 3; left: 0; right: 0; margin: 0 auto; top: calc(max(12px, env(safe-area-inset-top)) + 56px); width: min(440px, calc(100% - 28px)); display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 8px 6px 8px; border-radius: 18px; border: 2px solid #ffd23f; background: linear-gradient(160deg, rgba(58, 42, 122, 0.92), rgba(27, 21, 80, 0.92)); box-shadow: 0 4px 0 rgba(12, 10, 46, 0.8); color: #fff; font: inherit; cursor: pointer; text-align: left; }
-.road-mini .rm-medal { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
-.rm-mid { display: grid; gap: 4px; min-width: 0; }
-.rm-mid b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 17px; text-transform: uppercase; color: #ffd23f; line-height: 1; }
-.rm-bar { position: relative; height: 18px; border-radius: 9px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
-.rm-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ffb100, #ffe46a); border-radius: 9px; }
-.rm-bar em { position: relative; display: block; text-align: center; font-style: normal; font-family: var(--display); font-weight: 900; font-size: 13px; line-height: 18px; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); }
-.rm-next { display: grid; justify-items: center; gap: 1px; padding: 2px 6px; border-radius: 12px; background: rgba(255, 255, 255, 0.1); }
-.rm-next small { font-size: 10px; font-weight: 900; text-transform: uppercase; opacity: 0.85; }
-.rm-next img { width: 34px; height: 34px; object-fit: contain; }
-.road-mini.ready { animation: btnPulse 1.1s ease-in-out infinite; box-shadow: 0 4px 0 rgba(12, 10, 46, 0.8), 0 0 18px rgba(255, 210, 63, 0.8); }
-.road-mini.ready .rm-next { background: #ffd23f; color: #3a2400; }
 /* the logo moves down a little to make room for the road */
 .hp-play .home-logo { top: calc(max(12px, env(safe-area-inset-top)) + 128px); }
 
@@ -2167,3 +2156,56 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .tour-perks img { width: 38px; height: 38px; object-fit: contain; }
 .tour-perks b { font-family: var(--body, inherit); font-style: normal; font-size: 12px !important; text-transform: none; text-shadow: none; }
 .tour.welcome .tour-foot .btn { min-height: 46px; font-size: 17px; }
+
+/* profile picture: tap your picture on the stats page to change it */
+.sh-av-btn { position: relative; padding: 0; border: 0; background: none; cursor: pointer; }
+.sh-av-btn i { position: absolute; right: -6px; bottom: -6px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #ffd23f; border: 2px solid #fff; font-style: normal; font-size: 12px; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3); }
+.avatar-sheet { width: min(420px, 100%); }
+.avatar-hint { margin: 4px 0 10px; text-align: center; font-size: 13px; font-weight: 700; opacity: 0.85; }
+.avatar-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-height: min(56vh, 460px); overflow-y: auto; padding: 4px; }
+.av-tile { position: relative; display: grid; justify-items: center; gap: 2px; padding: 4px 2px 6px; border-radius: 14px; border: 2px solid rgba(255, 255, 255, 0.25); background: linear-gradient(180deg, #5d8bff, #3156e0); color: #fff; font: inherit; cursor: pointer; overflow: hidden; }
+.av-tile.rare { background: linear-gradient(180deg, #3fd0ff, #1b7fd6); }
+.av-tile.epic { background: linear-gradient(180deg, #c27bff, #7a3cf0); }
+.av-tile.legendary { background: linear-gradient(180deg, #ffd23f, #f08a00); }
+.av-tile img { width: 100%; aspect-ratio: 1; object-fit: cover; object-position: top; border-radius: 10px; }
+.av-tile small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 900; }
+.av-tile.on { border-color: #fff; box-shadow: 0 0 0 3px #b6f72a; }
+.av-tile.on::after { content: "✓"; position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #b6f72a; color: #1a2a00; font-weight: 900; font-size: 13px; }
+.av-tile.locked img { filter: grayscale(1) brightness(0.45); }
+.av-tile.locked { opacity: 0.75; }
+
+/* Gold Road on the Play page: a little road with your next three rewards */
+.road-mini { grid-template-columns: 52px minmax(0, 1fr) 30px; gap: 8px; padding: 12px 8px 6px 8px; overflow: visible; border: 3px solid #ffd23f; background: linear-gradient(180deg, rgba(92, 62, 190, 0.95), rgba(38, 24, 104, 0.95)); box-shadow: 0 4px 0 #7a5200, 0 8px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.road-mini::before { content: ""; position: absolute; inset: 0; border-radius: 15px; pointer-events: none; background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.18) 48%, transparent 60%) -200% 0 / 220% 100% no-repeat; animation: rmShine 4s ease-in-out infinite; }
+@keyframes rmShine { 0%, 55% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.rm-title { position: absolute; top: -11px; left: 14px; padding: 1px 10px; border-radius: 8px; background: linear-gradient(180deg, #ffe46a, #ffb100); border: 2px solid #fff; color: #4a2a00; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; box-shadow: 0 2px 0 #7a5200; }
+.rm-medal { position: relative; display: grid; justify-items: center; }
+.rm-medal img { width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5)); animation: todayBob 1.6s ease-in-out infinite; }
+.rm-medal b { margin-top: -10px; min-width: 30px; padding: 0 6px; border-radius: 8px; background: #1b1150; border: 2px solid #ffd23f; font-family: var(--display); font-weight: 900; font-size: 13px; line-height: 16px; text-align: center; color: #ffd23f; }
+.rm-track { position: relative; height: 56px; margin: 0 22px 0 4px; }
+.rm-line { position: absolute; left: 0; right: 0; top: 19px; height: 8px; border-radius: 4px; background: rgba(0, 0, 0, 0.35); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5); overflow: hidden; }
+.rm-line i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: linear-gradient(90deg, #ffb100, #ffe46a); box-shadow: 0 0 8px rgba(255, 210, 63, 0.8); }
+.rm-node { position: absolute; top: 0; display: grid; justify-items: center; gap: 1px; transform: translateX(-50%); }
+.rm-ball { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #6f5bd6, #2c1d7a); border: 3px solid rgba(255, 255, 255, 0.55); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
+.rm-ball img { width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4)); }
+.rm-node.first .rm-ball { border-color: #ffd23f; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 12px rgba(255, 210, 63, 0.7); }
+.rm-node.epic .rm-ball { background: radial-gradient(circle at 50% 35%, #c27bff, #5a1fc0); }
+.rm-node.legendary .rm-ball { background: radial-gradient(circle at 50% 35%, #ffe46a, #e07a00); }
+.rm-node small { display: flex; align-items: center; gap: 1px; margin-top: -6px; padding: 0 4px; border-radius: 6px; background: #1b1150; font-family: var(--display); font-weight: 900; font-size: 10px; line-height: 13px; color: #fff; }
+.rm-node small img { width: 11px; height: 11px; }
+.rm-go { align-self: center; display: grid; place-items: center; height: 30px; border-radius: 10px; background: rgba(255, 255, 255, 0.14); font-family: var(--display); font-weight: 900; font-size: 22px; color: #ffd23f; }
+.rm-done { align-self: center; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 16px; color: #ffd23f; }
+.road-mini.ready { animation: btnPulse 1.1s ease-in-out infinite; box-shadow: 0 4px 0 #7a5200, 0 0 20px rgba(255, 210, 63, 0.85); }
+.road-mini.ready .rm-go { grid-column: auto; width: auto; padding: 0 6px; font-size: 12px; background: #ffd23f; color: #3a2400; }
+.road-mini.ready { grid-template-columns: 52px minmax(0, 1fr) 54px; }
+.road-mini.ready .rm-node.first .rm-ball { animation: btnPulse 0.8s ease-in-out infinite; }
+/* the logo sits under the (taller) Gold Road */
+.hp-play .home-logo { top: calc(max(12px, env(safe-area-inset-top)) + 160px); }
+@media (max-height: 700px) { .hp-play .home-logo { top: calc(max(10px, env(safe-area-inset-top)) + 146px); font-size: 40px; } }
+/* race strangers online: slim, so the play card stays small */
+.play-card .online-btn { min-height: 36px; margin: 0; font-size: 14px; }
+/* home picture on phones: placed by fitHomeArt() so the runners stand between the logo and the play card */
+@media (max-aspect-ratio: 1/1) {
+  .home-art img.fit { right: auto; bottom: auto; transition: top 0.25s, width 0.25s, left 0.25s, height 0.25s; }
+  .home-art img.fit.narrow { -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 5%, #000 86%, transparent), linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent); -webkit-mask-composite: source-in; mask-image: linear-gradient(180deg, transparent 0, #000 5%, #000 86%, transparent), linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent); mask-composite: intersect; }
+}

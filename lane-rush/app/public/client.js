@@ -1707,12 +1707,52 @@ const homePages = $("#homePages");
 const PAGE = { compete: 0, skins: 1, play: 2, missions: 3, shop: 4 };
 const PAGE_NAMES = Object.keys(PAGE);
 let homePage = PAGE.play;
+// ── the home picture on phones: the runners always stand in the free space between
+// the logo and the play card, whatever widgets get added above or below them ──
+const ART_RUNNERS = { top: 0.25, bottom: 0.63 }; // where the runners are in home_tall.jpg, as parts of its height
+const ART_RATIO = 2115 / 1440; // home_tall.jpg height / width
+const ART_MIN_W = 0.6; // never smaller than this part of the screen width
+function fitHomeArt() {
+  const img = $(".home-art img");
+  const art = $(".home-art");
+  if (!img || !art) return;
+  if (!matchMedia("(max-aspect-ratio: 1/1)").matches) {
+    img.classList.remove("fit", "narrow");
+    img.style.cssText = "";
+    return;
+  }
+  if (homePage !== PAGE.play) return; // keep it where it was; only the Play page decides
+  const logo = $(".hp-play .home-logo");
+  const dock = $(".hp-play .home-dock");
+  const top0 = art.getBoundingClientRect().top;
+  // offsetTop/Height ignore the logo's pop-in animation (a transform)
+  const top = logo.getBoundingClientRect().top - (logo.getBoundingClientRect().height - logo.offsetHeight) / 2 + logo.offsetHeight - top0 + 4;
+  const bottom = dock.getBoundingClientRect().top - top0 - 6;
+  if (!dock.offsetHeight) return;
+  const W = art.clientWidth;
+  const span = ART_RUNNERS.bottom - ART_RUNNERS.top;
+  const w = Math.max(W * ART_MIN_W, Math.min(W, Math.max(0, bottom - top) / (span * ART_RATIO)));
+  const h = w * ART_RATIO;
+  const y = (top + bottom) / 2 - (h * (ART_RUNNERS.top + ART_RUNNERS.bottom)) / 2;
+  img.classList.add("fit");
+  img.classList.toggle("narrow", w < W - 1);
+  img.style.cssText = `width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;left:${((W - w) / 2).toFixed(1)}px;top:${y.toFixed(1)}px`;
+}
+addEventListener("resize", fitHomeArt);
+if ("ResizeObserver" in window) {
+  const ro = new ResizeObserver(() => fitHomeArt());
+  for (const sel of [".hp-play .home-dock", ".hp-play .home-logo", "#roadMini"]) ro.observe($(sel));
+}
+$(".hp-play .home-logo").addEventListener("animationend", fitHomeArt);
+$(".home-art img").addEventListener("load", fitHomeArt);
+
 function setHomePage(i, animate = true) {
   homePage = Math.max(0, Math.min(PAGE_NAMES.length - 1, i));
   screens.home.dataset.page = PAGE_NAMES[homePage];
   if (homePage === PAGE.play) {
     renderProfile(); // your runner or name may have changed
     renderEndlessBest();
+    requestAnimationFrame(fitHomeArt);
   }
   homePages.classList.toggle("drag", !animate);
   homePages.style.transform = `translateX(${-homePage * 100}vw)`;
@@ -2009,30 +2049,39 @@ function renderGoldRoad() {
   renderRoadMini();
 }
 /** The Gold Road in short, at the top of the Play page: progress to the next reward (tap: the full road). */
+/** The Gold Road on the Play page: your gold count, then the next three rewards on a little road. */
 function renderRoadMini() {
   const box = $("#roadMini");
   const g = road.gold();
   const ready = road.ready()[0];
   const next = ready ?? ROAD.find((r) => r.gold > g);
+  box.classList.toggle("ready", Boolean(ready));
+  const medal = el("span", { class: "rm-medal" }, el("img", { src: MEDAL_IMG.gold, alt: "" }), el("b", { text: g.toLocaleString() }));
+  const title = el("span", { class: "rm-title", text: "Gold Road" });
   if (!next) {
-    box.replaceChildren(el("img", { class: "rm-medal", src: MEDAL_IMG.gold, alt: "" }), el("span", { class: "rm-mid" }, el("b", { text: "Gold Road" }), el("small", { text: `Complete · ${g.toLocaleString()} gold` })));
+    box.replaceChildren(title, medal, el("span", { class: "rm-done", text: "Road complete! 🏆" }));
     return;
   }
   const i = ROAD.indexOf(next);
   const prev = i ? ROAD[i - 1].gold : 0;
-  const pct = ready ? 100 : Math.round(((g - prev) / (next.gold - prev)) * 100);
-  const info = roadInfo(next);
-  box.classList.toggle("ready", Boolean(ready));
-  box.replaceChildren(
-    el("img", { class: "rm-medal", src: MEDAL_IMG.gold, alt: "" }),
-    el(
-      "span",
-      { class: "rm-mid" },
-      el("b", { text: "Gold Road" }),
-      el("span", { class: "rm-bar" }, el("i", { style: `width:${pct}%` }), el("em", { text: ready ? "Reward ready!" : `${g} / ${next.gold}` })),
-    ),
-    el("span", { class: "rm-next" }, el("small", { text: ready ? "Claim" : "Next" }), el("img", { src: info.img, alt: info.label })),
+  const pct = ready ? 1 : Math.max(0, Math.min(1, (g - prev) / (next.gold - prev)));
+  const steps = ROAD.slice(i, i + 3);
+  // the road: you at the left, the next rewards spaced along it; the gold line shows how far you are to the first
+  const track = el(
+    "span",
+    { class: "rm-track" },
+    el("span", { class: "rm-line" }, el("i", { style: `width:${(pct * 100) / steps.length}%` })),
+    ...steps.map((st, k) => {
+      const info = roadInfo(st);
+      return el(
+        "span",
+        { class: `rm-node${k === 0 ? " first" : ""}${info.rarity ? ` ${info.rarity}` : ""}`, style: `left:${((k + 1) / steps.length) * 100}%` },
+        el("span", { class: "rm-ball" }, el("img", { src: info.img, alt: info.label })),
+        el("small", {}, el("img", { src: MEDAL_IMG.gold, alt: "" }), String(st.gold)),
+      );
+    }),
   );
+  box.replaceChildren(title, medal, track, el("span", { class: "rm-go", text: ready ? "Claim!" : "›" }));
 }
 $("#roadMini").addEventListener("click", () => {
   sfx.tap();
@@ -6031,7 +6080,7 @@ function renderRank() {
         "div",
         { class: `rrow${f.me ? " me" : ""}${i < 3 ? ` top${i + 1}` : ""}` },
         el("span", { class: "rpos", text: String(i + 1) }),
-        el("img", { class: "rface", src: portrait(f.char ?? 0), alt: "" }),
+        el("img", { class: "rface", src: f.me ? myAvatar() : portrait(f.char ?? 0), alt: "" }),
         el("span", { class: "rwho" }, el("b", { text: withFlag(f.name, f.country) + (f.me ? " (you)" : "") }), el("small", { text: fr.name })),
         el("img", { class: "rlg", src: fr.img, alt: "" }),
         el("b", { class: "rrp", text: f.rp.toLocaleString() }),
@@ -6079,6 +6128,7 @@ function openStats() {
 }
 $("#statsClose").addEventListener("click", () => (statsModal.hidden = true));
 $("#statsBody").addEventListener("click", (e) => {
+  if (e.target.closest('[data-go="avatar"]')) return openAvatar();
   if (!e.target.closest('[data-go="rank"]')) return;
   statsModal.hidden = true;
   openRank();
@@ -6101,7 +6151,7 @@ function renderStats() {
     el(
       "div",
       { class: "stats-hero" },
-      el("img", { class: "sh-av", src: portrait(preferredChar()), alt: "" }),
+      el("button", { class: "sh-av-btn", type: "button", "data-go": "avatar", "aria-label": "Change profile picture" }, el("img", { class: "sh-av", src: myAvatar(), alt: "" }), el("i", { text: "✏️" })),
       el("div", {}, el("b", { text: myName() || "Runner" }), el("span", {}, el("img", { src: r.img, alt: "" }), `${r.name} · ${rp.toLocaleString()} pts`)),
       el("button", { class: "btn small blue", type: "button", "data-go": "rank", text: "Rankings ›" }),
     ),
@@ -6141,7 +6191,7 @@ function renderStats() {
               "div",
               { class: `sfriend${x.me ? " me" : ""}` },
               el("em", { text: `#${i + 1}` }),
-              el("img", { src: portrait(x.char ?? 0), alt: "" }),
+              el("img", { src: x.me ? myAvatar() : portrait(x.char ?? 0), alt: "" }),
               el("span", {}, el("b", { text: x.me ? `${x.name} (you)` : x.name }), el("small", { text: `${rankOf(x.rp ?? 0).name} · ${(x.rp ?? 0).toLocaleString()} pts` })),
               x.me ? el("i", { text: "" }) : el("i", { class: "h2h", text: x.rec ? `${x.rec.w}–${x.rec.l}` : "–", title: "Your wins – losses against them" }),
             ),
@@ -6151,9 +6201,58 @@ function renderStats() {
   );
 }
 /** Top-left profile on the Play page: your runner, your name, your league. */
+// ── profile picture: any character you own (by default, the runner you race with) ──
+function myAvatarChar() {
+  const id = local.getItem("lr:avatar");
+  const c = id ? allChars().find((x) => x.id === id) : null;
+  return c && ownsChar(c) ? c : null;
+}
+function myAvatar() {
+  return myAvatarChar()?.img ?? portrait(preferredChar());
+}
+const avatarModal = $("#avatarModal");
+function openAvatar() {
+  sfx.tap();
+  renderAvatarGrid();
+  avatarModal.hidden = false;
+}
+function renderAvatarGrid() {
+  const mine = myAvatarChar();
+  const chars = allChars().sort((a, b) => Number(ownsChar(b)) - Number(ownsChar(a)));
+  $("#avatarGrid").replaceChildren(
+    el("button", { class: `av-tile auto${mine ? "" : " on"}`, type: "button", "data-av": "" }, el("img", { src: portrait(preferredChar()), alt: "" }), el("small", { text: "My runner" })),
+    ...chars.map((c) => {
+      const owned = ownsChar(c);
+      return el(
+        "button",
+        { class: `av-tile ${c.rarity}${owned ? "" : " locked"}${mine?.id === c.id ? " on" : ""}`, type: "button", "data-av": c.id, "aria-label": owned ? c.name : `${c.name} (locked)` },
+        el("img", { src: c.img, alt: "" }),
+        el("small", { text: owned ? c.name : "🔒" }),
+      );
+    }),
+  );
+}
+$("#avatarGrid").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-av]");
+  if (!t) return;
+  if (t.classList.contains("locked")) {
+    toast("Unlock this character to use its picture");
+    return;
+  }
+  const id = t.dataset.av;
+  if (id) local.setItem("lr:avatar", id);
+  else local.removeItem("lr:avatar");
+  sfx.pop();
+  renderAvatarGrid();
+  renderProfile();
+  if (!statsModal.hidden) renderStats();
+});
+$("#avatarClose").addEventListener("click", () => (avatarModal.hidden = true));
+avatarModal.addEventListener("click", (e) => e.target === avatarModal && (avatarModal.hidden = true));
+
 function renderProfile() {
   const r = rankOf(rank.rp());
-  $("#profAvatar").src = portrait(preferredChar());
+  $("#profAvatar").src = myAvatar();
   $("#profName").textContent = local.getItem("lr:name") || "Runner";
   $("#profLeagueImg").src = r.img;
   $("#profLeague").textContent = r.name;
