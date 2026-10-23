@@ -303,7 +303,7 @@ export const MIN_RACERS_FOR_MEDALS = 2;
 const SPEED_CAP = ROCKET_SPEED + 1.5;
 const SURVIVAL_SPEED_CAP = SURVIVAL_MAX_SPEED + SURVIVAL_ROCKET + 1.5;
 const POS_SLACK_M = 6;
-const ACTS = ["run", "jump", "slide", "stumble", "idle", "out"];
+const ACTS = ["run", "jump", "slide", "stumble", "idle", "out", "cheer"];
 const POWER_STATES = ["", "shield", "rocket", "ghost"];
 
 // ── course ──────────────────────────────────────────────────────────────────

@@ -2871,10 +2871,12 @@ const world = (() => {
     t.wrapS = THREE.RepeatWrapping;
     t.repeat.set(2, 1);
     const R = 300;
-    const H = ((2 * Math.PI * R) / 2) * (t.image.height / t.image.width);
+    // a little squashed, so a phone held upright sees the deep blue at the top, not just the pale horizon
+    const H = ((2 * Math.PI * R) / 2) * (t.image.height / t.image.width) * 0.62;
     const cyl = new THREE.Mesh(
       new THREE.CylinderGeometry(R, R, H, 64, 1, true),
-      new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, fog: false, depthWrite: false }),
+      // painted colours as they are (tone mapping washed the blue out)
+      new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false }),
     );
     cyl.position.y = H / 2 - 40;
     cyl.renderOrder = -1;
@@ -3867,9 +3869,10 @@ const world = (() => {
           const x = side * (edge + 2.5 + r() * 26);
           if (roll < 0.55) add(trees[Math.floor(r() * 3)], x, MEADOW_Y, z, 0.8 + r() * 0.5, r() * Math.PI * 2);
           else if (roll < 0.85) add(P.bush, side * (edge + 1.6 + r() * 10), MEADOW_Y, z, 0.7 + r() * 0.6, r() * Math.PI * 2);
-          // a bush hugging the fence every few metres keeps the meadow edge lively
-          if (r() < 0.45) add(P.bush, side * (edge + 1.0 + r() * 1.5), MEADOW_Y, z + r() * 4, 0.5 + r() * 0.4, r() * Math.PI * 2);
-          else add(P.rocks, side * (edge + 2 + r() * 14), MEADOW_Y, z, 0.6 + r() * 0.8, r() * Math.PI * 2);
+          // a bush hugging the fence every few metres keeps the meadow edge lively; rocks only now and then, further out
+          const extra = r();
+          if (extra < 0.55) add(P.bush, side * (edge + 1.0 + r() * 1.5), MEADOW_Y, z + r() * 4, 0.5 + r() * 0.4, r() * Math.PI * 2);
+          else if (extra < 0.7) add(P.rocks, side * (edge + 8 + r() * 14), MEADOW_Y, z, 0.6 + r() * 0.6, r() * Math.PI * 2);
         }
       }
     } else if (map === "farm") {

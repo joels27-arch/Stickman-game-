@@ -131,6 +131,11 @@ describe("race", () => {
     expect(reject(s, "p0", { type: "drop" })).toBeTruthy();
   });
 
+  it("accepts the cheer pose (waving on the line, after the finish)", () => {
+    const s = racing();
+    expect(L.validateAction(s, "p0", { type: "pos", d: 0, lane: 0, y: 0, act: "cheer" }).ok).toBe(true);
+  });
+
   it("goes back to the same lobby for a rematch", () => {
     let s = racing(2);
     s = act(s, "p0", pos(L.TRACK_LEN, s.startAt + 50_000));
