@@ -1828,7 +1828,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .look-btn small { font-size: 9px; line-height: 1; white-space: nowrap; }
 
 /* Gold Road: a lifetime path of rewards for every gold medal won */
-.gold-road { margin: 10px 0 4px; padding: 10px 10px 8px; border-radius: 18px; border: 3px solid #ffd23f; background: linear-gradient(160deg, #3a2a7a, #1b1550 70%); box-shadow: 0 5px 0 #0c0a2e, inset 0 0 30px rgba(255, 200, 40, 0.15); }
+.gold-road { padding: 10px 10px 8px; border-radius: 18px; border: 3px solid #ffd23f; background: linear-gradient(160deg, #3a2a7a, #1b1550 70%); box-shadow: 0 5px 0 #0c0a2e, inset 0 0 30px rgba(255, 200, 40, 0.15); }
 .road-head { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
 .road-head img { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
 .road-head b { display: block; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 22px; text-transform: uppercase; color: #ffd23f; line-height: 1; }
@@ -1863,3 +1863,21 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .quit-sheet h2 { margin: 0; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 28px; text-transform: uppercase; }
 .quit-sheet p { margin: 0; font-weight: 700; opacity: 0.85; }
 .quit-btns { display: grid; gap: 10px; }
+
+/* how league points are earned */
+.lc-how { display: flex; align-items: center; gap: 3px; font-family: var(--display); font-weight: 900; font-size: 13px; color: #ffd23f; }
+.lc-how img { width: 15px; height: 15px; margin-left: 4px; }
+.lc-how img:first-child { margin-left: 0; }
+.rhow-pts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rhow-pts span { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; border-radius: 14px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.25); }
+.rhow-pts img { width: 34px; height: 34px; object-fit: contain; }
+.rhow-pts b { font-family: var(--display); font-weight: 900; font-size: 22px; color: #ffd23f; line-height: 1; }
+.rhow-pts small { font-size: 11px; font-weight: 800; opacity: 0.8; }
+
+/* tournament cards: name and prize up front, the rules behind the ⓘ */
+.tcard .tc-head { position: relative; }
+.tc-prize { display: inline-flex; align-items: center; gap: 4px; font-family: var(--display); font-weight: 900; font-size: 17px; color: #ffd23f; }
+.tc-info { position: absolute; top: 0; right: 0; width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.15); color: #fff; font: italic 900 15px/1 Georgia, serif; cursor: pointer; }
+.tcard .tc-desc { display: none; margin: 6px 2px 0; font-size: 13px; font-weight: 700; opacity: 0.9; }
+.tcard.open .tc-desc { display: block; }
+.tcard.open .tc-info { background: #fff; color: #1d2a8a; }

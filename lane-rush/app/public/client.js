@@ -675,6 +675,7 @@ function serverNow() {
 function connect(code, creating) {
   disconnect();
   game.seen = null; // a new room: nothing seen yet
+  game.quit = false;
   net.code = code;
   net.creating = creating;
   net.wantOpen = true;
@@ -1441,7 +1442,7 @@ function onState(msg) {
   net.offset = Math.max(...net.offsets);
 
   const v = msg.view;
-  if (!v) return;
+  if (!v || game.quit) return; // we left: the room's last updates mustn't pull us back in
   const prev = net.view;
   net.view = v;
 
@@ -1688,9 +1689,9 @@ const LEAGUE_MATCHES = 10;
 const LEAGUE_PTS = [10, 6, 3, 1];
 const LEAGUE_TIERS = [
   { pts: 20, coins: 300 },
-  { pts: 45, coins: 700, medal: "bronze" },
-  { pts: 70, coins: 1200, medal: "silver" },
-  { pts: 90, coins: 2000, medal: "silver" },
+  { pts: 45, coins: 900 },
+  { pts: 70, coins: 1500 },
+  { pts: 90, coins: 2500 },
 ];
 function leagueWindow(now = new Date()) {
   const day = now.getDay();
@@ -1755,7 +1756,7 @@ function untilText(ms) {
   return d ? `${d}d ${h}h` : h ? `${h}h ${m % 60}m` : `${m}m`;
 }
 
-// ── Gold Road: a lifetime path (like a trophy road) paid for every gold medal you ever win ──
+// ── Gold Road (on the Missions page): a lifetime path, like a trophy road, paid for every gold medal you ever win ──
 
 /** Exclusive characters you can only get on the Gold Road. */
 const ROAD_CHARS = [
@@ -1877,8 +1878,7 @@ function renderGoldRoad() {
     const cur = track.querySelector(".rnode.ready") || track.querySelector(".rnode.future");
     if (cur) track.scrollLeft = cur.offsetLeft - track.clientWidth / 2 + cur.clientWidth / 2;
   });
-  const dot = document.querySelector(`.htab[data-page="${PAGE.compete}"] .dot`);
-  if (dot) dot.hidden = !road.ready().length;
+  renderMissionDots(); // a reward waiting on the road lights the Missions tab
 }
 
 function renderCompete() {
@@ -1900,9 +1900,11 @@ function renderCompete() {
         {},
         el("em", { class: "tc-status" }, w.open ? el("i", { class: "live-dot" }) : "", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday 18:00 · in ${untilText(w.start - Date.now())}`),
         el("b", { text: "Weekend League" }),
-        el("span", { text: `${LEAGUE_MATCHES} matches over the weekend, any mode. Places score ${LEAGUE_PTS.join(" / ")} points.` }),
+        el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${LEAGUE_TIERS.reduce((a, t) => a + t.coins, 0).toLocaleString()}`),
       ),
+      el("button", { class: "tc-info", type: "button", "aria-label": "How it works", "data-info": "" }, "i"),
     ),
+    el("p", { class: "tc-desc", text: `${LEAGUE_MATCHES} matches from Friday 18:00 to Sunday night, any mode. Each match scores ${LEAGUE_PTS.join(" / ")} points for 1st to 4th. Reach the marks on the bar to unlock coins.` }),
     el(
       "div",
       { class: "wl-row" },
@@ -1947,8 +1949,10 @@ function renderCompete() {
         "div",
         { class: "tc-head" },
         el("img", { src: t.img, alt: "" }),
-        el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { text: t.text })),
+        el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${t.prize[0].toLocaleString()}`)),
+        el("button", { class: "tc-info", type: "button", "aria-label": "How it works", "data-info": "" }, "i"),
       ),
+      el("p", { class: "tc-desc", text: t.text }),
       el(
         "div",
         { class: "tc-prizes" },
@@ -1976,6 +1980,8 @@ function playMode(mode, withWho) {
   connect(newCode(), true);
 }
 $("#hpCompete").addEventListener("click", (e) => {
+  const info = e.target.closest("[data-info]");
+  if (info) return info.closest(".tcard").classList.toggle("open"); // the details live behind the ⓘ
   const b = e.target.closest("[data-mode]");
   if (b) return playMode(b.dataset.mode, b.dataset.with);
   const lg = e.target.closest("[data-league]");
@@ -2041,6 +2047,7 @@ $("#quitGo").addEventListener("click", () => {
 
 function leaveLobby() {
   act({ type: "leave" });
+  game.quit = true;
   // let the leave reach the server before closing
   setTimeout(disconnect, 150);
   leaveToHome("");
@@ -5386,15 +5393,17 @@ renderStreak();
 // ── ranking: leagues climbed with medal points ──
 
 /** Leagues are climbed with medal points only: every medal you earn counts, spending them doesn't. */
-const MEDAL_PTS = { gold: 3, silver: 2, bronze: 1 };
+const MEDAL_PTS = { gold: 10, silver: 5, bronze: 3 };
 const LEAGUES = [
-  { id: "bronze", name: "Bronze", min: 0, steps: [0, 3, 6] },
-  { id: "silver", name: "Silver", min: 10, steps: [10, 15, 20] },
-  { id: "gold", name: "Gold", min: 28, steps: [28, 36, 44] },
-  { id: "platinum", name: "Platinum", min: 55, steps: [55, 66, 77] },
-  { id: "diamond", name: "Diamond", min: 90, steps: [90, 105, 120] },
-  { id: "master", name: "Brain Master", min: 140, steps: [140] },
+  { id: "bronze", name: "Bronze", min: 0, steps: [0, 10, 20] },
+  { id: "silver", name: "Silver", min: 40, steps: [40, 60, 80] },
+  { id: "gold", name: "Gold", min: 110, steps: [110, 140, 170] },
+  { id: "platinum", name: "Platinum", min: 220, steps: [220, 260, 300] },
+  { id: "diamond", name: "Diamond", min: 360, steps: [360, 420, 480] },
+  { id: "master", name: "Brain Master", min: 560, steps: [560] },
 ];
+/** Points were 3 / 2 / 1 per medal before (leagues 4× smaller): scale old totals once. */
+const LP_VERSION = "2";
 const ROMAN = ["I", "II", "III"];
 const RACE_COINS = [60, 40, 25, 15];
 function rankOf(rp) {
@@ -5413,9 +5422,14 @@ function rankOf(rp) {
   };
 }
 const rank = {
-  /** League points: 3 per gold, 2 per silver, 1 per bronze medal ever earned. */
+  /** League points: 10 per gold, 5 per silver, 3 per bronze medal ever earned. */
   points() {
-    const raw = local.getItem("lr:lp");
+    let raw = local.getItem("lr:lp");
+    if (raw !== null && local.getItem("lr:lpv") !== LP_VERSION) {
+      raw = String(Math.round((Number(raw) || 0) * 4));
+      local.setItem("lr:lp", raw);
+    }
+    local.setItem("lr:lpv", LP_VERSION);
     if (raw === null) {
       // first run with medal leagues: count the medals you hold plus the ones spent on characters
       let pts = 0;
@@ -5611,7 +5625,12 @@ function renderRank() {
       el("span", { class: "rwho" }, el("b", { text: l.name }), el("small", { text: `from ${l.min.toLocaleString()} pts${l.steps.length > 1 ? " · I · II · III" : ""}` })),
       l.id === r.league.id ? el("span", { class: "you-tag", text: "You" }) : null,
     )),
-    el("p", { class: "rhow", text: "Climb the leagues with medals only: every gold medal you earn is 3 points, silver 2, bronze 1. Spending medals never moves you down." }),
+    el(
+      "div",
+      { class: "rhow-pts" },
+      ...[["gold", 10, "1st"], ["silver", 5, "2nd"], ["bronze", 3, "3rd"]].map(([m, pts, place]) => el("span", {}, el("img", { src: MEDAL_IMG[m], alt: "" }), el("b", { text: `+${pts}` }), el("small", { text: place }))),
+    ),
+    el("p", { class: "rhow", text: "Place top 3 in a race with at least one other real player to win a medal. Every medal adds league points; spending medals never moves you down." }),
   );
 }
 function rankTab(friends) {
@@ -5675,10 +5694,10 @@ function renderMissionDots() {
     return; // still starting up: the career table isn't defined yet
   }
   const daily = dailyChallenges().some((q) => dailyState().done[q.id] && !dailyState().claimed[q.id]);
-  const trophies = false;
+  const gold = road.ready().length > 0;
   $("#careerDot").hidden = !career;
   const dot = document.querySelector(`.htab[data-page="${PAGE.missions}"] .dot`);
-  if (dot) dot.hidden = !(daily || career || trophies);
+  if (dot) dot.hidden = !(daily || career || gold);
   $("#dailyDot").hidden = !daily;
   renderStoreDot();
 }
@@ -5729,21 +5748,21 @@ function passXp(n) {
   if (after > before) setTimeout(() => toast(`⭐ Season Pass level ${after}! A reward is waiting`), 1200);
   return n;
 }
-/** What each level gives. Free: coins, medals, packs, a trail. Gold: more of everything, exclusives, and the level-30 character. */
+/** What each level gives. Free: coins, packs, a trail. Gold: more of everything, exclusives, and the level-30 character. Never medals: those are only won in races. */
 function passReward(level, track) {
   if (track === "free") {
     if (level === 1) return { pack: "brain", label: "Brain Pack", img: "/assets/pack_brain.webp" };
     if (level === PASS_RUNNERS[KIKO]) return { runner: KIKO, label: RUNNERS[KIKO].name, img: portrait(KIKO) };
     if (level === 30) return { item: "trail:gold", label: "Golden trail", icon: "✨" };
     if (level % 10 === 5) return { pack: "brain", label: "Brain Pack", img: "/assets/pack_brain.webp" };
-    if (level % 4 === 0) return { medal: level >= 20 ? "silver" : "bronze", label: `${level >= 20 ? "Silver" : "Bronze"} medal`, img: MEDAL_IMG[level >= 20 ? "silver" : "bronze"] };
+    if (level % 4 === 0) return { coins: 120 + level * 15, label: `${120 + level * 15} coins`, img: "/assets/ui_c2.webp" };
     return { coins: 50 + level * 10, label: `${50 + level * 10} coins`, img: "/assets/ui_c1.webp" };
   }
   if (level === 30) return { char: PASS_CHAR.id, label: PASS_CHAR.name, img: `/assets/pk_${PASS_CHAR.id}.webp` };
   if (level === 10) return { item: "trail:neon", label: "Neon trail", icon: "🌈" };
   if (level === 20) return { item: "cel:mega", label: "Mega fireworks", icon: "🎆" };
   if (level === 15 || level === 25) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
-  if (level % 5 === 0) return { medal: "silver", label: "Silver medal", img: MEDAL_IMG.silver };
+  if (level % 5 === 0) return { pack: "brain", label: "Brain Pack", img: "/assets/pack_brain.webp" };
   return { coins: 150 + level * 15, label: `${150 + level * 15} coins`, img: level > 15 ? "/assets/ui_c3.webp" : "/assets/ui_c2.webp" };
 }
 function passClaimable(p = passState()) {
@@ -5907,12 +5926,12 @@ const CAREER = [
   },
   {
     name: "Pro",
-    chest: { coins: 1000, medal: "silver" },
+    chest: { coins: 1000, pack: "brain" },
     missions: [
       { stat: "chaseBest", goal: 120, text: "Survive 2 minutes in Brain Chase", coins: 200, icon: "/assets/ui_watch.webp" },
       { stat: "cupWins", goal: 1, text: "Win a match of 3+ rounds", coins: 250, icon: "/assets/medal_gold.png" },
       { stat: "packs", goal: 3, text: "Open 3 packs", coins: 200, icon: "/assets/pack_brain.webp" },
-      { stat: "rp", goal: 10, text: "Reach the Silver league", coins: 250, icon: "/assets/lg_silver.webp" },
+      { stat: "rp", goal: 40, text: "Reach the Silver league", coins: 250, icon: "/assets/lg_silver.webp" },
     ],
   },
   {
@@ -5922,17 +5941,17 @@ const CAREER = [
       { stat: "winsAny", goal: 15, text: "Win 15 races", coins: 300, icon: "/assets/medal_gold.png" },
       { stat: "dist", goal: 25000, text: "Run 25 km in total", coins: 300, icon: "/assets/ui_shoe.webp" },
       { stat: "bestCombo", goal: 20, text: "Reach a 20 combo", coins: 300, icon: "/assets/ui_flame.webp" },
-      { stat: "rp", goal: 28, text: "Reach the Gold league", coins: 400, icon: "/assets/lg_gold.webp" },
+      { stat: "rp", goal: 110, text: "Reach the Gold league", coins: 400, icon: "/assets/lg_gold.webp" },
     ],
   },
   {
     name: "Legend",
-    chest: { coins: 5000, medal: "silver", medals: 3 },
+    chest: { coins: 5000, pack: "mega" },
     missions: [
       { stat: "winsAny", goal: 50, text: "Win 50 races", coins: 500, icon: "/assets/medal_gold.png" },
       { stat: "bestDist", goal: 3000, text: "Run 3,000 m in one race", coins: 500, icon: "/assets/ui_shoe.webp" },
       { stat: "chars", goal: 12, text: "Collect 12 characters", coins: 500, icon: "/assets/pk_brainz.webp" },
-      { stat: "rp", goal: 55, text: "Reach the Platinum league", coins: 600, icon: "/assets/lg_platinum.webp" },
+      { stat: "rp", goal: 220, text: "Reach the Platinum league", coins: 600, icon: "/assets/lg_platinum.webp" },
     ],
   },
 ];
