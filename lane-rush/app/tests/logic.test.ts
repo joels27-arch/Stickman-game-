@@ -438,6 +438,29 @@ describe("party cup", () => {
   });
 });
 
+describe("survival hearts", () => {
+  const racing = (kind = "survival"): S => {
+    let s = act(lobbyOf(2), "p0", { type: "mode", mode: kind });
+    s = act(s, "p0", { type: "start", bots: false, t: T0 });
+    return L.applyAction(s, "__system", { type: "tick", t: s.startAt }) as S;
+  };
+  it("go to the first runner who lost a heart, and are gone for everyone", () => {
+    let s = racing();
+    expect(reject(s, "p0", { type: "heart", i: 0 })).toMatch(/full/);
+    s = act(s, "p0", { type: "pos", d: 10, lane: 0, y: 0, act: "run", hits: 1, t: s.startAt + 2000 });
+    s = act(s, "p1", { type: "pos", d: 10, lane: 0, y: 0, act: "run", hits: 1, t: s.startAt + 2000 });
+    s = act(s, "p0", { type: "heart", i: 0 });
+    expect(s.players.p0.hits).toBe(0);
+    expect((L.viewFor(s, "p1") as S).heartsTaken).toEqual([{ i: 0, by: "p0" }]);
+    expect(reject(s, "p1", { type: "heart", i: 0 })).toMatch(/gone/);
+  });
+  it("don't exist outside survival", () => {
+    let s = racing("coinrush");
+    s = act(s, "p0", { type: "pos", d: 10, lane: 0, y: 0, act: "run", hits: 1, t: s.startAt + 2000 });
+    expect(reject(s, "p0", { type: "heart", i: 0 })).toMatch(/no hearts/);
+  });
+});
+
 describe("random mode and map", () => {
   it("draws a real mode and map when the race starts", () => {
     const kinds = new Set<string>();
@@ -931,6 +954,34 @@ describe("new modes", () => {
     expect(s.players[other].booms).toBe(1);
     expect(s.blasts).toHaveLength(1);
     expect(s.bomb).toBeNull();
+  });
+
+  it("coin rush: taken coins come back after a while", () => {
+    let s = start("coinrush");
+    const coins = L.coinLines(L.buildCourse(s.seed, L.SURVIVAL_LEN));
+    s = act(s, "p0", pos(coins[0]!.z, at(s, 3000), { lane: coins[0]!.lane }));
+    s = act(s, "p0", { type: "coin", i: 0, t: at(s, 3000) });
+    expect(s.coinsTaken).toContain(0);
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, 3000 + L.COIN_RESPAWN_MS - 100) });
+    expect(s.coinsTaken).toContain(0);
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, 3000 + L.COIN_RESPAWN_MS + 50) });
+    expect(s.coinsTaken).not.toContain(0);
+  });
+
+  it("hot potato: the holder can throw the bomb to the nearest runner within range, any lane", () => {
+    let s = start("potato");
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, L.POTATO_FIRST_MS + 10) });
+    const first = s.bomb.holder;
+    const other = first === "p0" ? "p1" : "p0";
+    s = act(s, first, pos(100, at(s, 5000), { lane: 0 }));
+    s = act(s, other, pos(100 - L.BOMB_THROW_M - 5, at(s, 5000), { lane: 3 }));
+    expect(reject(s, first, { type: "pass", t: at(s, 5100) })).toMatch(/nobody close/);
+    expect(reject(s, other, { type: "pass", t: at(s, 5100) })).toMatch(/no bomb/);
+    s = act(s, other, pos(100 - L.BOMB_THROW_M + 4, at(s, 5200), { lane: 3 }));
+    s = act(s, first, { type: "pass", t: at(s, 5300) });
+    expect(s.bomb.holder).toBe(other);
+    // and can't be thrown straight back
+    expect(reject(s, other, { type: "pass", t: at(s, 6200) })).toMatch(/nobody close/);
   });
 });
 

@@ -125,8 +125,27 @@ or spent on characters.
   higher later the same day pays the difference. Rounds also pay normal race
   coins (×2, as in every cup).
 
+## Packs
+
+Packs hold characters and coins only (no medals). Brain Pack per item:
+legendary 1 % · epic 6 % · rare 20 % · coins 73 %; the Mega Pack's last item is
+always a character (5 / 25 / 70 %). You get characters you don't own first
+(a duplicate only once you own every one of that rarity). New players: the
+first pack always has a new character, and the first 3 packs have double
+character odds.
+
 ## Modes
 
 Survival (main), Brain Chase, Coin Rush, Hot Potato, Party Cup (3 random rounds
 of the others), and the Grand Tour (`grandtour`). Play solo = Endless Run alone, or any mode against 3 bots.
 Sprint and Tournament were removed at the player's request.
+
+* **Hot Potato:** the holder taps PASS 💣 to throw the bomb to the nearest
+  runner within 12 m (any lane, ahead or behind; not straight back), or bumps
+  into someone. Bots pass it on too.
+* **Coin Rush:** a taken coin comes back 5 s later, so the runners at the back
+  don't run dry.
+* **Hearts** (Survival only): first come, first served, and gone for everyone.
+* **Boxing glove:** hits the nearest runner within 25 m; with nobody in reach
+  it's a whiff (used up), so you're never stuck holding it.
+* Locking in your runner in the lobby marks you Ready (tap again to cancel).

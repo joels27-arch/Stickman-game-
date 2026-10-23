@@ -48,7 +48,7 @@ import {
   ROLLER_SPEED,
   ROLLER_TRIGGER_M,
   glueLane2,
-  PUNCH_RANGE_M,
+  PUNCH_REACH_M,
   CLOUD_MS,
   brainDistance,
   coinLines,
@@ -113,7 +113,7 @@ const GAME_MODE_INFO = {
   survival: { label: "Survival", icon: "❤️", tag: "Main mode", text: "3 hearts each. Last runner standing wins. Alone it's an endless run." },
   chase: { label: "Brain Chase", icon: "🧠", tag: "Run for it", text: "A giant brain rolls after you and keeps speeding up. Caught = out." },
   coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins. Get hit and you spill coins for the others." },
-  potato: { label: "Hot Potato", icon: "💣", tag: "Pass it on", text: "Bump into someone to pass the bomb. Hold it when it blows: lose a heart." },
+  potato: { label: "Hot Potato", icon: "💣", tag: "Pass it on", text: "Got the bomb? Tap PASS to throw it to the nearest runner (or bump into someone). Hold it when it blows: lose a heart." },
   cup: { label: "Party Cup", icon: "🏆", tag: "3 rounds", text: `3 random modes on 3 maps. ${CUP_POINTS.join(" / ")} points per place.` },
   random: { label: "Random", icon: "🎲", tag: "Surprise", text: "A random mode is drawn when each race starts." },
   grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "Every mode once: Survival, Brain Chase, Coin Rush and Hot Potato." },
@@ -125,7 +125,7 @@ const KIND_RULE = {
   survival: "3 hearts · last one standing wins",
   chase: "Don't let the brain catch you!",
   coinrush: "Grab the most coins in 90 s",
-  potato: "Bump someone to pass the bomb!",
+  potato: "Got the bomb? Tap PASS 💣 to throw it on!",
   sprint: "First to the finish line",
 };
 const MAP_INFO = {
@@ -161,7 +161,7 @@ const POWER_INFO = {
   freeze: { label: "Freeze", hint: "Everyone else slows down" },
   glue: { label: "Glue puddle", hint: "Drop it behind you: sticky over 2 lanes" },
   fake: { label: "Fake box", hint: "Drop a trap box behind you" },
-  boxing: { label: "Boxing glove", hint: "Punch the runner next to you a lane over" },
+  boxing: { label: "Boxing glove", hint: "Punch the nearest runner (25 m) a lane over" },
   brainwave: { label: "Brain Wave", hint: "Flips left and right for everyone ahead" },
   thunder: { label: "Thundercloud", hint: "Storms the leader: pass it on or get zapped" },
   swap: { label: "Mind Swap", hint: "Swap places with the runner ahead" },
@@ -1144,28 +1144,31 @@ const PACK_CHARS = [
   { id: "mo", name: "Mecha Mo", rarity: "rare", dupe: 300 },
 ];
 /** Chances per item slot. Normal slots, and the boosted last slot of a Mega Pack. */
+/** Character odds per item (the rest is coins). Packs never contain medals. */
 const PACK_ODDS = {
-  normal: { legendary: 0.005, epic: 0.03, rare: 0.08, gold: 0.02, silver: 0.06, bronze: 0.105 },
-  boosted: { legendary: 0.03, epic: 0.15, rare: 0.4, gold: 0.12, silver: 0.3, bronze: 0 },
+  normal: { legendary: 0.01, epic: 0.06, rare: 0.2 },
+  boosted: { legendary: 0.05, epic: 0.25, rare: 0.7 }, // the Mega Pack's last item: always a character
 };
+const NEWBIE_PACKS = 3; // your first packs: double character odds, and the very first one always has a new character
 const PACKS = [
   { id: "brain", name: "Brain Pack", price: 600, slots: ["normal"], img: "/assets/pack_brain.webp", note: "1 item" },
   { id: "mega", name: "Mega Pack", price: 1800, slots: ["normal", "normal", "boosted"], img: "/assets/pack_mega.webp", note: "3 items · last one boosted" },
 ];
 const pct = (x) => `${Math.round(x * 1000) / 10}%`;
-function rollSlot(kind) {
+/** A character you don't own yet if that rarity has one left, else a duplicate. */
+function packChar(rarity) {
+  const pool = PACK_CHARS.filter((c) => c.rarity === rarity);
+  const fresh = pool.filter((c) => !wallet.has(c.id));
+  const from = fresh.length ? fresh : pool;
+  return { kind: "char", char: from[Math.floor(Math.random() * from.length)] };
+}
+function rollSlot(kind, boost = 1) {
   const o = PACK_ODDS[kind];
   let r = Math.random();
   for (const rarity of ["legendary", "epic", "rare"]) {
-    if (r < o[rarity]) {
-      const pool = PACK_CHARS.filter((c) => c.rarity === rarity);
-      return { kind: "char", char: pool[Math.floor(Math.random() * pool.length)] };
-    }
-    r -= o[rarity];
-  }
-  for (const medal of ["gold", "silver", "bronze"]) {
-    if (r < o[medal]) return { kind: "medal", medal };
-    r -= o[medal];
+    const p = o[rarity] * boost;
+    if (r < p) return packChar(rarity);
+    r -= p;
   }
   return { kind: "coins", n: kind === "boosted" ? 600 : 150 + 25 * Math.floor(Math.random() * 13) };
 }
@@ -1182,17 +1185,20 @@ function buyPack(pack) {
 }
 /** Roll a pack's items and credit them (characters, medals, coins). */
 function grantPack(pack) {
-  const items = pack.slots.map(rollSlot);
+  const opened = stats.get("packs");
+  const boost = opened < NEWBIE_PACKS ? 2 : 1;
+  const items = pack.slots.map((kind) => rollSlot(kind, boost));
+  // the very first pack always has a character you don't have yet
+  if (opened === 0 && !items.some((it) => it.kind === "char" && !wallet.has(it.char.id))) {
+    const left = PACK_CHARS.filter((c) => !wallet.has(c.id) && c.rarity !== "legendary");
+    if (left.length) items[0] = { kind: "char", char: left[Math.floor(Math.random() * left.length)] };
+  }
   for (const it of items) {
     if (it.kind === "char") {
       if (wallet.has(it.char.id)) {
         it.dupe = true;
         wallet.addCoins(it.char.dupe);
       } else local.setItem("lr:owned", JSON.stringify([...wallet.owned(), it.char.id]));
-    } else if (it.kind === "medal") {
-      const m = wallet.medals();
-      m[it.medal] += 1;
-      wallet.save(m);
     } else wallet.addCoins(it.n);
   }
   stats.add("packs", 1);
@@ -1220,7 +1226,8 @@ function renderPacks() {
     }),
   );
   const n = PACK_ODDS.normal;
-  $("#packOdds").textContent = `Odds per item: legendary ${pct(n.legendary)} · epic ${pct(n.epic)} · rare ${pct(n.rare)} · medal ${pct(n.gold + n.silver + n.bronze)} · coins ${pct(1 - Object.values(n).reduce((a, b) => a + b, 0))}. Mega Pack's last item: legendary 3% · epic 15% · rare 40%. Duplicates turn into coins. Pack characters are collectibles for now.`;
+  const b = PACK_ODDS.boosted;
+  $("#packOdds").textContent = `Odds per item: legendary ${pct(n.legendary)} · epic ${pct(n.epic)} · rare ${pct(n.rare)} · coins ${pct(1 - n.legendary - n.epic - n.rare)}. Mega Pack's last item is always a character (legendary ${pct(b.legendary)} · epic ${pct(b.epic)} · rare ${pct(b.rare)}). Your first pack always has a new character and your first ${NEWBIE_PACKS} packs have double character odds. You get characters you don't have yet first; duplicates turn into coins.`;
   renderWallet();
 }
 
@@ -1357,6 +1364,8 @@ function onServerError(error) {
     return;
   }
   if (error === "box gone") return loseBox();
+  if (error === "nobody close") return toast("Nobody close enough: get within 12 m of someone");
+  if (error === "heart gone" || error === "full health" || error === "no hearts in this race") return;
   // someone (or a bot) got to the coin first: trust the server's count again
   if (error === "coin gone" || error === "bad coin") {
     game.coinsShown = net.view?.players.find((p) => p.id === playerId)?.coins ?? 0;
@@ -1999,6 +2008,9 @@ function renderLobby(v) {
 $("#lockBtn").addEventListener("click", () => {
   sfx.unlock();
   game.locked = true;
+  // locking in your runner means you're ready; tap again on the line-up to cancel
+  const me = net.view?.players.find((p) => p.id === playerId);
+  if (me && net.view.host !== playerId && !me.ready) act({ type: "ready", ready: true });
   if (net.view) renderLobby(net.view);
 });
 $("#changeRunner").addEventListener("click", () => {
@@ -2318,16 +2330,26 @@ function adaptQuality(dt) {
 
 // Brain Chase: a little rear-view mirror in the corner, so you can see it coming
 const mirrorCam = new THREE.PerspectiveCamera(55, 1.5, 0.5, 400);
+const mirrorSize = new THREE.Vector2();
 function renderMirror() {
   const on = renderer && game.mode === "race" && game.kind === "chase" && !me.out && me.runner;
   $("#mirrorFrame").hidden = !on;
   if (!on) return;
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  const mw = Math.round(Math.min(170, w * 0.38));
+  // draw in the renderer's own units, then put the frame exactly over it on the page
+  // (the canvas can be a different size from the window, e.g. behind Safari's toolbars)
+  renderer.getSize(mirrorSize);
+  const w = mirrorSize.x;
+  const h = mirrorSize.y;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const sx = rect.width / w;
+  const sy = rect.height / h;
+  const visibleBottom = Math.min(rect.bottom, window.innerHeight);
+  const mw = Math.round(Math.min(170, window.innerWidth * 0.38) / sx);
   const mh = Math.round(mw / 1.5);
-  const x = w - mw - 12;
-  const y = h - mh - Math.round(h * 0.2); // bottom-left origin in WebGL
+  const x = Math.round((Math.min(rect.right, window.innerWidth) - rect.left - 12) / sx) - mw;
+  const bottomGap = Math.round(window.innerHeight * 0.2);
+  const yTop = Math.round((visibleBottom - bottomGap - rect.top) / sy) - mh; // from the top of the canvas
+  const y = h - yTop - mh; // WebGL counts from the bottom
   const p = me.runner.group.position;
   mirrorCam.position.set(p.x * 0.5, 3.2, p.z - 3);
   mirrorCam.lookAt(p.x * 0.3, 2.2, p.z + 30);
@@ -2338,10 +2360,12 @@ function renderMirror() {
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, w, h);
   const f = $("#mirrorFrame");
-  f.style.width = `${mw}px`;
-  f.style.height = `${mh}px`;
-  f.style.right = "12px";
-  f.style.bottom = `${Math.round(h * 0.2)}px`;
+  f.style.width = `${Math.round(mw * sx)}px`;
+  f.style.height = `${Math.round(mh * sy)}px`;
+  f.style.left = `${Math.round(rect.left + x * sx)}px`;
+  f.style.top = `${Math.round(rect.top + yTop * sy)}px`;
+  f.style.right = "auto";
+  f.style.bottom = "auto";
 }
 
 function resize() {
@@ -3345,7 +3369,7 @@ const world = (() => {
       spr.scale.set(1.1, 1.1, 1);
       spr.position.set(laneX(h.lane), 1.2, -h.z);
       raceGroup.add(spr);
-      const heart = { obj: spr, lane: h.lane, z: h.z, taken: false };
+      const heart = { obj: spr, lane: h.lane, z: h.z, idx: hearts.length, taken: false };
       hearts.push(heart);
       cullables.push({ obj: spr, z: h.z, box: heart });
     }
@@ -3924,6 +3948,22 @@ const game = { mode: "home", round: -1, kind: "survival", len: TRACK_LEN };
 // every mode now runs on the endless course; only Survival uses obstacle hearts
 const isSurvival = () => isEndless(game.kind);
 const heartsFromHits = () => game.kind === "survival";
+/** Hearts the room gave out: gone for everyone, and +1 heart for whoever got it (once). */
+function healFromHearts() {
+  for (const t of net.view?.heartsTaken || []) {
+    const h = world.hearts[t.i];
+    if (!h || h.taken) continue;
+    h.taken = true;
+    if (t.by !== playerId || game.healed?.has(t.i)) continue;
+    game.healed.add(t.i);
+    me.hits = Math.max(0, me.hits - 1);
+    renderHearts(false);
+    sfx.pickup();
+    banner("+1 ❤️", 900);
+    world.burst(laneX(h.lane), 1.2, -h.z, ["#ff4d6d", "#ff9fb3", "#ffffff"], 60);
+    sendPos(true);
+  }
+}
 
 const me = {
   d: 0,
@@ -4036,6 +4076,9 @@ function enterRace(v) {
   world.setEndless(isSurvival());
   remote.clear();
   race.course = world.buildCourseObjects(v.seed, game.len, v.courseBoost ?? 0);
+  // hearts only exist in modes where you have hearts to win back
+  if (v.kind !== "survival") for (const h of world.hearts) h.taken = true;
+  game.healed = new Set();
   game.introsShown = new Set();
   showScreen("race");
 
@@ -4215,7 +4258,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "ArrowRight" || k === "d" || k === "D") input("right");
   else if (k === "ArrowUp" || k === "w" || k === "W" || k === " ") input("jump");
   else if (k === "ArrowDown" || k === "s" || k === "S") input("slide");
-  else if (k === "e" || k === "E" || k === "Enter") useItem(me.lane, 1);
+  else if (k === "e" || k === "E" || k === "Enter") passBomb() || useItem(me.lane, 1);
   else if (k === "q" || k === "Q") useItem(me.lane, -1);
   else if (/^Digit[1-4]$/.test(e.code)) useItem(Number(e.code.slice(5)) - 1, e.shiftKey ? -1 : 1);
   else if (k === "c" || k === "C" || k === "b" || k === "B") game.lookBack = canControl() || game.mode === "race";
@@ -4389,17 +4432,14 @@ function stepMe(dt) {
     }
   }
   // survival: hearts floating over the track give back a lost heart
+  // (the room decides who gets it: the first one there; see healFromHearts)
   for (const h of world.hearts) {
-    if (h.taken || h.z < prevD - 0.8 || h.z > me.d + 0.8 || Math.abs(me.x - h.lane) > 0.6) continue;
-    if (!heartsFromHits() || me.hits <= 0) continue; // full health: leave it
-    h.taken = true;
-    me.hits -= 1;
-    renderHearts(false);
-    sfx.pickup();
-    banner("+1 ❤️", 900);
-    world.burst(laneX(h.lane), 1.2, -h.z, ["#ff4d6d", "#ff9fb3", "#ffffff"], 60);
-    sendPos(true);
+    if (h.taken || h.asked || h.z < prevD - 0.8 || h.z > me.d + 0.8 || Math.abs(me.x - h.lane) > 0.6) continue;
+    if (!heartsFromHits() || me.hits <= 0) continue; // full health: leave it for someone else
+    h.asked = true;
+    act({ type: "heart", i: h.idx });
   }
+  healFromHearts();
   // mystery boxes
   for (const b of world.boxes) {
     if (b.taken || b.z < prevD - 0.8 || b.z > me.d + 0.8) continue;
@@ -5771,7 +5811,15 @@ function useItem(lane = me.lane, dir = 1) {
     const posOf = (p) => remote.map.get(p.id)?.dispD ?? p.d;
     let target = null;
     if (kind === "boxing") {
-      target = others.filter((p) => Math.abs(posOf(p) - me.d) < PUNCH_RANGE_M).sort((a, b) => Math.abs(posOf(a) - me.d) + Math.abs(a.lane - me.lane) - (Math.abs(posOf(b) - me.d) + Math.abs(b.lane - me.lane)))[0];
+      // the glove reaches the nearest runner within PUNCH_REACH_M, ahead or behind
+      target = others.filter((p) => Math.abs(posOf(p) - me.d) < PUNCH_REACH_M).sort((a, b) => Math.abs(posOf(a) - me.d) + Math.abs(a.lane - me.lane) - (Math.abs(posOf(b) - me.d) + Math.abs(b.lane - me.lane)))[0];
+      if (!target) {
+        // nobody in reach: a swing at the air, so you're never stuck holding it
+        banner("🥊 WHIFF! Nobody close", 900);
+        sfx.lane();
+        renderPower();
+        return;
+      }
     } else target = others.find((p) => posOf(p) > me.d);
     if (!target || (kind === "thunder" && v?.cloud)) {
       me.items.unshift(kind); // keep it for when it's useful
@@ -6005,6 +6053,7 @@ function modeTick(prevD, v) {
     for (const c of world.coins) {
       if (c.got || c.z < prevD - 0.8 || c.z > me.d + 0.8 || Math.abs(me.x - c.lane) > 0.6 || me.y > 2.2) continue;
       c.got = true;
+      c.gotAt = performance.now();
       c.obj.visible = false;
       game.coinsShown = myCoins() + c.v;
       act({ type: "coin", i: c.i });
@@ -6045,9 +6094,17 @@ function modeView(v) {
   if (game.kind === "coinrush") {
     // coins someone else grabbed disappear for us too
     const taken = new Set(v.coinsTaken || []);
-    for (const c of world.coins) if (taken.has(c.i) && !c.got) {
-      c.got = true;
-      c.obj.visible = false;
+    const now = performance.now();
+    for (const c of world.coins) {
+      if (taken.has(c.i) && !c.got) {
+        c.got = true;
+        c.gotAt = now;
+        c.obj.visible = false;
+      } else if (!taken.has(c.i) && c.got && now - (c.gotAt ?? 0) > 2500) {
+        // it came back (taken coins respawn after a few seconds)
+        c.got = false;
+        c.obj.visible = true;
+      }
     }
     if (mine && (game.coinsShown ?? 0) > mine.coins + 12) game.coinsShown = mine.coins; // a pickup we lost the race for
   }
@@ -6074,9 +6131,22 @@ function renderModeHud() {
     box.hidden = !mineBomb || me.out;
     box.className = "mode-hud bomb";
     const left = v.bomb ? (v.bomb.until - serverNow()) / 1000 : 0;
-    setText(box, left < 3.5 ? `💣 ${Math.max(0, left).toFixed(1)} s · PASS IT!` : "💣 You have the bomb! Bump into someone!");
+    setText(box, left < 3.5 ? `💣 ${Math.max(0, left).toFixed(1)} s · PASS IT!` : "💣 You have the bomb! Tap PASS");
   } else box.hidden = true;
+  // the PASS button only while you hold the bomb
+  const bombBtn = hudEl.bomb ?? (hudEl.bomb = $("#bombBtn"));
+  const holding = game.kind === "potato" && v.bomb?.holder === playerId && !me.out;
+  if (bombBtn.hidden === holding) bombBtn.hidden = !holding;
 }
+function passBomb() {
+  if (game.kind !== "potato" || net.view?.bomb?.holder !== playerId) return false;
+  act({ type: "pass" });
+  return true;
+}
+$("#bombBtn").addEventListener("click", (e) => {
+  e.preventDefault();
+  passBomb();
+});
 
 /** Mind swap moved us (our warp went up), or someone punched us. */
 function applyWarpsAndPunches(v) {
