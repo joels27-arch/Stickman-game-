@@ -953,7 +953,7 @@ const VIA_ICON = { starter: "✅", coins: "🪙", medals: "🏅", pack: "🎁", 
 function howToGet(c) {
   if (c.via === "starter") return "A free runner. Race with it any time.";
   if (c.via === "coins") return `Buy it in the Shop for ${c.coins.toLocaleString()} coins.`;
-  if (c.via === "medals") return `Medal exclusive: ${medalText(c.price.medal, c.price.count)}. Win medals by placing top 3 against real players, from the day 7 reward, packs and the Season Pass.`;
+  if (c.via === "medals") return `Medal exclusive: ${medalText(c.price.medal, c.price.count)}. Win medals by placing top 3 against real players. Gold medals only come from winning races.`;
   if (c.via === "pack") return `Only in packs (${c.rarity}). Brain Pack: ${pct(PACK_ODDS.normal[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)} per item. Mega Pack last item: ${pct(PACK_ODDS.boosted[c.rarity] / PACK_CHARS.filter((x) => x.rarity === c.rarity).length)}.`;
   if (c.idx in PASS_RUNNERS) return `Season Pass reward: free track, level ${PASS_RUNNERS[c.idx]}. Play races to earn XP.`;
   return "Season Pass exclusive: Gold track, level 30.";
@@ -1668,7 +1668,7 @@ const LEAGUE_TIERS = [
   { pts: 20, coins: 300 },
   { pts: 45, coins: 700, medal: "bronze" },
   { pts: 70, coins: 1200, medal: "silver" },
-  { pts: 90, coins: 2000, medal: "gold" },
+  { pts: 90, coins: 2000, medal: "silver" },
 ];
 function leagueWindow(now = new Date()) {
   const day = now.getDay();
@@ -4948,7 +4948,7 @@ const STREAK_REWARDS = [
   { coins: 150, img: "/assets/ui_c2.webp" },
   { coins: 200, img: "/assets/ui_c3.webp" },
   { coins: 300, img: "/assets/ui_c3.webp" },
-  { coins: 750, medal: "gold", img: "/assets/ui_chest.webp" },
+  { coins: 1000, img: "/assets/ui_chest.webp" },
 ];
 function streakState() {
   let s = {};
@@ -5007,7 +5007,7 @@ function claimStreak() {
   }
   sfx.finish();
   coinRain($("#streakGrid .sday.today") || $("#streakClaim"), st.next === 7 ? 36 : 16);
-  toast(st.next === 7 ? `JACKPOT! +${r.coins} coins and a gold medal` : `Day ${st.next}: +${r.coins} coins`);
+  toast(st.next === 7 ? `JACKPOT! +${r.coins} coins` : `Day ${st.next}: +${r.coins} coins`);
   renderStreak();
   setTimeout(() => ($("#streakModal").hidden = true), 1400);
 }
@@ -5405,7 +5405,7 @@ function passReward(level, track) {
   if (level === 10) return { item: "trail:neon", label: "Neon trail", icon: "🌈" };
   if (level === 20) return { item: "cel:mega", label: "Mega fireworks", icon: "🎆" };
   if (level === 15 || level === 25) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
-  if (level % 5 === 0) return { medal: "gold", label: "Gold medal", img: MEDAL_IMG.gold };
+  if (level % 5 === 0) return { medal: "silver", label: "Silver medal", img: MEDAL_IMG.silver };
   return { coins: 150 + level * 15, label: `${150 + level * 15} coins`, img: level > 15 ? "/assets/ui_c3.webp" : "/assets/ui_c2.webp" };
 }
 function passClaimable(p = passState()) {
@@ -5569,7 +5569,7 @@ const CAREER = [
   },
   {
     name: "Pro",
-    chest: { coins: 1000, medal: "gold" },
+    chest: { coins: 1000, medal: "silver" },
     missions: [
       { stat: "chaseBest", goal: 120, text: "Survive 2 minutes in Brain Chase", coins: 200, icon: "/assets/ui_watch.webp" },
       { stat: "cupWins", goal: 1, text: "Win a match of 3+ rounds", coins: 250, icon: "/assets/medal_gold.png" },
@@ -5589,7 +5589,7 @@ const CAREER = [
   },
   {
     name: "Legend",
-    chest: { coins: 5000, medal: "gold", medals: 3 },
+    chest: { coins: 5000, medal: "silver", medals: 3 },
     missions: [
       { stat: "winsAny", goal: 50, text: "Win 50 races", coins: 500, icon: "/assets/medal_gold.png" },
       { stat: "bestDist", goal: 3000, text: "Run 3,000 m in one race", coins: 500, icon: "/assets/ui_shoe.webp" },
@@ -5643,7 +5643,7 @@ function claimCareer(ci, mi, btn) {
   renderMissionDots();
 }
 function chestLabel(c) {
-  return [c.coins ? `${c.coins.toLocaleString()} coins` : "", c.pack ? (c.pack === "mega" ? "Mega Pack" : "Brain Pack") : "", c.medal ? `${c.medals ?? 1} gold medal${(c.medals ?? 1) > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
+  return [c.coins ? `${c.coins.toLocaleString()} coins` : "", c.pack ? (c.pack === "mega" ? "Mega Pack" : "Brain Pack") : "", c.medal ? `${c.medals ?? 1} ${c.medal} medal${(c.medals ?? 1) > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
 }
 function openChest(ci) {
   const st = careerState();

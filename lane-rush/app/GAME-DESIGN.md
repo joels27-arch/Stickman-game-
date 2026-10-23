@@ -44,11 +44,13 @@ wide gap between rows.
 | Solo endless run | 1 per 25 m (5–60) |
 | Daily missions | 100 / 200 / 400 (claim) |
 | Career missions | 50–600 each + a chapter chest |
-| Daily login streak | 50 → 750 + gold medal on day 7 |
+| Daily login streak | 50 → 1000 coins on day 7 |
 
 Medals (gold/silver/bronze) come from top-3 places **against at least one other
-real player**, the day-7 login reward, the Weekend League, the Season Pass and
-chapter chests. Bots never pay medals (they do pay coins).
+real player**. Silver and bronze also come from the Weekend League, the Season
+Pass and chapter chests. **Gold medals are only won by winning races**: never
+from packs, the shop, the login streak, the pass or chests, and never bought.
+Bots never pay medals (they do pay coins).
 
 The **Gold Pass** (the Season Pass's second track) costs $4.99. Payments aren't
 connected yet, so for now tapping the button unlocks it.
