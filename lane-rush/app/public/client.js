@@ -2881,10 +2881,11 @@ const world = (() => {
   const assets = { chars: [], props: {} };
   let ready = false;
 
-  // Sky: the Higgsfield panorama wraps around the world on a far cylinder;
-  // above it, a solid colour sampled from the panorama's top edge.
-  scene.background = new THREE.Color("#1f78d1");
-  scene.fog = new THREE.Fog("#cfeefa", 90, 280);
+  // Sky: a gradient dome with a soft sun, and two rings of far hills and
+  // mountains fading into the haze. All of it follows the camera.
+  const SKY = { top: "#1d78dc", mid: "#6fbcf3", horizon: "#e4f5fd" };
+  scene.background = new THREE.Color(SKY.horizon);
+  scene.fog = new THREE.Fog(SKY.horizon, 90, 300);
   scene.add(new THREE.HemisphereLight("#e6f6ff", "#5fae3a", 1.1));
   const sun = new THREE.DirectionalLight("#fff1cc", 2.1);
   sun.position.set(-6, 14, 8);
@@ -2892,35 +2893,76 @@ const world = (() => {
 
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
-  texLoader.load("/assets/sky_pano.jpg", (t) => {
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.wrapS = THREE.RepeatWrapping;
-    t.repeat.set(2, 1);
-    const R = 300;
-    // a little squashed, so a phone held upright sees the deep blue at the top, not just the pale horizon
-    const H = ((2 * Math.PI * R) / 2) * (t.image.height / t.image.width) * 0.62;
-    const cyl = new THREE.Mesh(
-      new THREE.CylinderGeometry(R, R, H, 64, 1, true),
-      // painted colours as they are (tone mapping washed the blue out)
-      new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false }),
+  {
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(380, 32, 16),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: { top: { value: new THREE.Color(SKY.top) }, mid: { value: new THREE.Color(SKY.mid) }, horizon: { value: new THREE.Color(SKY.horizon) } },
+        vertexShader: "varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+        fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 horizon; varying vec3 vDir;
+          void main() {
+            float h = max(vDir.y, 0.0);
+            vec3 c = mix(horizon, mid, smoothstep(0.0, 0.16, h));
+            c = mix(c, top, smoothstep(0.16, 0.65, h));
+            gl_FragColor = vec4(c, 1.0);
+            #include <colorspace_fragment>
+          }`,
+      }),
     );
-    cyl.position.y = H / 2 - 40;
-    cyl.renderOrder = -1;
-    skyGroup.add(cyl);
-    try {
-      const c = document.createElement("canvas");
-      c.width = 16;
-      c.height = 4;
-      c.getContext("2d").drawImage(t.image, 0, 0, t.image.width, 8, 0, 0, 16, 4);
-      const px = c.getContext("2d").getImageData(0, 0, 16, 4).data;
-      let r = 0, g = 0, b = 0;
-      for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; }
-      const n = px.length / 4;
-      scene.background = new THREE.Color().setRGB(r / n / 255, g / n / 255, b / n / 255, THREE.SRGBColorSpace);
-    } catch {
-      /* keep the default top colour */
-    }
-  });
+    dome.renderOrder = -2;
+    skyGroup.add(dome);
+    // the sun: a warm glow up and to the right of the track
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const g = c.getContext("2d");
+    const grd = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+    grd.addColorStop(0, "rgba(255,255,250,1)");
+    grd.addColorStop(0.18, "rgba(255,250,215,0.95)");
+    grd.addColorStop(0.4, "rgba(255,236,170,0.35)");
+    grd.addColorStop(1, "rgba(255,230,160,0)");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 128, 128);
+    const sunTex = new THREE.CanvasTexture(c);
+    sunTex.colorSpace = THREE.SRGBColorSpace;
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending, toneMapped: false }));
+    glow.scale.set(110, 110, 1);
+    glow.position.set(95, 120, -320);
+    glow.renderOrder = -1;
+    skyGroup.add(glow);
+    // far mountains (hazy blue) and nearer rolling hills (soft green), as rings round the world
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const ring = (radius, baseY, height, sharp, top, bottom) => {
+      const n = 160;
+      const p = [rnd() * 6.3, rnd() * 6.3, rnd() * 6.3, rnd() * 6.3];
+      const pos = [];
+      const col = [];
+      const cTop = new THREE.Color(top);
+      const cBot = new THREE.Color(bottom);
+      for (let i = 0; i <= n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        let h = 0.5 + 0.22 * Math.sin(3 * a + p[0]) + 0.16 * Math.sin(7 * a + p[1]) + 0.08 * Math.sin(13 * a + p[2]) + 0.05 * Math.sin(29 * a + p[3]);
+        if (sharp) h = Math.pow(Math.max(0, h), 1.6) * 1.5;
+        const x = Math.sin(a) * radius;
+        const z = Math.cos(a) * radius;
+        pos.push(x, baseY, z, x, baseY + height * Math.max(0.12, h), z);
+        col.push(cBot.r, cBot.g, cBot.b, cTop.r, cTop.g, cTop.b);
+      }
+      const idx = [];
+      for (let i = 0; i < n; i++) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+      geo.setIndex(idx);
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: false, depthWrite: false, toneMapped: false }));
+      m.renderOrder = -1;
+      return m;
+    };
+    skyGroup.add(ring(340, -14, 78, true, "#8eaee0", SKY.horizon));
+    skyGroup.add(ring(270, -10, 30, false, "#6cbf6a", "#cdebd8"));
+  }
 
   // Meadow far below the raised turf track; the track itself is Higgsfield 3D
   // ground tiles (built once the models load, see buildScenery).
@@ -3851,6 +3893,66 @@ const world = (() => {
     return g;
   }
 
+  /** Height of the meadow's hills, `d` metres out from the track edge at distance `z`: flat near the fence, rolling further out. */
+  function hillY(d, z) {
+    const rise = THREE.MathUtils.smoothstep(d, 12, 70);
+    return rise * (7 + 4 * Math.sin(z * 0.021 + d * 0.05) + 2.5 * Math.sin(z * 0.063 - d * 0.11));
+  }
+  /** Grassy hills on both sides of the meadow track, one mesh per side. */
+  function meadowHills(edge) {
+    const g = new THREE.Group();
+    const len = TRACK_LEN + 400;
+    const width = 130;
+    const tex = grassTex.clone();
+    tex.needsUpdate = true;
+    tex.repeat.set(width / 9, len / 9);
+    const mat = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true });
+    const light = new THREE.Color("#ffffff");
+    const shade = new THREE.Color("#b9d6a6");
+    for (const side of [-1, 1]) {
+      const geo = new THREE.PlaneGeometry(width, len, 26, Math.round(len / 5));
+      geo.rotateX(-Math.PI / 2);
+      const pos = geo.attributes.position;
+      const col = [];
+      for (let i = 0; i < pos.count; i++) {
+        const d = pos.getX(i) + width / 2; // 0 at the track edge
+        const z = -pos.getZ(i) + len / 2 - 120;
+        const y = hillY(d, z);
+        pos.setXYZ(i, side * (edge + d), MEADOW_Y + y - 0.02, -z);
+        // valleys a touch darker, so the hills read as hills
+        const c = shade.clone().lerp(light, Math.min(1, 0.55 + y / 14));
+        col.push(c.r, c.g, c.b);
+      }
+      if (side < 0) geo.index.array.reverse(); // mirrored: keep the faces pointing up
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+      geo.computeVertexNormals();
+      g.add(new THREE.Mesh(geo, mat));
+    }
+    return g;
+  }
+  /** Little flowers in the grass along both fences (one instanced mesh: cheap on phones). */
+  function meadowFlowers(edge, r) {
+    const colors = ["#ffffff", "#ffe14d", "#ff7ab8", "#ffffff", "#c58bff", "#ff9f43"].map((c) => new THREE.Color(c));
+    const geo = new THREE.IcosahedronGeometry(0.11, 0);
+    const n = Math.round(((TRACK_LEN + 220) / 0.55) * 2);
+    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial(), n);
+    mesh.frustumCulled = false; // spread along the whole track
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const sc = new THREE.Vector3();
+    const at = new THREE.Vector3();
+    for (let i = 0; i < n; i++) {
+      const side = i % 2 ? 1 : -1;
+      const z = -60 + (i >> 1) * 0.55 + r() * 0.5;
+      at.set(side * (edge + 0.75 + r() * 3.2), MEADOW_Y + 0.08, -z);
+      const k = 0.7 + r() * 0.7;
+      sc.set(k, k * 0.6, k);
+      mesh.setMatrixAt(i, m.compose(at, q, sc));
+      mesh.setColorAt(i, colors[Math.floor(r() * colors.length)]);
+    }
+    return mesh;
+  }
+
   function buildMap(map) {
     const group = new THREE.Group();
     const cull = [];
@@ -3887,18 +3989,22 @@ const world = (() => {
     else if (map === "space") buildSpace(add, group, r, edge);
 
     if (map === "meadow") {
-      // trees, bushes and rocks on the meadow
+      // rolling hills either side, a strip of flowers along the fence, then trees, bushes and the odd rock
+      group.add(meadowHills(edge), meadowFlowers(edge, r));
       const trees = [P.oak, P.pine, P.blossom];
       for (let z = -60; z < TRACK_LEN + 160; z += 5 + r() * 5) {
         for (const side of [-1, 1]) {
           const roll = r();
           const x = side * (edge + 2.5 + r() * 26);
-          if (roll < 0.55) add(trees[Math.floor(r() * 3)], x, MEADOW_Y, z, 0.8 + r() * 0.5, r() * Math.PI * 2);
+          if (roll < 0.55) add(trees[Math.floor(r() * 3)], x, MEADOW_Y + hillY(Math.abs(x) - edge, z), z, 0.8 + r() * 0.5, r() * Math.PI * 2);
           else if (roll < 0.85) add(P.bush, side * (edge + 1.6 + r() * 10), MEADOW_Y, z, 0.7 + r() * 0.6, r() * Math.PI * 2);
           // a bush hugging the fence every few metres keeps the meadow edge lively; rocks only now and then, further out
           const extra = r();
           if (extra < 0.55) add(P.bush, side * (edge + 1.0 + r() * 1.5), MEADOW_Y, z + r() * 4, 0.5 + r() * 0.4, r() * Math.PI * 2);
-          else if (extra < 0.7) add(P.rocks, side * (edge + 8 + r() * 14), MEADOW_Y, z, 0.6 + r() * 0.6, r() * Math.PI * 2);
+          else if (extra < 0.7) {
+            const d = 8 + r() * 14;
+            add(P.rocks, side * (edge + d), MEADOW_Y + hillY(d, z), z, 0.6 + r() * 0.6, r() * Math.PI * 2);
+          }
         }
       }
     } else if (map === "farm") {
