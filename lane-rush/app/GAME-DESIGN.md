@@ -88,11 +88,15 @@ because new keys are added alongside the old ones.
 ## Home pages
 
 The home screen is four pages with a tab bar (swipe or tap): **Tournaments**,
-**Skins** (your collection and every character), **Play** (the default) and
-**Shop** (Season Pass, shop tabs, Missions).
+**Missions** (daily, career and trophies, open on the page), **Play** (the
+default) and **Shop**.
 
-* The top bar shows only your medals and Settings; coins also show on Skins and
-  Shop, and the Shop page adds the daily reward and your league badge.
+* The Shop page shows everything at once, with no category tiles: the Season
+  Pass, packs, every character (yours first, then the ones still to get, from
+  common to legendary; coin and medal ones show their price) and items. Opened
+  from the lobby or results, the same shop appears on its own screen.
+* The top bar shows only your medals and Settings; the Shop page adds coins,
+  the daily reward and your league badge.
 * Your name is asked once, the first time the game opens, and can be changed in
   Settings.
 

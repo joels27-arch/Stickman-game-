@@ -68,12 +68,19 @@
             <div id="tourneyList" class="tourney-list"></div>
           </div>
         </div>
-        <!-- SKINS: your collection and every character -->
-        <div class="hpage hp-side hp-skins" id="hpSkins" aria-label="Skins">
+        <!-- MISSIONS: daily, career and trophies, open right on the page -->
+        <div class="hpage hp-side hp-missions" id="hpMissions" aria-label="Missions">
           <div class="hp-scroll">
-            <div class="ribbon pink hp-ribbon"><h2>Skins</h2></div>
-            <div class="coll-progress"><b id="collCount">0/0</b><div class="qbar"><i id="collBar"></i><span id="collPct"></span></div></div>
-            <div id="collGrid" class="coll-grid"></div>
+            <div class="ribbon pink hp-ribbon"><h2>Missions</h2></div>
+            <div class="gtabs mission-tabs" role="tablist">
+              <button id="tabDaily" class="gtab on" type="button">Daily <i class="dot" id="dailyDot" hidden></i></button>
+              <button id="tabCareer" class="gtab" type="button">Career <i class="dot" id="careerDot" hidden></i></button>
+              <button id="tabAll" class="gtab" type="button">Trophies <i class="dot" hidden></i></button>
+            </div>
+            <div class="gsub" id="questHead"><span class="reset-badge"><img src="/assets/ui_watch.webp" alt="" /><span>New in <b id="questReset">--:--:--</b></span></span><p id="questSub"></p></div>
+            <div id="questList" class="quest-list"></div>
+            <div id="careerList" class="quest-list career-list" hidden></div>
+            <div id="achList" class="quest-list" hidden></div>
           </div>
         </div>
         <!-- PLAY -->
@@ -110,28 +117,13 @@
               <span class="sc-go">Open ›</span>
               <i class="dot" hidden></i>
             </button>
-            <div class="store-grid">
-              <button class="store-tile shopBtn" type="button" data-tab="chars"><img src="/assets/sc_luna.webp" alt="" /><b>Characters</b><small>Coins &amp; medals</small></button>
-              <button class="store-tile shopBtn" type="button" data-tab="packs"><img src="/assets/pack_brain.webp" alt="" /><b>Packs</b><small>Pack-only runners</small></button>
-              <button class="store-tile shopBtn" type="button" data-tab="items"><img src="/assets/ui_shoe.webp" alt="" /><b>Items</b><small>Trails &amp; emotes</small></button>
-              <button id="collPill" class="store-tile coll" type="button"><img src="/assets/pk_brainz.webp" alt="" /><b>Skins</b><small id="collPillCount">8/24</small></button>
-            </div>
-            <button id="questPill" class="store-card quests" type="button">
-              <img src="/assets/ui_star.webp" alt="" />
-              <span class="sc-info">
-                <em>Missions</em>
-                <b id="questCount">0/3</b>
-                <small>Daily, career and trophies</small>
-              </span>
-              <span class="sc-go">Open ›</span>
-              <i class="dot"></i>
-            </button>
+            <div id="shopHome" class="shop-mount"></div>
           </div>
         </div>
       </div>
       <nav class="home-tabs" role="tablist" aria-label="Home pages">
         <button class="htab" type="button" role="tab" data-page="0"><img src="/assets/tab_trophy.webp" alt="" /><span>Tournaments</span></button>
-        <button class="htab" type="button" role="tab" data-page="1"><img src="/assets/tab_skins.webp" alt="" /><span>Skins</span></button>
+        <button class="htab" type="button" role="tab" data-page="1"><img src="/assets/tab_missions.webp" alt="" /><span>Missions</span><i class="dot" hidden></i></button>
         <button class="htab on" type="button" role="tab" data-page="2"><img src="/assets/tab_play.webp" alt="" /><span>Play</span></button>
         <button class="htab" type="button" role="tab" data-page="3"><img src="/assets/tab_shop.webp" alt="" /><span>Shop</span><i class="dot" hidden></i></button>
       </nav>
@@ -162,7 +154,6 @@
           <div id="hostPicks" class="host-picks">
             <h3 class="pick-title">Game mode</h3>
             <div id="modePick" class="mode-pick"></div>
-            <p id="modeDesc" class="mode-desc"></p>
             <label class="bot-toggle"><input type="checkbox" id="botToggle" checked /> <span>🤖 Fill empty spots with bots</span></label>
             <h3 class="pick-title">Map</h3>
             <div id="mapPick" class="map-pick"></div>
@@ -313,23 +304,6 @@
     </div>
 
     <!-- DAILY CHALLENGES: three a day, coins for each -->
-    <div id="questModal" class="modal gmodal" hidden>
-      <div class="grays" aria-hidden="true"></div>
-      <div class="gsheet quest-sheet" role="dialog" aria-modal="true" aria-labelledby="questTitle">
-        <div class="ribbon pink"><h2 id="questTitle">Missions</h2></div>
-        <button id="questClose" class="gclose" type="button" aria-label="Close">✕</button>
-        <div class="gtabs" role="tablist">
-          <button id="tabDaily" class="gtab on" type="button">Daily <i class="dot" id="dailyDot" hidden></i></button>
-          <button id="tabCareer" class="gtab" type="button">Career <i class="dot" id="careerDot" hidden></i></button>
-          <button id="tabAll" class="gtab" type="button">Trophies <i class="dot" hidden></i></button>
-        </div>
-        <div class="gsub" id="questHead"><span class="reset-badge"><img src="/assets/ui_watch.webp" alt="" /><span>New in <b id="questReset">--:--:--</b></span></span><p id="questSub"></p></div>
-        <div id="questList" class="quest-list"></div>
-        <div id="careerList" class="quest-list career-list" hidden></div>
-        <div id="achList" class="quest-list" hidden></div>
-      </div>
-    </div>
-
     <!-- SETTINGS -->
     <div id="setModal" class="modal gmodal" hidden>
       <div class="gsheet set-sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
@@ -424,18 +398,19 @@
           <div class="ribbon gold static"><h2>Shop</h2></div>
         </header>
         <div class="wallet shop-wallet" title="Your coins and medals"></div>
-        <div class="gtabs shop-tabs" role="tablist">
-          <button id="tabChars" class="gtab on" type="button">Characters</button>
-          <button id="tabPacks" class="gtab" type="button">Packs</button>
-          <button id="tabItems" class="gtab" type="button">Items <i class="newtag">New</i></button>
-        </div>
-        <div id="shopGrid" class="shop-grid"></div>
-        <div id="itemView" class="pack-view item-view" hidden></div>
-        <div id="packView" class="pack-view" hidden>
-          <div id="packRow" class="pack-row"></div>
-          <h3 class="album-title">Pack exclusives <small id="albumCount">0/5</small></h3>
-          <div id="packAlbum" class="pack-album"></div>
-          <p class="shop-note" id="packOdds"></p>
+        <div id="shopMount" class="shop-mount">
+          <div id="shopBody" class="shop-body">
+            <h3 class="shop-sec" id="sec-packs"><img src="/assets/pack_brain.webp" alt="" /><span>Packs</span><small id="albumCount">0/5</small></h3>
+            <div id="packView" class="pack-view">
+              <div id="packRow" class="pack-row"></div>
+              <div id="packAlbum" class="pack-album"></div>
+              <p class="shop-note" id="packOdds"></p>
+            </div>
+            <h3 class="shop-sec" id="sec-chars"><img src="/assets/sc_luna.webp" alt="" /><span>Characters</span><small id="collCount">0/24</small></h3>
+            <div id="shopGrid" class="coll-grid shop-chars"></div>
+            <h3 class="shop-sec" id="sec-items"><img src="/assets/ui_shoe.webp" alt="" /><span>Items</span><small>Trails · celebrations · emotes</small></h3>
+            <div id="itemView" class="pack-view item-view"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -445,8 +420,6 @@
       <small id="spinTitle">Round 2</small>
       <div class="spin-window"><div id="spinReel" class="spin-reel"></div></div>
     </div>
-
-    <!-- COLLECTION: every character, how to get them -->
 
     <div id="charModal" class="modal gmodal" hidden>
       <div class="grays" aria-hidden="true"></div>

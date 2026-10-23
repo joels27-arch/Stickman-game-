@@ -836,27 +836,31 @@ function giveItem(id) {
 
 // ── shop ───────────────────────────────────────────────────────────────────
 let shopReturn = "home";
+/** The shop body lives on the home Shop page; from the lobby or results it moves onto the shop screen. */
+function mountShop(where) {
+  const body = $("#shopBody");
+  if (body.parentElement !== where) where.append(body);
+}
+function shopShown() {
+  return screens.shop.classList.contains("show") || (screens.home.classList.contains("show") && homePage === PAGE.shop);
+}
+/** Open the shop, scrolled to a section: "chars", "packs" or "items". */
 function openShop(tab = "chars") {
-  shopReturn = game.mode === "lobby" ? "lobby" : game.mode === "results" ? "results" : "home";
-  renderShop();
-  shopTab(tab === "chars" ? true : tab === "packs" ? false : tab);
-  showScreen("shop");
+  if (game.mode === "home") {
+    showScreen("home");
+    setHomePage(PAGE.shop);
+  } else {
+    shopReturn = game.mode === "lobby" ? "lobby" : "results";
+    mountShop($("#shopMount"));
+    renderShop();
+    showScreen("shop");
+  }
+  requestAnimationFrame(() => {
+    const target = document.getElementById(`sec-${tab}`);
+    const sc = target?.closest(".hp-scroll, .shop-mount");
+    if (sc) sc.scrollTop += target.getBoundingClientRect().top - sc.getBoundingClientRect().top - 8;
+  });
 }
-/** Shop tabs: true = characters, false = packs, "items" = trails, celebrations, emotes. */
-function shopTab(which) {
-  const tab = which === true ? "chars" : which === false ? "packs" : which;
-  $("#tabChars").classList.toggle("on", tab === "chars");
-  $("#tabPacks").classList.toggle("on", tab === "packs");
-  $("#tabItems").classList.toggle("on", tab === "items");
-  $("#shopGrid").hidden = tab !== "chars";
-  $("#packView").hidden = tab !== "packs";
-  $("#itemView").hidden = tab !== "items";
-  if (tab === "packs") renderPacks();
-  if (tab === "items") renderItems();
-}
-$("#tabChars").addEventListener("click", () => shopTab(true));
-$("#tabPacks").addEventListener("click", () => shopTab(false));
-$("#tabItems").addEventListener("click", () => shopTab("items"));
 function renderItems() {
   const eq = equipped();
   const card = (id, slot, name, preview, price, pass) => {
@@ -931,46 +935,51 @@ function collectionCount() {
 }
 function renderCollPill() {
   const { got, all } = collectionCount();
-  $("#collPillCount").textContent = `${got}/${all}`;
+  $("#collCount").textContent = `${got}/${all}`;
 }
 
-// a shop card for a coin or medal character
-function shopCard(c) {
-  const owned = wallet.has(c.id);
-  const can = c.via === "coins" ? wallet.coins() >= c.coins : Boolean(wallet.plan(c.price));
-  const price = owned
-    ? el("span", { class: "owned-tag", text: "Owned ✓" })
-    : c.via === "coins"
-      ? el("span", { class: `sprice${can ? "" : " short"}` }, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }))
-      : el("span", { class: `sprice medal${can ? "" : " short"}` }, el("img", { src: MEDAL_IMG[c.price.medal], alt: "" }), el("b", { text: `×${c.price.count}` }));
-  const card = el(
-    "button",
-    { class: `skin ${c.rarity}${owned ? " owned" : ""}`, type: "button" },
-    el("span", { class: "rar", text: c.rarity }),
-    el("img", { class: "pic", src: `/assets/sc_${c.id}.webp`, alt: "" }),
-    el("b", { text: c.name }),
-    price,
-  );
-  card.addEventListener("click", () => (owned ? inspectChar(allChars().find((x) => x.id === c.id)) : askBuy(c)));
-  return card;
-}
+/**
+ * The shop: packs, every character (yours first, then the ones still to get,
+ * each from common to legendary) and items, all on one page.
+ */
 function renderShop() {
-  const coinChars = COLLECTION.filter((c) => c.via === "coins");
-  const medalChars = COLLECTION.filter((c) => c.via === "medals");
-  const packLink = el("button", { class: "shop-link", type: "button" }, el("img", { src: "/assets/pack_brain.webp", alt: "" }), el("span", {}, el("b", { text: "Pack exclusives" }), el("small", { text: `${PACK_CHARS.length} characters you can only pull from packs` })), el("i", { text: "›" }));
-  packLink.addEventListener("click", () => shopTab(false));
-  const collLink = el("button", { class: "shop-link teal", type: "button" }, el("img", { src: "/assets/pk_brainz.webp", alt: "" }), el("span", {}, el("b", { text: "Your collection" }), el("small", { text: `${collectionCount().got} of ${collectionCount().all} characters` })), el("i", { text: "›" }));
-  collLink.addEventListener("click", () => openCollection());
-  // the Skins page is on the home screen: only link to it when the shop was opened from there
-  collLink.hidden = shopReturn !== "home";
+  const all = allChars();
+  const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
+  const mine = all.filter((c) => ownsChar(c)).sort(byRarity);
+  const rest = all.filter((c) => !ownsChar(c)).sort(byRarity);
+  const sel = preferredChar();
+  let n = 0;
+  const card = (c) => {
+    const owned = ownsChar(c);
+    const buyable = !owned && (c.via === "coins" || c.via === "medals");
+    const can = c.via === "coins" ? wallet.coins() >= c.coins : c.via === "medals" ? Boolean(wallet.plan(c.price)) : false;
+    const tag = owned
+      ? el("small", { class: "via", text: c.playable ? (c.idx === sel ? "★ Selected" : "Playable") : "Collected" })
+      : c.via === "coins"
+        ? el("span", { class: `sprice${can ? "" : " short"}` }, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }))
+        : c.via === "medals"
+          ? el("span", { class: `sprice medal${can ? "" : " short"}` }, el("img", { src: MEDAL_IMG[c.price.medal], alt: "" }), el("b", { text: `×${c.price.count}` }))
+          : el("small", { class: "via", text: `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` });
+    const b = el(
+      "button",
+      { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${buyable ? " buyable" : ""}${c.playable && c.idx === sel ? " sel" : ""}`, type: "button", style: `--i:${n++}` },
+      el("span", { class: "rar", text: c.rarity }),
+      el("img", { src: c.img, alt: "" }),
+      el("b", { text: c.name }),
+      tag,
+    );
+    const item = COLLECTION.find((x) => x.id === c.id);
+    b.addEventListener("click", () => (buyable && item ? askBuy(item) : inspectChar(c)));
+    return b;
+  };
   $("#shopGrid").replaceChildren(
-    el("h3", { class: "sec-title" }, el("span", { text: "🪙 Coin characters" }), el("small", { text: "Buy with coins" })),
-    el("div", { class: "char-grid" }, ...coinChars.map(shopCard)),
-    el("h3", { class: "sec-title medal" }, el("span", { text: "🏅 Medal exclusives" }), el("small", { text: "Medals only · win them against real players" })),
-    el("div", { class: "char-grid" }, ...medalChars.map(shopCard)),
-    packLink,
-    collLink,
+    el("h3", { class: "coll-head", text: `Yours · ${mine.length}` }),
+    ...mine.map(card),
+    ...(rest.length ? [el("h3", { class: "coll-head", text: `Unlock · ${rest.length}` }), ...rest.map(card)] : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
   );
+  renderPacks();
+  renderItems();
+  renderCollPill();
   renderWallet();
 }
 
@@ -1007,58 +1016,9 @@ $("#buyOk").addEventListener("click", () => {
   if (!ok) return toast("Not enough to unlock that yet");
   stats.add("bought", 1);
   showUnlock({ kind: "char", char: { ...c, img: `/assets/sc_${c.id}.webp` } }, () => {
-    if (screens.shop.classList.contains("show")) renderShop();
-    if (onSkins()) renderCollection();
+    if (shopShown()) renderShop();
   });
   renderCollPill();
-});
-
-// ── the collection page ──
-/** The collection lives on the home screen's Skins page. */
-function openCollection() {
-  showScreen("home");
-  setHomePage(PAGE.skins);
-}
-function onSkins() {
-  return screens.home.classList.contains("show") && homePage === PAGE.skins;
-}
-function renderCollection() {
-  const all = allChars();
-  const { got } = collectionCount();
-  $("#collCount").textContent = `${got}/${all.length}`;
-  $("#collBar").style.width = `${Math.round((got / all.length) * 100)}%`;
-  $("#collPct").textContent = `${Math.round((got / all.length) * 100)}% collected`;
-  // no categories: yours first, then everything you can still get, each from common to legendary
-  const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
-  const mine = all.filter((c) => ownsChar(c)).sort(byRarity);
-  const rest = all.filter((c) => !ownsChar(c)).sort(byRarity);
-  const sel = preferredChar();
-  let n = 0;
-  const card = (c) => {
-    const owned = ownsChar(c);
-    const b = el(
-      "button",
-      { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${c.playable && c.idx === sel ? " sel" : ""}`, type: "button", style: `--i:${n++}` },
-      el("span", { class: "rar", text: c.rarity }),
-      el("img", { src: c.img, alt: "" }),
-      el("b", { text: c.name }),
-      el("small", { class: "via", text: owned ? (c.playable ? (c.idx === sel ? "★ Selected" : "Playable") : "Collected") : `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` }),
-      owned ? null : el("i", { class: "padlock", text: "🔒" }),
-    );
-    b.addEventListener("click", () => inspectChar(c));
-    return b;
-  };
-  $("#collGrid").replaceChildren(
-    el("h3", { class: "coll-head", text: `Your runners · ${mine.length}` }),
-    ...mine.map(card),
-    ...(rest.length ? [el("h3", { class: "coll-head", text: `Still to get · ${rest.length}` }), ...rest.map(card)] : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
-  );
-  renderWallet();
-  renderCollPill();
-}
-$("#collPill").addEventListener("click", () => {
-  sfx.unlock();
-  openCollection();
 });
 
 // inspect one character: big picture, rarity, how to get it, and the one action that makes sense
@@ -1083,7 +1043,7 @@ function inspectChar(c) {
       if (net.view?.phase === "lobby" && net.view.joined) act({ type: "pick", char: c.idx });
       toast(`${c.name} selected`);
       charModal.hidden = true;
-      if (onSkins()) renderCollection();
+      if (shopShown()) renderShop();
     };
   } else if (owned) {
     btn.textContent = "In your collection ✓";
@@ -1098,8 +1058,7 @@ function inspectChar(c) {
     btn.textContent = "Open packs";
     action = () => {
       charModal.hidden = true;
-      openShop();
-      shopTab(false);
+      openShop("packs");
     };
   } else {
     btn.textContent = "Go to the Season Pass";
@@ -1298,9 +1257,7 @@ $("#poDone").addEventListener("click", () => {
   po = null;
   renderCollPill();
   if (done) return done();
-  renderPacks();
   renderShop();
-  shopTab(false);
 });
 /** A single card reveal (no pack): a purchase or a reward. */
 function showUnlock(item, onDone) {
@@ -1319,6 +1276,7 @@ function showUnlock(item, onDone) {
 
 for (const b of document.querySelectorAll(".shopBtn")) b.addEventListener("click", () => openShop(b.dataset.tab || "chars"));
 $("#shopBack").addEventListener("click", () => {
+  mountShop($("#shopHome"));
   showScreen(shopReturn);
   if (shopReturn === "lobby" && net.view) renderLobby(net.view);
 });
@@ -1593,7 +1551,7 @@ codeInput.addEventListener("keydown", (e) => e.key === "Enter" && $("#joinBtn").
 
 // ── home: three pages · Tournaments | Play | Shop ──
 const homePages = $("#homePages");
-const PAGE = { compete: 0, skins: 1, play: 2, shop: 3 };
+const PAGE = { compete: 0, missions: 1, play: 2, shop: 3 };
 const PAGE_NAMES = Object.keys(PAGE);
 let homePage = PAGE.play;
 function setHomePage(i, animate = true) {
@@ -1607,7 +1565,11 @@ function setHomePage(i, animate = true) {
     t.setAttribute("aria-selected", String(on));
   }
   if (homePage === PAGE.compete) renderCompete();
-  if (homePage === PAGE.skins) renderCollection();
+  if (homePage === PAGE.missions) renderDaily();
+  if (homePage === PAGE.shop) {
+    mountShop($("#shopHome"));
+    renderShop();
+  }
 }
 for (const t of document.querySelectorAll(".htab")) {
   t.addEventListener("click", () => {
@@ -1891,7 +1853,7 @@ function renderStoreDot() {
   } catch {
     // still starting up
   }
-  dot.hidden = !pass && !$("#questPill").classList.contains("has-claim");
+  dot.hidden = !pass;
 }
 renderCompete();
 
@@ -1933,7 +1895,7 @@ function renderLobby(v) {
   for (let i = 0; i < 4; i++) {
     const p = v.players[i];
     if (!p) {
-      slots.append(el("div", { class: "rcard empty" }, el("span", { class: "num", text: String(i + 1) }), el("span", { class: "nm", text: botsOn() ? "🤖 Bot" : "Open" })));
+      slots.append(el("div", { class: "rcard empty" }, el("span", { class: "num", text: String(i + 1) }), el("span", { class: "nm", text: "Waiting for player…" })));
       continue;
     }
     const cty = p.country ? `${flagOf(p.country)} ${countryName(p.country)}` : "🌍 No country";
@@ -2024,14 +1986,6 @@ function renderLobby(v) {
       return b;
     }),
   );
-  // the cards only name the mode; the picked one is explained underneath
-  $("#modeDesc").textContent = GAME_MODE_INFO[gm]?.text ?? "";
-  if (modePick.dataset.gm !== gm) {
-    // keep the picked mode in view in the sideways list (only when it changes, so it doesn't fight your scrolling)
-    modePick.dataset.gm = gm;
-    const on = modePick.querySelector(".on");
-    if (on) modePick.scrollLeft = Math.max(0, on.offsetLeft - modePick.offsetLeft - 12);
-  }
   const mp = v.map || "meadow";
   $("#mapPick").replaceChildren(
     ...MAPS.map((key) => {
@@ -4760,7 +4714,7 @@ function untilMidnight() {
   return [Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60].map((x) => String(x).padStart(2, "0")).join(":");
 }
 setInterval(() => {
-  if (!$("#questModal").hidden) $("#questReset").textContent = untilMidnight();
+  if (game.mode === "home" && homePage === PAGE.missions) $("#questReset").textContent = untilMidnight();
   if (!$("#streakModal").hidden && streakState().claimedToday) $("#streakClaim").textContent = `Next reward in ${untilMidnight()}`;
 }, 1000);
 function dayKey(d = new Date()) {
@@ -4852,7 +4806,6 @@ function renderDaily() {
   const st = dailyState();
   const n = qs.filter((q) => st.done[q.id]).length;
   const ready = qs.filter((q) => st.done[q.id] && !st.claimed[q.id]).length;
-  $("#questCount").textContent = `${n}/${qs.length}`;
   $("#dailyDot").hidden = ready === 0;
   $("#questSub").textContent = n === qs.length ? (ready ? "All done! Claim your rewards." : "All done! New missions tomorrow.") : `${n} of ${qs.length} done today`;
   $("#questReset").textContent = untilMidnight();
@@ -4873,14 +4826,6 @@ function renderDaily() {
   );
   renderMissionDots();
 }
-const questModal = $("#questModal");
-$("#questPill").addEventListener("click", () => {
-  renderDaily();
-  questTab(true);
-  questModal.hidden = false;
-});
-$("#questClose").addEventListener("click", () => (questModal.hidden = true));
-questModal.addEventListener("click", (e) => e.target === questModal && (questModal.hidden = true));
 renderDaily();
 
 // ── login streak: come back every day, day 7 pays big ──
@@ -5284,7 +5229,9 @@ function renderMissionDots() {
   const daily = dailyChallenges().some((q) => dailyState().done[q.id] && !dailyState().claimed[q.id]);
   const trophies = ACHIEVEMENTS.some((a) => achState(a).ready);
   $("#careerDot").hidden = !career;
-  $("#questPill").classList.toggle("has-claim", daily || career || trophies);
+  const dot = document.querySelector(`.htab[data-page="${PAGE.missions}"] .dot`);
+  if (dot) dot.hidden = !(daily || career || trophies);
+  $("#dailyDot").hidden = !daily;
   renderStoreDot();
 }
 function renderAch() {
@@ -5637,7 +5584,6 @@ function openChest(ci) {
     wallet.save(m);
   }
   passXp(300);
-  questModal.hidden = true;
   const next = CAREER[ci + 1];
   const after = () => {
     toast(next ? `Chapter ${ci + 2} · ${next.name} unlocked!` : "You finished the career. Legend!");
