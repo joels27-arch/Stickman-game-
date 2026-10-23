@@ -2858,9 +2858,9 @@ const world = (() => {
   // Sky: the Higgsfield panorama wraps around the world on a far cylinder;
   // above it, a solid colour sampled from the panorama's top edge.
   scene.background = new THREE.Color("#1f78d1");
-  scene.fog = new THREE.Fog("#bfe9f2", 60, 190);
-  scene.add(new THREE.HemisphereLight("#e6f6ff", "#5fae3a", 1.35));
-  const sun = new THREE.DirectionalLight("#fff4d6", 1.6);
+  scene.fog = new THREE.Fog("#cfeefa", 90, 280);
+  scene.add(new THREE.HemisphereLight("#e6f6ff", "#5fae3a", 1.1));
+  const sun = new THREE.DirectionalLight("#fff1cc", 2.1);
   sun.position.set(-6, 14, 8);
   scene.add(sun);
 
@@ -2905,7 +2905,7 @@ const world = (() => {
   scene.add(trackGroup);
   const finishGroup = new THREE.Group();
   scene.add(finishGroup);
-  const grassTex = texLoader.load("/assets/grass.jpg");
+  const grassTex = texLoader.load("/assets/grass_hd.jpg");
   grassTex.colorSpace = THREE.SRGBColorSpace;
   grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
   grassTex.anisotropy = 4;
@@ -2925,7 +2925,7 @@ const world = (() => {
     }
     return groundTexs[name];
   }
-  grassTex.repeat.set(700 / 6, GROUND_LEN / 6);
+  grassTex.repeat.set(700 / 9, GROUND_LEN / 9);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, GROUND_LEN), new THREE.MeshLambertMaterial({ map: grassTex }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(0, MEADOW_Y, -TRACK_LEN / 2);
@@ -3056,7 +3056,8 @@ const world = (() => {
     c.width = c.height = 64;
     const g = c.getContext("2d");
     const grd = g.createRadialGradient(32, 32, 2, 32, 32, 30);
-    grd.addColorStop(0, "rgba(0,0,0,0.45)");
+    grd.addColorStop(0, "rgba(0,0,0,0.6)");
+    grd.addColorStop(0.55, "rgba(0,0,0,0.42)");
     grd.addColorStop(1, "rgba(0,0,0,0)");
     g.fillStyle = grd;
     g.fillRect(0, 0, 64, 64);
@@ -3411,7 +3412,7 @@ const world = (() => {
     pivot.scale.setScalar(a.scale);
     pivot.rotation.y = Math.PI; // models face +z; the race runs toward -z
     g.add(pivot);
-    g.add(blobShadow(1.1));
+    g.add(blobShadow(1.35));
     const mixer = new THREE.AnimationMixer(body);
     const actions = {};
     for (const [k, clip] of Object.entries(a.clips)) actions[k] = mixer.clipAction(clip);
@@ -3796,6 +3797,32 @@ const world = (() => {
     }
   }
 
+  /**
+   * The meadow's track: a raised red running track (top at y = 0, the meadow
+   * below) with white kerbs down both sides. One box each: cheap on phones.
+   */
+  function runningTrack() {
+    const len = TRACK_LEN + 220;
+    const g = new THREE.Group();
+    const tex = texLoader.load("/assets/track_red.jpg");
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = renderer?.capabilities.getMaxAnisotropy?.() ?? 4;
+    tex.repeat.set(TRACK_W / 3, len / 3);
+    const side = new THREE.MeshLambertMaterial({ color: "#a8402f" });
+    const top = new THREE.MeshLambertMaterial({ map: tex });
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(TRACK_W, -MEADOW_Y, len), [side, side, top, side, side, side]);
+    deck.position.set(0, MEADOW_Y / 2, -(len / 2 - 60));
+    g.add(deck);
+    const kerbMat = new THREE.MeshLambertMaterial({ color: "#f4f1e8" });
+    for (const s of [-1, 1]) {
+      const kerb = new THREE.Mesh(new THREE.BoxGeometry(0.45, -MEADOW_Y + 0.12, len), kerbMat);
+      kerb.position.set(s * (TRACK_W / 2 + 0.22), MEADOW_Y / 2 + 0.06, -(len / 2 - 60));
+      g.add(kerb);
+    }
+    return g;
+  }
+
   function buildMap(map) {
     const group = new THREE.Group();
     const cull = [];
@@ -3812,14 +3839,18 @@ const world = (() => {
       return o;
     };
     const built = BUILT_MAPS.has(map);
-    const tile = built ? P[`${map}Tile`] : map === "farm" ? P.farmTile : map === "beach" ? P.boardTile : P.ground;
-    const step = tile.userData.length * 0.97;
-    for (let z = -60; z < TRACK_LEN + 160; z += step) add(tile, 0, 0, z, 1, 0);
+    if (map === "meadow") group.add(runningTrack());
+    else {
+      const tile = built ? P[`${map}Tile`] : map === "farm" ? P.farmTile : map === "beach" ? P.boardTile : P.ground;
+      const step = tile.userData.length * 0.97;
+      for (let z = -60; z < TRACK_LEN + 160; z += step) add(tile, 0, 0, z, 1, 0);
+    }
     flatTrack.visible = false;
     // the built maps bring their own edges (barriers, ad boards, neon rails)
     if (!built) {
       for (let z = -40; z < TRACK_LEN + 120; z += 2.9) {
-        for (const side of [-1, 1]) add(P.fence, side * (TRACK_W / 2 - 0.1), 0, z, 1, Math.PI / 2);
+        // on the meadow the fence stands on the white kerb
+        for (const side of [-1, 1]) map === "meadow" ? add(P.fence, side * (TRACK_W / 2 + 0.22), 0.12, z, 1, Math.PI / 2) : add(P.fence, side * (TRACK_W / 2 - 0.1), 0, z, 1, Math.PI / 2);
       }
     }
     const edge = TRACK_W / 2;
