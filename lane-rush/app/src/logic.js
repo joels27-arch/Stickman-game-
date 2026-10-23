@@ -107,7 +107,17 @@ export const EMOTE_COOLDOWN_MS = 1200;
 export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
-export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space"];
+/** The classic maps (3D models), then the themed ones built in code (public/themes.js: same ids). */
+export const MAPS = [
+  "meadow", "farm", "beach", "city", "stadium", "space",
+  "sunset", "autumn", "snowy", "desert", "canyon", "jungle", "swamp", "volcano", "candy", "mushroom",
+  "crystal", "icelake", "sakura", "tropical", "neon", "mars", "deepsea", "lava", "savanna", "tundra",
+  "bamboo", "lavender", "tulips", "halloween", "xmas", "rainbow", "clouds", "islands", "egypt", "greek",
+  "pirate", "wildwest", "ghost", "alien", "synth", "toyland", "icecream", "zen", "terraces", "aurora",
+  "golf", "vineyard", "redwood", "fairy",
+];
+/** Themed maps borrow a classic map's moving obstacles (the rest use the meadow's logs and bees). */
+export const MAP_MOVERS = { tropical: "beach", neon: "city", mars: "space", deepsea: "beach", savanna: "farm", lavender: "farm", tulips: "farm", rainbow: "space", clouds: "space", islands: "space", egypt: "farm", pirate: "beach", wildwest: "farm", alien: "space", synth: "space", toyland: "city", terraces: "farm", golf: "stadium", vineyard: "farm" };
 /** A Party Cup is three rounds; each placing scores points, most points wins. */
 export const CUP_ROUND_BOOST_M = 350;
 export const CUP_POINTS = [10, 5, 3, 1];
@@ -678,7 +688,8 @@ export function moverCovers(m, lane, t) {
 }
 /** The course's moving obstacles for a map: one every ~150 m (from 150 m on), in a wide gap between rows. */
 export function moversFor(course, seed, map) {
-  const kinds = Object.keys(MOVER_KINDS).filter((k) => MOVER_KINDS[k].map === (map ?? "meadow"));
+  const base = MAP_MOVERS[map] ?? (MAPS.indexOf(map) > 5 ? "meadow" : map ?? "meadow");
+  const kinds = Object.keys(MOVER_KINDS).filter((k) => MOVER_KINDS[k].map === base);
   if (!kinds.length) return [];
   const r = rng((seed ^ 0x5bd1e995) >>> 0);
   const out = [];

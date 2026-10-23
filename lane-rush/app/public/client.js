@@ -1,5 +1,5 @@
 /**
- * BRAIN RUN — browser client.
+ * 4 FRIENDS — browser client.
  *
  *   net     WebSocket to /ws/<CODE>, join + hello, reconnect, clock sync
  *   ui      home / lobby / HUD / results screens (DOM)
@@ -15,6 +15,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "/vendor/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "/vendor/jsm/utils/SkeletonUtils.js";
+import { THEMES } from "/themes.js";
 import {
   buildCourse,
   TRACK_LEN,
@@ -163,6 +164,9 @@ const MAP_INFO = {
   space: { label: "Space", text: "A neon walkway over the moon" },
   random: { label: "Random", text: "A different map every race" },
 };
+// the themed maps, built in code (public/themes.js)
+const THEME = Object.fromEntries(THEMES.map((t) => [t.id, t]));
+for (const t of THEMES) MAP_INFO[t.id] = { label: t.label, text: "", icon: t.icon };
 const LANE_W = 2.0; // metres between lane centres
 const CHAR_H = 1.55; // runner height in metres
 const JUMP_V = 8.6;
@@ -2493,11 +2497,14 @@ function renderLobby(v) {
   );
   const mp = v.map || "meadow";
   $("#mapPick").replaceChildren(
-    ...[...MAPS, "random"].map((key) => {
+    ...["random", ...MAPS].map((key) => {
       const info = MAP_INFO[key];
+      const t = THEME[key];
+      // themed maps have no picture: their sky over their ground, and an icon
+      const style = key === "random" ? "" : t ? `background:linear-gradient(180deg, ${t.sky.top} 0%, ${t.sky.mid} 35%, ${t.sky.horizon} 58%, ${t.ground.colors[0]} 60%, ${t.ground.colors[1] ?? t.ground.colors[0]} 100%)` : `--pic:url(/assets/map_${key}.webp)`;
       const b = el(
         "button",
-        { class: `map-card${mp === key ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style: key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)` },
+        { class: `map-card${mp === key ? " on" : ""}${key === "random" ? " random" : ""}${t ? " themed" : ""}`, type: "button", style, "data-icon": info.icon ?? "" },
         el("b", { text: info.label }),
         el("span", { text: info.text }),
       );
@@ -2984,17 +2991,19 @@ const world = (() => {
   const SKY = { top: "#1d78dc", mid: "#6fbcf3", horizon: "#e4f5fd" };
   scene.background = new THREE.Color(SKY.horizon);
   scene.fog = new THREE.Fog(SKY.horizon, 90, 300);
-  scene.add(new THREE.HemisphereLight("#e6f6ff", "#5fae3a", 1.1));
+  const hemi = new THREE.HemisphereLight("#e6f6ff", "#5fae3a", 1.1);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight("#fff1cc", 2.1);
   sun.position.set(-6, 14, 8);
   scene.add(sun);
 
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
+  let domeMat, sunGlow, farRing, nearRing, stars, moon;
   {
     const dome = new THREE.Mesh(
       new THREE.SphereGeometry(380, 32, 16),
-      new THREE.ShaderMaterial({
+      (domeMat = new THREE.ShaderMaterial({
         side: THREE.BackSide,
         depthWrite: false,
         uniforms: { top: { value: new THREE.Color(SKY.top) }, mid: { value: new THREE.Color(SKY.mid) }, horizon: { value: new THREE.Color(SKY.horizon) } },
@@ -3007,7 +3016,7 @@ const world = (() => {
             gl_FragColor = vec4(c, 1.0);
             #include <colorspace_fragment>
           }`,
-      }),
+      })),
     );
     dome.renderOrder = -2;
     skyGroup.add(dome);
@@ -3024,7 +3033,7 @@ const world = (() => {
     g.fillRect(0, 0, 128, 128);
     const sunTex = new THREE.CanvasTexture(c);
     sunTex.colorSpace = THREE.SRGBColorSpace;
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending, toneMapped: false }));
+    const glow = (sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending, toneMapped: false })));
     glow.scale.set(70, 70, 1);
     glow.position.set(150, 165, -300);
     glow.renderOrder = -1;
@@ -3059,8 +3068,69 @@ const world = (() => {
       m.renderOrder = -1;
       return m;
     };
-    skyGroup.add(ring(340, -14, 52, true, "#97b6e6", SKY.horizon));
-    skyGroup.add(ring(270, -10, 30, false, "#6cbf6a", "#cdebd8"));
+    skyGroup.add((farRing = ring(340, -14, 52, true, "#97b6e6", SKY.horizon)));
+    skyGroup.add((nearRing = ring(270, -10, 30, false, "#6cbf6a", "#cdebd8")));
+    // night: stars on the dome and a moon (hidden by day)
+    const sp = [];
+    for (let i = 0; i < 700; i++) {
+      const a = rnd() * Math.PI * 2;
+      const y = 0.08 + rnd() * 0.92;
+      const rr = Math.sqrt(1 - y * y);
+      sp.push(Math.cos(a) * rr * 360, y * 360, Math.sin(a) * rr * 360);
+    }
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
+    stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: "#ffffff", size: 1.6, sizeAttenuation: false, fog: false, depthWrite: false, toneMapped: false }));
+    stars.renderOrder = -1;
+    stars.visible = false;
+    skyGroup.add(stars);
+    const mc = document.createElement("canvas");
+    mc.width = mc.height = 64;
+    const mg = mc.getContext("2d");
+    const mgr = mg.createRadialGradient(32, 32, 10, 32, 32, 32);
+    mgr.addColorStop(0, "rgba(240,248,255,1)");
+    mgr.addColorStop(0.45, "rgba(230,240,255,1)");
+    mgr.addColorStop(0.55, "rgba(200,220,255,0.35)");
+    mgr.addColorStop(1, "rgba(200,220,255,0)");
+    mg.fillStyle = mgr;
+    mg.fillRect(0, 0, 64, 64);
+    const mt = new THREE.CanvasTexture(mc);
+    mt.colorSpace = THREE.SRGBColorSpace;
+    moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: mt, fog: false, depthWrite: false, transparent: true, toneMapped: false }));
+    moon.scale.set(46, 46, 1);
+    moon.position.set(-110, 150, -300);
+    moon.visible = false;
+    skyGroup.add(moon);
+  }
+  /** Recolour a hill ring: its top edge and its foot (the horizon haze). */
+  function tintRing(m, top, bottom) {
+    const c = m.geometry.attributes.color;
+    const t = new THREE.Color(top);
+    const b = new THREE.Color(bottom);
+    for (let i = 0; i < c.count; i++) (i % 2 ? t : b).toArray(c.array, i * 3);
+    c.needsUpdate = true;
+  }
+  /** The day look (the meadow and the classic maps). */
+  const DAY_LOOK = { sky: SKY, sun: "#fff3c4", fog: [SKY.horizon, 90, 300], light: { hemi: ["#e6f6ff", "#5fae3a", 1.1], sun: ["#fff1cc", 2.1] }, far: "#97b6e6", near: "#6cbf6a", nearFoot: "#cdebd8" };
+  /** Sky, light and haze for a map's look (a theme from themes.js, or the day look). */
+  function applyLook(look) {
+    domeMat.uniforms.top.value.set(look.sky.top);
+    domeMat.uniforms.mid.value.set(look.sky.mid);
+    domeMat.uniforms.horizon.value.set(look.sky.horizon);
+    scene.background = new THREE.Color(look.sky.horizon);
+    scene.fog.color.set(look.fog[0]);
+    scene.fog.near = look.fog[1];
+    scene.fog.far = look.fog[2];
+    hemi.color.set(look.light.hemi[0]);
+    hemi.groundColor.set(look.light.hemi[1]);
+    hemi.intensity = look.light.hemi[2];
+    sun.color.set(look.light.sun[0]);
+    sun.intensity = look.light.sun[1];
+    sunGlow.visible = Boolean(look.sun);
+    if (look.sun) sunGlow.material.color.set(look.sun);
+    tintRing(farRing, look.far, look.sky.horizon);
+    tintRing(nearRing, look.near, look.nearFoot ?? look.sky.horizon);
+    stars.visible = moon.visible = Boolean(look.night);
   }
 
   // Meadow far below the raised turf track; the track itself is Higgsfield 3D
@@ -3323,7 +3393,7 @@ const world = (() => {
   /** Farm and beach props load the first time someone picks that map. */
   const mapLoads = new Map();
   function ensureMap(map) {
-    if (map === "meadow" || mapReady(map)) return Promise.resolve();
+    if (map === "meadow" || THEME[map] || mapReady(map)) return Promise.resolve();
     if (!mapLoads.has(map)) {
       const P = assets.props;
       const glb = (file, key, size) => loadGLB(`/assets/${file}.glb`).then((g) => (P[key] = fitProp(g.scene, size)));
@@ -3833,6 +3903,7 @@ const world = (() => {
     space: { color: "#ffffff", tex: "moon" },
   };
   function mapReady(map) {
+    if (THEME[map]) return Boolean(assets.props.ground); // themed maps need nothing more to load
     if (BUILT_MAPS.has(map)) return Boolean(assets.props[`${map}Tile`]);
     if (map === "farm") return Boolean(assets.props.farmTile);
     if (map === "beach") return Boolean(assets.props.boardTile);
@@ -3848,10 +3919,12 @@ const world = (() => {
     sceneryCull = mapScenery[map].cull;
     activeMap = map;
     setSky(map);
-    const look = MAP_GROUND[map];
+    const theme = THEME[map];
+    const look = MAP_GROUND[map] ?? { color: "#ffffff" };
     ground.material.color.set(look.color);
-    ground.material.map = typeof look.tex === "string" ? groundTex(look.tex) : look.tex ? grassTex : null;
+    ground.material.map = theme ? patternTex(theme.ground, 6, 700, GROUND_LEN) : typeof look.tex === "string" ? groundTex(look.tex) : look.tex ? grassTex : null;
     ground.material.needsUpdate = true;
+    chalk.color.set(theme?.track.lines ?? "#ffffff");
     if (!sharedBuilt) buildShared();
   }
   let sharedBuilt = false;
@@ -3891,16 +3964,20 @@ const world = (() => {
     return g;
   }
   /** Sky, fog and clouds per map. */
-  let daySky = null;
   function setSky(map) {
-    if (!daySky) daySky = { bg: scene.background.clone(), fog: scene.fog.color.clone() };
     const own = MAP_SKY[map];
+    const theme = THEME[map];
     if (own) mapSkyGroup(map);
     for (const [k, g] of Object.entries(mapSkies)) g.visible = k === map;
+    // a painted panorama for city and space; the dome, coloured per map, everywhere else
+    applyLook(theme ?? DAY_LOOK);
     skyGroup.visible = !own;
-    clouds.visible = !own || own.clouds;
-    scene.background = own ? new THREE.Color(own.bg) : daySky.bg.clone();
-    scene.fog.color.copy(own ? new THREE.Color(own.fog) : daySky.fog);
+    clouds.visible = own ? own.clouds : theme ? theme.clouds : true;
+    if (own) {
+      scene.background = new THREE.Color(own.bg);
+      scene.fog.color.set(own.fog);
+    }
+    setWeather(theme?.fx ?? null);
   }
 
   // city, stadium and space: Higgsfield 3D props along the track, plus simple edges
@@ -3970,20 +4047,22 @@ const world = (() => {
    * The meadow's track: a raised red running track (top at y = 0, the meadow
    * below) with white kerbs down both sides. One box each: cheap on phones.
    */
-  function runningTrack() {
+  function runningTrack(tex = null, sideColor = "#a8402f", kerbColor = "#f4f1e8") {
     const len = TRACK_LEN + 220;
     const g = new THREE.Group();
-    const tex = texLoader.load("/assets/track_red.jpg");
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    if (!tex) {
+      tex = texLoader.load("/assets/track_red.jpg");
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(TRACK_W / 3, len / 3);
+    }
     tex.anisotropy = renderer?.capabilities.getMaxAnisotropy?.() ?? 4;
-    tex.repeat.set(TRACK_W / 3, len / 3);
-    const side = new THREE.MeshLambertMaterial({ color: "#a8402f" });
+    const side = new THREE.MeshLambertMaterial({ color: sideColor });
     const top = new THREE.MeshLambertMaterial({ map: tex });
     const deck = new THREE.Mesh(new THREE.BoxGeometry(TRACK_W, -MEADOW_Y, len), [side, side, top, side, side, side]);
     deck.position.set(0, MEADOW_Y / 2, -(len / 2 - 60));
     g.add(deck);
-    const kerbMat = new THREE.MeshLambertMaterial({ color: "#f4f1e8" });
+    const kerbMat = new THREE.MeshLambertMaterial({ color: kerbColor });
     for (const s of [-1, 1]) {
       const kerb = new THREE.Mesh(new THREE.BoxGeometry(0.45, -MEADOW_Y + 0.12, len), kerbMat);
       kerb.position.set(s * (TRACK_W / 2 + 0.22), MEADOW_Y / 2 + 0.06, -(len / 2 - 60));
@@ -3993,18 +4072,20 @@ const world = (() => {
   }
 
   /** Height of the meadow's hills, `d` metres out from the track edge at distance `z`: flat near the fence, rolling further out. */
-  function hillY(d, z) {
+  function hillY(d, z, amp = 1) {
     const rise = THREE.MathUtils.smoothstep(d, 12, 70);
-    return rise * (7 + 4 * Math.sin(z * 0.021 + d * 0.05) + 2.5 * Math.sin(z * 0.063 - d * 0.11));
+    return amp * rise * (7 + 4 * Math.sin(z * 0.021 + d * 0.05) + 2.5 * Math.sin(z * 0.063 - d * 0.11));
   }
   /** Grassy hills on both sides of the meadow track, one mesh per side. */
-  function meadowHills(edge) {
+  function meadowHills(edge, tex = null, amp = 1) {
     const g = new THREE.Group();
     const len = TRACK_LEN + 400;
     const width = 130;
-    const tex = grassTex.clone();
-    tex.needsUpdate = true;
-    tex.repeat.set(width / 9, len / 9);
+    if (!tex) {
+      tex = grassTex.clone();
+      tex.needsUpdate = true;
+      tex.repeat.set(width / 9, len / 9);
+    }
     const mat = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true });
     const light = new THREE.Color("#ffffff");
     const shade = new THREE.Color("#b9d6a6");
@@ -4016,10 +4097,10 @@ const world = (() => {
       for (let i = 0; i < pos.count; i++) {
         const d = pos.getX(i) + width / 2; // 0 at the track edge
         const z = -pos.getZ(i) + len / 2 - 120;
-        const y = hillY(d, z);
+        const y = hillY(d, z, amp);
         pos.setXYZ(i, side * (edge + d), MEADOW_Y + y - 0.02, -z);
         // valleys a touch darker, so the hills read as hills
-        const c = shade.clone().lerp(light, Math.min(1, 0.55 + y / 14));
+        const c = shade.clone().lerp(light, Math.min(1, 0.55 + y / (14 * Math.max(amp, 0.3))));
         col.push(c.r, c.g, c.b);
       }
       if (side < 0) geo.index.array.reverse(); // mirrored: keep the faces pointing up
@@ -4052,6 +4133,329 @@ const world = (() => {
     return mesh;
   }
 
+  // ── themed maps: everything built in code from a recipe in themes.js ──
+
+  /** A seamless 256 px pattern for the ground or the track (cached per recipe). */
+  const patternCache = new Map();
+  function patternCanvas({ style, colors: C }) {
+    const key = `${style}:${C.join(",")}`;
+    if (patternCache.has(key)) return patternCache.get(key);
+    const N = 256;
+    const c = document.createElement("canvas");
+    c.width = c.height = N;
+    const g = c.getContext("2d");
+    let seed = 1234;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    // draw something everywhere it shows when the tile repeats
+    const wrapped = (fn) => { for (const dx of [-N, 0, N]) for (const dy of [-N, 0, N]) { g.save(); g.translate(dx, dy); fn(); g.restore(); } };
+    const speckle = (n, cols, rmin, rmax, alpha = 1) => {
+      for (let i = 0; i < n; i++) {
+        const x = rnd() * N, y = rnd() * N, r = rmin + rnd() * (rmax - rmin);
+        g.globalAlpha = alpha;
+        g.fillStyle = cols[i % cols.length];
+        wrapped(() => { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); });
+      }
+      g.globalAlpha = 1;
+    };
+    g.fillStyle = C[0];
+    g.fillRect(0, 0, N, N);
+    if (style === "speckle") speckle(1600, [C[1], C[2] ?? C[1]], 0.6, 2.2);
+    else if (style === "waves") {
+      g.strokeStyle = C[1];
+      g.lineWidth = 3;
+      for (let y = 0; y < N; y += 16) { g.beginPath(); for (let x = 0; x <= N; x += 8) g.lineTo(x, y + Math.sin((x / N) * Math.PI * 4) * 4); g.stroke(); }
+      speckle(500, [C[2] ?? C[1]], 0.5, 1.4, 0.8);
+    } else if (style === "lava") {
+      speckle(900, [C[2] ?? C[0]], 1, 3);
+      g.shadowColor = C[1];
+      g.shadowBlur = 8;
+      speckle(70, [C[1]], 1.5, 4.5);
+      g.shadowBlur = 0;
+    } else if (style === "planks") {
+      for (let y = 0; y < N; y += 32) {
+        g.fillStyle = (y / 32) % 2 ? C[0] : C[1];
+        g.fillRect(0, y, N, 32);
+        g.fillStyle = C[2];
+        g.fillRect(0, y, N, 3);
+        for (let x = (y / 32) % 2 ? 40 : 110; x < N; x += 150) g.fillRect(x, y, 3, 32);
+      }
+      speckle(500, [C[2]], 0.5, 1.2, 0.35);
+    } else if (style === "tiles") {
+      for (let y = 0; y < N; y += 64) for (let x = 0; x < N; x += 64) { g.fillStyle = rnd() < 0.5 ? C[0] : C[1]; g.fillRect(x, y, 64, 64); }
+      g.fillStyle = C[2];
+      for (let k = 0; k < N; k += 64) { g.fillRect(k, 0, 4, N); g.fillRect(0, k, N, 4); }
+      speckle(400, [C[2]], 0.5, 1.2, 0.3);
+    } else if (style === "ice") {
+      g.strokeStyle = C[1];
+      g.globalAlpha = 0.7;
+      for (let i = 0; i < 40; i++) { const x = rnd() * N, y = rnd() * N; g.lineWidth = 1 + rnd() * 2; wrapped(() => { g.beginPath(); g.moveTo(x, y); g.lineTo(x + 30 + rnd() * 40, y + 10 - rnd() * 20); g.stroke(); }); }
+      g.globalAlpha = 1;
+      speckle(300, [C[2] ?? C[1]], 0.5, 1.3, 0.6);
+    } else if (style === "grid") {
+      g.strokeStyle = C[1];
+      for (const [w, a] of [[9, 0.18], [3, 1]]) {
+        g.lineWidth = w;
+        g.globalAlpha = a;
+        for (let k = 0; k <= N; k += 64) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k, N); g.moveTo(0, k); g.lineTo(N, k); g.stroke(); }
+      }
+      g.globalAlpha = 1;
+    } else if (style === "bands") {
+      for (let y = 0; y < N; y += 32) { g.fillStyle = (y / 32) % 2 ? C[1] : C[0]; g.fillRect(0, y, N, 32); }
+    } else if (style === "rows") {
+      for (let x = 0; x < N; x += 32) { g.fillStyle = (x / 32) % 2 ? C[1] : C[0]; g.fillRect(x, 0, 32, N); }
+      speckle(500, [C[0], C[1]], 0.6, 1.6, 0.5);
+    } else if (style === "rainbowrows") {
+      for (let x = 0, i = 0; x < N; x += 16, i++) { g.fillStyle = C[i % C.length]; g.fillRect(x, 0, 16, N); }
+      g.fillStyle = "#4a8a3a";
+      for (let x = 12; x < N; x += 16) g.fillRect(x, 0, 4, N);
+    } else if (style === "rainbow") {
+      const w = N / C.length;
+      C.forEach((col, i) => { g.fillStyle = col; g.fillRect(i * w, 0, w + 1, N); });
+    } else if (style === "checker") {
+      for (let y = 0; y < N; y += 64) for (let x = 0; x < N; x += 64) { g.fillStyle = (x + y) % 128 ? C[1] : C[0]; g.fillRect(x, y, 64, 64); }
+    }
+    patternCache.set(key, c);
+    return c;
+  }
+  /** A texture of a pattern, `metres` per tile, for a surface `w` × `len` metres. */
+  function patternTex(spec, metres, w, len) {
+    const t = new THREE.CanvasTexture(patternCanvas(spec));
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 4;
+    // the rainbow track: one band per lane, straight across
+    t.repeat.set(spec.style === "rainbow" ? 1 : w / metres, len / metres);
+    return t;
+  }
+
+  /** Lit windows, for buildings (the colour tints the walls). */
+  const windowTex = (() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const g = c.getContext("2d");
+    g.fillStyle = "#c8c8d0";
+    g.fillRect(0, 0, 64, 64);
+    for (let y = 6; y < 64; y += 14) for (let x = 6; x < 64; x += 14) { g.fillStyle = (x * 7 + y * 3) % 5 ? "#fff3b0" : "#3a3a4a"; g.fillRect(x, y, 8, 8); }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2, 4);
+    return t;
+  })();
+
+  /** Several shapes, each placed, as one geometry (positions and normals only). */
+  function bake(...parts) {
+    const pos = [];
+    const nor = [];
+    for (const [geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1] of parts) {
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
+      const g = (geo.index ? geo.toNonIndexed() : geo).applyMatrix4(m);
+      pos.push(...g.attributes.position.array);
+      nor.push(...g.attributes.normal.array);
+    }
+    const out = new THREE.BufferGeometry();
+    out.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    out.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+    return out;
+  }
+  const Cyl = (rt, rb, h, n = 8) => new THREE.CylinderGeometry(rt, rb, h, n);
+  const Cone = (r, h, n = 8) => new THREE.ConeGeometry(r, h, n);
+  const Ball = (r, w = 10, h = 8) => new THREE.SphereGeometry(r, w, h);
+  const Dome = (r) => new THREE.SphereGeometry(r, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+  const Box = (x, y, z) => new THREE.BoxGeometry(x, y, z);
+  const PI = Math.PI;
+  /**
+   * The scenery library: each kind is parts, each part a shape and which of the
+   * recipe's colours paints it (leaf, trunk, c = main, accent; glow = always lit).
+   * Shapes are about real size (metres); the recipe can scale them.
+   */
+  const PROP_PARTS = {
+    tree: [[bake([Cyl(0.16, 0.24, 1.6, 7), 0, 0.8]), "trunk"], [bake([new THREE.IcosahedronGeometry(1.25, 1), 0, 2.5, 0, 0, 0, 0, 1, 0.95, 1]), "leaf"]],
+    pine: [[bake([Cyl(0.14, 0.2, 1, 6), 0, 0.5]), "trunk"], [bake([Cone(1.15, 2.2), 0, 1.9], [Cone(0.8, 1.7), 0, 2.9]), "leaf"]],
+    palm: [[bake([Cyl(0.13, 0.2, 4.4, 6), 0, 2.2, 0, 0, 0, 0.08]), "trunk"], [bake([Cone(2, 0.8, 8), 0.2, 4.6, 0, PI]), "leaf"]],
+    acacia: [[bake([Cyl(0.14, 0.2, 2.4, 6), 0, 1.2]), "trunk"], [bake([Cyl(2.3, 1.6, 0.6, 9), 0, 2.7]), "leaf"]],
+    cypress: [[bake([Ball(0.6, 8, 8), 0, 2.4, 0, 0, 0, 0, 1, 4, 1]), "c"]],
+    cactus: [[bake([Cyl(0.32, 0.36, 2.6), 0, 1.3], [Cyl(0.17, 0.17, 0.8, 6), 0.5, 1.3, 0, 0, 0, PI / 2], [Cyl(0.17, 0.17, 0.9, 6), 0.85, 1.7], [Cyl(0.15, 0.15, 0.6, 6), -0.42, 0.9, 0, 0, 0, PI / 2], [Cyl(0.15, 0.15, 0.7, 6), -0.7, 1.2]), "c"]],
+    rock: [[bake([new THREE.DodecahedronGeometry(0.9, 0), 0, 0.35, 0, 0, 0, 0, 1, 0.65, 1.1]), "c"]],
+    spire: [[bake([Cyl(0.8, 1.8, 7, 7), 0, 3.5]), "c"]],
+    fern: [[bake([new THREE.IcosahedronGeometry(0.8, 0), 0, 0.3, 0, 0, 0, 0, 1, 0.6, 1]), "c"]],
+    deadtree: [[bake([Cyl(0.14, 0.28, 3.2, 6), 0, 1.6], [Cyl(0.06, 0.1, 1.4, 5), 0.45, 2.3, 0, 0, 0, -0.9], [Cyl(0.06, 0.1, 1.2, 5), -0.4, 2.7, 0, 0, 0, 1]), "c"]],
+    mushroom: [[bake([Cyl(0.25, 0.35, 1.4), 0, 0.7]), "accent"], [bake([Dome(1.1), 0, 1.3, 0, 0, 0, 0, 1, 0.7, 1]), "c"]],
+    crystal: [[bake([new THREE.OctahedronGeometry(0.6, 0), 0, 1.4, 0, 0, 0, 0, 1, 2.4, 1], [new THREE.OctahedronGeometry(0.4, 0), 0.6, 0.8, 0.2, 0, 0, 0.3, 1, 2, 1]), "c"]],
+    lollipop: [[bake([Cyl(0.06, 0.06, 2.4, 6), 0, 1.2]), "accent"], [bake([Cyl(0.8, 0.8, 0.22, 20), 0, 2.8, 0, PI / 2]), "c"]],
+    gumdrop: [[bake([Dome(0.75), 0, 0, 0, 0, 0, 0, 1, 1.2, 1]), "c"]],
+    icecream: [[bake([Cone(0.55, 1.6, 10), 0, 0.8, 0, PI]), "accent"], [bake([Ball(0.62), 0, 1.75]), "c"]],
+    iceberg: [[bake([new THREE.IcosahedronGeometry(1.3, 0), 0, 0.9, 0, 0, 0, 0, 1, 1.4, 1]), "c"]],
+    snowman: [[bake([Ball(0.7), 0, 0.6], [Ball(0.5), 0, 1.55], [Ball(0.36), 0, 2.25]), "c"]],
+    lamp: [[bake([Cyl(0.07, 0.09, 3.4, 6), 0, 1.7]), "c"], [bake([Ball(0.28, 8, 6), 0, 3.5]), "accent", true]],
+    hut: [[bake([Cyl(1.1, 1.1, 1.5, 10), 0, 0.75]), "c"], [bake([Cone(1.6, 1.3, 10), 0, 2.15]), "accent"]],
+    house: [[bake([Box(2.4, 1.8, 2.2), 0, 0.9]), "c"], [bake([Cone(2, 1.3, 4), 0, 2.45, 0, 0, PI / 4]), "accent"]],
+    building: [[bake([Box(1, 1, 1), 0, 0.5]), "c", "windows"]],
+    dome: [[bake([Dome(2.2)]), "c"], [bake([new THREE.TorusGeometry(1.75, 0.14, 6, 24), 0, 0.9, 0, PI / 2]), "accent", true]],
+    coral: [[bake([Cone(0.35, 1.8, 6), 0, 0.9], [Cone(0.3, 1.3, 6), 0.5, 0.65, 0.2, 0, 0, -0.3], [Cone(0.28, 1.5, 6), -0.4, 0.75, -0.1, 0, 0, 0.25]), "c"]],
+    seaweed: [[bake([Cone(0.18, 3, 5), 0, 1.5], [Cone(0.15, 2.4, 5), 0.3, 1.2, 0.1, 0, 0, 0.1], [Cone(0.14, 2, 5), -0.25, 1, -0.2, 0, 0, -0.12]), "c"]],
+    bamboo: [[bake([Cyl(0.09, 0.09, 6, 6), 0, 3], [Cyl(0.08, 0.08, 5.4, 6), 0.4, 2.7, 0.2], [Cyl(0.09, 0.09, 6.4, 6), -0.3, 3.2, -0.3]), "c"]],
+    windmill: [[bake([Cyl(0.9, 1.3, 5, 8), 0, 2.5]), "c"], [bake([Box(0.3, 5, 0.1), 0, 5, 1], [Box(5, 0.3, 0.1), 0, 5, 1]), "accent"]],
+    grave: [[bake([Box(0.8, 1.1, 0.22), 0, 0.55], [Cyl(0.4, 0.4, 0.22, 10), 0, 1.1, 0, PI / 2]), "c"]],
+    star: [[bake([new THREE.OctahedronGeometry(1, 0), 0, 0, 0, 0, 0, PI / 4, 1, 1, 0.35]), "c"]],
+    puff: [[bake([Ball(1), 0, 0.6], [Ball(0.8), 1, 0.45, 0.2], [Ball(0.7), -0.9, 0.4, -0.1]), "c"]],
+    balloon: [[bake([Ball(1.1, 12, 10), 0, 0, 0, 0, 0, 0, 1, 1.15, 1]), "c"], [bake([Cyl(0.02, 0.02, 3, 4), 0, -2.6]), "accent"]],
+    island: [[bake([Cone(2.4, 3.2, 8), 0, -1.6, 0, PI]), "c"], [bake([Cyl(2.45, 2.45, 0.5, 10), 0, 0.25]), "accent"]],
+    pyramid: [[bake([Cone(3, 3.2, 4), 0, 1.6, 0, 0, PI / 4]), "c"]],
+    column: [[bake([Cyl(0.4, 0.45, 3.6, 10), 0, 1.8], [Box(1.1, 0.3, 1.1), 0, 3.75], [Box(1.1, 0.3, 1.1), 0, 0.15]), "c"]],
+    barrel: [[bake([Cyl(0.45, 0.45, 1, 10), 0, 0.5]), "c"], [bake([Cyl(0.47, 0.47, 0.08, 10), 0, 0.2], [Cyl(0.47, 0.47, 0.08, 10), 0, 0.8]), "accent"]],
+    pillar: [[bake([Box(0.5, 7, 0.5), 0, 3.5]), "c"]],
+    block: [[bake([Box(1.4, 1.4, 1.4), 0, 0.7]), "c"]],
+    torii: [[bake([Cyl(0.18, 0.2, 4, 8), -1.6, 2], [Cyl(0.18, 0.2, 4, 8), 1.6, 2], [Box(4.6, 0.32, 0.4), 0, 4.05], [Box(3.8, 0.22, 0.28), 0, 3.35]), "c"]],
+    flag: [[bake([Cyl(0.04, 0.04, 3, 5), 0, 1.5]), "c"], [bake([Box(0.9, 0.6, 0.04), 0.45, 2.7]), "accent"]],
+    giantflower: [[bake([Cyl(0.08, 0.1, 2.4, 5), 0, 1.2]), "accent"], [bake([Ball(0.65), 0, 2.5, 0, 0, 0, 0, 1, 0.5, 1]), "c"]],
+    pumpkin: [[bake([Ball(0.8, 10, 8), 0, 0.55, 0, 0, 0, 0, 1, 0.7, 1]), "c"], [bake([Cyl(0.06, 0.08, 0.3, 5), 0, 1.15]), "accent"]],
+  };
+  /** Where a kind goes: [nearest, furthest] metres from the kerb, and how high it floats. */
+  const PROP_PLACE = {
+    building: { d: [9, 40] }, pyramid: { d: [18, 70] }, spire: { d: [10, 50] }, dome: { d: [8, 35] }, windmill: { d: [10, 40] },
+    house: { d: [7, 30] }, hut: { d: [5, 25] }, torii: { d: [3, 5] }, column: { d: [3, 25] }, iceberg: { d: [4, 40] },
+    island: { d: [10, 50], fly: [6, 14] }, balloon: { d: [4, 40], fly: [8, 18] }, star: { d: [4, 40], fly: [5, 14] },
+  };
+  /** Build a themed map's track and scenery into `group`. */
+  function buildThemed(theme, group, r, edge) {
+    const len = TRACK_LEN + 220;
+    const tc = theme.track.colors;
+    group.add(runningTrack(patternTex(theme.track, 3, TRACK_W, len), new THREE.Color(tc[2] ?? tc[0]).multiplyScalar(0.75), theme.track.kerb));
+    group.add(meadowHills(edge, patternTex(theme.ground, 6, 130, TRACK_LEN + 400), theme.hills));
+    // scatter the recipe's props, weighted, both sides
+    const kinds = theme.props.map(([kind, w, colors, scale, glow]) => ({ kind, w, colors, scale: scale ?? [0.8, 1.3], glow: Boolean(glow), items: [] }));
+    const total = kinds.reduce((a, k) => a + k.w, 0);
+    const pick = () => {
+      let x = r() * total;
+      for (const k of kinds) if ((x -= k.w) < 0) return k;
+      return kinds[0];
+    };
+    for (let z = -60; z < TRACK_LEN + 160; z += 3.5 + r() * 4) {
+      for (const side of [-1, 1]) {
+        if (r() < 0.12) continue;
+        const k = pick();
+        const place = PROP_PLACE[k.kind] ?? { d: [2.5, 30] };
+        const d = place.d[0] + r() * (place.d[1] - place.d[0]);
+        const s = k.scale[0] + r() * (k.scale[1] - k.scale[0]);
+        const y = MEADOW_Y + hillY(d, z, theme.hills) + (place.fly ? place.fly[0] + r() * (place.fly[1] - place.fly[0]) : 0);
+        // buildings get their own proportions
+        const sc = k.kind === "building" ? [5 + r() * 5, (8 + r() * 26) * s, 5 + r() * 5] : [s, s, s];
+        k.items.push({ x: side * (edge + d), y, z, rot: k.kind === "torii" ? 0 : r() * PI * 2, sc, pick: r() });
+      }
+    }
+    // lamp posts along both kerbs when the recipe has lamps
+    const lamp = kinds.find((k) => k.kind === "lamp");
+    if (lamp) for (let z = -40; z < TRACK_LEN + 140; z += 18) for (const side of [-1, 1]) lamp.items.push({ x: side * (edge + 1.3), y: MEADOW_Y + 0.9, z, rot: 0, sc: [1, 1, 1], pick: r() });
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const v = new THREE.Vector3();
+    const sv = new THREE.Vector3();
+    for (const k of kinds) {
+      if (!k.items.length) continue;
+      for (const [geo, key, special] of PROP_PARTS[k.kind]) {
+        const cols = (k.colors[key] ?? k.colors.c ?? k.colors.leaf ?? ["#ffffff"]).map((c) => new THREE.Color(c));
+        const lit = special === true || (k.glow && key !== "trunk");
+        const mat =
+          special === "windows"
+            ? lit
+              ? new THREE.MeshBasicMaterial({ map: windowTex })
+              : new THREE.MeshLambertMaterial({ map: windowTex })
+            : lit
+              ? new THREE.MeshBasicMaterial({ toneMapped: false })
+              : new THREE.MeshLambertMaterial();
+        // the window texture needs UVs: the building is a plain box
+        const g = special === "windows" ? new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0) : geo;
+        const inst = new THREE.InstancedMesh(g, mat, k.items.length);
+        inst.frustumCulled = false;
+        k.items.forEach((it, i) => {
+          inst.setMatrixAt(i, m.compose(v.set(it.x, it.y, -it.z), q.setFromEuler(e.set(0, it.rot, 0)), sv.set(...it.sc)));
+          inst.setColorAt(i, cols[Math.floor(it.pick * cols.length) % cols.length]);
+        });
+        group.add(inst);
+      }
+    }
+    // neon arches over the track
+    if (theme.arches) {
+      const zs = [];
+      for (let z = 20; z < TRACK_LEN + 140; z += 45) zs.push(z);
+      const arch = new THREE.InstancedMesh(new THREE.TorusGeometry(TRACK_W / 2 + 0.7, 0.16, 6, 28, PI), new THREE.MeshBasicMaterial({ toneMapped: false }), zs.length);
+      arch.frustumCulled = false;
+      zs.forEach((z, i) => {
+        arch.setMatrixAt(i, m.compose(v.set(0, 0, -z), q.identity(), sv.set(1, 1, 1)));
+        arch.setColorAt(i, new THREE.Color(theme.arches[i % theme.arches.length]));
+      });
+      group.add(arch);
+    }
+  }
+
+  // ── weather: snow, petals, leaves, fireflies, embers, bubbles or dust round the camera ──
+  const FX = {
+    snow: { color: "#ffffff", size: 0.35, v: [0, -1.6, 0], sway: 0.6 },
+    petals: { color: "#ffb8d4", size: 0.3, v: [0.6, -0.9, 0], sway: 1 },
+    leaves: { color: "#f0902a", size: 0.38, v: [0.8, -1.1, 0], sway: 1.2 },
+    fireflies: { color: "#d8ff7a", size: 0.28, v: [0, 0.1, 0], sway: 0.8, add: true },
+    embers: { color: "#ff8a2a", size: 0.26, v: [0.2, 1.6, 0], sway: 0.5, add: true },
+    bubbles: { color: "#bff0ff", size: 0.32, v: [0, 1.3, 0], sway: 0.5 },
+    dust: { color: "#f0d8a8", size: 0.18, v: [1.4, 0.05, 0], sway: 0.3 },
+  };
+  const fxGroup = new THREE.Group();
+  scene.add(fxGroup);
+  let weather = null; // { points, spec, t }
+  const FX_N = 380;
+  function setWeather(kind) {
+    if (weather) {
+      fxGroup.remove(weather.points);
+      weather.points.geometry.dispose();
+      weather.points.material.dispose();
+      weather = null;
+    }
+    const spec = FX[kind];
+    if (!spec) return;
+    const pos = new Float32Array(FX_N * 3);
+    for (let i = 0; i < FX_N; i++) pos.set([(Math.random() - 0.5) * 50, Math.random() * 18, -Math.random() * 75 + 5], i * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const points = new THREE.Points(geo, new THREE.PointsMaterial({ map: fxDot(), color: spec.color, size: spec.size, transparent: true, depthWrite: false, blending: spec.add ? THREE.AdditiveBlending : THREE.NormalBlending }));
+    points.frustumCulled = false;
+    fxGroup.add(points);
+    weather = { points, spec, t: 0 };
+  }
+  let fxDotTex = null;
+  function fxDot() {
+    if (fxDotTex) return fxDotTex;
+    const c = document.createElement("canvas");
+    c.width = c.height = 32;
+    const g = c.getContext("2d");
+    const grd = g.createRadialGradient(16, 16, 1, 16, 16, 16);
+    grd.addColorStop(0, "rgba(255,255,255,1)");
+    grd.addColorStop(0.5, "rgba(255,255,255,0.8)");
+    grd.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 32, 32);
+    return (fxDotTex = new THREE.CanvasTexture(c));
+  }
+  function stepWeather(dt, camZ) {
+    fxGroup.position.z = camZ;
+    if (!weather) return;
+    weather.t += dt;
+    const { spec } = weather;
+    const p = weather.points.geometry.attributes.position;
+    const a = p.array;
+    for (let i = 0; i < FX_N; i++) {
+      const k = i * 3;
+      a[k] += (spec.v[0] + Math.sin(weather.t * 1.3 + i) * spec.sway) * dt;
+      a[k + 1] += (spec.v[1] + Math.cos(weather.t * 0.9 + i * 0.7) * spec.sway * 0.3) * dt;
+      // wrap round the box the camera sits in
+      if (a[k + 1] < 0) a[k + 1] += 18;
+      else if (a[k + 1] > 18) a[k + 1] -= 18;
+      if (a[k] > 25) a[k] -= 50;
+      else if (a[k] < -25) a[k] += 50;
+    }
+    p.needsUpdate = true;
+  }
+
   function buildMap(map) {
     const group = new THREE.Group();
     const cull = [];
@@ -4068,15 +4472,16 @@ const world = (() => {
       return o;
     };
     const built = BUILT_MAPS.has(map);
+    const theme = THEME[map];
     if (map === "meadow") group.add(runningTrack());
-    else {
+    else if (!theme) {
       const tile = built ? P[`${map}Tile`] : map === "farm" ? P.farmTile : map === "beach" ? P.boardTile : P.ground;
       const step = tile.userData.length * 0.97;
       for (let z = -60; z < TRACK_LEN + 160; z += step) add(tile, 0, 0, z, 1, 0);
     }
     flatTrack.visible = false;
     // the built maps bring their own edges (barriers, ad boards, neon rails)
-    if (!built) {
+    if (!built && !theme) {
       for (let z = -40; z < TRACK_LEN + 120; z += 2.9) {
         // on the meadow the fence stands on the white kerb
         for (const side of [-1, 1]) map === "meadow" ? add(P.fence, side * (TRACK_W / 2 + 0.22), 0.12, z, 1, Math.PI / 2) : add(P.fence, side * (TRACK_W / 2 - 0.1), 0, z, 1, Math.PI / 2);
@@ -4086,6 +4491,7 @@ const world = (() => {
     if (map === "city") buildCity(add, group, r, edge);
     else if (map === "stadium") buildStadium(add, group, r, edge);
     else if (map === "space") buildSpace(add, group, r, edge);
+    else if (theme) buildThemed(theme, group, r, edge);
 
     if (map === "meadow") {
       // rolling hills either side, a strip of flowers along the fence, then trees, bushes and the odd rock
@@ -4270,6 +4676,7 @@ const world = (() => {
 
   function tick(camZ, dt) {
     stepParticles(dt);
+    stepWeather(dt, camZ);
     skyGroup.position.z = camZ;
     clouds.position.z = camZ;
     for (const g of Object.values(mapSkies)) g.position.z = camZ;

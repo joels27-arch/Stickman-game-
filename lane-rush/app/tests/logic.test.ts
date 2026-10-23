@@ -1090,10 +1090,19 @@ describe("moving obstacles", () => {
       const ms = L.moversFor(course, 7, map);
       expect(ms.length).toBeGreaterThan(20);
       expect(new Set(ms.map((m) => m.kind)).size).toBe(2);
-      expect(ms.every((m) => L.MOVER_KINDS[m.kind]!.map === map)).toBe(true);
+      // themed maps borrow a classic map's movers
+      const base = L.MAP_MOVERS[map] ?? (L.MAPS.indexOf(map) < 6 ? map : "meadow");
+      expect(ms.every((m) => L.MOVER_KINDS[m.kind]!.map === base)).toBe(true);
       expect(ms[0]!.z).toBeGreaterThan(140);
       for (let i = 1; i < ms.length; i++) expect(ms[i]!.z - ms[i - 1]!.z).toBeGreaterThan(100);
     }
+  });
+
+  it("has a recipe for every themed map, with the same movers", async () => {
+    const { THEMES } = await import("../public/themes.js");
+    expect(L.MAPS.slice(6)).toEqual(THEMES.map((t: { id: string }) => t.id));
+    expect(L.MAPS.length).toBe(50);
+    for (const t of THEMES as { id: string; movers?: string }[]) expect(L.MAP_MOVERS[t.id]).toBe(t.movers);
   });
 
   it("sweep across all four lanes and back on the shared clock", () => {
