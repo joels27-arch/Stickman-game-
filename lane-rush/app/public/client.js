@@ -192,6 +192,7 @@ const POWER_INFO = {
 const WAVE_S = 4; // brain wave: controls flipped this long
 const GLUE_SLOW = 0.45; // speed factor while stuck in glue
 const STAGGER_S = 0.7; // after a punch
+const POWER_TIPS = 3; // how many times a power-up is explained when you pick it up
 // phones and tablets (iPads can report a fine pointer, so check for touch too)
 const TOUCH = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0 || "ontouchstart" in window;
 const BOOST_S = 1.6;
@@ -6222,7 +6223,10 @@ function renderModeHud() {
   // the PASS button only while you hold the bomb
   const bombBtn = hudEl.bomb ?? (hudEl.bomb = $("#bombBtn"));
   const holding = game.kind === "potato" && v.bomb?.holder === playerId && !me.out;
-  if (bombBtn.hidden === holding) bombBtn.hidden = !holding;
+  if (bombBtn.hidden === holding) {
+    bombBtn.hidden = !holding;
+    if (holding) $("#powerToast").classList.remove("show"); // the tip shares its spot
+  }
 }
 function passBomb() {
   if (game.kind !== "potato" || net.view?.bomb?.holder !== playerId) return false;
@@ -6296,6 +6300,12 @@ function flash() {
 
 function showPowerToast(kind, how = "") {
   const t = $("#powerToast");
+  // explain each power-up the first few times only, and never over the PASS button
+  let seen = {};
+  try { seen = JSON.parse(local.getItem("lr:tips") || "{}") || {}; } catch { /* fresh tips */ }
+  if ((seen[kind] ?? 0) >= POWER_TIPS || !$("#bombBtn").hidden) return;
+  seen[kind] = (seen[kind] ?? 0) + 1;
+  local.setItem("lr:tips", JSON.stringify(seen));
   t.replaceChildren(
     el("img", { src: `/assets/pw_${kind}.png`, alt: "" }),
     el("div", {}, el("b", {}, POWER_INFO[kind].label), el("span", {}, POWER_INFO[kind].hint), how ? el("small", {}, how) : null),

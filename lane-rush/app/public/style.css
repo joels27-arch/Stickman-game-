@@ -1798,3 +1798,17 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .chip.prize small { font-size: 11px; font-weight: 700; opacity: 0.8; }
 .pick-note { margin: 6px 2px 0; font-size: 12px; font-weight: 700; opacity: 0.75; }
 .pick-note:empty { display: none; }
+
+/* race HUD zones: nothing stacks on anything else (phones, notch-safe)
+   top    — row 1: hearts / mode counter left, mode tag right; row 2: combo left, feed right
+   bottom — left: power-up, saved item above it, throw pad beside it; right: look + emotes;
+            centre above the thumbs: the power-up tip or the PASS button (never both) */
+.mode-hud { top: max(64px, calc(env(safe-area-inset-top) + 58px)); max-width: 58vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mode-hud.bomb { left: max(14px, env(safe-area-inset-left)); transform: none; }
+.combo { top: max(118px, calc(env(safe-area-inset-top) + 112px)); }
+.feed { top: max(118px, calc(env(safe-area-inset-top) + 112px)); max-width: min(52vw, 300px); }
+.hud .saved-slot { left: calc(var(--safe-l) + 23px); bottom: calc(var(--safe-b) + 96px); }
+.bomb-btn { bottom: calc(max(14px, calc(env(safe-area-inset-bottom) + 8px)) + 146px); }
+@media (max-width: 760px) {
+  .power-toast { bottom: calc(max(14px, calc(env(safe-area-inset-bottom) + 8px)) + 146px); }
+}
