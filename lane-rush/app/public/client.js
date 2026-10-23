@@ -2417,15 +2417,23 @@ function renderResults(v) {
           ? `${p.hits} bump${p.hits === 1 ? "" : "s"}`
           : `${Math.round(p.d)} m of ${TRACK_LEN} m`;
     const extra = p.sc ? ` · ${p.sc} style${p.cb > 1 ? ` · best combo ${p.cb}` : ""}` : "";
-    const time = survival
-      ? p.outAt !== null
-        ? `out ${fmtTime(p.outAt - v.startAt)}`
-        : p.left
-          ? "–"
-          : "Survived"
-      : p.finish !== null
-        ? fmtTime(p.finish)
-        : "DNF";
+    // the number that decides this mode (no more "DNF" for modes without a finish line)
+    const outTime = p.outAt !== null ? fmtTime(p.outAt - v.startAt) : "";
+    const time = p.left
+      ? "Left"
+      : v.kind === "coinrush"
+        ? `🪙 ${p.coins ?? 0}`
+        : v.kind === "chase"
+          ? outTime ? `🧠 ${outTime}` : "Escaped!"
+          : v.kind === "potato"
+            ? outTime ? `💥 ${outTime}` : "Survived"
+            : survival
+              ? outTime ? `out ${outTime}` : "Survived"
+              : p.finish !== null
+                ? fmtTime(p.finish)
+                : `${Math.round(p.d)} m`;
+    // in a match of several rounds: the points this place scored
+    const pts = v.cup ? el("small", { class: "rpts", text: `+${p.left ? 0 : CUP_POINTS[i] ?? 0} pts` }) : null;
     const earn = rw?.medal
       ? el("span", { class: "earn" }, el("img", { src: MEDAL_IMG[rw.medal], alt: `${rw.medal} medal` }))
       : el("span", { class: "earn", text: "" });
@@ -2436,7 +2444,7 @@ function renderResults(v) {
         el("span", { class: `pl p${Math.min(i + 1, 4)}`, text: PLACE[i] ?? `${i + 1}th` }),
         el("img", { src: portrait(p.char), alt: "" }),
         el("span", { class: "who", text: withFlag(p.name, p.country) + (p.bot ? " 🤖" : "") + (p.id === playerId ? " (you)" : "") }, el("small", { text: detail + extra })),
-        el("span", { class: "tm", text: time }),
+        el("span", { class: "tm" }, time, pts),
         earn,
       ),
     );

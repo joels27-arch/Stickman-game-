@@ -885,15 +885,23 @@ export function coinLines(course) {
     const a = rows[i];
     const b = rows[i + 1];
     const gap = b.z - a.z;
-    if (gap < 7) continue;
-    // a lane that's clear ahead, behind nothing taller than a hurdle (so you can see the coins coming)
+    if (gap < 5) continue;
+    // lanes that are clear ahead, behind nothing taller than a hurdle (so you can see the coins coming)
     const clear = [0, 1, 2, 3].filter((l) => !a.lanes[l] && !b.lanes[l]);
     const lanes = clear.length ? clear : [0, 1, 2, 3].filter((l) => !b.lanes[l] && a.lanes[l] === "hurdle");
     if (!lanes.length) continue;
-    const lane = lanes[Math.floor(((a.z * 7.31) % 1) * lanes.length)] ?? lanes[0];
-    const n = gap > 16 ? 5 : 3;
-    const start = a.z + (gap - (n - 1) * 2) / 2;
-    for (let k = 0; k < n; k++) out.push({ z: Math.round((start + k * 2) * 10) / 10, lane, v: k === Math.floor(n / 2) && i % 7 === 3 ? 5 : 1 });
+    // up to two lines per gap, each filling the gap end to end (a coin every 1.8 m)
+    const first = Math.floor(((a.z * 7.31) % 1) * lanes.length);
+    const picks = [lanes[first]];
+    if (lanes.length > 1 && i % 3 !== 2) picks.push(lanes[(first + 1 + (i % (lanes.length - 1))) % lanes.length]);
+    const n = Math.min(10, Math.max(2, Math.floor((gap - 3) / 1.8) + 1));
+    const start = a.z + (gap - (n - 1) * 1.8) / 2;
+    picks.forEach((lane, li) => {
+      for (let k = 0; k < n; k++) {
+        const big = li === 0 && k === Math.floor(n / 2) && i % 4 === 1; // a 5-coin bonus every few rows
+        out.push({ z: Math.round((start + k * 1.8) * 10) / 10, lane, v: big ? 5 : 1 });
+      }
+    });
   }
   return out;
 }

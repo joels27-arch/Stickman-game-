@@ -1921,3 +1921,11 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 }
 .play-card .room-btn.blue { background: linear-gradient(180deg, #5aa8ff, #2463e0); color: #fff; box-shadow: 0 4px 0 #123a8a; border-color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3); }
 .play-card .room-btn.green { text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3); }
+
+/* results: each runner's deciding number (coins, time caught, survived…) also on phones */
+.podium .tm { display: grid; justify-items: end; line-height: 1.05; white-space: nowrap; }
+.podium .tm .rpts { font-family: var(--display); font-style: normal; font-size: 13px; font-weight: 900; color: #ffd23f; }
+@media (max-width: 560px) {
+  .podium li { grid-template-columns: 44px 38px minmax(0, 1fr) auto auto; gap: 6px; }
+  .podium .tm { display: grid; font-size: 16px; }
+}
