@@ -2145,7 +2145,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .tour-body { display: grid; grid-template-columns: 68px 1fr; gap: 12px; align-items: center; }
 .tour-face { position: relative; width: 68px; height: 68px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #bfe3ff, #3f8cff 70%); border: 3px solid #fff; box-shadow: 0 3px 0 #121c63; overflow: visible; }
 .tour-face .ava { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; }
-.tour-face .ava img { position: absolute; left: 50%; top: 4px; width: 170%; transform: translateX(-50%); }
+.tour-face .ava img { position: absolute; left: 50%; top: -64px; width: 190%; transform: translateX(-50%); }
 .tour-sticker { position: absolute; right: -8px; bottom: -6px; width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45)); animation: todayBob 1.2s ease-in-out infinite; }
 .tour-sticker[hidden] { display: none; }
 .tour-kicker { display: block; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #ffd23f; }
