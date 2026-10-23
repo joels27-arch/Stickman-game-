@@ -71,7 +71,6 @@
                 <b id="leagueName">Bronze I</b>
                 <span class="qbar"><i id="leagueBar"></i></span>
                 <span id="leagueNext" class="lc-next">0 pts</span>
-                <span class="lc-how"><img src="/assets/medal_gold.png" alt="" />+10 <img src="/assets/medal_silver.png" alt="" />+5 <img src="/assets/medal_bronze.png" alt="" />+3 · 4th +1</span>
               </span>
               <span class="lc-go">Rankings ›</span>
             </button>
@@ -88,7 +87,6 @@
         </div>
         <!-- PLAY -->
         <div class="hpage hp-play" id="hpPlay" aria-label="Play">
-          <button id="roadMini" class="road-mini" type="button" aria-label="Gold Road"></button>
           <h1 class="logo home-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
           <div class="roster" id="homeRoster" hidden></div>
           <div class="home-dock">
@@ -454,6 +452,14 @@
         <div class="ribbon teal"><h2 id="statsTitle">Your stats</h2></div>
         <button id="statsClose" class="gclose" type="button" aria-label="Close">✕</button>
         <div id="statsBody" class="stats-body"></div>
+      </div>
+    </div>
+    <div id="tourneyModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet tourney-sheet" role="dialog" aria-modal="true" aria-labelledby="tourneyTitle">
+        <div class="ribbon teal"><h2 id="tourneyTitle">Tournament</h2></div>
+        <button id="tourneyClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div id="tourneyBody" class="tourney-body"></div>
       </div>
     </div>
     <div id="avatarModal" class="modal gmodal" hidden>

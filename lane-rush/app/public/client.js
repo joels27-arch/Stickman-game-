@@ -629,10 +629,9 @@ const TOUR = [
   { sel: "#roomRow", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room and share the code, or Join a friend's. Up to 4 runners, bots fill empty spots." },
   { sel: "#soloBtn", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Survival, Brain Chase, Coin Rush, Hot Potato and more, against bots you can make easy or hard." },
   { sel: "#profileCard", img: "/assets/lg_bronze.webp", title: "That's you", text: "Your name and league. Tap it for your stats: wins, records and how you rank among friends." },
-  { sel: "#roadMini", img: "/assets/medal_gold.png", title: "Gold Road", text: "Every gold medal you win moves you along it: coins, packs and three exclusive characters." },
   { sel: '.htab[data-page="0"]', img: "/assets/tab_trophy.webp", title: "Tournaments", text: "The Weekend League and the Grand Tour, with coin prizes." },
   { sel: '.htab[data-page="1"]', img: "/assets/tab_skins.webp", title: "Skins", text: "All your characters. Pick who you race with." },
-  { sel: '.htab[data-page="3"]', img: "/assets/tab_missions.webp", title: "Missions", text: "Daily missions, your career and the full Gold Road." },
+  { sel: '.htab[data-page="3"]', img: "/assets/tab_missions.webp", title: "Missions", text: "Daily missions, your career and the Gold Road: every gold medal you win moves you along it, for coins, packs and exclusive characters." },
   { sel: '.htab[data-page="4"]', img: "/assets/tab_shop.webp", title: "Shop", text: "Packs, characters, trails and the Season Pass." },
   { sel: "#endlessBtn", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life, how far can you get? I'll teach you the moves while you run. Tap it!", last: true },
 ];
@@ -1737,7 +1736,7 @@ function fitHomeArt() {
 addEventListener("resize", fitHomeArt);
 if ("ResizeObserver" in window) {
   const ro = new ResizeObserver(() => fitHomeArt());
-  for (const sel of [".hp-play .home-dock", ".hp-play .home-logo", "#roadMini"]) ro.observe($(sel));
+  for (const sel of [".hp-play .home-dock", ".hp-play .home-logo"]) ro.observe($(sel));
 }
 $(".hp-play .home-logo").addEventListener("animationend", fitHomeArt);
 $(".home-art img").addEventListener("load", fitHomeArt);
@@ -2042,50 +2041,10 @@ function renderGoldRoad() {
     if (cur) track.scrollLeft = cur.offsetLeft - track.clientWidth / 2 + cur.clientWidth / 2;
   });
   renderMissionDots(); // a reward waiting on the road lights the Missions tab
-  renderRoadMini();
 }
-/** The Gold Road in short, at the top of the Play page: progress to the next reward (tap: the full road). */
-/** The Gold Road on the Play page: your gold count, then the next three rewards on a little road. */
-function renderRoadMini() {
-  const box = $("#roadMini");
-  const g = road.gold();
-  const ready = road.ready()[0];
-  const next = ready ?? ROAD.find((r) => r.gold > g);
-  box.classList.toggle("ready", Boolean(ready));
-  const medal = el("span", { class: "rm-medal" }, el("img", { src: MEDAL_IMG.gold, alt: "" }), el("b", { text: g.toLocaleString() }));
-  const title = el("span", { class: "rm-title", text: "Gold Road" });
-  if (!next) {
-    box.replaceChildren(title, medal, el("span", { class: "rm-done", text: "Road complete! 🏆" }));
-    return;
-  }
-  const i = ROAD.indexOf(next);
-  const prev = i ? ROAD[i - 1].gold : 0;
-  const pct = ready ? 1 : Math.max(0, Math.min(1, (g - prev) / (next.gold - prev)));
-  const steps = ROAD.slice(i, i + 3);
-  // the road: you at the left, the next rewards spaced along it; the gold line shows how far you are to the first
-  const track = el(
-    "span",
-    { class: "rm-track" },
-    el("span", { class: "rm-line" }, el("i", { style: `width:${(pct * 100) / steps.length}%` })),
-    ...steps.map((st, k) => {
-      const info = roadInfo(st);
-      return el(
-        "span",
-        { class: `rm-node${k === 0 ? " first" : ""}${info.rarity ? ` ${info.rarity}` : ""}`, style: `left:${((k + 1) / steps.length) * 100}%` },
-        el("span", { class: "rm-ball" }, el("img", { src: info.img, alt: info.label })),
-        el("small", {}, el("img", { src: MEDAL_IMG.gold, alt: "" }), String(st.gold)),
-      );
-    }),
-  );
-  box.replaceChildren(title, medal, track, el("span", { class: "rm-go", text: ready ? "Claim!" : "›" }));
-}
-$("#roadMini").addEventListener("click", () => {
-  sfx.tap();
-  setHomePage(PAGE.missions);
-  setTimeout(() => $("#goldRoad").scrollIntoView({ behavior: "smooth", block: "center" }), 380);
-});
 
-function renderCompete() {
+/** Full Weekend League card (shown in the detail sheet). */
+function weekendCard() {
   const w = leagueWindow();
   const st = leagueState();
   const mine = st.id === w.id;
@@ -2106,7 +2065,6 @@ function renderCompete() {
         el("b", { text: "Weekend League" }),
         el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${LEAGUE_TIERS.reduce((a, t) => a + t.coins, 0).toLocaleString()}`),
       ),
-      el("button", { class: "tc-info", type: "button", "aria-label": "How it works", "data-info": "" }, "i"),
     ),
     el("p", { class: "tc-desc", text: `${LEAGUE_MATCHES} matches from Friday 18:00 to Sunday night, any mode. Each match scores ${LEAGUE_PTS.join(" / ")} points for 1st to 4th. Reach the marks on the bar to unlock coins.` }),
     el(
@@ -2144,36 +2102,74 @@ function renderCompete() {
               ]),
     ),
   );
+  return weekend;
+}
+/** Full card for a tournament (shown in the detail sheet). */
+function tourneyCard(t) {
   const paid = tourneyPaid();
-  const cards = TOURNEYS.map((t) =>
+  return el(
+    "div",
+    { class: `tcard t-${t.id}` },
     el(
       "div",
-      { class: `tcard t-${t.id}` },
-      el(
-        "div",
-        { class: "tc-head" },
-        el("img", { src: t.img, alt: "" }),
-        el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${t.prize[0].toLocaleString()}`)),
-        el("button", { class: "tc-info", type: "button", "aria-label": "How it works", "data-info": "" }, "i"),
-      ),
-      el("p", { class: "tc-desc", text: t.text }),
-      el(
-        "div",
-        { class: "tc-prizes" },
-        el("small", { text: "Daily prize" }),
-        ...t.prize.map((c, i) => el("span", { class: `prz${paid[t.id]?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), el("i", { class: "coin" }), String(c))),
-      ),
-      paid[t.id] ? el("p", { class: "tc-note", text: `Today: ${PLACE_SHORT[paid[t.id].place - 1]} place ✓ · finish higher to win the difference` }) : "",
-      el(
-        "div",
-        { class: "tc-btns" },
-        el("button", { class: "btn big go", type: "button", "data-mode": t.id, "data-with": "bots", text: "🤖 Vs bots" }),
-        el("button", { class: "btn big blue", type: "button", "data-mode": t.id, "data-with": "friends", text: "👥 Host" }),
-      ),
+      { class: "tc-head" },
+      el("img", { src: t.img, alt: "" }),
+      el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${t.prize[0].toLocaleString()}`)),
+    ),
+    el("p", { class: "tc-desc", text: t.text }),
+    el(
+      "div",
+      { class: "tc-prizes" },
+      el("small", { text: "Daily prize" }),
+      ...t.prize.map((c, i) => el("span", { class: `prz${paid[t.id]?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), el("i", { class: "coin" }), String(c))),
+    ),
+    paid[t.id] ? el("p", { class: "tc-note", text: `Today: ${PLACE_SHORT[paid[t.id].place - 1]} place ✓ · finish higher to win the difference` }) : "",
+    el(
+      "div",
+      { class: "tc-btns" },
+      el("button", { class: "btn big go", type: "button", "data-mode": t.id, "data-with": "bots", text: "🤖 Vs bots" }),
+      el("button", { class: "btn big blue", type: "button", "data-mode": t.id, "data-with": "friends", text: "👥 Host" }),
     ),
   );
-  $("#tourneyList").replaceChildren(weekend, ...cards);
 }
+/** The Tournaments page: one simple row each; tap one for the rules, prizes and Play buttons. */
+function renderCompete() {
+  const w = leagueWindow();
+  const st = leagueState();
+  const ready = leagueReady(st).length > 0;
+  const row = (id, img, name, status, prize, opts = {}) =>
+    el(
+      "button",
+      { class: `trow${opts.live ? " live" : ""}${opts.ready ? " ready" : ""}`, type: "button", "data-open": id },
+      el("img", { src: img, alt: "" }),
+      el("span", { class: "tr-txt" }, el("b", { text: name }), el("small", {}, opts.live ? el("i", { class: "live-dot" }) : "", status)),
+      opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : el("span", { class: "tr-prize" }, el("i", { class: "coin" }), prize),
+      el("i", { class: "tr-go", text: "›" }),
+    );
+  $("#tourneyList").replaceChildren(
+    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, LEAGUE_TIERS.reduce((a, t) => a + t.coins, 0).toLocaleString(), { live: w.open, ready }),
+    ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, t.prize[0].toLocaleString())),
+  );
+  if (!tourneyModal.hidden) renderTourneySheet();
+}
+const tourneyModal = $("#tourneyModal");
+let tourneyOpen = null;
+function renderTourneySheet() {
+  const t = TOURNEYS.find((x) => x.id === tourneyOpen);
+  const card = tourneyOpen === "weekend" ? weekendCard() : t ? tourneyCard(t) : null;
+  if (!card) return;
+  card.classList.add("open"); // all the details show in the sheet
+  $("#tourneyTitle").textContent = tourneyOpen === "weekend" ? "Weekend League" : t.label;
+  $("#tourneyBody").replaceChildren(card);
+}
+function openTourney(id) {
+  sfx.tap();
+  tourneyOpen = id;
+  renderTourneySheet();
+  tourneyModal.hidden = false;
+}
+$("#tourneyClose").addEventListener("click", () => (tourneyModal.hidden = true));
+tourneyModal.addEventListener("click", (e) => e.target === tourneyModal && (tourneyModal.hidden = true));
 function playMode(mode, withWho) {
   sfx.unlock();
   if (soloBtn.disabled) return toast("Still loading the runners…");
@@ -2185,10 +2181,15 @@ function playMode(mode, withWho) {
   connect(newCode(), true);
 }
 $("#hpCompete").addEventListener("click", (e) => {
-  const info = e.target.closest("[data-info]");
-  if (info) return info.closest(".tcard").classList.toggle("open"); // the details live behind the ⓘ
+  const open = e.target.closest("[data-open]");
+  if (open) openTourney(open.dataset.open);
+});
+$("#tourneyBody").addEventListener("click", (e) => {
   const b = e.target.closest("[data-mode]");
-  if (b) return playMode(b.dataset.mode, b.dataset.with);
+  if (b) {
+    tourneyModal.hidden = true;
+    return playMode(b.dataset.mode, b.dataset.with);
+  }
   const lg = e.target.closest("[data-league]");
   if (!lg) return;
   if (lg.dataset.league === "claim") {
@@ -2203,6 +2204,7 @@ $("#hpCompete").addEventListener("click", (e) => {
     return;
   }
   // a league match is a random mode each time
+  tourneyModal.hidden = true;
   playMode(ROUND_KINDS[Math.floor(Math.random() * ROUND_KINDS.length)], lg.dataset.league === "host" ? "friends" : "bots");
 });
 // keep the countdowns fresh while the page is open
