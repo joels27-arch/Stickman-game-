@@ -1389,3 +1389,13 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 /* centred without transform, so the button's pulse animation can't push it off-screen */
 .po-done { left: 0; right: 0; margin: 0 auto; transform: none; }
 .po-done:active { transform: translateY(5px); }
+
+/* the remaining sheets (country picker, play solo) in the game look */
+.modal:not(.gmodal) { background: radial-gradient(ellipse at 50% 40%, rgba(40, 60, 160, 0.55), rgba(3, 5, 20, 0.88) 70%); backdrop-filter: blur(6px); }
+.modal:not(.gmodal) .sheet { border-radius: 24px; clip-path: none; border: 3px solid #fff; background: linear-gradient(180deg, #2f4bc8 0%, #1d2a8a 45%, #121a5c 100%); box-shadow: 0 8px 0 #070a24, 0 24px 50px rgba(0, 0, 0, 0.55); animation: gpop 360ms cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+.modal:not(.gmodal) .sheet-head h2 { font-size: 28px; -webkit-text-stroke: 1px #0a1240; paint-order: stroke fill; text-shadow: 0 3px 0 #0a1240; }
+.modal:not(.gmodal) .sheet .search { border-radius: 14px; }
+.flag-grid button { border-radius: 12px; }
+#soloModal .sheet { overflow-y: auto; }
+#soloModal .spotlight { border-radius: 18px; overflow: hidden; }
+#soloModal .card { border-radius: 14px; clip-path: none; }
