@@ -5445,12 +5445,17 @@ const world = (() => {
     const extra = new THREE.Group();
     for (const p of Object.values(assets.props)) if (p?.isObject3D && !p.parent) extra.add(p);
     scene.add(extra);
-    scene.traverse((o) => {
+    // only this race's things: other maps' scenery (built earlier, hidden) stays out of it
+    const roots = new Set([raceGroup, trackGroup, finishGroup, scenery, extra]);
+    const unhide = (o) => {
       if (!o.visible) {
         hidden.push(o);
         o.visible = true;
       }
-    });
+      for (const ch of o.children) unhide(ch);
+    };
+    for (const ch of scene.children) if (ch.visible || roots.has(ch)) unhide(ch);
+    const t0 = performance.now();
     try {
       renderer.compile(scene, camera);
       const seen = new Set();
@@ -5471,6 +5476,7 @@ const world = (() => {
     for (const o of hidden) o.visible = false;
     for (const p of [...extra.children]) extra.remove(p);
     scene.remove(extra);
+    game.warmMs = Math.round(performance.now() - t0);
   }
   /** Build a map's scenery ahead of time (in the lobby), hidden until the race. */
   function prebuild(map) {
