@@ -2834,6 +2834,11 @@ function renderLobby(v) {
     isHost && n < 2 ? "Share the code. Bots fill empty spots." : "";
   world.setShowcase(me?.char ?? 0);
   if (world.ready) for (const p of v.players) world.ensureChar(p.char).catch(() => {});
+  // bots join at the gun with any runner: have every runner downloaded while people pick
+  if (world.ready && !game.allChars) {
+    game.allChars = true;
+    setTimeout(() => RUNNERS.forEach((_, i) => world.ensureChar(i).catch(() => (game.allChars = false))), 600);
+  }
   // a set map gets downloaded and built while people pick, so the race starts smooth
   if (world.ready && v.map && v.map !== "random" && game.prepped !== v.map) {
     game.prepped = v.map;
