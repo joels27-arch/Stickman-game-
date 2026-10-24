@@ -9162,7 +9162,7 @@ world
 const mpModal = $("#mpModal");
 const pickModal = $("#pickModal");
 /** Runners on their way: shown in the picker, not playable yet (no 3D model). */
-const SOON = ["zara", "foxy", "pandu", "momo", "sharky", "captainstar", "kingcrown", "boulder"].map((id) => COLLECTION.find((c) => c.id === id)).filter(Boolean);
+const SOON = ["zara", "pandu", "momo", "sharky", "captainstar", "webster", "gloop", "boulder"].map((id) => COLLECTION.find((c) => c.id === id)).filter(Boolean);
 function renderPick() {
   const cur = preferredChar();
   $("#pickGrid").replaceChildren(

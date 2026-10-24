@@ -102,7 +102,6 @@ const COLLECTION = [
   { id: "kai", name: "Kai", color: "#21c7d9", rarity: "epic", via: "road", legacy: { medal: "silver", count: 6 } },
   { id: "zed", name: "Zed", color: "#7be3b0", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 3 } },
   { id: "porky", name: "Porky", color: "#ff9ec4", rarity: "rare", via: "pack" },
-  { id: "foxy", name: "Flash Fox", color: "#ff7a1a", rarity: "rare", via: "pack" },
   { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pack" },
   { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pack" },
   { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "road", legacy: { medal: "silver", count: 5 } },
@@ -112,7 +111,6 @@ const COLLECTION = [
   { id: "captainstar", name: "Captain Star", color: "#2f5ae0", rarity: "rare", via: "pack" },
   { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "pack" },
   { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "pack" },
-  { id: "kingcrown", name: "King Crown", color: "#6a2ab0", rarity: "legendary", via: "pack" },
   { id: "boulder", name: "The Boulder", color: "#7a5a3a", rarity: "legendary", via: "pack" },
   { id: "thunderjack", name: "Thunderjack", color: "#b02a2a", rarity: "legendary", via: "pack" },
 ];
@@ -1178,8 +1176,6 @@ function renderSkins() {
  */
 function renderShop() {
   // characters only come out of packs now: no characters for sale
-  $("#sec-chars").hidden = true;
-  $("#shopGrid").hidden = true;
   renderPacks();
   renderItems();
   renderCollPill();
@@ -6274,9 +6270,13 @@ function showTutInvite() {
   $("#endlessBtn").classList.add("tut-hl");
   const box = $("#tutInvite");
   box.hidden = false;
-  // sit right above the Endless Run button, pointing down at it
+  // sit above the whole play card (covering none of its buttons), the arrow pointing at Endless Run
   const r = $("#endlessBtn").getBoundingClientRect();
-  box.style.top = `${Math.max(70, r.top - box.firstElementChild.offsetHeight - 26)}px`;
+  const dock = $(".play-card").getBoundingClientRect();
+  const card = box.firstElementChild;
+  box.style.top = `${Math.max(70, dock.top - card.offsetHeight - 24)}px`;
+  const c = card.getBoundingClientRect();
+  card.style.setProperty("--ax", `${Math.round(Math.min(c.width - 24, Math.max(24, r.left + r.width / 2 - c.left)))}px`);
 }
 function closeTutInvite() {
   $("#tutInvite").hidden = true;
@@ -7823,7 +7823,7 @@ renderCollPill();
 const CAREER = [
   {
     name: "Rookie",
-    chest: { coins: 300, pack: "mega" },
+    chest: { pack: "brain" },
     missions: [
       { stat: "races", goal: 3, text: "Play 3 races", coins: 50, icon: "/assets/ui_star.webp" },
       { stat: "dist", goal: 1000, text: "Run 1 km in total", coins: 50, icon: "/assets/ui_shoe.webp" },
@@ -7833,7 +7833,7 @@ const CAREER = [
   },
   {
     name: "Runner",
-    chest: { coins: 600 },
+    chest: { pack: "brain" },
     missions: [
       { stat: "races", goal: 10, text: "Play 10 races", coins: 80, icon: "/assets/ui_star.webp" },
       { stat: "winsAny", goal: 1, text: "Win a race (bots count)", coins: 100, icon: "/assets/medal_gold.png" },
@@ -7843,7 +7843,7 @@ const CAREER = [
   },
   {
     name: "Contender",
-    chest: { coins: 500, pack: "mega" },
+    chest: { pack: "mega" },
     missions: [
       { stat: "modes", goal: 4, text: "Play all 4 modes (Survival, Chase, Coin Rush, Potato)", coins: 150, icon: "/assets/ui_chest.webp" },
       { stat: "winsAny", goal: 3, text: "Win 3 races", coins: 150, icon: "/assets/medal_gold.png" },
@@ -7853,7 +7853,7 @@ const CAREER = [
   },
   {
     name: "Pro",
-    chest: { coins: 1000, pack: "mega" },
+    chest: { pack: "mega" },
     missions: [
       { stat: "chaseBest", goal: 120, text: "Survive 2 minutes in Brain Chase", coins: 200, icon: "/assets/ui_watch.webp" },
       { stat: "cupWins", goal: 1, text: "Win a match of 3+ rounds", coins: 250, icon: "/assets/medal_gold.png" },
@@ -7863,7 +7863,7 @@ const CAREER = [
   },
   {
     name: "Champion",
-    chest: { coins: 2000, pack: "mega" },
+    chest: { pack: "legend" },
     missions: [
       { stat: "winsAny", goal: 15, text: "Win 15 races", coins: 300, icon: "/assets/medal_gold.png" },
       { stat: "dist", goal: 25000, text: "Run 25 km in total", coins: 300, icon: "/assets/ui_shoe.webp" },
@@ -7873,7 +7873,7 @@ const CAREER = [
   },
   {
     name: "Legend",
-    chest: { coins: 5000, pack: "mega" },
+    chest: { pack: "legend" },
     missions: [
       { stat: "winsAny", goal: 50, text: "Win 50 races", coins: 500, icon: "/assets/medal_gold.png" },
       { stat: "bestDist", goal: 3000, text: "Run 3,000 m in one race", coins: 500, icon: "/assets/ui_shoe.webp" },
@@ -7927,7 +7927,7 @@ function claimCareer(ci, mi, btn) {
   renderMissionDots();
 }
 function chestLabel(c) {
-  return [c.coins ? `${c.coins.toLocaleString()} coins` : "", c.pack ? "Mega Pack" : "", c.medal ? `${c.medals ?? 1} ${c.medal} medal${(c.medals ?? 1) > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
+  return [c.coins ? `${c.coins.toLocaleString()} coins` : "", c.pack ? PACKS.find((x) => x.id === c.pack)?.name ?? "Pack" : "", c.medal ? `${c.medals ?? 1} ${c.medal} medal${(c.medals ?? 1) > 1 ? "s" : ""}` : ""].filter(Boolean).join(" + ");
 }
 function openChest(ci) {
   const st = careerState();
@@ -7977,7 +7977,7 @@ function renderCareer() {
         el("small", { text: finished ? "Complete" : open ? `${done}/${ch.missions.length} missions` : `Finish chapter ${ci} to unlock` }),
         open && !finished ? el("span", { class: "ch-bar" }, el("i", { style: `width:${Math.round((done / ch.missions.length) * 100)}%` })) : null,
       ),
-      el("span", { class: "ch-chest" }, el("img", { src: "/assets/ui_chest.webp", alt: "" }), el("small", { text: chestLabel(ch.chest) })),
+      el("span", { class: "ch-chest" }, el("img", { src: PACKS.find((x) => x.id === ch.chest.pack)?.img ?? "/assets/ui_chest.webp", alt: "" }), el("small", { text: chestLabel(ch.chest) })),
     );
     out.push(head);
     // only the chapter you're on shows its missions
@@ -7998,7 +7998,8 @@ function renderCareer() {
       );
     });
     if (open && done === ch.missions.length) {
-      const b = el("button", { class: "gbtn chest-btn", type: "button" }, el("img", { src: "/assets/ui_chest.webp", alt: "" }), el("span", { text: `Open chapter chest` }));
+      const pk = PACKS.find((x) => x.id === ch.chest.pack);
+      const b = el("button", { class: "gbtn chest-btn", type: "button" }, el("img", { src: pk?.img ?? "/assets/ui_chest.webp", alt: "" }), el("span", { text: `Open your ${pk?.name ?? "pack"}` }));
       b.addEventListener("click", () => openChest(ci));
       out.push(b);
     }
@@ -9095,7 +9096,7 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 
 // characters taken out of the game: whoever owned one gets coins for it, once
 {
-  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500 };
+  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000 };
   const owned = wallet.owned();
   const had = owned.filter((id) => id in GONE && !local.getItem(`lr:refund:${id}`));
   if (had.length) {
