@@ -585,14 +585,7 @@ for (let i = 0; i < 4; i++) $("#homeRoster").append(runnerCard(i, i + 1));
 const nameInput = $("#nameInput");
 const codeInput = $("#codeInput");
 nameInput.value = local.getItem("lr:name") || "";
-// the name is asked once, the first time the game opens; after that it lives in Settings
-const nameModal = $("#nameModal");
-function askName() {
-  $("#firstName").value = /^Runner\d{3}$/.test(nameInput.value) ? "" : nameInput.value;
-  $("#nameMsg").textContent = "";
-  nameModal.hidden = false;
-  setTimeout(() => $("#firstName").focus(), 60);
-}
+// nobody is asked for a name: a new player gets "Runner" plus 3 digits, and can change it in Settings
 function saveName(n) {
   const name = String(n).trim().slice(0, 14);
   if (!name) return false;
@@ -602,19 +595,9 @@ function saveName(n) {
   renderProfile(); // the card top left shows the new name right away
   return true;
 }
-$("#nameForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  if (!saveName($("#firstName").value)) {
-    $("#nameMsg").textContent = "Type a name first";
-    return;
-  }
-  sfx.unlock();
-  nameModal.hidden = true;
-  if (!local.getItem("lr:tour")) setTimeout(startTour, 450); // first visit: the quick tour
-});
 // ── first-visit tour: a spotlight on each part of the app, skippable, ending on the endless run ──
 const TOUR = [
-  { sel: null, welcome: true, title: "Hey {name}, I'm Nia!", text: "Race your friends! Quick tour?" },
+  { sel: null, welcome: true, title: "Hey, I'm Nia!", text: "Race your friends! Quick tour?" },
   { sel: "#roomRow", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room or join a friend's." },
   { sel: "#soloBtn", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Race bots in any mode." },
   { sel: ".stats-hero", open: "stats", img: "/assets/lg_bronze.webp", title: "Your profile", text: "Your stats and how you rank." },
@@ -725,11 +708,12 @@ nameInput.addEventListener("change", () => {
   if (!saveName(nameInput.value)) nameInput.value = local.getItem("lr:name") || "";
   else toast("Name saved");
 });
-if (!local.getItem("lr:named")) {
-  // players from before keep a name they typed themselves; only the random "Runner123" ones get asked
-  if (nameInput.value.trim() && !/^Runner\d{3}$/.test(nameInput.value.trim())) local.setItem("lr:named", "1");
-  else askName();
+if (!nameInput.value.trim()) {
+  nameInput.value = `Runner${100 + Math.floor(Math.random() * 900)}`;
+  local.setItem("lr:name", nameInput.value);
 }
+local.setItem("lr:named", "1");
+if (!local.getItem("lr:tour")) setTimeout(startTour, 900); // first visit: straight into the quick tour
 // Join room opens the code box inside the same card
 function openJoin(open) {
   $("#roomRow").hidden = open;
@@ -1663,11 +1647,7 @@ function newCode() {
 // ── home ────────────────────────────────────────────────────────────────────
 
 function requireName() {
-  const n = myName();
-  if (!n || !local.getItem("lr:named")) {
-    askName();
-    return null;
-  }
+  const n = myName() || nameInput.value || "Runner";
   local.setItem("lr:name", n);
   $("#homeMsg").textContent = "";
   return n;
