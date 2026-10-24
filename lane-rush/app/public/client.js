@@ -111,6 +111,13 @@ const COLLECTION = [
   { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "road", legacy: { medal: "silver", count: 5 } },
   { id: "hoops", name: "Big Slam", color: "#ff8a00", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 4 } },
   { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 6 } },
+  // heroes and stars (pictures only)
+  { id: "captainstar", name: "Captain Star", color: "#2f5ae0", rarity: "rare", via: "coins", coins: 3500 },
+  { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "coins", coins: 5500 },
+  { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "coins", coins: 6000 },
+  { id: "kingcrown", name: "King Crown", color: "#6a2ab0", rarity: "legendary", via: "coins", coins: 9000 },
+  { id: "boulder", name: "The Boulder", color: "#7a5a3a", rarity: "legendary", via: "coins", coins: 9000 },
+  { id: "thunderjack", name: "Thunderjack", color: "#b02a2a", rarity: "legendary", via: "coins", coins: 10000 },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
 const medalText = (medal, n) => `${n} ${medal} medal${n === 1 ? "" : "s"}`;
