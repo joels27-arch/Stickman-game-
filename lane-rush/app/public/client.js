@@ -2330,7 +2330,7 @@ function renderCompete() {
       el("i", { class: "tr-go", text: "›" }),
     );
   $("#tourneyList").replaceChildren(
-    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, LEAGUE_TIERS.reduce((a, t) => a + t.coins, 0).toLocaleString(), { live: w.open, ready }),
+    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0).toLocaleString(), { live: w.open, ready }),
     ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, t.prize[0].toLocaleString())),
   );
   if (!tourneyModal.hidden) renderTourneySheet();
