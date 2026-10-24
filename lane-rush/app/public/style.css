@@ -2466,3 +2466,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .hud .emote-toggle { left: max(14px, env(safe-area-inset-left)); right: auto; bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px)); }
 .hud .mode-hud { top: calc(max(10px, env(safe-area-inset-top)) + 6px); left: 50%; transform: translateX(-50%); max-width: 50vw; }
 .hud .emote-menu { left: max(14px, env(safe-area-inset-left)); right: auto; bottom: max(80px, calc(env(safe-area-inset-bottom) + 72px)); justify-content: flex-start; }
+.hud .place b { grid-column: 1; grid-row: 1 / span 2; font-size: 42px; color: #fff; -webkit-text-stroke: 3px #8a5200; }
+.hud .place sup { grid-column: 2; grid-row: 1; font-size: 17px; color: #fff; -webkit-text-stroke: 2.5px #8a5200; }
+.hud .place sub { grid-column: 2; grid-row: 2; font-size: 14px; color: #fff; -webkit-text-stroke: 2.5px #8a5200; }
