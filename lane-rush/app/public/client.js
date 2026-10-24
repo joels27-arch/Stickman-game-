@@ -2970,44 +2970,52 @@ function adaptQuality(dt) {
   }
 }
 
-// Brain Chase: a little rear-view mirror in the corner, so you can see it coming
-const mirrorCam = new THREE.PerspectiveCamera(55, 1.5, 0.5, 400);
+// a round rear-view mirror in the top-right corner, always on in a race: you see who's coming without a button.
+// The view behind is drawn small into a texture, then onto a disc over the corner.
+const mirrorCam = new THREE.PerspectiveCamera(60, 1, 0.5, 300);
+const mirrorRT = new THREE.WebGLRenderTarget(256, 256);
+const mirrorScene = new THREE.Scene();
+const mirrorOrtho = new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1);
+const mirrorDisc = new THREE.Mesh(new THREE.CircleGeometry(0.5, 48), new THREE.MeshBasicMaterial({ map: mirrorRT.texture }));
+mirrorScene.add(mirrorDisc);
 const mirrorSize = new THREE.Vector2();
+let mirrorTick = 0;
 function renderMirror() {
-  const on = renderer && game.mode === "race" && game.kind === "chase" && !me.out && me.runner;
-  $("#mirrorFrame").hidden = !on;
+  const on = renderer && game.mode === "race" && !me.out && me.runner && !game.lookBack && serverNow() >= (net.view?.startAt ?? Infinity);
+  const f = $("#mirrorFrame");
+  if (f.hidden === Boolean(on)) f.hidden = !on;
   if (!on) return;
-  // draw in the renderer's own units, then put the frame exactly over it on the page
-  // (the canvas can be a different size from the window, e.g. behind Safari's toolbars)
   renderer.getSize(mirrorSize);
   const w = mirrorSize.x;
   const h = mirrorSize.y;
   const rect = renderer.domElement.getBoundingClientRect();
   const sx = rect.width / w;
   const sy = rect.height / h;
-  const visibleBottom = Math.min(rect.bottom, window.innerHeight);
-  const mw = Math.round(Math.min(170, window.innerWidth * 0.38) / sx);
-  const mh = Math.round(mw / 1.5);
-  const x = Math.round((Math.min(rect.right, window.innerWidth) - rect.left - 12) / sx) - mw;
-  const bottomGap = Math.round(window.innerHeight * 0.2);
-  const yTop = Math.round((visibleBottom - bottomGap - rect.top) / sy) - mh; // from the top of the canvas
-  const y = h - yTop - mh; // WebGL counts from the bottom
-  const p = me.runner.group.position;
-  mirrorCam.position.set(p.x * 0.5, 3.2, p.z - 3);
-  mirrorCam.lookAt(p.x * 0.3, 2.2, p.z + 30);
-  renderer.setScissorTest(true);
-  renderer.setScissor(x, y, mw, mh);
-  renderer.setViewport(x, y, mw, mh);
-  renderer.render(scene, mirrorCam);
-  renderer.setScissorTest(false);
-  renderer.setViewport(0, 0, w, h);
-  const f = $("#mirrorFrame");
-  f.style.width = `${Math.round(mw * sx)}px`;
-  f.style.height = `${Math.round(mh * sy)}px`;
-  f.style.left = `${Math.round(rect.left + x * sx)}px`;
-  f.style.top = `${Math.round(rect.top + yTop * sy)}px`;
-  f.style.right = "auto";
-  f.style.bottom = "auto";
+  // the disc goes exactly inside the frame (placed by CSS under the pause button)
+  const size = Math.round(Math.min(116, window.innerWidth * 0.3));
+  const fr = f.getBoundingClientRect();
+  const cx = (fr.left + fr.width / 2 - rect.left) / sx;
+  const cy = h - (fr.top + fr.height / 2 - rect.top) / sy;
+  // the view behind is redrawn every other frame (it's small, nobody notices)
+  if ((mirrorTick = (mirrorTick + 1) % 2) === 0) {
+    const p = me.runner.group.position;
+    mirrorCam.position.set(p.x * 0.6, 2.6, p.z - 2.5);
+    mirrorCam.lookAt(p.x * 0.3, 1.4, p.z + 18);
+    renderer.setRenderTarget(mirrorRT);
+    renderer.render(scene, mirrorCam);
+    renderer.setRenderTarget(null);
+  }
+  mirrorOrtho.right = w;
+  mirrorOrtho.top = h;
+  mirrorOrtho.updateProjectionMatrix();
+  mirrorDisc.position.set(cx, cy, 0);
+  mirrorDisc.scale.setScalar(size / sx - 6 / sx);
+  const auto = renderer.autoClear;
+  renderer.autoClear = false;
+  renderer.clearDepth();
+  renderer.render(mirrorScene, mirrorOrtho);
+  renderer.autoClear = auto;
+  f.style.width = f.style.height = `${size}px`;
 }
 
 function resize() {
@@ -5889,7 +5897,6 @@ function input(kind) {
       me.lane = next;
       me.laneAt = performance.now();
       sfx.lane();
-      if (game.aimLane == null && me.items.length) paintAim(); // the picker follows you
     }
   } else if (kind === "jump") {
     if (me.power === "rocket") return;
@@ -5936,19 +5943,6 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => {
   if ("cCbB".includes(e.key)) game.lookBack = false;
 });
-{
-  const lb = $("#lookBtn");
-  const on = (e) => {
-    e.preventDefault();
-    game.lookBack = true;
-  };
-  const off = () => (game.lookBack = false);
-  lb.addEventListener("pointerdown", on);
-  lb.addEventListener("pointerup", off);
-  lb.addEventListener("pointerleave", off);
-  lb.addEventListener("pointercancel", off);
-}
-
 {
   let sx = 0;
   let sy = 0;
@@ -8031,14 +8025,8 @@ function renderPower() {
   const next = me.power ? me.items[0] : me.items[1];
   const held = !me.power && Boolean(me.items[0]);
   const aims = held && THROWN.has(me.items[0]);
-  // anything you can throw: pick a lane (yours unless you tap another), then ahead or behind
-  $("#throwPad").classList.toggle("show", aims && TOUCH);
-  if (!aims) game.aimLane = null;
-  if (aims) {
-    $("#throwAhead small").textContent = me.items[0] === "bowling" ? "Roll ahead" : "Throw ahead";
-    $("#throwBack small").textContent = me.items[0] === "bowling" ? "Roll back" : "Drop behind";
-    paintAim();
-  }
+  // anything you can throw: swipe up on the button to throw it ahead, down to drop it behind
+  $("#throwHint").classList.toggle("show", aims && TOUCH);
   slot.classList.toggle("aims", aims && TOUCH);
   slot.classList.toggle("held", held);
   saved.classList.toggle("show", Boolean(next));
@@ -8056,38 +8044,25 @@ function renderPower() {
     slot.style.setProperty("--p", "1");
   }
 }
-$("#powerSlot").addEventListener("click", () => useItem());
-for (const [id, dir] of [["#throwAhead", 1], ["#throwBack", -1]]) {
-  $(id).addEventListener("click", (e) => {
-    e.stopPropagation();
+// the item button: tap to use; for things you throw, swipe up = throw ahead, swipe down = drop behind
+{
+  const slot = $("#powerSlot");
+  let y0 = null;
+  slot.addEventListener("pointerdown", (e) => {
+    y0 = e.clientY;
+    slot.setPointerCapture?.(e.pointerId);
+  });
+  slot.addEventListener("pointerup", (e) => {
+    if (y0 == null) return;
+    const dy = e.clientY - y0;
+    y0 = null;
     buzz(15);
-    const lane = game.aimLane ?? me.lane;
-    game.aimLane = null;
-    useItem(lane, dir);
+    const throws = !me.power && THROWN.has(me.items[0]);
+    if (throws && dy > 22) useItem(me.lane, -1);
+    else if (throws) useItem(me.lane, 1);
+    else useItem();
   });
-}
-/** The lane picker on the throw pad: a mini track, your lane marked, the target lit. */
-function paintAim() {
-  const box = $("#aimLanes");
-  if (box.children.length !== LANES) {
-    box.replaceChildren(
-      ...Array.from({ length: LANES }, (_, i) => {
-        const b = el("button", { class: "aim-lane", type: "button", "aria-label": `Lane ${i + 1}` });
-        b.addEventListener("click", (e) => {
-          e.stopPropagation();
-          buzz(8);
-          game.aimLane = i === me.lane ? null : i;
-          paintAim();
-        });
-        return b;
-      }),
-    );
-  }
-  const target = game.aimLane ?? me.lane;
-  [...box.children].forEach((b, i) => {
-    b.classList.toggle("on", i === target);
-    b.classList.toggle("me", i === me.lane);
-  });
+  slot.addEventListener("pointercancel", () => (y0 = null));
 }
 
 function currentAct() {
@@ -8409,7 +8384,7 @@ function updateHud() {
     });
   }
   const place = entries.findIndex((e) => e.id === playerId) + 1 || 1;
-  setHTML(hudEl.place, `${place}<sup>${ordinal(place)}</sup>`);
+  setHTML(hudEl.place, `<b>${place}</b><sup>${ordinal(place)}</sup><sub>/${entries.length}</sub>`);
   // coloured by place, and it pops whenever you gain or lose one
   if (hudEl.place.dataset.p !== String(place)) {
     const before = Number(hudEl.place.dataset.p || 0);
@@ -8420,15 +8395,18 @@ function updateHud() {
   }
   hudEl.place.hidden = entries.length < 2; // an endless run has no places
 
-  if (!isSurvival()) {
-    for (const dot of hudEl.dots.children) {
-      const id = dot.getAttribute("data-id");
-      const e = entries.find((x) => x.id === id);
-      const d = e ? e.d : 0;
-      const left = `${(clamp(d / TRACK_LEN, 0, 1) * 100).toFixed(1)}%`;
-      if (dot.style.left !== left) dot.style.left = left;
-      dot.style.display = e ? "" : "none";
-    }
+  // the bar up the right side: finish at the top in a race; in survival the leader is at the top
+  const bar = hudEl.bar ?? (hudEl.bar = $(".track-bar"));
+  bar.hidden = entries.length < 2;
+  const ds = entries.map((e) => e.d);
+  const lo = isSurvival() ? Math.min(...ds) : 0;
+  const span = isSurvival() ? Math.max(40, Math.max(...ds) - lo) : TRACK_LEN;
+  for (const dot of hudEl.dots.children) {
+    const id = dot.getAttribute("data-id");
+    const e = entries.find((x) => x.id === id);
+    const top = `${((1 - clamp(((e ? e.d : 0) - lo) / span, 0, 1)) * 100).toFixed(1)}%`;
+    if (dot.style.top !== top) dot.style.top = top;
+    dot.style.display = e && e.outAt == null ? "" : "none";
   }
 }
 

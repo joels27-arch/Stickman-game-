@@ -230,13 +230,15 @@
     </div>
     <section id="hud" class="hud">
       <div class="hud-top">
-        <button id="quitBtn" class="quit-btn" type="button" aria-label="Leave the race">✕</button>
         <div id="place" class="place">1<sup>st</sup></div>
-        <div class="track-bar"><div id="dots"></div><div class="flag">🏁</div><div id="distText" class="dist-text"></div></div>
+        <button id="quitBtn" class="quit-btn" type="button" aria-label="Pause">❚❚</button>
+        <div id="timer" class="timer" hidden>0.0</div>
         <div id="aliveChip" class="alive-chip" hidden title="Runners still in the race"></div>
-        <div id="timer" class="timer">0.0</div>
       </div>
       <div id="hearts" class="hearts"></div>
+      <div id="distText" class="dist-chip"></div>
+      <!-- who's where: a dot per runner on a bar up the right side, the leader at the top -->
+      <div class="track-bar"><div class="flag">🏁</div><div id="dots"></div></div>
       <div id="combo" class="combo"></div>
       <div id="stylePop" class="style-pop"></div>
       <div id="feed" class="feed" aria-live="polite"></div>
@@ -252,7 +254,7 @@
       <div id="cloudHud" class="cloud-hud" hidden></div>
       <div id="modeHud" class="mode-hud" hidden></div>
       <div id="brainFx" class="brain-fx"></div>
-      <div id="mirrorFrame" class="mirror-frame" hidden><small>Behind you</small></div>
+      <div id="mirrorFrame" class="mirror-frame" hidden></div>
       <div id="spectate" class="spectate"><button id="specPrev" type="button" aria-label="Watch the previous runner">◀</button><div><small>Watching</small><b id="spectateName"></b><small id="spectateCount"></small></div><button id="specNext" type="button" aria-label="Watch the next runner">▶</button></div>
       <div id="speedFx" class="speed-fx"></div>
       <button id="powerSlot" class="power-slot" type="button" aria-label="Use power-up">
@@ -261,12 +263,7 @@
         <div class="lbl"><b>Shield</b><span class="bar"><i></i></span><span class="use"></span></div>
       </button>
       <div id="savedSlot" class="saved-slot" aria-label="Saved power-up"><img src="/assets/pw_shield.png" alt="" /><small>Next</small></div>
-      <div id="throwPad" class="throw-pad" aria-label="Throw your item">
-        <div id="aimLanes" class="aim-lanes" aria-label="Pick a lane"></div>
-        <button id="throwAhead" class="tbtn ahead" type="button" aria-label="Throw ahead"><b>▲</b><small>Throw ahead</small></button>
-        <button id="throwBack" class="tbtn back" type="button" aria-label="Drop behind"><b>▼</b><small>Drop behind</small></button>
-      </div>
-      <button id="lookBtn" class="look-btn" type="button" aria-label="Hold to look back"><span>👀</span><small>Look back</small></button>
+      <div id="throwHint" class="throw-hint" aria-hidden="true"><i class="up"></i><span>swipe up = throw<br />swipe down = drop</span><i class="down"></i></div>
       <div id="powerToast" class="power-toast"></div>
       <div id="controlsHint" class="controls-hint"></div>
       <!-- first endless run: the tutorial happens in the run (slow motion until you make the move) -->
