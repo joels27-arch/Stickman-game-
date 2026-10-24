@@ -4978,7 +4978,12 @@ const world = (() => {
       }
       const age = (now - m.born) / 1000;
       if (m.kind === "glue") {
-        m.obj.material.opacity = 0.85 * Math.min(1, age * 4);
+        // the puddle spreads out as it lands
+        if (m.obj.material) m.obj.material.opacity = 0.85 * Math.min(1, age * 4);
+        else {
+          m.s0 ??= m.obj.scale.x;
+          m.obj.scale.setScalar(m.s0 * Math.min(1, 0.3 + age * 3));
+        }
         continue;
       }
       const restY = m.kind === "fake" ? 1.0 : 0.02;
@@ -8629,7 +8634,7 @@ world
 // test hooks for the local dev server only (headless browser checks)
 if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
   // test hooks (used by the automated play-tests)
-  window.__laneRush = { me, hit, grabBox, useItem, game, net, remote, world, race, camera, MOVER_KINDS, moverCovers, raceElapsed: () => (net.view ? (serverNow() - net.view.startAt) / 1000 : 0) };
+  window.__laneRush = { me, hit, grabBox, useItem, game, net, remote, world, race, camera, renderPower, MOVER_KINDS, moverCovers, raceElapsed: () => (net.view ? (serverNow() - net.view.startAt) / 1000 : 0) };
 }
 
 requestAnimationFrame(frame);
