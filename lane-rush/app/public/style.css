@@ -2774,3 +2774,6 @@ html, body { background: var(--k1); }
 .hud .run-coins { top: calc(max(10px, env(safe-area-inset-top)) + 118px); }
 /* the mark at the top of the bar: the finish flag, or the next distance mark */
 .hud .track-bar.endless .flag { display: block; top: -26px; padding: 1px 6px; border-radius: 8px; background: rgba(10, 14, 10, 0.72); font-family: var(--display); font-weight: 900; font-size: 13px; color: #fff; white-space: nowrap; }
+.hud .place b, .hud .place sup, .hud .place sub { align-self: baseline; }
+.hud .place sup { position: relative; top: -10px; margin-top: 0; }
+.hud .place sub { font-size: 14px; }
