@@ -2722,9 +2722,10 @@ html, body { background: var(--k1); }
 .hud .sprint-btn.going { opacity: 1; background: radial-gradient(circle at 50% 50%, #10203a 0 58%, transparent 59%), conic-gradient(#ffd23f calc(var(--p) * 360deg), rgba(255, 255, 255, 0.18) 0); }
 
 /* the name (and country) question after the first round */
-.ask-modal .ask-sheet { width: min(340px, 100%); align-items: stretch; gap: 12px; padding: 22px 18px 14px; text-align: center; background: linear-gradient(180deg, var(--k3), var(--k1)); border-color: var(--lime); }
+#askModal.modal .sheet.ask-sheet { width: min(340px, 100%); align-items: stretch; gap: 12px; padding: 22px 18px 14px; text-align: center; background: linear-gradient(180deg, var(--k3), var(--k1)); border-color: var(--lime); }
 .ask-sheet h2 { margin: 0; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 26px; text-transform: uppercase; color: var(--lime); }
 .ask-sheet #askName { height: 50px; padding: 0 14px; border-radius: 14px; border: 2px solid var(--edge); background: rgba(0, 0, 0, 0.4); color: #fff; font: inherit; font-size: 20px; font-weight: 800; text-align: center; }
 .ask-sheet #askName:focus { outline: none; border-color: var(--lime); }
 .ask-sheet .ask-country { justify-content: center; height: 46px; border-radius: 14px; font-size: 16px; }
 .ask-later { border: 0; background: none; color: rgba(255, 255, 255, 0.6); font: inherit; font-weight: 800; font-size: 14px; padding: 6px; }
+#askModal.modal { z-index: 70; }
