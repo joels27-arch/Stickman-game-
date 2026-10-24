@@ -1088,24 +1088,22 @@ function renderCollPill() {
   $("#skinBar").style.width = `${Math.round((got / all) * 100)}%`;
   $("#skinPct").textContent = "";
 }
-/** A character card: full colour even when locked (you just can't race with it yet). */
+/** A character card: the picture on its rarity colour, the name in big letters, a rarity tag; locked ones show a padlock (and the price, for shop characters). */
+const RARITY_ICON = { common: "●", rare: "◆", epic: "✦", legendary: "★" };
 function charCard(c, n, onClick) {
   const owned = ownsChar(c);
-  const sel = preferredChar();
-  const can = c.via === "coins" && wallet.coins() >= c.coins;
+  const sel = c.playable && c.idx === preferredChar();
+  const forCoins = !owned && c.via === "coins";
+  const can = forCoins && wallet.coins() >= c.coins;
+  const name = forCoins ? el("b", { class: `cname price${can ? "" : " short"}` }, el("i", { class: "coin" }), el("span", { text: c.coins.toLocaleString() })) : el("b", { class: "cname", text: c.name });
   const tag = owned
-    ? el("small", { class: "via", text: c.playable ? (c.idx === sel ? "★ Selected" : "Playable") : "Collected" })
-    : c.via === "coins"
-      ? el("span", { class: `sprice${can ? "" : " short"}` }, el("i", { class: "coin" }), el("b", { text: c.coins.toLocaleString() }))
-      : el("small", { class: "via", text: c.idx in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[c.idx]}` : `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` });
+    ? el("span", { class: "crar" }, el("i", { text: RARITY_ICON[c.rarity] }), el("span", { text: sel ? "Selected" : c.rarity }))
+    : el("span", { class: "crar lock" }, el("span", { text: forCoins ? "Locked" : c.idx in PASS_RUNNERS ? `Pass Lv ${PASS_RUNNERS[c.idx]}` : VIA_LABEL[c.via] }));
   const b = el(
     "button",
-    { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${c.playable && c.idx === sel ? " sel" : ""}`, type: "button", style: `--i:${n}` },
-    el("span", { class: "rar", text: c.rarity }),
-    el("img", { src: c.img, alt: "" }),
-    el("b", { text: c.name }),
-    tag,
-    owned ? null : el("i", { class: "padlock", text: "🔒" }),
+    { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${sel ? " sel" : ""}`, type: "button", style: `--i:${n}`, "aria-label": c.name },
+    el("span", { class: "cpic" }, el("img", { src: c.img, alt: "" }), owned ? null : el("i", { class: "padlock", text: "🔒" })),
+    el("span", { class: "cfoot" }, name, tag),
   );
   b.addEventListener("click", () => onClick(c));
   return b;
@@ -2100,22 +2098,32 @@ function renderTrophyRoad() {
   const r = rankOf(p);
   const done = road.claimed();
   const next = ROAD.find((x) => x.pts > p);
+  // one long bar under the rewards: each node owns the stretch from halfway back to halfway on
+  const fillOf = (lo, mid, hi) => (p <= lo ? 0 : p >= hi ? 1 : p <= mid ? (0.5 * (p - lo)) / (mid - lo) : 0.5 + (0.5 * (p - mid)) / (hi - mid));
+  const bar = (f) => el("span", { class: "rbar" }, el("i", { style: `width:${Math.round(f * 100)}%` }), f > 0 && f < 1 ? el("b", { class: "rknob", style: `left:${Math.round(f * 100)}%` }) : null);
+  const first = ROAD[0].pts;
+  const start = el(
+    "div",
+    { class: "rnode rstart" },
+    el("span", { class: "rleague" }),
+    el("span", { class: "rbubble you" }, el("img", { src: myAvatar(), alt: "" })),
+    bar(Math.min(1, p / (first / 2))),
+    el("span", { class: "rpts" }),
+  );
   const nodes = ROAD.map((step, i) => {
     const info = roadInfo(step);
     const got = done.includes(step.pts);
     const ready = step.pts <= p && !got;
     const league = LEAGUES.find((l) => l.min === step.pts); // a new league starts here
-    // how far the road is filled toward this node from the one before
     const prev = i ? ROAD[i - 1].pts : 0;
-    const fill = Math.max(0, Math.min(1, (p - prev) / (step.pts - prev)));
+    const nextPts = ROAD[i + 1]?.pts ?? step.pts * 2 - prev;
     const b = el(
       "button",
-      { class: `rnode${got ? " got" : ""}${ready ? " ready" : ""}${step.pts > p ? " future" : ""}${step.char ? ` star ${info.rarity}` : ""}${league ? " league" : ""}`, type: "button" },
-      el("span", { class: "rline" }, el("i", { style: `width:${Math.round(fill * 100)}%` })),
-      league ? el("span", { class: "rleague" }, el("img", { src: `/assets/lg_${league.id}.webp`, alt: "" }), el("small", { text: league.name })) : el("span", { class: "rleague" }),
-      el("span", { class: "rgold" }, el("i", { text: "🏆" }), el("b", { text: step.pts.toLocaleString() })),
-      el("span", { class: "rbubble" }, el("img", { src: info.img, alt: "" }), got ? el("i", { class: "tick", text: "✓" }) : null),
-      el("small", { text: ready ? "Claim!" : info.label }),
+      { class: `rnode${got ? " got" : ""}${ready ? " ready" : ""}${step.pts > p ? " future" : ""}${step.char ? ` star ${info.rarity}` : ""}`, type: "button", "aria-label": info.label },
+      el("span", { class: "rleague" }, league ? el("small", { text: league.name }) : null),
+      el("span", { class: "rbubble" }, el("img", { src: info.img, alt: "" }), got ? el("i", { class: "tick", text: "✓" }) : null, ready ? el("em", { class: "rclaim", text: "Claim!" }) : null),
+      bar(fillOf((prev + step.pts) / 2, step.pts, (step.pts + nextPts) / 2)),
+      el("span", { class: "rpts", text: step.pts.toLocaleString() }),
     );
     b.addEventListener("click", (e) => {
       if (!ready) return; // anything but a reward to claim opens the whole road
@@ -2124,7 +2132,7 @@ function renderTrophyRoad() {
     });
     return b;
   });
-  const track = el("div", { class: "road-track" }, ...nodes);
+  const track = el("div", { class: "road-track" }, start, ...nodes);
   box.replaceChildren(
     el(
       "div",
@@ -6492,7 +6500,7 @@ function claimDaily(q, btn) {
   toast(`+${q.coins} coins · +150 XP`);
   renderDaily();
 }
-function missionRow({ icon, tierClass, text, have, goal, reward, state, onClaim, extra }) {
+function missionRow({ icon, tierClass = "", text, have, goal, reward, state, onClaim, extra }) {
   // state: active | ready | claimed | locked
   const pct = Math.round((Math.min(have, goal) / goal) * 100);
   let right;
@@ -6527,7 +6535,6 @@ function renderDaily() {
     ...qs.map((q) =>
       missionRow({
         icon: STAT_ICON[q.stat],
-        tierClass: q.tier,
         text: q.text,
         have: st.best[q.id] ?? 0,
         goal: q.goal,
@@ -7405,7 +7412,6 @@ function renderCareer() {
       out.push(
         missionRow({
           icon: m.icon,
-          tierClass: ["easy", "easy", "medium", "medium", "hard", "hard"][ci],
           text: m.text,
           have,
           goal: m.goal,

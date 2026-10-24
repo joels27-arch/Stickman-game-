@@ -1807,24 +1807,8 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .road-head em { font-style: normal; font-family: var(--display); font-weight: 900; font-size: 26px; color: #fff; padding: 2px 12px; border-radius: 12px; background: rgba(255, 210, 63, 0.18); border: 2px solid #ffd23f; }
 .road-track { display: flex; overflow-x: auto; padding: 8px 4px 4px; scrollbar-width: none; scroll-snap-type: x proximity; }
 .road-track::-webkit-scrollbar { display: none; }
-.rnode { position: relative; flex: none; width: 84px; display: grid; justify-items: center; gap: 4px; padding: 0; border: 0; background: none; color: #fff; font: inherit; cursor: pointer; scroll-snap-align: center; }
-.rnode:disabled { cursor: default; }
-.rnode .rline { position: absolute; top: 50px; right: 50%; width: 100%; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); z-index: 0; overflow: hidden; }
-.rnode:first-child .rline { display: none; }
-.rnode .rline i { display: block; height: 100%; background: linear-gradient(90deg, #ffb100, #ffe46a); }
 .rgold { display: flex; align-items: center; gap: 2px; font-family: var(--display); font-weight: 900; font-size: 15px; }
 .rgold img { width: 16px; height: 16px; }
-.rbubble { position: relative; z-index: 1; width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, #5b6bd0, #252b78 70%); border: 3px solid rgba(255, 255, 255, 0.5); box-shadow: 0 4px 0 #0c0a2e; }
-.rbubble img { width: 46px; height: 46px; object-fit: contain; }
-.rnode.star .rbubble { width: 70px; height: 70px; margin-top: -4px; border-color: #c27bff; background: radial-gradient(circle at 35% 30%, #a35bff, #4a1a9e 70%); }
-.rnode.star.legendary .rbubble { border-color: #ffd23f; background: radial-gradient(circle at 35% 30%, #ffcf4a, #b05e00 70%); }
-.rnode.star .rbubble img { width: 60px; height: 60px; }
-.rnode.future .rbubble img { filter: saturate(0.4) brightness(0.8); }
-.rnode.got .rbubble { opacity: 0.6; }
-.rbubble .tick { position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 900; font-size: 13px; background: #2ecc71; border: 2px solid #fff; }
-.rnode.ready .rbubble { border-color: #fff; box-shadow: 0 0 0 3px #ffd23f, 0 0 18px rgba(255, 210, 63, 0.9); animation: btnPulse 1s ease-in-out infinite; }
-.rnode small { font-size: 11px; font-weight: 800; text-align: center; line-height: 1.1; max-width: 80px; }
-.rnode.ready small { color: #ffd23f; font-family: var(--display); font-size: 14px; text-transform: uppercase; }
 .road-note { margin: 4px 2px 0; font-size: 11px; font-weight: 700; opacity: 0.7; }
 
 /* leave the race: a small ✕ before the place badge, and its confirm sheet */
@@ -2167,10 +2151,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .coach.item .coach-pose { height: 92px; max-width: 76px; left: -10px; }
 
 /* Trophy Road: league badges mark where each league starts */
-.rnode .rleague { display: grid; justify-items: center; height: 34px; align-content: end; }
-.rnode .rleague img { width: 24px; height: 24px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)); }
-.rnode .rleague small { font-family: var(--display); font-style: italic; font-size: 10px; font-weight: 900; text-transform: uppercase; color: #ffd23f; line-height: 1; }
-.rnode .rline { top: 88px; }
 .rgold i { font-style: normal; font-size: 12px; }
 .road-head em { font-size: 20px; }
 /* Nia stands still: her poses do the talking */
@@ -2296,43 +2276,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .ccard.picked { animation: pickedPop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
 @keyframes pickedPop { 0% { transform: scale(0.9); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
 
-/* ── skin card design options (preview: add cv1 / cv2 / cv3 to #skinGrid) ── */
-#skinGrid .ccard { --rc: #4f9a3a; --rc-hi: #9ad66b; --rc-dark: #234a18; }
-#skinGrid .ccard.rare { --rc: #2f6fe0; --rc-hi: #7ab8ff; --rc-dark: #12306a; }
-#skinGrid .ccard.epic { --rc: #8a3af0; --rc-hi: #d09aff; --rc-dark: #3a1070; }
-#skinGrid .ccard.legendary { --rc: #f0a000; --rc-hi: #ffe36e; --rc-dark: #7a4600; }
-
-/* A · Arena: dark card, a glow in the rarity colour, the runner big, name and rarity on a strip at the bottom */
-#skinGrid.cv1 .ccard { aspect-ratio: 3 / 4; padding: 0; gap: 0; align-content: start; border: 3px solid var(--rc-hi); border-radius: 18px; background: radial-gradient(circle at 50% 38%, var(--rc-hi) 0%, var(--rc) 38%, #15123c 88%); box-shadow: 0 5px 0 var(--rc-dark); }
-#skinGrid.cv1 .ccard img { width: 112%; margin: 4% -6% 0; aspect-ratio: 1; object-fit: cover; object-position: top; }
-#skinGrid.cv1 .ccard .rar { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 2px 0; background: var(--rc); font-size: 9px; }
-#skinGrid.cv1 .ccard b { position: absolute; left: 0; right: 0; bottom: 16px; padding: 4px 2px 2px; background: linear-gradient(180deg, transparent, rgba(10, 8, 30, 0.85) 40%); font-size: 14px; }
-#skinGrid.cv1 .ccard .via, #skinGrid.cv1 .ccard .sprice { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); margin: 0; padding: 1px 6px; border-radius: 8px; background: rgba(10, 8, 30, 0.7); white-space: nowrap; }
-#skinGrid.cv1 .ccard .fav, #skinGrid.cv1 .ccard .cinfo, #skinGrid.cv1 .ccard .padlock { top: auto; bottom: 40px; }
-#skinGrid.cv1 .ccard.sel { border-color: #b6f72a; box-shadow: 0 5px 0 #3f7a00, 0 0 16px rgba(182, 247, 42, 0.8); }
-
-/* B · Trading card: white frame, the runner in a window of light rays, a name plate, a holo shine on legendaries */
-#skinGrid.cv2 .ccard { padding: 5px 5px 8px; gap: 0; border: 0; border-radius: 16px; background: #fff; box-shadow: 0 5px 0 rgba(0, 0, 0, 0.3); color: #1d1a5c; }
-#skinGrid.cv2 .ccard .rar { order: 3; justify-self: center; margin: 4px 0 0; padding: 1px 8px; border-radius: 999px; background: var(--rc); color: #fff; font-size: 9px; }
-#skinGrid.cv2 .ccard img { order: 1; width: 100%; border-radius: 11px; background: repeating-conic-gradient(from 0deg at 50% 60%, var(--rc-hi) 0 10deg, var(--rc) 10deg 20deg); border: 2px solid var(--rc-dark); }
-#skinGrid.cv2 .ccard b { order: 2; margin-top: -12px; z-index: 1; padding: 3px 10px; border-radius: 10px; background: var(--rc-dark); color: #fff; font-size: 13px; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3); }
-#skinGrid.cv2 .ccard .via { order: 4; color: #5a5a7a; }
-#skinGrid.cv2 .ccard .sprice { order: 4; }
-#skinGrid.cv2 .ccard.legendary::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.55) 45%, transparent 60%) -150% 0 / 220% 100% no-repeat; animation: holo 3s ease-in-out infinite; }
-@keyframes holo { 0%, 40% { background-position: -150% 0; } 100% { background-position: 150% 0; } }
-#skinGrid.cv2 .ccard.sel { box-shadow: 0 0 0 4px #b6f72a, 0 5px 0 #3f7a00; }
-#skinGrid.cv2 .ccard .fav, #skinGrid.cv2 .ccard .cinfo, #skinGrid.cv2 .ccard .padlock { top: 9px; }
-
-/* C · Portraits: round badges with a thick ring in the rarity colour, the name underneath; light and clean */
-#skinGrid.cv3 .ccard { padding: 0 0 6px; gap: 3px; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
-#skinGrid.cv3 .ccard .rar { order: 3; justify-self: center; margin: 0; padding: 0; background: none; color: var(--rc-hi); font-size: 9px; }
-#skinGrid.cv3 .ccard img { order: 1; width: 92%; aspect-ratio: 1; border-radius: 50%; object-fit: cover; object-position: top; background: radial-gradient(circle at 50% 35%, var(--rc-hi), var(--rc) 70%); border: 5px solid var(--rc-hi); box-shadow: 0 4px 0 var(--rc-dark), 0 6px 12px rgba(0, 0, 0, 0.35); }
-#skinGrid.cv3 .ccard b { order: 2; font-size: 14px; }
-#skinGrid.cv3 .ccard .via, #skinGrid.cv3 .ccard .sprice { order: 4; }
-#skinGrid.cv3 .ccard.sel img { border-color: #b6f72a; box-shadow: 0 0 0 4px rgba(182, 247, 42, 0.45), 0 0 20px rgba(182, 247, 42, 0.8); }
-#skinGrid.cv3 .ccard .fav, #skinGrid.cv3 .ccard .padlock { top: 0; left: 0; }
-#skinGrid.cv3 .ccard .cinfo, #skinGrid.cv3 .ccard .padlock { top: 0; left: auto; right: 0; }
-
 /* game mode cards: a picture on the left */
 .mode-card { grid-template-columns: 46px minmax(0, 1fr); column-gap: 10px; align-items: center; }
 .mode-card > :not(.mode-ico) { grid-column: 2; }
@@ -2343,3 +2286,84 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .slots .rcard img.pic { top: 6%; height: 94%; }
 .slots .rcard .you { top: 46px; }
 .slots .rcard.empty { border-radius: 0; clip-path: polygon(0 0, 100% 0, 100% 90%, 93% 100%, 0 100%); border-width: 2px; }
+
+/* ── character cards: the picture on its rarity colour, a big name, a rarity tag (Skins + Shop) ── */
+.coll-grid .ccard { --rc: #8d939e; --rc-hi: #c9ced6; --rc-dark: #4a4f59; --rc-bg: #6d737e;
+  display: flex; flex-direction: column; padding: 0; gap: 0; aspect-ratio: auto; border: 3px solid var(--rc-hi); border-radius: 16px; overflow: hidden;
+  background: var(--rc-bg); box-shadow: 0 4px 0 var(--rc-dark), 0 8px 14px rgba(0, 0, 0, 0.3); color: #fff; }
+.coll-grid .ccard.rare { --rc: #2f7cf0; --rc-hi: #8cc4ff; --rc-dark: #12357a; --rc-bg: #2160c8; }
+.coll-grid .ccard.epic { --rc: #9a45f5; --rc-hi: #dba8ff; --rc-dark: #3e1080; --rc-bg: #7a2fd8; }
+.coll-grid .ccard.legendary { --rc: #f5a300; --rc-hi: #ffe680; --rc-dark: #7a4600; --rc-bg: #e08600; }
+/* the picture: soft light behind the runner, a few diagonal stripes */
+.coll-grid .ccard .cpic { position: relative; display: block; width: 100%; aspect-ratio: 1 / 1; overflow: hidden;
+  background: radial-gradient(circle at 50% 42%, var(--rc-hi) 0%, var(--rc) 46%, var(--rc-dark) 100%); }
+.coll-grid .ccard .cpic::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(125deg, rgba(255, 255, 255, 0.1) 0 8px, transparent 8px 22px); }
+.coll-grid .ccard.epic .cpic::after, .coll-grid .ccard.legendary .cpic::after { content: "✦ ✧ ✦"; position: absolute; top: 6%; left: 0; right: 0; text-align: center; font-size: 11px; letter-spacing: 1.2em; color: rgba(255, 255, 255, 0.75); }
+.coll-grid .ccard .cpic img { position: relative; display: block; width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; object-position: 50% 8%; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.35)); }
+.coll-grid .ccard.locked .cpic { background: radial-gradient(circle at 50% 42%, #3b4766 0%, #232a42 60%, #151a2c 100%); }
+.coll-grid .ccard.locked .cpic img { filter: brightness(0) opacity(0.55); }
+.coll-grid .ccard.locked { --rc-hi: #56607a; --rc-dark: #0f1322; --rc-bg: #1d2338; }
+.coll-grid .ccard .padlock { position: absolute; top: 50%; left: 50%; right: auto; width: auto; height: auto; transform: translate(-50%, -50%); border: 0; background: none; font-style: normal; font-size: 34px; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.6)); }
+/* the name: chunky yellow letters with a dark outline */
+.coll-grid .ccard .cfoot { display: grid; justify-items: center; gap: 3px; padding: 5px 4px 7px; border-top: 2px solid rgba(255, 255, 255, 0.25); background: linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.28)); }
+.coll-grid .ccard .cname { display: flex; align-items: center; justify-content: center; gap: 3px; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-family: var(--display); font-style: normal; font-weight: 900; font-size: 16px; line-height: 1; text-transform: uppercase; color: #ffe14d; -webkit-text-stroke: 3px #3a1f00; paint-order: stroke fill; text-shadow: 0 2px 0 #3a1f00; }
+.coll-grid .ccard .cname .coin { width: 16px; height: 16px; flex: none; }
+.coll-grid .ccard .cname.short span { color: #ffb1a8; }
+/* the rarity tag: a small ribbon in a darker shade */
+.coll-grid .ccard .crar { display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border-radius: 4px; background: var(--rc-dark); border: 1px solid var(--rc-hi); font-weight: 900; font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.5; clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 50%, 100% 100%, 0 100%, 4px 50%); padding: 1px 10px; }
+.coll-grid .ccard .crar i { font-style: normal; font-size: 8px; color: var(--rc-hi); }
+.coll-grid .ccard.sel { border-color: #b6f72a; box-shadow: 0 4px 0 #3f7a00, 0 0 16px rgba(182, 247, 42, 0.75); }
+.coll-grid .ccard.sel .crar { background: #4f8a00; border-color: #b6f72a; }
+.coll-grid .ccard .fav, .coll-grid .ccard .cinfo { top: 5px; width: 24px; height: 24px; font-size: 13px; }
+.coll-grid .ccard .fav { left: 5px; }
+.coll-grid .ccard .cinfo { right: 5px; }
+
+/* ── Trophy Road strip: reward bubbles over one golden bar, points under it ── */
+.road-track { display: flex; gap: 0; overflow-x: auto; padding: 6px 2px 2px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.rnode { position: relative; flex: none; width: 66px; display: grid; grid-template-rows: 16px 64px 22px 16px; justify-items: center; align-items: center; padding: 0; border: 0; background: none; color: #fff; font: inherit; cursor: pointer; scroll-snap-align: center; }
+.rnode.rstart { width: 58px; cursor: default; }
+.rnode .rleague { align-self: end; }
+.rnode .rleague small { display: block; padding: 1px 6px; border-radius: 6px; background: #d6dcef; color: #2a2f5c; font-family: var(--display); font-weight: 900; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.3; }
+/* the reward: a light speech bubble pointing down at the bar */
+.rbubble { position: relative; width: 52px; height: 52px; margin-bottom: 6px; display: grid; place-items: center; border-radius: 13px; border: 2px solid #fff; background: linear-gradient(180deg, #f6f8ff, #cfd7f5); box-shadow: 0 3px 0 #6f78b8; }
+.rbubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 11px; height: 11px; transform: translateX(-50%) rotate(45deg); background: #cfd7f5; border-right: 2px solid #fff; border-bottom: 2px solid #fff; }
+.rbubble img { position: relative; z-index: 1; width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3)); }
+.rbubble.you { width: 46px; height: 46px; border-color: #ffd23f; background: linear-gradient(180deg, #4d7cff, #2a48c0); box-shadow: 0 3px 0 #a36b00; }
+.rbubble.you::after { display: none; }
+.rbubble.you img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 10px; }
+.rnode.star .rbubble { background: linear-gradient(180deg, #f3e8ff, #d5bdf7); }
+.rnode.star.legendary .rbubble { background: linear-gradient(180deg, #fff6d6, #ffe08a); }
+.rnode.got .rbubble img { opacity: 0.55; }
+.rbubble .tick { position: absolute; z-index: 2; right: -5px; top: -5px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 900; font-size: 12px; color: #fff; background: #2fb36a; border: 2px solid #fff; }
+.rnode.ready .rbubble { border-color: #ffd23f; box-shadow: 0 3px 0 #a36b00, 0 0 14px rgba(255, 210, 63, 0.9); animation: btnPulse 1s ease-in-out infinite; }
+.rbubble .rclaim { position: absolute; z-index: 2; left: 50%; top: -9px; transform: translateX(-50%); padding: 0 6px; border-radius: 6px; background: #2fb36a; border: 2px solid #fff; color: #fff; font-style: normal; font-family: var(--display); font-weight: 900; font-size: 10px; text-transform: uppercase; white-space: nowrap; line-height: 1.4; }
+/* the bar: one long dark groove filled with gold, a dot under every reward, a glowing knob where you are */
+.rbar { position: relative; width: 100%; height: 14px; background: #161b46; box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.5); }
+.rnode.rstart .rbar { border-radius: 7px 0 0 7px; }
+.rnode:last-child .rbar { border-radius: 0 7px 7px 0; }
+.rbar i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, #ffe680, #ffb300); border-radius: inherit; }
+.rnode:not(.rstart) .rbar::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%); border-radius: 50%; background: #2c3370; border: 2px solid #4a538f; z-index: 1; }
+.rnode:not(.future):not(.rstart) .rbar::after { background: #ffd23f; border-color: #fff; }
+.rknob { position: absolute; top: 50%; z-index: 2; width: 22px; height: 22px; transform: translate(-50%, -50%); border-radius: 50%; border: 2px solid #fff; background: radial-gradient(circle at 40% 35%, #fff6c0, #ffc21a 60%, #e08a00); box-shadow: 0 0 10px rgba(255, 210, 63, 0.9); }
+.rpts { font-family: var(--display); font-weight: 900; font-size: 13px; color: #fff; line-height: 1; }
+
+/* ── Missions: centred section titles and light mission cards ── */
+.m-head { margin: 18px 0 8px; text-align: center; color: #fff; }
+.m-head h3 { position: relative; display: inline-block; margin: 0; font-family: var(--display); font-weight: 900; font-size: 24px; letter-spacing: 0.02em; text-transform: uppercase; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
+.m-head h3 .dot { position: absolute; top: -2px; right: -14px; width: 11px; height: 11px; border-radius: 50%; background: #ff3b30; border: 2px solid #fff; }
+.m-head h3 .dot[hidden] { display: none; }
+.m-head p { margin: 2px 0 0; font-size: 13px; font-weight: 800; color: #b9c2ec; }
+.m-head p b { color: #fff; }
+.hp-missions .quest { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; padding: 8px 8px 8px 8px; border-radius: 16px; border: 2px solid #fff; color: #1d2150; background: linear-gradient(180deg, #f6f7ff, #dde2fa); box-shadow: 0 4px 0 #7d86c4, 0 8px 16px rgba(0, 0, 0, 0.25); }
+.hp-missions .quest .qicon { width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(180deg, #c9d2f6, #a9b4ea); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12); }
+.hp-missions .quest .qicon img { width: 40px; height: 40px; }
+.hp-missions .qmain > b { font-size: 15px; font-weight: 900; color: #1d2150; }
+.hp-missions .qbar { height: 18px; background: #262c6c; box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.4); }
+.hp-missions .qbar i { background: linear-gradient(180deg, #ffe680, #ffb300); animation: none; box-shadow: none; }
+.hp-missions .qbar span { line-height: 18px; font-size: 12px; color: #fff; -webkit-text-stroke: 0; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
+.hp-missions .qreward { width: 52px; padding: 4px 0; border-radius: 12px; background: linear-gradient(180deg, #e6eaff, #c3cbf2); border: 2px solid #fff; box-shadow: 0 2px 0 #7d86c4; }
+.hp-missions .qreward img { width: 26px; height: 26px; }
+.hp-missions .qreward b { font-size: 14px; color: #1d2150; }
+.hp-missions .quest.done { background: linear-gradient(180deg, #ecfff1, #c9f2d4); }
+.hp-missions .quest.ready { background: linear-gradient(180deg, #fffbe0, #ffecA0); box-shadow: 0 4px 0 #b07a00, 0 0 16px rgba(255, 210, 63, 0.6); }
