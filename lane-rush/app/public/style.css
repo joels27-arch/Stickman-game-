@@ -2489,3 +2489,9 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .wl-m.next { border-color: #b6f72a; box-shadow: 0 0 12px rgba(182, 247, 42, 0.7); }
 .wl-m.next img { opacity: 1; }
 .wl-tier em { white-space: nowrap; }
+
+/* locked characters still show their picture (in full colour); a small padlock marks them */
+.coll-grid .ccard.locked .cpic { background: radial-gradient(circle at 50% 42%, var(--rc-hi) 0%, var(--rc) 46%, var(--rc-dark) 100%); }
+.coll-grid .ccard.locked .cpic img, .hp-skins .coll-grid .ccard.locked .cpic img { filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.35)); }
+.coll-grid .ccard.locked .padlock { top: auto; left: auto; right: 5px; bottom: 5px; transform: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; border: 2px solid #fff; background: rgba(10, 14, 40, 0.75); font-size: 13px; }
+.av-tile.locked img { filter: none; }
