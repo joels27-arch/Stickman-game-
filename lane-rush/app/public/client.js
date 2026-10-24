@@ -3713,6 +3713,11 @@ const world = (() => {
       loadGLB("/assets/barrel.glb").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
       loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
       // nice-to-haves: the game still runs with stand-ins if one of these fails
+      // power-up models (made with Higgsfield): the rocket backpack, the storm cloud, the glue puddle, the boxing glove
+      loadGLB("/assets/pw3d_rocket.glb").then((g) => (assets.props.jetpack = fitProp(g.scene, { height: 0.95 }))).catch(() => {}),
+      loadGLB("/assets/pw3d_cloud.glb").then((g) => (assets.props.storm = fitProp(g.scene, { width: 1.7 }))).catch(() => {}),
+      loadGLB("/assets/pw3d_glue.glb").then((g) => (assets.props.glue = fitProp(g.scene, { width: 1, maxHeight: 0.12 }))).catch(() => {}),
+      loadGLB("/assets/pw3d_glove.glb").then((g) => (assets.props.glove = fitProp(g.scene, { height: 0.9 }))).catch(() => {}),
       loadGLB("/assets/throw.glb").then((g) => (throwClip = g.animations[0] ? upperBody(g.animations[0]) : null)).catch(() => {}),
       loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
       // gates are wide enough that their pillars stand outside the fences
@@ -3850,6 +3855,21 @@ const world = (() => {
     flame.position.set(0, CHAR_H * 0.55, 0.65);
     flame.visible = false;
     group.add(bubble, flame);
+    if (assets.props.jetpack) {
+      // the rocket backpack on your back (the runner faces -z, so the back is +z); flames out of its two nozzles
+      flame.position.set(0, 0, 0);
+      outer.visible = inner.visible = false;
+      const pack = assets.props.jetpack.clone();
+      pack.rotation.y = Math.PI;
+      pack.position.set(0, CHAR_H * 0.3, 0.4);
+      flame.add(pack);
+      for (const side of [-0.17, 0.17]) {
+        const jet = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.7, 10), new THREE.MeshBasicMaterial({ color: "#ffb347", transparent: true, opacity: 0.9 }));
+        jet.rotation.x = Math.PI; // pointing down out of the nozzle
+        jet.position.set(side, CHAR_H * 0.3 - 0.32, 0.42);
+        flame.add(jet);
+      }
+    }
     return { group, bubble, flame };
   }
 
@@ -4931,10 +4951,16 @@ const world = (() => {
         let obj;
         if (b.kind === "glue") {
           // a sticky green puddle across two lanes
-          obj = new THREE.Mesh(glueGeo, new THREE.MeshBasicMaterial({ color: 0x5ee05e, transparent: true, opacity: 0.85 }));
-          obj.rotation.x = -Math.PI / 2;
-          obj.scale.set((laneX(1) - laneX(0)) * 1.15, 1.7, 1);
-          obj.position.set((laneX(b.lane) + laneX(glueLane2(b.lane))) / 2, 0.04, -b.d);
+          if (assets.props.glue) {
+            obj = assets.props.glue.clone();
+            obj.scale.multiplyScalar((laneX(1) - laneX(0)) * 2.2);
+            obj.position.set((laneX(b.lane) + laneX(glueLane2(b.lane))) / 2, 0.02, -b.d);
+          } else {
+            obj = new THREE.Mesh(glueGeo, new THREE.MeshBasicMaterial({ color: 0x5ee05e, transparent: true, opacity: 0.85 }));
+            obj.rotation.x = -Math.PI / 2;
+            obj.scale.set((laneX(1) - laneX(0)) * 1.15, 1.7, 1);
+            obj.position.set((laneX(b.lane) + laneX(glueLane2(b.lane))) / 2, 0.04, -b.d);
+          }
         } else if (b.kind === "fake" && assets.props.box) {
           // looks just like a real mystery box (a slightly redder glow gives it away to sharp eyes)
           obj = new THREE.Group();
@@ -5348,7 +5374,33 @@ const world = (() => {
     scene.add(flash, ring);
     blastFx.push({ flash, ring, t0: performance.now() });
   }
+  /** The boxing glove: springs out from the puncher to whoever gets hit, then back. */
+  const gloves = [];
+  function punchFx(from, to) {
+    if (!assets.props.glove || !from || !to) return;
+    const g = assets.props.glove.clone();
+    g.lookAt(to.x - from.x, 0, to.z - from.z);
+    scene.add(g);
+    gloves.push({ g, from: from.clone(), to: to.clone(), t0: performance.now() });
+  }
+  function stepGloves() {
+    const now = performance.now();
+    for (let i = gloves.length - 1; i >= 0; i--) {
+      const f = gloves[i];
+      const k = (now - f.t0) / 520;
+      if (k >= 1) {
+        scene.remove(f.g);
+        gloves.splice(i, 1);
+        continue;
+      }
+      const out = k < 0.4 ? k / 0.4 : 1 - (k - 0.4) / 0.6; // shoots out fast, comes back slower
+      f.g.position.lerpVectors(f.from, f.to, out * 0.85);
+      f.g.position.y = 1.2;
+      f.g.scale.setScalar(0.6 + out * 0.6);
+    }
+  }
   function stepBlasts() {
+    stepGloves();
     const now = performance.now();
     for (let i = blastFx.length - 1; i >= 0; i--) {
       const f = blastFx[i];
@@ -5377,17 +5429,22 @@ const world = (() => {
       return;
     }
     if (!cloudSpr) {
-      cloudSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex("⛈️"), depthTest: false, transparent: true }));
-      cloudSpr.scale.set(1.6, 1.6, 1);
-      cloudSpr.renderOrder = 12;
+      if (assets.props.storm) {
+        cloudSpr = assets.props.storm.clone();
+      } else {
+        cloudSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex("⛈️"), depthTest: false, transparent: true }));
+        cloudSpr.scale.set(1.6, 1.6, 1);
+        cloudSpr.renderOrder = 12;
+      }
       scene.add(cloudSpr);
     }
     cloudSpr.visible = true;
     const k = performance.now() / 1000;
-    cloudSpr.position.set(at.x, at.y + CHAR_H + 1.3 + Math.sin(k * 5) * 0.08, at.z);
-    // flickers faster as the strike gets close
+    cloudSpr.position.set(at.x, at.y + CHAR_H + 0.9 + Math.sin(k * 5) * 0.08, at.z);
+    cloudSpr.rotation.y = Math.sin(k * 1.5) * 0.3;
+    // it shakes harder as the strike gets close
     const left = (cloud.until - serverNow()) / 1000;
-    cloudSpr.material.opacity = left < 1.5 && Math.sin(k * 30) > 0 ? 0.55 : 1;
+    if (left < 1.5) cloudSpr.position.x += Math.sin(k * 40) * 0.06;
   }
 
   function clearCourse() {
@@ -5505,6 +5562,7 @@ const world = (() => {
       return moverList;
     },
     explode,
+    punchFx,
     get coins() {
       return coinList;
     },
@@ -8035,9 +8093,11 @@ function applyWarpsAndPunches(v) {
     banner(ahead ? "🔄 SWAPPED AHEAD!" : "🔄 MIND SWAPPED!", 1100);
     sfx.boost();
   }
+  const runnerAt = (id) => (id === playerId ? me.runner : remote.map.get(id)?.runner)?.group.position;
   for (const pu of v.punches || []) {
     if (pu.id <= (me.lastPunch ?? 0)) continue;
     me.lastPunch = pu.id;
+    world.punchFx(runnerAt(pu.by), runnerAt(pu.target));
     if (pu.target !== playerId || me.finished || me.out) continue;
     if (me.power === "shield") {
       endPower();
