@@ -2297,3 +2297,40 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .ccard .cinfo { position: absolute; z-index: 2; top: 20px; right: 4px; width: 26px; height: 26px; padding: 0; border: 2px solid #fff; border-radius: 50%; background: rgba(10, 14, 40, 0.65); color: #fff; font-family: Georgia, serif; font-style: italic; font-weight: 900; font-size: 14px; line-height: 1; cursor: pointer; }
 .ccard.picked { animation: pickedPop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
 @keyframes pickedPop { 0% { transform: scale(0.9); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+
+/* ── skin card design options (preview: add cv1 / cv2 / cv3 to #skinGrid) ── */
+#skinGrid .ccard { --rc: #4f9a3a; --rc-hi: #9ad66b; --rc-dark: #234a18; }
+#skinGrid .ccard.rare { --rc: #2f6fe0; --rc-hi: #7ab8ff; --rc-dark: #12306a; }
+#skinGrid .ccard.epic { --rc: #8a3af0; --rc-hi: #d09aff; --rc-dark: #3a1070; }
+#skinGrid .ccard.legendary { --rc: #f0a000; --rc-hi: #ffe36e; --rc-dark: #7a4600; }
+
+/* A · Arena: dark card, a glow in the rarity colour, the runner big, name and rarity on a strip at the bottom */
+#skinGrid.cv1 .ccard { aspect-ratio: 3 / 4; padding: 0; gap: 0; align-content: start; border: 3px solid var(--rc-hi); border-radius: 18px; background: radial-gradient(circle at 50% 38%, var(--rc-hi) 0%, var(--rc) 38%, #15123c 88%); box-shadow: 0 5px 0 var(--rc-dark); }
+#skinGrid.cv1 .ccard img { width: 112%; margin: 4% -6% 0; aspect-ratio: 1; object-fit: cover; object-position: top; }
+#skinGrid.cv1 .ccard .rar { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 2px 0; background: var(--rc); font-size: 9px; }
+#skinGrid.cv1 .ccard b { position: absolute; left: 0; right: 0; bottom: 16px; padding: 4px 2px 2px; background: linear-gradient(180deg, transparent, rgba(10, 8, 30, 0.85) 40%); font-size: 14px; }
+#skinGrid.cv1 .ccard .via, #skinGrid.cv1 .ccard .sprice { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); margin: 0; padding: 1px 6px; border-radius: 8px; background: rgba(10, 8, 30, 0.7); white-space: nowrap; }
+#skinGrid.cv1 .ccard .fav, #skinGrid.cv1 .ccard .cinfo, #skinGrid.cv1 .ccard .padlock { top: auto; bottom: 40px; }
+#skinGrid.cv1 .ccard.sel { border-color: #b6f72a; box-shadow: 0 5px 0 #3f7a00, 0 0 16px rgba(182, 247, 42, 0.8); }
+
+/* B · Trading card: white frame, the runner in a window of light rays, a name plate, a holo shine on legendaries */
+#skinGrid.cv2 .ccard { padding: 5px 5px 8px; gap: 0; border: 0; border-radius: 16px; background: #fff; box-shadow: 0 5px 0 rgba(0, 0, 0, 0.3); color: #1d1a5c; }
+#skinGrid.cv2 .ccard .rar { order: 3; justify-self: center; margin: 4px 0 0; padding: 1px 8px; border-radius: 999px; background: var(--rc); color: #fff; font-size: 9px; }
+#skinGrid.cv2 .ccard img { order: 1; width: 100%; border-radius: 11px; background: repeating-conic-gradient(from 0deg at 50% 60%, var(--rc-hi) 0 10deg, var(--rc) 10deg 20deg); border: 2px solid var(--rc-dark); }
+#skinGrid.cv2 .ccard b { order: 2; margin-top: -12px; z-index: 1; padding: 3px 10px; border-radius: 10px; background: var(--rc-dark); color: #fff; font-size: 13px; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3); }
+#skinGrid.cv2 .ccard .via { order: 4; color: #5a5a7a; }
+#skinGrid.cv2 .ccard .sprice { order: 4; }
+#skinGrid.cv2 .ccard.legendary::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.55) 45%, transparent 60%) -150% 0 / 220% 100% no-repeat; animation: holo 3s ease-in-out infinite; }
+@keyframes holo { 0%, 40% { background-position: -150% 0; } 100% { background-position: 150% 0; } }
+#skinGrid.cv2 .ccard.sel { box-shadow: 0 0 0 4px #b6f72a, 0 5px 0 #3f7a00; }
+#skinGrid.cv2 .ccard .fav, #skinGrid.cv2 .ccard .cinfo, #skinGrid.cv2 .ccard .padlock { top: 9px; }
+
+/* C · Portraits: round badges with a thick ring in the rarity colour, the name underneath; light and clean */
+#skinGrid.cv3 .ccard { padding: 0 0 6px; gap: 3px; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
+#skinGrid.cv3 .ccard .rar { order: 3; justify-self: center; margin: 0; padding: 0; background: none; color: var(--rc-hi); font-size: 9px; }
+#skinGrid.cv3 .ccard img { order: 1; width: 92%; aspect-ratio: 1; border-radius: 50%; object-fit: cover; object-position: top; background: radial-gradient(circle at 50% 35%, var(--rc-hi), var(--rc) 70%); border: 5px solid var(--rc-hi); box-shadow: 0 4px 0 var(--rc-dark), 0 6px 12px rgba(0, 0, 0, 0.35); }
+#skinGrid.cv3 .ccard b { order: 2; font-size: 14px; }
+#skinGrid.cv3 .ccard .via, #skinGrid.cv3 .ccard .sprice { order: 4; }
+#skinGrid.cv3 .ccard.sel img { border-color: #b6f72a; box-shadow: 0 0 0 4px rgba(182, 247, 42, 0.45), 0 0 20px rgba(182, 247, 42, 0.8); }
+#skinGrid.cv3 .ccard .fav, #skinGrid.cv3 .ccard .padlock { top: 0; left: 0; }
+#skinGrid.cv3 .ccard .cinfo, #skinGrid.cv3 .ccard .padlock { top: 0; left: auto; right: 0; }
