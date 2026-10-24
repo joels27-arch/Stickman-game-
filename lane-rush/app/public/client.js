@@ -8672,9 +8672,20 @@ const endlessBtn = $("#endlessBtn");
 createBtn.disabled = joinBtn.disabled = soloBtn.disabled = endlessBtn.disabled = true;
 renderEndlessBest();
 world
-  .load((f) => ($("#loadHint").textContent = `Loading 3D runners… ${Math.round(f * 100)}%`))
+  .load((f) => {
+    const pct = Math.round(f * 100);
+    $("#loadHint").textContent = `Loading 3D runners… ${pct}%`;
+    $("#bootFill").style.width = `${pct}%`;
+    $("#bootText").textContent = `Loading… ${pct}%`;
+    $("#boot").setAttribute("aria-valuenow", String(pct));
+  })
   .then(() => {
     $("#loadHint").textContent = "";
+    // the loading screen fills up, then fades away
+    $("#bootFill").style.width = "100%";
+    $("#bootText").textContent = "Let's go!";
+    setTimeout(() => $("#boot").classList.add("done"), 250);
+    setTimeout(() => $("#boot").remove(), 900);
     createBtn.disabled = joinBtn.disabled = soloBtn.disabled = endlessBtn.disabled = false;
     world.buildScenery();
     world.setShowcase(preferredChar());
@@ -8685,6 +8696,7 @@ world
   .catch((err) => {
     console.error(err);
     $("#loadHint").textContent = "Couldn't load the 3D models — check your connection and reload.";
+    $("#bootText").textContent = "Couldn't load the game. Check your connection and reload.";
   });
 
 // test hooks for the local dev server only (headless browser checks)

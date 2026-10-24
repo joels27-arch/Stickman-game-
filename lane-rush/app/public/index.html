@@ -38,6 +38,19 @@
   <body>
     <canvas id="scene"></canvas>
     <div class="veil" aria-hidden="true"></div>
+    <!-- loading screen: the picture, the logo and a bar, until the 3D runners and maps are downloaded -->
+    <div id="boot" class="boot" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100">
+      <picture class="boot-art">
+        <source media="(max-aspect-ratio: 1/1)" srcset="/assets/home_tall.jpg" />
+        <img src="/assets/home_wide.jpg" alt="" />
+      </picture>
+      <div class="boot-shade"></div>
+      <div class="boot-main">
+        <h1 class="logo boot-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+        <div class="boot-bar"><i id="bootFill"></i></div>
+        <small id="bootText">Loading… 0%</small>
+      </div>
+    </div>
 
     <!-- HOME -->
     <section id="home" class="screen show home" data-page="play">
