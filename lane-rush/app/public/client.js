@@ -80,7 +80,8 @@ const RUNNERS = [
 const STARTERS = RUNNERS.length;
 /** 3D runners you don't start with: Kiko is the Season Pass reward (free track, level 2). */
 const KIKO = 5;
-const PASS_RUNNERS = { [KIKO]: 2 };
+const PIP = 4;
+const PASS_RUNNERS = { [KIKO]: 2, [PIP]: 12 };
 
 /**
  * Collectible characters: bought in the shop with medals. They don't have 3D
@@ -100,7 +101,7 @@ const COLLECTION = [
   { id: "leo", name: "Sir Leo", color: "#4c8dff", rarity: "epic", via: "road", legacy: { medal: "silver", count: 4 } },
   { id: "kai", name: "Kai", color: "#21c7d9", rarity: "epic", via: "road", legacy: { medal: "silver", count: 6 } },
   { id: "zed", name: "Zed", color: "#7be3b0", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 3 } },
-  { id: "porky", name: "Porky", color: "#ff9ec4", rarity: "common", via: "pack" },
+  { id: "porky", name: "Porky", color: "#ff9ec4", rarity: "rare", via: "pack" },
   { id: "foxy", name: "Flash Fox", color: "#ff7a1a", rarity: "rare", via: "pack" },
   { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pack" },
   { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pack" },
@@ -1055,7 +1056,7 @@ function renderItems() {
 // ── the character catalog: every character, its rarity and how you get it ──
 
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
-const STARTER_RARITY = ["common", "common", "common", "rare", "common", "rare", "rare", "epic"];
+const STARTER_RARITY = ["rare", "rare", "rare", "rare", "epic", "epic", "rare", "epic"]; // nothing below rare
 function allChars() {
   return [
     ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
@@ -1105,10 +1106,10 @@ function charCard(c, n, onClick) {
     "button",
     { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${sel ? " sel" : ""}`, type: "button", style: `--i:${n}`, "aria-label": c.name },
     el("span", { class: "cpic" }, el("img", { src: c.img, alt: "" }), owned ? null : el("i", { class: "padlock", text: "🔒" })),
-    el("span", { class: "cfoot" }, name, tag),
-    owned && (c.via === "pack" || c.via === "starter") ? levelBadge(c.id) : null,
+    el("span", { class: "cfoot" }, name, tag, owned && (c.via === "pack" || c.via === "starter") ? levelBadge(c.id) : null),
   );
-  b.addEventListener("click", () => onClick(c));
+  // the picture shows the character's card; the name (and the rest) does the main thing, e.g. select
+  b.addEventListener("click", (e) => (e.target.closest(".cpic") ? inspectChar(c) : onClick(c)));
   return b;
 }
 /** Level and copies on a card; it glows when a level-up is ready. */
@@ -1152,15 +1153,8 @@ function renderSkins() {
     el("h3", { class: "coll-head", text: `Yours · ${mine.length}` }),
     ...mine.map((c) => {
       // a tap on one of your runners picks it straight away; the ⓘ shows its card
+      // tap the name to race with them, the picture for their card
       const card = charCard(c, n++, c.playable ? selectRunner : inspectChar);
-      if (c.playable) {
-        const info = el("button", { class: "cinfo", type: "button", "aria-label": `About ${c.name}`, text: "i" });
-        info.addEventListener("click", (e) => {
-          e.stopPropagation();
-          inspectChar(c);
-        });
-        card.append(info);
-      }
       const on = fav.includes(c.id);
       const star = el("button", { class: `fav${on ? " on" : ""}`, type: "button", "aria-label": on ? "Remove from favourites" : "Add to favourites", text: on ? "★" : "☆" });
       star.addEventListener("click", (e) => {
@@ -1347,10 +1341,10 @@ const PACK_CHARS = [
  * odds: chance per card for each rarity · sure: the last card is at least this rarity.
  */
 const PACKS = [
-  { id: "starter", name: "Starter Pack", price: 250, cards: 2, img: "/assets/pack_starter.webp", odds: { common: 0.8, rare: 0.17, epic: 0.03, legendary: 0 } },
-  { id: "brain", name: "Brain Pack", price: 750, cards: 4, img: "/assets/pack_brain.webp", odds: { common: 0.6, rare: 0.3, epic: 0.09, legendary: 0.01 }, sure: "rare" },
-  { id: "mega", name: "Mega Pack", price: 2000, cards: 8, img: "/assets/pack_mega.webp", odds: { common: 0.45, rare: 0.35, epic: 0.16, legendary: 0.04 }, sure: "epic" },
-  { id: "legend", name: "Legend Pack", price: 5000, cards: 12, img: "/assets/pack_legend.webp", odds: { common: 0.25, rare: 0.4, epic: 0.27, legendary: 0.08 }, sure: "legendary" },
+  { id: "starter", name: "Starter Pack", price: 250, cards: 2, img: "/assets/pack_starter.webp", odds: { rare: 0.88, epic: 0.11, legendary: 0.01 } },
+  { id: "brain", name: "Brain Pack", price: 750, cards: 4, img: "/assets/pack_brain.webp", odds: { rare: 0.78, epic: 0.19, legendary: 0.03 } },
+  { id: "mega", name: "Mega Pack", price: 2000, cards: 8, img: "/assets/pack_mega.webp", odds: { rare: 0.66, epic: 0.28, legendary: 0.06 }, sure: "epic" },
+  { id: "legend", name: "Legend Pack", price: 5000, cards: 12, img: "/assets/pack_legend.webp", odds: { rare: 0.5, epic: 0.38, legendary: 0.12 }, sure: "legendary" },
 ];
 const pct = (x) => `${Math.round(x * 1000) / 10}%`;
 
@@ -1406,7 +1400,7 @@ function rollRarity(odds) {
     if (r < (odds[rarity] ?? 0)) return rarity;
     r -= odds[rarity] ?? 0;
   }
-  return "common";
+  return "rare";
 }
 function packCard(rarity) {
   const pool = packPool();
@@ -1471,7 +1465,7 @@ function renderPacks() {
         el("img", { class: "pack-img", src: pk.img, alt: "" }),
         el("b", { text: pk.name }),
         el("small", { class: "pk-cards", text: `${pk.cards} cards${pk.sure ? ` · 1 ${pk.sure}+` : ""}` }),
-        el("small", { class: "pk-odds", text: pk.odds.legendary ? `Legendary ${pct(pk.odds.legendary)} · Epic ${pct(pk.odds.epic)}` : `Rare ${pct(pk.odds.rare)} · Epic ${pct(pk.odds.epic)}` }),
+        el("small", { class: "pk-odds", text: `Legendary ${pct(pk.odds.legendary)} · Epic ${pct(pk.odds.epic)}` }),
         btn,
       );
     }),
@@ -7659,6 +7653,15 @@ if (!local.getItem("lr:kikoMove")) {
   local.setItem("lr:kikoMove", "1");
   if (passState().free.includes(PASS_RUNNERS[KIKO])) giveItem(KIKO);
 }
+// Pip moved to the Season Pass: anyone who has already played keeps him
+if (!local.getItem("lr:pipMove")) {
+  local.setItem("lr:pipMove", "1");
+  try {
+    if ((JSON.parse(local.getItem("lr:stats") || "{}").races ?? 0) > 0 || passState().free.includes(PASS_RUNNERS[PIP])) giveItem(PIP);
+  } catch {
+    /* fresh player */
+  }
+}
 function passLevel(xp) {
   return Math.min(PASS_LEVELS, Math.floor(xp / PASS_XP) + 1);
 }
@@ -7676,7 +7679,7 @@ function passXp(n) {
 function passReward(level, track) {
   if (track === "free") {
     if (level === 1) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
-    if (level === PASS_RUNNERS[KIKO]) return { runner: KIKO, label: RUNNERS[KIKO].name, img: portrait(KIKO) };
+    for (const [i, lv] of Object.entries(PASS_RUNNERS)) if (level === lv) return { runner: Number(i), label: RUNNERS[i].name, img: portrait(Number(i)) };
     if (level === 30) return { coins: 800, label: "800 coins", img: "/assets/ui_c3.webp" };
     if (level % 10 === 5) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
     if (level % 4 === 0) return { coins: 120 + level * 15, label: `${120 + level * 15} coins`, img: "/assets/ui_c2.webp" };

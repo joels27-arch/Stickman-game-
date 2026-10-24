@@ -2777,3 +2777,7 @@ html, body { background: var(--k1); }
 .hud .place b, .hud .place sup, .hud .place sub { align-self: baseline; }
 .hud .place sup { position: relative; top: -10px; margin-top: 0; }
 .hud .place sub { font-size: 14px; }
+
+/* the level sits under the rarity, not on the picture */
+.ccard .cfoot .clvl { position: static; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 3px; padding: 2px 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.35); pointer-events: none; }
+.ccard .cfoot .clvl .cbar { width: 34px; }
