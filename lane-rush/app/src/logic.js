@@ -108,16 +108,9 @@ export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
 /** The classic maps (3D models), then the themed ones built in code (public/themes.js: same ids). */
-export const MAPS = [
-  "meadow", "farm", "beach", "city", "stadium", "space",
-  "sunset", "autumn", "snowy", "desert", "canyon", "jungle", "swamp", "volcano", "candy", "mushroom",
-  "crystal", "icelake", "sakura", "tropical", "neon", "mars", "deepsea", "lava", "savanna", "tundra",
-  "bamboo", "lavender", "tulips", "halloween", "xmas", "rainbow", "clouds", "islands", "egypt", "greek",
-  "pirate", "wildwest", "ghost", "alien", "synth", "toyland", "icecream", "zen", "terraces", "aurora",
-  "golf", "vineyard", "redwood", "fairy",
-];
+export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space", "candy", "xmas", "lava", "desert"];
 /** Themed maps borrow a classic map's moving obstacles (the rest use the meadow's logs and bees). */
-export const MAP_MOVERS = { tropical: "beach", neon: "city", mars: "space", deepsea: "beach", savanna: "farm", lavender: "farm", tulips: "farm", rainbow: "space", clouds: "space", islands: "space", egypt: "farm", pirate: "beach", wildwest: "farm", alien: "space", synth: "space", toyland: "city", terraces: "farm", golf: "stadium", vineyard: "farm" };
+export const MAP_MOVERS = {};
 /** A Party Cup is three rounds; each placing scores points, most points wins. */
 export const CUP_ROUND_BOOST_M = 350;
 export const CUP_POINTS = [10, 5, 3, 1];
