@@ -121,6 +121,7 @@ const COLLECTION = [
   { id: "thunderjack", name: "Thunderjack", color: "#b02a2a", rarity: "legendary", via: "coins", coins: 10000 },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
+const MEDAL_ICON = { gold: "🥇", silver: "🥈", bronze: "🥉" };
 const medalText = (medal, n) => `${n} ${medal} medal${n === 1 ? "" : "s"}`;
 const flagOf = (code) => (code && code.length === 2 ? String.fromCodePoint(...[...code].map((c) => 127397 + c.charCodeAt(0))) : "");
 const withFlag = (name, code) => (code ? `${flagOf(code)} ${name}` : name);
@@ -1922,15 +1923,18 @@ function tourneyPrize(v) {
   return prize - before;
 }
 
-// Weekend League: Friday 18:00 to Sunday midnight, 10 matches, points by place
+// Weekend League: Friday 18:00 to Sunday midnight, 10 matches vs bots, each one a set mode
+// (the modes take turns). Only matches started from the league count. Rewards go by medals won.
 const LEAGUE_MATCHES = 10;
-const LEAGUE_PTS = [10, 6, 3, 1];
+const LEAGUE_PLAN = ["survival", "chase", "coinrush", "potato", "survival", "chase", "coinrush", "potato", "chase", "survival"];
 const LEAGUE_TIERS = [
-  { pts: 20, coins: 300 },
-  { pts: 45, coins: 900 },
-  { pts: 70, coins: 1500 },
-  { pts: 90, coins: 2500 },
+  { medals: 2, coins: 300 },
+  { medals: 4, coins: 800 },
+  { medals: 6, pack: "mega" },
+  { medals: 8, coins: 1500 },
+  { medals: 10, coins: 2500, pack: "mega" },
 ];
+const leagueMedals = (st) => (st.medals ?? []).filter(Boolean).length;
 function leagueWindow(now = new Date()) {
   const day = now.getDay();
   const open = (day === 5 && now.getHours() >= 18) || day === 6 || day === 0;
@@ -1950,42 +1954,51 @@ function leagueState() {
   } catch {
     st = null;
   }
-  if (!st || typeof st !== "object") st = { id: "", matches: 0, pts: 0, claimed: [] };
+  if (!st || typeof st !== "object") st = { id: "", matches: 0, medals: [], claimed: [] };
+  st.medals ??= [];
   const w = leagueWindow();
   if (w.open && st.id !== w.id) {
     // a new weekend: rewards left unclaimed last time are paid out first
     if (st.id) payLeague(st, true);
-    st = { id: w.id, matches: 0, pts: 0, claimed: [] };
+    st = { id: w.id, matches: 0, medals: [], claimed: [] };
     local.setItem("lr:league", JSON.stringify(st));
   }
   return st;
 }
 function leagueReady(st) {
-  return LEAGUE_TIERS.map((tier, i) => i).filter((i) => st.pts >= LEAGUE_TIERS[i].pts && !st.claimed.includes(i));
+  return LEAGUE_TIERS.map((tier, i) => i).filter((i) => leagueMedals(st) >= LEAGUE_TIERS[i].medals && !st.claimed.includes(i));
 }
 function payLeague(st, quiet = false) {
   const ready = leagueReady(st);
   let coins = 0;
+  let packs = 0;
   for (const i of ready) {
-    coins += LEAGUE_TIERS[i].coins;
-    if (LEAGUE_TIERS[i].medal) wallet.claim(`wl:${st.id}:${i}`, LEAGUE_TIERS[i].medal);
+    coins += LEAGUE_TIERS[i].coins ?? 0;
+    if (LEAGUE_TIERS[i].pack) packs++;
     st.claimed.push(i);
+  }
+  // packs open right away; a weekend that ended unclaimed turns them into coins
+  if (packs && quiet) coins += packs * 1200;
+  else if (packs) {
+    const pk = PACKS.find((x) => x.id === "mega");
+    setTimeout(() => openPackAnim(pk, grantPack(pk)), 400);
   }
   if (coins) wallet.addCoins(coins);
   local.setItem("lr:league", JSON.stringify(st));
   if (coins && quiet) toast(`Weekend League rewards: +${coins} coins`);
   return coins;
 }
-/** A race finished: count it as a league match while the weekend is live. */
-function leagueMatch(n, place) {
-  if (n < 2 || !leagueWindow().open) return null;
+/** A race finished: it counts for the Weekend League only if it was started from the league, in that match's mode. */
+function leagueMatch(v, n, place) {
+  if (game.fixed?.kind !== "league" || n < 2 || !leagueWindow().open) return null;
   const st = leagueState();
-  if (st.matches >= LEAGUE_MATCHES) return null;
-  const pts = LEAGUE_PTS[place - 1] ?? 0;
+  if (st.matches >= LEAGUE_MATCHES || v.kind !== LEAGUE_PLAN[st.matches]) return null;
+  const medal = ["gold", "silver", "bronze"][place - 1] ?? "";
+  st.medals.push(medal);
   st.matches += 1;
-  st.pts += pts;
   local.setItem("lr:league", JSON.stringify(st));
-  return { pts, matches: st.matches };
+  game.fixed = null; // one match per start
+  return { medal, matches: st.matches, medals: leagueMedals(st) };
 }
 function untilText(ms) {
   const m = Math.max(1, Math.round(ms / 60000));
@@ -2200,15 +2213,19 @@ $("#trophyRoad").addEventListener("click", openRoad);
 $("#roadClose").addEventListener("click", () => (roadModal.hidden = true));
 roadModal.addEventListener("click", (e) => e.target === roadModal && (roadModal.hidden = true));
 
-/** Full Weekend League card (shown in the detail sheet). */
+/** Full Weekend League card (shown in the detail sheet): 10 matches, a mode each, rewards by medals. */
 function weekendCard() {
   const w = leagueWindow();
   const st = leagueState();
   const mine = st.id === w.id;
   const ready = leagueReady(st);
-  const full = mine && st.matches >= LEAGUE_MATCHES;
-  const pct = (x) => Math.min(100, Math.round((x / 100) * 100));
-  const weekend = el(
+  const played = mine ? st.matches : 0;
+  const medals = mine ? leagueMedals(st) : 0;
+  const full = played >= LEAGUE_MATCHES;
+  const next = LEAGUE_PLAN[played];
+  const pct = (x) => Math.round((x / LEAGUE_MATCHES) * 100);
+  const tierText = (t) => [t.coins ? `${t.coins}` : "", t.pack ? "Pack" : ""].filter(Boolean).join(" + ");
+  return el(
     "div",
     { class: `tcard t-weekend${w.open ? " live" : ""}` },
     el(
@@ -2220,27 +2237,34 @@ function weekendCard() {
         {},
         el("em", { class: "tc-status" }, w.open ? el("i", { class: "live-dot" }) : "", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday 18:00 · in ${untilText(w.start - Date.now())}`),
         el("b", { text: "Weekend League" }),
-        el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${LEAGUE_TIERS.reduce((a, t) => a + t.coins, 0).toLocaleString()}`),
+        el("span", { class: "tc-prize" }, `${medals} 🏅 · ${played}/${LEAGUE_MATCHES} played`),
       ),
     ),
-    el("p", { class: "tc-desc", text: `${LEAGUE_MATCHES} matches, Friday to Sunday. Score points, unlock coins.` }),
+    el("p", { class: "tc-desc", text: "10 matches, every mode. More medals, better rewards." }),
+    // the 10 matches: the mode each one is, and the medal you got
     el(
       "div",
-      { class: "wl-row" },
-      el("span", { class: "wl-pips" }, ...Array.from({ length: LEAGUE_MATCHES }, (_, i) => el("i", { class: mine && i < st.matches ? "on" : "" }))),
-      el("b", { text: `${mine ? st.pts : 0} pts` }),
+      { class: "wl-plan" },
+      ...LEAGUE_PLAN.map((m, i) =>
+        el(
+          "span",
+          { class: `wl-m${i < played ? " done" : ""}${i === played && w.open ? " next" : ""}` },
+          el("img", { src: `/assets/mode_${m}.webp`, alt: "" }),
+          el("i", { text: i < played ? MEDAL_ICON[st.medals[i]] ?? "—" : String(i + 1) }),
+        ),
+      ),
     ),
     el(
       "div",
       { class: "wl-track" },
-      el("span", { class: "wl-fill", style: `width:${pct(mine ? st.pts : 0)}%` }),
+      el("span", { class: "wl-fill", style: `width:${pct(medals)}%` }),
       ...LEAGUE_TIERS.map((tier, i) =>
         el(
           "span",
-          { class: `wl-tier${mine && st.pts >= tier.pts ? " got" : ""}${st.claimed.includes(i) && mine ? " claimed" : ""}`, style: `left:${pct(tier.pts)}%` },
-          el("img", { src: tier.medal ? MEDAL_IMG[tier.medal] : "/assets/ui_c1.webp", alt: "" }),
-          el("small", { text: `${tier.pts}` }),
-          el("em", { text: `${tier.coins}` }),
+          { class: `wl-tier${medals >= tier.medals ? " got" : ""}${mine && st.claimed.includes(i) ? " claimed" : ""}`, style: `left:${pct(tier.medals)}%` },
+          el("img", { src: tier.pack ? "/assets/pack_mega.webp" : "/assets/ui_c1.webp", alt: "" }),
+          el("small", { text: `${tier.medals}🏅` }),
+          el("em", { text: tierText(tier) }),
         ),
       ),
     ),
@@ -2248,18 +2272,14 @@ function weekendCard() {
       "div",
       { class: "tc-btns" },
       ...(ready.length
-        ? [el("button", { class: "btn big gold-btn", type: "button", "data-league": "claim", text: `🎁 Claim ${ready.reduce((a, i) => a + LEAGUE_TIERS[i].coins, 0)} coins` })]
+        ? [el("button", { class: "btn big gold-btn", type: "button", "data-league": "claim", text: "🎁 Claim rewards" })]
         : !w.open
           ? [el("button", { class: "btn big ghost", type: "button", disabled: "", text: "🔒 Opens on Friday" })]
           : full
-            ? [el("button", { class: "btn big ghost", type: "button", disabled: "", text: "✓ All matches played" })]
-            : [
-                el("button", { class: "btn big go", type: "button", "data-league": "bots", text: "▶ Play match" }),
-                el("button", { class: "btn big blue", type: "button", "data-league": "host", text: "👥 Host" }),
-              ]),
+            ? [el("button", { class: "btn big ghost", type: "button", disabled: "", text: "✓ All 10 played" })]
+            : [el("button", { class: "btn big go", type: "button", "data-league": "play", text: `▶ Match ${played + 1} · ${KIND_LABEL[next]}` })]),
     ),
   );
-  return weekend;
 }
 /** Full card for a tournament (shown in the detail sheet). */
 function tourneyCard(t) {
@@ -2284,8 +2304,7 @@ function tourneyCard(t) {
     el(
       "div",
       { class: "tc-btns" },
-      el("button", { class: "btn big go", type: "button", "data-mode": t.id, "data-with": "bots", text: "🤖 Vs bots" }),
-      el("button", { class: "btn big blue", type: "button", "data-mode": t.id, "data-with": "friends", text: "👥 Host" }),
+      el("button", { class: "btn big go", type: "button", "data-mode": t.id, "data-with": "bots", text: "▶ Play" }),
     ),
   );
 }
@@ -2327,11 +2346,15 @@ function openTourney(id) {
 }
 $("#tourneyClose").addEventListener("click", () => (tourneyModal.hidden = true));
 tourneyModal.addEventListener("click", (e) => e.target === tourneyModal && (tourneyModal.hidden = true));
-function playMode(mode, withWho) {
+function playMode(mode, withWho, fixed = null) {
   sfx.unlock();
   if (soloBtn.disabled) return toast("Still loading the runners…");
   if (!requireName()) return;
-  if (withWho === "bots") return openSoloRoom(mode);
+  if (withWho === "bots") {
+    openSoloRoom(mode);
+    game.fixed = fixed; // league and tournament matches: the mode is set, nobody can change it
+    return;
+  }
   game.solo = false;
   game.endless = false;
   game.wantMode = mode;
@@ -2345,7 +2368,7 @@ $("#tourneyBody").addEventListener("click", (e) => {
   const b = e.target.closest("[data-mode]");
   if (b) {
     tourneyModal.hidden = true;
-    return playMode(b.dataset.mode, b.dataset.with);
+    return playMode(b.dataset.mode, "bots", { kind: "tourney" });
   }
   const lg = e.target.closest("[data-league]");
   if (!lg) return;
@@ -2356,13 +2379,15 @@ $("#tourneyBody").addEventListener("click", (e) => {
       sfx.finish();
       toast(`Weekend League: +${coins} coins!`);
     }
+    tourneyModal.hidden = true;
     renderWallet();
     renderCompete();
     return;
   }
-  // a league match is a random mode each time
+  // the next league match, in its set mode, vs bots
   tourneyModal.hidden = true;
-  playMode(ROUND_KINDS[Math.floor(Math.random() * ROUND_KINDS.length)], lg.dataset.league === "host" ? "friends" : "bots");
+  const st = leagueState();
+  playMode(LEAGUE_PLAN[st.matches] ?? "survival", "bots", { kind: "league" });
 });
 // keep the countdowns fresh while the page is open
 setInterval(() => game.mode === "home" && homePage === PAGE.compete && renderCompete(), 30000);
@@ -2386,6 +2411,7 @@ function leaveToHome(message = "") {
   renderDaily();
   game.solo = false;
   game.endless = false;
+  game.fixed = null;
   renderEndlessBest();
   world.clearRace();
   showScreen("home");
@@ -2524,9 +2550,11 @@ function renderLobby(v) {
   const gm = v.mode || "survival";
   // only the host chooses mode and map; invited friends just pick a runner
   $("#hostPicks").hidden = !isHost;
+  // league and tournament matches have a set mode
+  $("#modePick").hidden = $("#modePick").previousElementSibling.hidden = Boolean(game.fixed);
   const modePick = $("#modePick");
   modePick.replaceChildren(
-    ...Object.entries(GAME_MODE_INFO).map(([key, info]) => {
+    ...Object.entries(GAME_MODE_INFO).filter(([key]) => key !== "grandtour").map(([key, info]) => {
       const b = el(
         "button",
         { class: `mode-card${gm === key ? " on" : ""}`, type: "button" },
@@ -2845,7 +2873,7 @@ function renderResults(v) {
     if (rpChange.prize) reward.append(el("span", { class: "xpchip prizechip", text: `🏆 Prize +${rpChange.prize}` }));
     if (roomPrize) reward.append(el("span", { class: "xpchip prizechip", text: roomPrize }));
     if (potBack) reward.append(el("span", { class: "xpchip prizechip", text: potBack }));
-    if (rpChange.league) reward.append(el("span", { class: "xpchip leaguechip", text: `Weekend League +${rpChange.league.pts} pts · ${rpChange.league.matches}/${LEAGUE_MATCHES}` }));
+    if (rpChange.league) reward.append(el("span", { class: "xpchip leaguechip", text: `Weekend League ${rpChange.league.medal ? MEDAL_ICON[rpChange.league.medal] : "—"} · match ${rpChange.league.matches}/${LEAGUE_MATCHES}` }));
     if (rpChange.botsOnly) reward.append(el("span", { class: "nomedal", text: "Medals (and league progress) need 2 real players" }));
     else reward.append(rankChip(rank.points() - ptsBefore));
   }
@@ -6476,21 +6504,27 @@ function claimDaily(q, btn) {
   if (!st.done[q.id] || st.claimed[q.id]) return;
   st.claimed[q.id] = true;
   local.setItem("lr:daily2", JSON.stringify(st));
-  wallet.addCoins(q.coins);
   passXp(150);
+  if (q.tier === "hard") {
+    // the toughest mission of the day always pays a pack
+    const pk = PACKS.find((x) => x.id === "mega");
+    renderDaily();
+    return openPackAnim(pk, grantPack(pk));
+  }
+  wallet.addCoins(q.coins);
   coinRain(btn, 14);
   sfx.finish();
   toast(`+${q.coins} coins · +150 XP`);
   renderDaily();
 }
-function missionRow({ icon, tierClass = "", text, have, goal, reward, state, onClaim, extra }) {
+function missionRow({ icon, tierClass = "", text, have, goal, reward, rewardImg = "/assets/ui_c1.webp", state, onClaim, extra }) {
   // state: active | ready | claimed | locked
   const pct = Math.round((Math.min(have, goal) / goal) * 100);
   let right;
   if (state === "ready") {
     right = el("button", { class: "aclaim", type: "button" }, el("span", { text: "CLAIM" }), el("b", { text: reward }));
     right.addEventListener("click", () => onClaim(right));
-  } else right = el("div", { class: "qreward" }, el("img", { src: "/assets/ui_c1.webp", alt: "" }), el("b", { text: reward }));
+  } else right = el("div", { class: "qreward" }, el("img", { src: rewardImg, alt: "" }), el("b", { text: reward }));
   return el(
     "div",
     { class: `quest ${tierClass}${state === "claimed" ? " done" : ""}${state === "ready" ? " ready" : ""}${state === "locked" ? " locked" : ""}` },
@@ -6521,7 +6555,8 @@ function renderDaily() {
         text: q.text,
         have: st.best[q.id] ?? 0,
         goal: q.goal,
-        reward: `+${q.coins}`,
+        reward: q.tier === "hard" ? "Pack" : `+${q.coins}`,
+        rewardImg: q.tier === "hard" ? "/assets/pack_mega.webp" : "/assets/ui_c1.webp",
         state: st.claimed[q.id] ? "claimed" : st.done[q.id] ? "ready" : "active",
         onClaim: (btn) => claimDaily(q, btn),
       }),
@@ -6720,7 +6755,7 @@ function recordRace(v, place) {
   const coins = ((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1);
   wallet.addCoins(coins);
   const prize = tourneyPrize(v);
-  const league = leagueMatch(n, place);
+  const league = leagueMatch(v, n, place);
   const res = {};
   res.coins = coins;
   res.kos = kos;

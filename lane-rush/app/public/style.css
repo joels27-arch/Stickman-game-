@@ -2478,3 +2478,14 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .name-modal .name-bubble span { font-size: 14px; }
 .name-modal .name-field { height: 54px; }
 .name-modal .name-go { font-size: 22px; }
+
+/* Weekend League: the 10 matches, the mode of each and the medal you won */
+.wl-plan { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 8px 0 14px; }
+.wl-m { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.25); background: rgba(10, 14, 40, 0.45); }
+.wl-m img { width: 70%; height: 70%; object-fit: contain; opacity: 0.55; }
+.wl-m i { position: absolute; right: -4px; bottom: -6px; min-width: 20px; height: 20px; display: grid; place-items: center; border-radius: 10px; background: #2a2f6e; border: 2px solid #fff; color: #fff; font-style: normal; font-weight: 900; font-size: 11px; }
+.wl-m.done img { opacity: 1; }
+.wl-m.done i { background: none; border: 0; font-size: 18px; }
+.wl-m.next { border-color: #b6f72a; box-shadow: 0 0 12px rgba(182, 247, 42, 0.7); }
+.wl-m.next img { opacity: 1; }
+.wl-tier em { white-space: nowrap; }
