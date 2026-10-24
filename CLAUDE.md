@@ -25,6 +25,11 @@ folder names stay as they are, and commits name a game by its folder (see
 the artifact `room` capability, plus solo practice), with the scripts that
 turn the Higgsfield models into glTF JSON for it; its README has the details.
 
+`lane-rush-mobile/` is Lane Rush as an **iOS app** (Capacitor), for a
+TestFlight test: the game's files from `lane-rush/app`, bundled inside the
+app, racing on the live server. Its README explains how it is built, how it
+goes to TestFlight and how the backend works.
+
 All the art is generated on **Higgsfield**: concept images, image-to-3D
 meshes with auto-rigged animations, music. INKFALL's processed art is tracked
 in `assets/` and `icons/`. Lane Rush's is not in git at all: it is downloaded
@@ -109,6 +114,23 @@ It started as a copy of Lane Rush and keeps the same layout and server
 A change meant for both games is made in both folders in one piece of work,
 and named for both (see "Commits"). It has no `GAME-DESIGN.md` of its own.
 
+### Lane Rush on iOS (`lane-rush-mobile/`)
+
+- The game is not copied here. `scripts/build-web.mjs` makes `www/` from
+  `../lane-rush/app` (`public/` and `src/logic.js`) at every build, and
+  `npx cap sync` copies `www/` into `ios/App/App/public/`. Both are
+  generated and git-ignored: a change to the game is made in `lane-rush/`,
+  and reaches the app only through `npm run sync` and a new upload.
+- `native/native.js`, which the build loads before the game, holds the app's
+  differences from the website: the lobby socket goes to the server instead
+  of the app itself, invite links point to the website and open the iOS share
+  sheet, and vibration becomes haptics. It calls the native plugins through
+  the bridge Capacitor injects (`Capacitor.nativePromise`), so the game needs
+  no bundler. The server address is its two constants, `SITE` and `SERVER`.
+- `ios/` is the Xcode project from Capacitor 8 (Swift Package Manager, no
+  CocoaPods): bundle id `com.masprime77.lanerush`, the name "4 Friends", team
+  `GPR2C9QVS4`, iPhone only, portrait.
+
 ### Tumble Royale (`tumble-royale/`)
 
 - `shared/` is the deterministic simulation, run by the server and by the
@@ -149,6 +171,12 @@ npm run typecheck
 npm run test:load                # load test with scripted clients
 npm run test:e2e
 npm run build && npm start       # production build on :8080
+
+# Lane Rush on iOS (lane-rush-mobile); needs Xcode
+npm install
+npm run assets                   # once: Lane Rush's art + three.js (../lane-rush/fetch-assets.sh)
+npm run sync                     # build www/ from ../lane-rush/app and copy it into ios/
+npm run open                     # Xcode: ⌘R to run, Product ▸ Archive for TestFlight
 ```
 
 ## Testing
@@ -167,6 +195,9 @@ npm run build && npm start       # production build on :8080
   pass; widen the pattern's gap instead, as the generator does.
 - INKFALL's balance comes from `npm run sim`. A change to units, costs or the
   AI reruns it and the levels test, and the plan says what moved.
+- The iOS app is checked in an iOS 26.5 iPhone Simulator: the game loads, an
+  Endless Run starts on the server, and a lobby made in the app can be joined
+  from the website.
 - Never weaken, skip or delete a failing test to get a change through. A test
   that is itself wrong is fixed in a commit of its own.
 
@@ -186,7 +217,8 @@ not drift:
   prices or rules stays owned, and a character taken out of the game refunds
   its owners once. `GAME-DESIGN.md` records each case.
 - **The wire protocol.** A page loaded before a deploy keeps talking to the
-  new server until it reloads. Change messages additively: new fields are
+  new server until it reloads, and an iOS build keeps the client it was built
+  with until the next upload is installed. Change messages additively: new fields are
   optional, and nothing is renamed or removed while an older client could
   still send or expect it.
 - **Determinism.** Every Lane Rush client builds the course from the seed
@@ -321,11 +353,14 @@ commit — never a separate release-notes commit.
 
 ### Versioning
 
-INKFALL and Tumble Royale carry `1.0.0` in their `package.json`; Lane Rush
-and 4 Friends Run have no version yet, and no game has had a numbered
-release. When a game first ships to an app store, it starts at **1.0.0
-(build 1)**, semver from there, with its version and build number kept in one
-file, which this section then names. INKFALL's service worker `VERSION` is a
+INKFALL and Tumble Royale carry `1.0.0` in their `package.json`; the Lane
+Rush website and 4 Friends Run have no version, and no game has had a numbered
+release. A game that ships as an app starts at **1.0.0 (build 1)**, semver
+from there, with its version and build number kept in one file. Lane Rush's
+iOS app is 1.0.0 (build 1): `MARKETING_VERSION` and
+`CURRENT_PROJECT_VERSION` of the App target in
+`lane-rush-mobile/ios/App/App.xcodeproj/project.pbxproj`. Every TestFlight
+upload needs a higher build number. INKFALL's service worker `VERSION` is a
 cache name, not a release version (see "Gotchas").
 
 ### Distribution
@@ -341,7 +376,9 @@ cache name, not a release version (see "Gotchas").
   of the user's own (its README).
 - INKFALL is static files for any static host; offline play through `sw.js`
   needs HTTPS.
-- No game is in the App Store or Google Play yet.
+- Lane Rush's iOS app goes to TestFlight for testing
+  (`lane-rush-mobile/README.md`); no game is in the App Store or Google Play
+  yet. Uploading is the user's step, from Xcode with their Apple account.
 
 ### Dependencies
 
@@ -354,6 +391,9 @@ cache name, not a release version (see "Gotchas").
   dev tools are pinned exactly in `package.json`, and `bunfig.toml` refuses
   any package version published less than a day ago, a supply-chain guard
   that stays.
+- The iOS app's Capacitor packages are pinned exactly in
+  `lane-rush-mobile/package.json`, and Capacitor's Swift package in
+  `Package.resolved`; they move together, in a commit of their own.
 
 ### Formatting & lint
 
@@ -382,8 +422,9 @@ local checkout.
 - It zips exactly what git sees: tracked files, untracked files that are not
   git-ignored, and `.git`. So everything in a `.gitignore` stays out:
   `node_modules/`, `dist/`, `.wrangler/`, Lane Rush's downloaded
-  `public/assets/` and `public/vendor/`, Tumble Royale's `data/` and
-  `test-results/`, `.DS_Store` and the script itself. INKFALL's tracked art
+  `public/assets/` and `public/vendor/`, the iOS app's `www/` and
+  `ios/App/App/public/`, Tumble Royale's `data/` and `test-results/`,
+  `.DS_Store` and the script itself. INKFALL's tracked art
   (`assets/`, `icons/`) goes in.
 - **Keep it current.** When a change adds heavy, generated or secret data (a
   new build or dependency directory, downloaded art, caches, a secrets file),
@@ -421,7 +462,11 @@ local checkout.
 - **Test hooks on localhost.** `public/client.js` exposes `window.__laneRush`
   (scene, runner, race state) to the automated play-tests whenever the
   hostname is `localhost` or `127.0.0.1`, so any page served from there gets
-  them.
+  them, the iOS app (`capacitor://localhost`) included.
+- **The iOS Simulator.** In a new iOS 27.0 iPhone Simulator the app's page
+  never finished loading, and Safari there hung too; an iOS 26.5 iPhone runs
+  it. The share sheet opens blank in the Simulator, so check invites on a
+  phone.
 - **Two tabs are one player** in Tumble Royale: the profile token is in
   localStorage, and the second tab takes over the seat. Use a private window,
   another browser, or `?guest`.

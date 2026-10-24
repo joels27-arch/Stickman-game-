@@ -1,0 +1,26 @@
+{
+  "name": "lane-rush-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Lane Rush (4 Friends) as an iOS app: the web game bundled with Capacitor",
+  "scripts": {
+    "assets": "bash ../lane-rush/fetch-assets.sh",
+    "build": "node scripts/build-web.mjs",
+    "sync": "npm run build && cap sync ios",
+    "open": "cap open ios"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.5.3",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/share": "8.0.3",
+    "@capacitor/status-bar": "8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

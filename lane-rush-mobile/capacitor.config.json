@@ -1,0 +1,15 @@
+{
+  "appId": "com.masprime77.lanerush",
+  "appName": "4 Friends",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#2a1166"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "overlaysWebView": true
+    }
+  }
+}
