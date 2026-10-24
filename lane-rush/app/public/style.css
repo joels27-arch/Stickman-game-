@@ -2469,3 +2469,12 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .hud .place b { grid-column: 1; grid-row: 1 / span 2; font-size: 42px; color: #fff; -webkit-text-stroke: 3px #8a5200; }
 .hud .place sup { grid-column: 2; grid-row: 1; font-size: 17px; color: #fff; -webkit-text-stroke: 2.5px #8a5200; }
 .hud .place sub { grid-column: 2; grid-row: 2; font-size: 14px; color: #fff; -webkit-text-stroke: 2.5px #8a5200; }
+
+/* first visit: a small pop-up over the Play page (the home stays visible behind it) */
+.name-modal { background: rgba(8, 6, 30, 0.55); backdrop-filter: blur(3px); overflow: hidden; }
+.name-modal .name-card { width: min(340px, calc(100vw - 32px)); gap: 10px; padding: 16px 16px 18px; border-radius: 26px; border: 3px solid #fff; background: linear-gradient(180deg, #6a4dff 0%, #3d24c8 60%, #2a1a8f 100%); box-shadow: 0 8px 0 #160d5a, 0 24px 50px rgba(0, 0, 0, 0.5); animation: gpop 360ms cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+.name-modal .name-hero img { height: 110px; animation: none; }
+.name-modal .name-bubble b { font-size: 19px; }
+.name-modal .name-bubble span { font-size: 14px; }
+.name-modal .name-field { height: 54px; }
+.name-modal .name-go { font-size: 22px; }
