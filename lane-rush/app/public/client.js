@@ -1224,7 +1224,7 @@ function selectRunner(c) {
 const charModal = $("#charModal");
 function inspectChar(c) {
   const owned = ownsChar(c);
-  $("#charHero").replaceChildren(el("i", { class: `glow ${c.rarity}` }), el("img", { class: owned ? "" : "dark", src: c.hero, alt: "" }));
+  $("#charHero").replaceChildren(el("i", { class: `glow ${c.rarity}` }), el("img", { src: c.hero, alt: "" }));
   $("#charName").textContent = c.name;
   $("#charTags").replaceChildren(el("span", { class: `tag ${c.rarity}`, text: c.rarity }), el("span", { class: "tag via", text: `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` }), c.playable ? el("span", { class: "tag play", text: "🏃 Playable" }) : el("span", { class: "tag soon", text: "Collectible · playable soon" }));
   $("#charHow").textContent = owned ? (c.playable ? c.tag ?? "" : "In your collection. 3D racing version coming soon!") : howToGet(c);
