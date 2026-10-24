@@ -5913,7 +5913,11 @@ function showTutInvite() {
   if (game.mode !== "home" || local.getItem("lr:endlessTut")) return;
   local.setItem("lr:tutAuto", "1");
   $("#endlessBtn").classList.add("tut-hl");
-  $("#tutInvite").hidden = false;
+  const box = $("#tutInvite");
+  box.hidden = false;
+  // sit right above the Endless Run button, pointing down at it
+  const r = $("#endlessBtn").getBoundingClientRect();
+  box.style.top = `${Math.max(70, r.top - box.firstElementChild.offsetHeight - 26)}px`;
 }
 function closeTutInvite() {
   $("#tutInvite").hidden = true;
