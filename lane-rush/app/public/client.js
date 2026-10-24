@@ -3599,6 +3599,14 @@ const world = (() => {
     return tile;
   }
 
+  // one throw animation (made once on Rex with Higgsfield) shared by every runner: they all have the
+  // same skeleton. Only the upper body moves, so the legs keep running.
+  let throwClip = null;
+  const UPPER = /^(Spine|Spine01|Spine02|neck|Head|LeftShoulder|LeftArm|LeftForeArm|LeftHand|RightShoulder|RightArm|RightForeArm|RightHand)\./;
+  function upperBody(clip) {
+    clip.tracks = clip.tracks.filter((t) => UPPER.test(t.name));
+    return clip;
+  }
   function stripRootMotion(clip) {
     for (const tr of clip.tracks) {
       if (!/Hips\.position$/.test(tr.name)) continue;
@@ -3698,6 +3706,7 @@ const world = (() => {
       loadGLB("/assets/barrel.glb").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
       loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
       // nice-to-haves: the game still runs with stand-ins if one of these fails
+      loadGLB("/assets/throw.glb").then((g) => (throwClip = g.animations[0] ? upperBody(g.animations[0]) : null)).catch(() => {}),
       loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
       // gates are wide enough that their pillars stand outside the fences
       loadGLB("/assets/boost_pad.glb").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
@@ -3775,6 +3784,18 @@ const world = (() => {
         }
       },
       fx,
+      /** The arm swing for throwing something, played over whatever the legs are doing. */
+      throwIt() {
+        if (!throwClip) return;
+        const a = mixer.clipAction(throwClip);
+        a.setLoop(THREE.LoopOnce, 1);
+        a.clampWhenFinished = false;
+        a.reset();
+        a.timeScale = throwClip.duration / 0.75; // the whole swing in three quarters of a second
+        a.setEffectiveWeight(4); // the arms follow the throw, not the run
+        a.fadeIn(0.06).play();
+        setTimeout(() => a.isRunning() && a.fadeOut(0.15), 600);
+      },
       play(name, fade = 0.15, timeScale = 1, restart = false) {
         const next = actions[name] || actions.run || Object.values(actions)[0];
         if (!next) return;
@@ -6324,8 +6345,14 @@ function announce(prev, v) {
     if (z.kind === "thunder") continue; // the hit line covers it
     feed({ freeze: `❄️ ${nameOf(z.by)} froze everyone`, brainwave: `🌀 ${nameOf(z.by)} sent a brain wave`, mud: `🟤 ${nameOf(z.by)} threw mud` }[z.kind] ?? `⚡ ${nameOf(z.by)} called lightning`);
   }
-  for (const b of fresh(v.bowls, seen.bowls)) feed(`🎳 ${nameOf(b.by)} rolled a bowling ball ${b.dir > 0 ? "ahead" : "back"}`);
+  // other runners swing their arm when they throw something
+  const throwAnim = (by) => by !== playerId && remote.map.get(by)?.runner?.throwIt?.();
+  for (const b of fresh(v.bowls, seen.bowls)) {
+    throwAnim(b.by);
+    feed(`🎳 ${nameOf(b.by)} rolled a bowling ball ${b.dir > 0 ? "ahead" : "back"}`);
+  }
   for (const b of fresh(v.bananas, seen.bananas)) {
+    throwAnim(b.by);
     // a fake box is a secret: no callout
     if (b.kind === "glue") feed(`🟢 ${nameOf(b.by)} spilled glue`);
     else if (b.kind !== "fake" || b.by === playerId) feed(b.kind === "fake" ? "🎁 You set a fake box" : `🍌 ${nameOf(b.by)} dropped a banana in lane ${b.lane + 1}`);
@@ -7593,6 +7620,7 @@ function useItem(lane = me.lane, dir = 1) {
   if (!me.items.length || !canControl() || me.stumbleT > 0) return;
   const kind = me.items.shift();
   stats.add("used", 1);
+  if (THROWN.has(kind)) me.runner?.throwIt?.();
   if (kind === "banana") {
     game.bananasThrown = (game.bananasThrown ?? 0) + 1;
     stats.add("bananas", 1);
