@@ -2500,7 +2500,10 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .road-sheet .road-full { position: relative; display: grid; gap: 14px; max-height: min(66vh, 560px); overflow-y: auto; margin: 0 -14px -14px; padding: 18px 12px 26px; border-radius: 0 0 22px 22px;
   background: radial-gradient(ellipse 40% 6% at 20% 12%, rgba(255, 255, 255, 0.9), transparent 70%), radial-gradient(ellipse 35% 5% at 80% 38%, rgba(255, 255, 255, 0.85), transparent 70%), radial-gradient(ellipse 40% 6% at 25% 70%, rgba(255, 255, 255, 0.85), transparent 70%), linear-gradient(180deg, #a9d8ff 0%, #d7e9ff 45%, #e6dcff 100%); }
 /* the road itself: gold edges, a green middle */
-.road-full::before { content: ""; position: absolute; z-index: 0; left: 50%; top: 0; bottom: 0; width: 22px; margin-left: -11px; border-radius: 6px; background: linear-gradient(90deg, #c98a00 0 3px, #ffd65a 3px 6px, #7ac943 6px 16px, #ffd65a 16px 19px, #c98a00 19px); }
+.road-sheet .road-full { background-attachment: local; }
+.road-sheet .road-full::after { content: ""; }
+/* the road: drawn as a background stripe that scrolls with the list (gold edges, a green middle) */
+.road-sheet .road-full { background-image: linear-gradient(90deg, transparent calc(50% - 11px), #c98a00 calc(50% - 11px) calc(50% - 8px), #ffd65a calc(50% - 8px) calc(50% - 5px), #7ac943 calc(50% - 5px) calc(50% + 5px), #ffd65a calc(50% + 5px) calc(50% + 8px), #c98a00 calc(50% + 8px) calc(50% + 11px), transparent calc(50% + 11px)), radial-gradient(ellipse 40% 6% at 20% 12%, rgba(255, 255, 255, 0.9), transparent 70%), radial-gradient(ellipse 35% 5% at 80% 38%, rgba(255, 255, 255, 0.85), transparent 70%), radial-gradient(ellipse 40% 6% at 25% 70%, rgba(255, 255, 255, 0.85), transparent 70%), linear-gradient(180deg, #a9d8ff 0%, #d7e9ff 45%, #e6dcff 100%); }
 .rv-row { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 22px 52px 22px minmax(0, 1fr); align-items: center; }
 .rv-row.l .rv-card { grid-column: 1; grid-row: 1; justify-self: end; }
 .rv-row.l .rv-link { grid-column: 2; grid-row: 1; }
