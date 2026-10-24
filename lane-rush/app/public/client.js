@@ -1471,7 +1471,7 @@ function renderPacks() {
         el("img", { class: "pack-img", src: pk.img, alt: "" }),
         el("b", { text: pk.name }),
         el("small", { class: "pk-cards", text: `${pk.cards} cards${pk.sure ? ` · 1 ${pk.sure}+` : ""}` }),
-        el("small", { class: "pk-odds", text: `★ ${pct(pk.odds.legendary)} · ✦ ${pct(pk.odds.epic)}` }),
+        el("small", { class: "pk-odds", text: pk.odds.legendary ? `Legendary ${pct(pk.odds.legendary)} · Epic ${pct(pk.odds.epic)}` : `Rare ${pct(pk.odds.rare)} · Epic ${pct(pk.odds.epic)}` }),
         btn,
       );
     }),

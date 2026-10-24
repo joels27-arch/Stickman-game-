@@ -2757,3 +2757,5 @@ html, body { background: var(--k1); }
 .char-lvl .lv-row span, .char-lvl small { font-size: 13px; font-weight: 700; color: rgba(255, 255, 255, 0.8); }
 .char-lvl .cbar.big { width: 100%; height: 10px; border-radius: 5px; }
 .char-lvl .lvup { width: 100%; }
+.ccard .clvl { top: 40px; left: 6px; }
+.char-lvl .lvup:disabled { opacity: 0.45; filter: grayscale(0.6); }
