@@ -1033,23 +1033,24 @@ describe("new modes", () => {
     expect(L.standings(s)[0]).toBe("p1");
   });
 
-  it("hot potato: the bomb appears, passes on contact, and costs the holder a heart", () => {
+  it("hot potato: the bomb sits on whoever is last, jumps when they overtake, and blows on a fixed fuse", () => {
     let s = start("potato");
+    s = act(s, "p0", pos(30, at(s, 2900)));
+    s = act(s, "p1", pos(20, at(s, 2900)));
     s = L.applyAction(s, "SYS", { type: "tick", t: at(s, L.POTATO_FIRST_MS + 10) });
-    expect(s.bomb).not.toBeNull();
-    const first = s.bomb.holder;
-    const other = first === "p0" ? "p1" : "p0";
-    // run into the other runner: it passes
-    s = act(s, first, pos(50, at(s, 4000)));
-    s = act(s, other, pos(50.5, at(s, 4000)));
-    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, 4100) });
-    expect(s.bomb.holder).toBe(other);
-    // obstacle hits don't cost hearts in hot potato
-    s = act(s, other, pos(60, at(s, 4500), { hits: 2 }));
-    expect(s.players[other].outAt).toBeNull();
-    s = act(s, other, pos(90, at(s, 6000), { lane: 3 }));
+    expect(s.bomb.holder).toBe("p1");
+    expect(s.bomb.until - s.bomb.at).toBe(L.POTATO_FUSE_MS);
+    // p1 overtakes: now p0 is last and holds it
+    s = act(s, "p1", pos(45, at(s, 5000)));
+    s = act(s, "p0", pos(40, at(s, 5000)));
+    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, 5100) });
+    expect(s.bomb.holder).toBe("p0");
+    // obstacle hits don't cost lives in hot potato
+    s = act(s, "p0", pos(50, at(s, 5500), { hits: 2 }));
+    expect(s.players.p0.outAt).toBeNull();
+    s = act(s, "p1", pos(80, at(s, 6000)));
     s = L.applyAction(s, "SYS", { type: "tick", t: s.bomb.until + 1 });
-    expect(s.players[other].booms).toBe(1);
+    expect(s.players.p0.booms).toBe(1);
     expect(s.blasts).toHaveLength(1);
     expect(s.bomb).toBeNull();
   });
@@ -1066,20 +1067,19 @@ describe("new modes", () => {
     expect(s.coinsTaken).not.toContain(0);
   });
 
-  it("hot potato: the holder can throw the bomb to the nearest runner within range, any lane", () => {
+  it("hot potato: three blasts and you're out", () => {
     let s = start("potato");
-    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, L.POTATO_FIRST_MS + 10) });
-    const first = s.bomb.holder;
-    const other = first === "p0" ? "p1" : "p0";
-    s = act(s, first, pos(100, at(s, 5000), { lane: 0 }));
-    s = act(s, other, pos(100 - L.BOMB_THROW_M - 5, at(s, 5000), { lane: 3 }));
-    expect(reject(s, first, { type: "pass", t: at(s, 5100) })).toMatch(/nobody close/);
-    expect(reject(s, other, { type: "pass", t: at(s, 5100) })).toMatch(/no bomb/);
-    s = act(s, other, pos(100 - L.BOMB_THROW_M + 4, at(s, 5200), { lane: 3 }));
-    s = act(s, first, { type: "pass", t: at(s, 5300) });
-    expect(s.bomb.holder).toBe(other);
-    // and can't be thrown straight back
-    expect(reject(s, other, { type: "pass", t: at(s, 6200) })).toMatch(/nobody close/);
+    s = act(s, "p0", pos(30, at(s, 2900)));
+    s = act(s, "p1", pos(20, at(s, 2900)));
+    let t = L.POTATO_FIRST_MS + 10;
+    for (let i = 0; i < L.livesOf(s); i++) {
+      s = L.applyAction(s, "SYS", { type: "tick", t: at(s, t) });
+      expect(s.bomb.holder).toBe("p1");
+      s = L.applyAction(s, "SYS", { type: "tick", t: s.bomb.until + 1 });
+      t = s.bomb ? t : s.nextBombAt - s.startAt + 10;
+    }
+    expect(s.players.p1.booms).toBe(L.livesOf(s));
+    expect(s.players.p1.outAt).not.toBeNull();
   });
 });
 

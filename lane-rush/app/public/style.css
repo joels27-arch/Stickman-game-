@@ -1064,7 +1064,9 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .mode-hud.chase { border-color: #ff8fb8; }
 .mode-hud.chase.danger { background: #c21e3a; animation: btnPulse 0.45s ease-in-out infinite; }
 .mode-hud.coins { border-color: #ffc928; color: #ffd23f; font-size: 28px; }
-.mode-hud.bomb { left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 18px; border-color: #ff4d00; background: #2a0a00; animation: btnPulse 0.5s ease-in-out infinite; }
+.mode-hud.bomb { left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 18px; border-color: #ff9f1c; background: rgba(42, 14, 0, 0.85); }
+.mode-hud.bomb.mine { border-color: #ff4d00; background: #c21e00; }
+.mode-hud.bomb.hot { animation: btnPulse 0.4s ease-in-out infinite; }
 .brain-fx { position: fixed; inset: 0; pointer-events: none; z-index: 4; opacity: 0; transition: opacity 0.3s; box-shadow: inset 0 0 120px 40px rgba(255, 40, 90, 0.75); }
 .brain-fx.on { opacity: 1; animation: brainPulse 0.6s ease-in-out infinite; }
 @keyframes brainPulse { 50% { opacity: 0.55; } }
@@ -1686,10 +1688,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 }
 
 /* Hot Potato: big PASS button while you hold the bomb */
-.bomb-btn { position: fixed; z-index: 12; left: 50%; bottom: calc(118px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 10px 22px 10px 14px; border: 3px solid #fff; border-radius: 999px; background: linear-gradient(180deg, #ff6b3d, #d62a00); color: #fff; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 26px; box-shadow: 0 5px 0 #7a1400, 0 0 24px rgba(255, 90, 40, 0.7); cursor: pointer; animation: bombPulse 0.6s ease-in-out infinite; touch-action: manipulation; }
-@keyframes bombPulse { 50% { transform: translateX(-50%) scale(1.07); } }
-.bomb-btn[hidden] { display: none; }
-.bomb-btn span { font-size: 30px; }
 
 /* ── Missions page: game-quality look ── */
 .hp-missions { background: radial-gradient(ellipse at 50% 0%, rgba(255, 80, 170, 0.35), transparent 55%), linear-gradient(180deg, #2a1166 0%, #160a3d 45%, #0c0726 100%); }
@@ -1783,7 +1781,6 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .combo { top: max(118px, calc(env(safe-area-inset-top) + 112px)); }
 .feed { top: max(118px, calc(env(safe-area-inset-top) + 112px)); max-width: min(52vw, 300px); }
 .hud .saved-slot { left: calc(var(--safe-l) + 23px); bottom: calc(var(--safe-b) + 96px); }
-.bomb-btn { bottom: calc(max(14px, calc(env(safe-area-inset-bottom) + 8px)) + 146px); }
 @media (max-width: 760px) {
   .power-toast { bottom: calc(max(14px, calc(env(safe-area-inset-bottom) + 8px)) + 146px); }
 }

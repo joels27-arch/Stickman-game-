@@ -43,7 +43,7 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  *   chase      — Brain Chase: a giant brain rolls after everyone and keeps
  *                speeding up; caught = out, last one running wins
  *   coinrush   — Coin Rush: 90 s, most coins wins; a hit spills your coins
- *   potato     — Hot Potato: a bomb on a random fuse, passed on by bumping
+ *   potato     — Hot Potato: the bomb sits on whoever is last and blows every 20 s
  *                into someone; it costs whoever holds it a heart (3 = out)
  *   cup        — Party Cup: three different rounds of the above, in a random
  *                order; placings score CUP_POINTS, most points wins
@@ -90,18 +90,18 @@ export const COIN_SPILL = 5;
 /** Coin Rush: a coin someone took comes back this long after, so nobody runs dry. */
 export const COIN_RESPAWN_MS = 5000;
 export const LOOSE_MS = 15000;
-/** Hot Potato: the bomb blows after a random fuse; pass it by bumping into someone. */
+/** Hot Potato: the bomb always sits on whoever is last and blows on a fixed fuse; each blast costs a life. */
 export const POTATO_FIRST_MS = 3000;
 export const POTATO_NEXT_MS = 2500;
-export const BOMB_PASS_M = 1.8;
-/** Hot Potato: the holder can also throw the bomb to the nearest runner this close (any lane, ahead or behind). */
-export const BOMB_THROW_M = 12;
+export const POTATO_FUSE_MS = 20000;
+/** Hot Potato: the bomb can't jump between runners faster than this (no flicker when two are side by side). */
+export const BOMB_SWAP_MS = 600;
 /** Quick reactions anyone can show above their runner. */
 export const EMOTES = ["👋", "😂", "🔥", "😱", "😎", "💪"];
 /** Emotes you can buy in the shop (anyone may send them; the shop decides who sees the button). */
 export const SHOP_EMOTES = ["👑", "🧠", "🤡", "🥶", "💩", "🫡"];
 /** Running trails (cosmetic): everyone in the race sees yours. "" = none. */
-export const TRAILS = ["", "sparkle", "bubbles", "fire", "rainbow", "lightning", "gold", "neon"];
+export const TRAILS = ["", "sparkle", "bubbles", "fire", "rainbow", "lightning", "neon"];
 export const EMOTE_COOLDOWN_MS = 1200;
 /** In survival a heart floats over the track every so often: grab it to win back a lost heart. */
 export const HEART_EVERY_M = 420;
@@ -959,33 +959,20 @@ function spillCoins(state, p, t) {
   state.looseSeq = (state.looseSeq ?? 0) + 1;
   state.loose = [...(state.loose ?? []), { id: state.looseSeq, d: Math.round((p.d + 3) * 10) / 10, lane: p.lane, n, at: t }].slice(-20);
 }
-function giveBomb(state, t, exclude = null) {
-  const alive = ids(state).map((x) => state.players[x]).filter((p) => racingNow(p) && p.id !== exclude);
-  const pool = alive.length ? alive : ids(state).map((x) => state.players[x]).filter((p) => racingNow(p));
-  if (!pool.length) return;
-  const r = rng((Math.floor(t) ^ state.seed) >>> 0);
-  const holder = pool[Math.floor(r() * pool.length)];
-  state.bombSeq = (state.bombSeq ?? 0) + 1;
-  state.bomb = { id: state.bombSeq, holder: holder.id, prev: null, at: t, until: t + 10000 + Math.floor(r() * 6000), passAt: t };
-}
-/** The nearest runner the bomb can be thrown to, or null. */
-function bombTarget(state, holder, t) {
-  const b = state.bomb;
-  let best = null;
+/** Whoever is furthest back among the runners still in (ties go to the first in the room). */
+function lastRunner(state) {
+  let last = null;
   for (const id of ids(state)) {
     const p = state.players[id];
-    if (p.id === holder.id || !racingNow(p)) continue;
-    if (p.id === b.prev && t - b.passAt < 1500) continue; // no straight hand-back
-    const gap = Math.abs(p.d - holder.d);
-    if (gap <= BOMB_THROW_M && (!best || gap < Math.abs(best.d - holder.d))) best = p;
+    if (racingNow(p) && (!last || p.d < last.d)) last = p;
   }
-  return best;
+  return last;
 }
-function passBomb(state, to, t) {
-  const b = state.bomb;
-  b.prev = b.holder;
-  b.holder = to.id;
-  b.passAt = t;
+function giveBomb(state, t) {
+  const holder = lastRunner(state);
+  if (!holder) return;
+  state.bombSeq = (state.bombSeq ?? 0) + 1;
+  state.bomb = { id: state.bombSeq, holder: holder.id, prev: null, at: t, until: t + POTATO_FUSE_MS, passAt: t };
 }
 function takeCoin(state, i, t) {
   state.coinsTaken = [...(state.coinsTaken ?? []), i];
@@ -1016,12 +1003,15 @@ function stepMode(state, t) {
       if (state.nextBombAt !== null && t >= state.nextBombAt) giveBomb(state, t);
       return;
     }
-    const holder = state.players[b.holder];
-    if (!racingNow(holder)) {
-      // the holder left or got knocked out some other way: hand it to someone else
-      giveBomb(state, t, b.holder);
-      return;
+    // the bomb jumps to whoever is last: overtake someone and it's theirs
+    const last = lastRunner(state);
+    if (!last) return;
+    if (last.id !== b.holder && (!racingNow(state.players[b.holder]) || t - b.passAt >= BOMB_SWAP_MS)) {
+      b.prev = b.holder;
+      b.holder = last.id;
+      b.passAt = t;
     }
+    const holder = state.players[b.holder];
     if (t >= b.until) {
       holder.booms = (holder.booms ?? 0) + 1;
       state.blastSeq = (state.blastSeq ?? 0) + 1;
@@ -1033,21 +1023,6 @@ function stepMode(state, t) {
       }
       state.bomb = null;
       state.nextBombAt = t + POTATO_NEXT_MS;
-      return;
-    }
-    if (t - b.passAt < 700) return;
-    // bots throw it on when someone is close (not instantly, so you can get away)
-    if (holder.bot && t - b.passAt > 1500) {
-      const to = bombTarget(state, holder, t);
-      if (to && rng((Math.floor(t / 250) ^ state.seed) >>> 0)() < 0.2) return passBomb(state, to, t);
-    }
-    const near = ids(state)
-      .map((x) => state.players[x])
-      .find((p) => p.id !== holder.id && racingNow(p) && p.lane === holder.lane && Math.abs(p.d - holder.d) < BOMB_PASS_M && !(p.id === b.prev && t - b.passAt < 1500));
-    if (near) {
-      b.prev = holder.id;
-      b.holder = near.id;
-      b.passAt = t;
     }
   }
 }
@@ -1274,7 +1249,7 @@ function stepBots(state, t) {
       v = runSpeed(state.kind, elapsedS) * (0.97 + roll(state.seed, bi, 1) * 0.03) * botLevel(state).pace;
       if ((p.rocketUntil ?? 0) > t) v += survival ? SURVIVAL_ROCKET : ROCKET_SPEED - BASE_SPEED;
       if ((p.slowUntil ?? 0) > t) v *= 0.55;
-      if (state.bomb?.holder === id) v *= 1.15; // the bomb holder runs a little faster, to catch someone
+      if (state.bomb?.holder === id) v *= 1.1; // the bomb holder runs a little faster, to get out of last
       if (p.act === "stumble") p.act = "run";
     }
     // speed up from a standstill like a player does (start, after a fall)
@@ -1341,11 +1316,6 @@ function stepBots(state, t) {
         state.loose = state.loose.filter((x) => x.id !== c.id);
         p.coins = (p.coins ?? 0) + c.n;
       }
-    }
-    if (state.bomb?.holder === id && (p.stunUntil ?? 0) <= t) {
-      // steer toward the nearest runner ahead to hand the bomb over
-      const target = runners.filter((o) => o.id !== id && racingNow(o) && o.d > p.d && o.d - p.d < 25).sort((a, b) => a.d - b.d)[0];
-      if (target && target.lane !== p.lane && roll(state.seed, bi, t / 700) < 0.5) p.lane += Math.sign(target.lane - p.lane);
     }
     // moving obstacles: time the jump/slide, or be in another lane when it passes
     if (!rocketing) {
@@ -1620,14 +1590,6 @@ export function validateAction(state, playerId, action) {
       if (Math.abs(target.d - me.d) > PUNCH_REACH_M + POS_SLACK_M) return { ok: false, error: "too far" };
       return { ok: true };
     }
-    case "pass": {
-      if (!me) return { ok: false, error: "join first" };
-      if (state.phase !== "race" || state.kind !== "potato" || state.bomb?.holder !== playerId) return { ok: false, error: "no bomb" };
-      const t = num(action.t) ? action.t : state.now;
-      if (t - state.bomb.passAt < 700) return { ok: false, error: "too soon" };
-      if (!bombTarget(state, me, t)) return { ok: false, error: "nobody close" };
-      return { ok: true };
-    }
     case "emote": {
       if (!me) return { ok: false, error: "join first" };
       if (!EMOTES.includes(action.e) && !SHOP_EMOTES.includes(action.e)) return { ok: false, error: "bad emote" };
@@ -1881,9 +1843,6 @@ export function applyAction(state0, playerId, action) {
         takeCoin(state, action.i, t);
         me.coins = (me.coins ?? 0) + (coinsFor(state)[action.i]?.v ?? 1);
       }
-      break;
-    case "pass":
-      passBomb(state, bombTarget(state, me, t), t);
       break;
     case "heart":
       state.heartsTaken = [...(state.heartsTaken ?? []), { i: action.i, by: playerId }];

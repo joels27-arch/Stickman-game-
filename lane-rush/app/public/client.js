@@ -27,6 +27,7 @@ import {
   MIN_RACERS_FOR_MEDALS,
   POWERS,
   LIVES,
+  POTATO_FUSE_MS,
   SURVIVAL_LEN,
   SURVIVAL_BOOST,
   survivalSpeed,
@@ -129,7 +130,7 @@ const GAME_MODE_INFO = {
   survival: { label: "Survival", icon: "❤️", tag: "Main mode", text: "3 hearts. Last one standing wins." },
   chase: { label: "Brain Chase", icon: "🧠", tag: "Run for it", text: "Outrun the giant brain!" },
   coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins." },
-  potato: { label: "Hot Potato", icon: "💣", tag: "Pass it on", text: "Pass the bomb before it blows!" },
+  potato: { label: "Hot Potato", icon: "💣", tag: "Don't be last", text: "Last place holds the bomb!" },
   random: { label: "Random", icon: "🎲", tag: "Surprise", text: "A surprise mode each race." },
   grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "One round of every mode." },
 };
@@ -160,7 +161,7 @@ const KIND_RULE = {
   survival: "3 hearts · last one standing wins",
   chase: "Don't let the brain catch you!",
   coinrush: "Grab the most coins in 90 s",
-  potato: "Got the bomb? Tap PASS 💣 to throw it on!",
+  potato: "Last place holds the bomb. Overtake to lose it!",
   sprint: "First to the finish line",
 };
 const MAP_INFO = {
@@ -957,10 +958,10 @@ const TRAIL_INFO = {
   fire: { name: "Fire", colors: ["#ff4d00", "#ff9f1c", "#ffe066"], price: 600 },
   rainbow: { name: "Rainbow", colors: ["#ff4d6d"], price: 800 },
   lightning: { name: "Lightning", colors: ["#7df9ff", "#ffffff", "#4f7dff"], price: 800 },
-  gold: { name: "Golden", colors: ["#ffd23f", "#ffb300", "#fff2b0"], pass: "free" },
   neon: { name: "Neon", colors: ["#ff3df5", "#3dfcff", "#b6f72a"], pass: "gold" },
 };
 const EMOTE_PRICE = 200;
+const EMOTE_NAME = { "👑": "King", "🧠": "Big brain", "🤡": "Clown", "🥶": "Frozen", "💩": "Poop", "🫡": "Salute" };
 function equipped() {
   try {
     const e = JSON.parse(local.getItem("lr:equip") || "{}") || {};
@@ -1045,7 +1046,7 @@ function renderItems() {
     el("h3", { class: "album-title", text: "Running trails" }),
     el("div", { class: "item-grid" }, ...Object.entries(TRAIL_INFO).map(([k, t]) => card(`trail:${k}`, "trail", t.name, swatch(k), t.price, t.pass))),
     el("h3", { class: "album-title", text: "Emotes" }),
-    el("div", { class: "item-grid emotes" }, ...SHOP_EMOTES.map((e) => card(`emote:${e}`, null, e, el("i", { class: "big-emoji", text: e }), EMOTE_PRICE))),
+    el("div", { class: "item-grid emotes" }, ...SHOP_EMOTES.map((e) => card(`emote:${e}`, null, EMOTE_NAME[e] ?? "Emote", el("i", { class: "big-emoji", text: e }), EMOTE_PRICE))),
   );
   renderWallet();
 }
@@ -3840,6 +3841,29 @@ const world = (() => {
     }
     return emojiTexCache.get(e);
   }
+  /** A soft white dot that fades out to the edge: tint it for glows and flashes. */
+  let glowTexture = null;
+  function glowTex() {
+    if (!glowTexture) {
+      const c = document.createElement("canvas");
+      c.width = c.height = 128;
+      const g = c.getContext("2d");
+      const grd = g.createRadialGradient(64, 64, 2, 64, 64, 64);
+      grd.addColorStop(0, "rgba(255,255,255,1)");
+      grd.addColorStop(0.3, "rgba(255,255,255,0.55)");
+      grd.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 128, 128);
+      glowTexture = new THREE.CanvasTexture(c);
+    }
+    return glowTexture;
+  }
+  const glowSprite = (color, scale) => {
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, fog: false }));
+    spr.scale.setScalar(scale);
+    spr.renderOrder = 11;
+    return spr;
+  };
   /** After a crash: three stars circle the runner's head until they're back up. */
   function dizzy(runner, secs) {
     if (runner.dizzy) runner.group.remove(runner.dizzy);
@@ -5037,6 +5061,8 @@ const world = (() => {
   let modeKind = "";
   let brainObj = null;
   let bombObj = null;
+  let bombHop = { holder: null, from: null, t0: 0 }; // the bomb hops over when it changes hands
+  const blastFx = []; // flashes and shockwave rings from explosions
   let coinList = [];
   let looseMeshes = new Map();
   const coinGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.14, 24);
@@ -5135,16 +5161,29 @@ const world = (() => {
     }
     if (kind === "potato") {
       bombObj = new THREE.Group();
+      // a red glow behind it that grows as the fuse burns down, and a spark on the fuse
+      const glow = glowSprite(0xff4a12, 1.8);
+      glow.name = "glow";
+      bombObj.add(glow);
+      const body = new THREE.Group();
+      body.name = "body";
+      bombObj.add(body);
       const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex("💣"), depthTest: false, transparent: true }));
       spr.scale.set(1.2, 1.2, 1);
       spr.renderOrder = 12;
-      bombObj.add(spr);
+      body.add(spr);
+      const spark = glowSprite(0xffe066, 0.5);
+      spark.name = "spark";
+      spark.renderOrder = 13;
+      spark.position.set(0.25, 0.62, 0);
+      bombObj.add(spark);
       bombObj.visible = false;
+      bombHop = { holder: null, from: null, t0: 0 };
       scene.add(bombObj);
       loadModeProp("bomb", { width: 0.95, maxHeight: 1.2 }).then((m) => {
         if (!m || !bombObj || modeKind !== "potato") return;
-        bombObj.remove(spr);
-        bombObj.add(sizeTo(m.clone(), 0.9));
+        body.remove(spr);
+        body.add(sizeTo(m.clone(), 0.9));
       });
     }
   }
@@ -5192,21 +5231,71 @@ const world = (() => {
         looseMeshes.delete(id);
       }
     }
+    stepBlasts();
     if (modeKind === "potato" && bombObj) {
-      const at = v.bomb ? posOf(v.bomb.holder) : null;
+      const b = v.bomb;
+      const at = b ? posOf(b.holder) : null;
+      const wasShown = bombObj.visible;
       bombObj.visible = Boolean(at);
       if (at) {
-        const k = performance.now() / 1000;
-        const left = (v.bomb.until - sn) / 1000;
-        const pulse = left < 3 ? 1 + Math.sin(k * 25) * 0.12 : 1 + Math.sin(k * 6) * 0.05;
-        bombObj.position.set(at.x, at.y + CHAR_H + 0.9, at.z);
-        bombObj.scale.setScalar(pulse);
-        bombObj.rotation.y = k * 2;
+        const now = performance.now();
+        const k = now / 1000;
+        if (b.holder !== bombHop.holder) bombHop = { holder: b.holder, from: wasShown ? bombObj.position.clone() : null, t0: now };
+        // 0 when the fuse is fresh, 1 the moment it blows: everything speeds up and swells toward 1
+        const danger = 1 - Math.min(1, Math.max(0, (b.until - sn) / POTATO_FUSE_MS));
+        const rate = 5 + danger * danger * 30;
+        const x = at.x;
+        let y = at.y + CHAR_H + 0.9;
+        let z = at.z;
+        const hop = (now - bombHop.t0) / 380;
+        if (bombHop.from && hop < 1) {
+          const e = hop * hop * (3 - 2 * hop);
+          bombObj.position.set(bombHop.from.x + (x - bombHop.from.x) * e, bombHop.from.y + (y - bombHop.from.y) * e + Math.sin(Math.PI * hop) * 2.4, bombHop.from.z + (z - bombHop.from.z) * e);
+        } else bombObj.position.set(x, y + Math.sin(k * 4) * 0.06, z);
+        const beat = Math.abs(Math.sin(k * rate));
+        const body = bombObj.getObjectByName("body");
+        body.scale.setScalar(1 + beat * (0.04 + danger * 0.22));
+        body.rotation.z = Math.sin(k * rate * 1.3) * danger * 0.25;
+        body.rotation.y = k * 1.5;
+        const glow = bombObj.getObjectByName("glow");
+        glow.scale.setScalar(1.4 + danger * 2.2 + beat * danger * 0.6);
+        glow.material.opacity = 0.2 + danger * 0.7 * (0.4 + 0.6 * beat);
+        const spark = bombObj.getObjectByName("spark");
+        spark.scale.setScalar(0.3 + Math.random() * 0.35);
+        spark.material.opacity = 0.6 + Math.random() * 0.4;
       }
     }
   }
+  /** The bomb going off: a fireball, a white flash and a shockwave ring along the ground. */
   function explode(x, z) {
-    burst(x, 1.2, z, ["#ff9f1c", "#ff4d00", "#ffe066", "#333333"], 90);
+    burst(x, 1.2, z, ["#ff9f1c", "#ff4d00", "#ffe066", "#ffffff"], 150);
+    burst(x, 1.6, z, ["#3a3a3a", "#555555", "#2a2a2a"], 50);
+    const flash = glowSprite(0xffc070, 1);
+    flash.position.set(x, 1.4, z);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, 0.12, z);
+    scene.add(flash, ring);
+    blastFx.push({ flash, ring, t0: performance.now() });
+  }
+  function stepBlasts() {
+    const now = performance.now();
+    for (let i = blastFx.length - 1; i >= 0; i--) {
+      const f = blastFx[i];
+      const k = (now - f.t0) / 650;
+      if (k >= 1) {
+        scene.remove(f.flash, f.ring);
+        f.flash.material.dispose();
+        f.ring.geometry.dispose();
+        f.ring.material.dispose();
+        blastFx.splice(i, 1);
+        continue;
+      }
+      f.flash.scale.setScalar(2 + Math.sqrt(k) * 9);
+      f.flash.material.opacity = 1 - k;
+      f.ring.scale.setScalar(1 + k * 7);
+      f.ring.material.opacity = 0.9 * (1 - k);
+    }
   }
 
   // the thundercloud: a dark storm sprite hovering over whoever holds it
@@ -5831,7 +5920,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "ArrowRight" || k === "d" || k === "D") input("right");
   else if (k === "ArrowUp" || k === "w" || k === "W" || k === " ") input("jump");
   else if (k === "ArrowDown" || k === "s" || k === "S") input("slide");
-  else if (k === "e" || k === "E" || k === "Enter") passBomb() || useItem(me.lane, 1);
+  else if (k === "e" || k === "E" || k === "Enter") useItem(me.lane, 1);
   else if (k === "q" || k === "Q") useItem(me.lane, -1);
   else if (/^Digit[1-4]$/.test(e.code)) useItem(Number(e.code.slice(5)) - 1, e.shiftKey ? -1 : 1);
   else if (k === "c" || k === "C" || k === "b" || k === "B") game.lookBack = canControl() || game.mode === "race";
@@ -5946,7 +6035,7 @@ function stepMe(dt) {
   if (me.glueT > 0) base *= GLUE_SLOW;
   if (me.slowPadT > 0) base *= 0.55; // ran over a red slow pad
   if (me.staggerT > 0) base *= 0.6;
-  if (net.view?.bomb?.holder === playerId) base *= 1.15; // catch someone and pass it on!
+  if (net.view?.bomb?.holder === playerId) base *= 1.1; // a little push to get out of last
   const fast = base + (isSurvival() ? SURVIVAL_BOOST : BOOST_SPEED - BASE_SPEED);
   const rocket = isSurvival() ? base + SURVIVAL_ROCKET : ROCKET_SPEED;
   let target = me.power === "rocket" ? rocket : me.boostT > 0 ? fast : base;
@@ -7004,7 +7093,7 @@ function passReward(level, track) {
   if (track === "free") {
     if (level === 1) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
     if (level === PASS_RUNNERS[KIKO]) return { runner: KIKO, label: RUNNERS[KIKO].name, img: portrait(KIKO) };
-    if (level === 30) return { item: "trail:gold", label: "Golden trail", icon: "✨" };
+    if (level === 30) return { coins: 800, label: "800 coins", img: "/assets/ui_c3.webp" };
     if (level % 10 === 5) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
     if (level % 4 === 0) return { coins: 120 + level * 15, label: `${120 + level * 15} coins`, img: "/assets/ui_c2.webp" };
     return { coins: 50 + level * 10, label: `${50 + level * 10} coins`, img: "/assets/ui_c1.webp" };
@@ -7769,6 +7858,18 @@ function modeTick(prevD, v) {
 function modeView(v) {
   const mine = v.players.find((p) => p.id === playerId);
   if (mine && mine.outAt != null && !me.out && game.mode === "race") knockOut(v.kind === "chase" ? "brain" : v.kind === "potato" ? "bomb" : "");
+  // hot potato: tell me when the bomb lands on me, and when I've shaken it off
+  if (v.kind === "potato" && game.mode === "race" && !me.out) {
+    const h = v.bomb?.holder ?? null;
+    if (h !== game.bombHolder) {
+      if (h === playerId) {
+        banner("💣 YOU'RE LAST!", 900);
+        buzz(40);
+        sfx.pop();
+      } else if (game.bombHolder === playerId && h) banner("😅 BOMB GONE!", 800);
+      game.bombHolder = h;
+    }
+  }
   for (const b of v.blasts || []) {
     if (b.id <= (game.lastBlast ?? 0)) continue;
     game.lastBlast = b.id;
@@ -7821,29 +7922,14 @@ function renderModeHud() {
     box.className = "mode-hud coins";
     setText(box, `🪙 ${myCoins()}`);
   } else if (game.kind === "potato") {
+    // everyone sees the fuse; the last runner sees it in red
     const mineBomb = v.bomb?.holder === playerId;
-    box.hidden = !mineBomb || me.out;
-    box.className = "mode-hud bomb";
-    const left = v.bomb ? (v.bomb.until - serverNow()) / 1000 : 0;
-    setText(box, left < 3.5 ? `💣 ${Math.max(0, left).toFixed(1)} s · PASS IT!` : "💣 You have the bomb! Tap PASS");
+    box.hidden = !v.bomb || me.out;
+    const left = v.bomb ? Math.max(0, (v.bomb.until - serverNow()) / 1000) : 0;
+    box.className = `mode-hud bomb${mineBomb ? " mine" : ""}${left < 5 ? " hot" : ""}`;
+    setText(box, mineBomb ? `💣 ${Math.ceil(left)} s · You're last! Overtake!` : `💣 ${Math.ceil(left)} s · ${nameOf(v.bomb?.holder)}`);
   } else box.hidden = true;
-  // the PASS button only while you hold the bomb
-  const bombBtn = hudEl.bomb ?? (hudEl.bomb = $("#bombBtn"));
-  const holding = game.kind === "potato" && v.bomb?.holder === playerId && !me.out;
-  if (bombBtn.hidden === holding) {
-    bombBtn.hidden = !holding;
-    if (holding) $("#powerToast").classList.remove("show"); // the tip shares its spot
-  }
 }
-function passBomb() {
-  if (game.kind !== "potato" || net.view?.bomb?.holder !== playerId) return false;
-  act({ type: "pass" });
-  return true;
-}
-$("#bombBtn").addEventListener("click", (e) => {
-  e.preventDefault();
-  passBomb();
-});
 
 /** Mind swap moved us (our warp went up), or someone punched us. */
 function applyWarpsAndPunches(v) {
@@ -7918,7 +8004,7 @@ function showPowerToast(kind, how = "") {
   // explain each power-up the first few times only, and never over the PASS button
   let seen = {};
   try { seen = JSON.parse(local.getItem("lr:tips") || "{}") || {}; } catch { /* fresh tips */ }
-  if ((seen[kind] ?? 0) >= POWER_TIPS || !$("#bombBtn").hidden) return;
+  if ((seen[kind] ?? 0) >= POWER_TIPS) return;
   seen[kind] = (seen[kind] ?? 0) + 1;
   local.setItem("lr:tips", JSON.stringify(seen));
   t.replaceChildren(
