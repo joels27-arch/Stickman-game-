@@ -2759,3 +2759,18 @@ html, body { background: var(--k1); }
 .char-lvl .lvup { width: 100%; }
 .ccard .clvl { top: 40px; left: 6px; }
 .char-lvl .lvup:disabled { opacity: 0.45; filter: grayscale(0.6); }
+
+/* place: a small chip top left (was a big gold medal) */
+.hud .place { width: auto; height: 40px; min-width: 0; margin: 6px 0 0 4px; padding: 0 12px; display: flex; align-items: baseline; justify-content: center; gap: 1px; border-radius: 14px; border: 3px solid #ffd23f; background: rgba(10, 14, 10, 0.72); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
+.hud .place::before { display: none; }
+.hud .place b { font-size: 28px; line-height: 34px; color: #fff; -webkit-text-stroke: 0; }
+.hud .place sup { font-size: 14px; color: #fff; -webkit-text-stroke: 0; align-self: flex-start; margin-top: 6px; }
+.hud .place sub { font-size: 13px; color: rgba(255, 255, 255, 0.6); -webkit-text-stroke: 0; margin-left: 2px; }
+.hud .place[data-p="2"] { border-color: #c9d4e2; }
+.hud .place[data-p="3"] { border-color: #d9884a; }
+.hud .place[data-p="4"], .hud .place[data-p="5"], .hud .place[data-p="6"], .hud .place[data-p="7"], .hud .place[data-p="8"] { border-color: rgba(255, 255, 255, 0.5); }
+.hud .hearts { top: calc(max(10px, env(safe-area-inset-top)) + 56px); }
+.hud .dist-chip { top: calc(max(10px, env(safe-area-inset-top)) + 88px); }
+.hud .run-coins { top: calc(max(10px, env(safe-area-inset-top)) + 118px); }
+/* the mark at the top of the bar: the finish flag, or the next distance mark */
+.hud .track-bar.endless .flag { display: block; top: -26px; padding: 1px 6px; border-radius: 8px; background: rgba(10, 14, 10, 0.72); font-family: var(--display); font-weight: 900; font-size: 13px; color: #fff; white-space: nowrap; }

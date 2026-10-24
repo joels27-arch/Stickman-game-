@@ -9058,9 +9058,13 @@ function updateHud() {
   // the bar up the right side: finish at the top in a race; in survival the leader is at the top
   const bar = hudEl.bar ?? (hudEl.bar = $(".track-bar"));
   bar.hidden = entries.length < 2;
+  // the top of the bar is the finish line; modes without one show the next distance mark
+  // (every 250 m) instead, so the leader isn't stuck at the very top
   const ds = entries.map((e) => e.d);
-  const lo = isSurvival() ? Math.min(...ds) : 0;
-  const span = isSurvival() ? Math.max(40, Math.max(...ds) - lo) : TRACK_LEN;
+  const lo = 0;
+  const span = isSurvival() ? Math.max(250, Math.ceil((Math.max(...ds) + 60) / 250) * 250) : TRACK_LEN;
+  const flag = hudEl.flag ?? (hudEl.flag = bar.querySelector(".flag"));
+  setText(flag, isSurvival() ? `${span} m` : "🏁");
   for (const dot of hudEl.dots.children) {
     const id = dot.getAttribute("data-id");
     const e = entries.find((x) => x.id === id);
