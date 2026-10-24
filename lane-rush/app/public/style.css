@@ -2729,3 +2729,31 @@ html, body { background: var(--k1); }
 .ask-sheet .ask-country { justify-content: center; height: 46px; border-radius: 14px; font-size: 16px; }
 .ask-later { border: 0; background: none; color: rgba(255, 255, 255, 0.6); font: inherit; font-weight: 800; font-size: 14px; padding: 6px; }
 #askModal.modal { z-index: 70; }
+
+/* four packs, two by two: how many cards, and the top odds */
+.pack-row { grid-template-columns: 1fr 1fr; }
+.pack-card .pk-cards { font-weight: 900; font-size: 13px; color: var(--lime); }
+.pack-card .pk-odds { font-size: 11px; font-weight: 700; opacity: 0.75; }
+.pack-card.legend { border-color: #ffd23f; box-shadow: 0 0 18px rgba(255, 210, 63, 0.45); }
+.po-skip { position: absolute; z-index: 5; top: max(16px, env(safe-area-inset-top)); right: 16px; padding: 8px 16px; border: 2px solid #fff; border-radius: 999px; background: rgba(0, 0, 0, 0.45); color: #fff; font-family: var(--display); font-weight: 900; font-size: 15px; text-transform: uppercase; }
+.po-skip[hidden] { display: none; }
+.pcard .plvl { font-style: normal; font-weight: 900; font-size: 11px; color: #10141f; background: var(--lime); padding: 2px 8px; border-radius: 999px; }
+
+/* card levels: a badge on every card you own, and the level-up box on its sheet */
+.ccard { position: relative; }
+.ccard .clvl { position: absolute; top: 6px; left: 6px; display: grid; gap: 2px; justify-items: start; padding: 3px 6px; border-radius: 8px; background: rgba(0, 0, 0, 0.6); pointer-events: none; }
+.ccard .clvl b { font-family: var(--display); font-weight: 900; font-size: 12px; line-height: 1; color: #fff; }
+.ccard .clvl small { font-size: 9px; font-weight: 800; color: #fff; line-height: 1; }
+.ccard .clvl.ready { background: var(--lime); }
+.ccard .clvl.ready b, .ccard .clvl.ready small { color: #10141f; }
+.cbar { position: relative; display: block; width: 46px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
+.cbar i { position: absolute; inset: 0 auto 0 0; background: var(--lime); }
+.cbar small { display: none; }
+.clvl .cbar { width: 40px; height: 5px; }
+.char-lvl { display: grid; gap: 8px; width: 100%; padding: 10px 12px; border-radius: 14px; background: rgba(0, 0, 0, 0.3); text-align: left; }
+.char-lvl[hidden] { display: none; }
+.char-lvl .lv-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.char-lvl .lv-row b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 20px; color: var(--lime); }
+.char-lvl .lv-row span, .char-lvl small { font-size: 13px; font-weight: 700; color: rgba(255, 255, 255, 0.8); }
+.char-lvl .cbar.big { width: 100%; height: 10px; border-radius: 5px; }
+.char-lvl .lvup { width: 100%; }

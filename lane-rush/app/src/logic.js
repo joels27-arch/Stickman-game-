@@ -48,12 +48,12 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  *   cup        — Party Cup: three different rounds of the above, in a random
  *                order; placings score CUP_POINTS, most points wins
  *   grandtour  — Grand Tour tournament: every round kind once, in a random order
- * Empty spots are filled with bots. (The old 700 m "sprint" race still runs
- * if a kind is "sprint", but no mode starts one any more.)
+ *   sprint     — Classic Race: 700 m to a finish line, first one there wins
+ * Empty spots are filled with bots.
  * `state.mode` is what the host picked; `state.kind` is the race being run.
  * The host can also pick "random" as the mode or the map: it's drawn when each race starts.
  */
-export const GAME_MODES = ["survival", "chase", "coinrush", "potato", "grandtour", "random"];
+export const GAME_MODES = ["survival", "sprint", "chase", "coinrush", "potato", "grandtour", "random"];
 /** Modes played over several rounds with a points table. */
 export const CUP_MODES = ["grandtour"];
 /** How many rounds the host can pick for a match (the Grand Tour is always one of each mode). */

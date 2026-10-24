@@ -388,7 +388,7 @@ describe("survival (3 hearts)", () => {
   it("ignores positions once you're out and lets nobody else pick the mode", () => {
     let s = survival(2);
     expect(reject(lobbyOf(2), "p1", { type: "mode", mode: "chase" })).toMatch(/host/);
-    expect(reject(lobbyOf(2), "p0", { type: "mode", mode: "sprint" })).toBeTruthy();
+    expect(act(lobbyOf(2), "p0", { type: "mode", mode: "sprint" }).mode).toBe("sprint"); // Classic Race is back
     expect(reject(lobbyOf(2), "p0", { type: "mode", mode: "marathon" })).toBeTruthy();
     s = act(s, "p0", pos(50, s.startAt + 5000, 3));
     expect(s.phase).toBe("results");
