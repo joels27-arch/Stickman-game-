@@ -3009,7 +3009,7 @@ mirrorScene.add(mirrorDisc);
 const mirrorSize = new THREE.Vector2();
 let mirrorTick = 0;
 function renderMirror() {
-  const on = renderer && game.mode === "race" && !me.out && me.runner && !game.lookBack && serverNow() >= (net.view?.startAt ?? Infinity);
+  const on = renderer && game.mode === "race" && !me.out && me.runner && !game.lookBack && !game.noMirror && serverNow() >= (net.view?.startAt ?? Infinity);
   const f = $("#mirrorFrame");
   if (f.hidden === Boolean(on)) f.hidden = !on;
   if (!on) return;
