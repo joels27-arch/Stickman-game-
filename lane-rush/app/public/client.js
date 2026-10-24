@@ -4835,9 +4835,32 @@ const world = (() => {
     }
   }
 
+  /**
+   * The tutorial run's course: one thing at a time with lots of room. First a crate wall with one gap,
+   * a hurdle across the track and a gate across the track (each twice), then the normal course, thinned out.
+   */
+  function easyCourse(course) {
+    const rows = [];
+    const r = Math.random;
+    let z = 70;
+    for (let k = 0; k < 2; k++) {
+      for (const kind of ["crate", "hurdle", "gate"]) {
+        const gap = Math.floor(r() * LANES);
+        const lanes = Array.from({ length: LANES }, (_, l) => (kind === "crate" ? (l === gap ? "" : "crate") : kind));
+        rows.push({ z, lanes, looks: lanes.map(() => 0) });
+        z += 60;
+      }
+    }
+    for (const row of course.rows) {
+      if (row.z < z + 40 || row.lanes.includes("roller") || row.z - rows[rows.length - 1].z < 38) continue;
+      rows.push(row);
+    }
+    return { ...course, rows, slows: [], boosts: (course.boosts || []).filter((b) => b.z > z) };
+  }
   function buildCourseObjects(seed, len, boost = 0) {
     clearCourse();
-    const course = buildCourse(seed, len, boost);
+    let course = buildCourse(seed, len, boost);
+    if (world.easy) course = easyCourse(course);
     rollers = [];
     boxes = [];
     hearts = [];
@@ -5096,7 +5119,8 @@ const world = (() => {
   }
   function setupMovers(course, seed, map) {
     for (const m of moverList) raceGroup.remove(m.obj);
-    moverList = moversFor(course, seed, map).map((m) => {
+    // no moving obstacles in the tutorial run
+    moverList = (world.easy ? [] : moversFor(course, seed, map)).map((m) => {
       const spec = MOVER_MODEL[m.kind];
       const holder = new THREE.Group();
       let body;
@@ -5757,6 +5781,7 @@ function enterRace(v) {
   world.buildScenery(map);
   world.setEndless(isSurvival());
   remote.clear();
+  world.easy = Boolean(game.endless) && !local.getItem("lr:endlessTut"); // the tutorial run gets the easy course
   race.course = world.buildCourseObjects(v.seed, game.len, v.courseBoost ?? 0);
   // hearts only exist in modes where you have hearts to win back
   if (v.kind !== "survival" || (v.lives ?? LIVES) < 2) for (const h of world.hearts) h.taken = true; // none in a one-life endless run
@@ -5883,6 +5908,29 @@ function banner(text, ms = 1400) {
   bannerTimer = setTimeout(() => b.classList.remove("show"), ms);
 }
 
+// ── the invite: a small card pointing at Endless Run — "Let's go" starts the tutorial run, "Skip" doesn't ──
+function showTutInvite() {
+  if (game.mode !== "home" || local.getItem("lr:endlessTut")) return;
+  local.setItem("lr:tutAuto", "1");
+  $("#endlessBtn").classList.add("tut-hl");
+  $("#tutInvite").hidden = false;
+}
+function closeTutInvite() {
+  $("#tutInvite").hidden = true;
+  $("#endlessBtn").classList.remove("tut-hl");
+}
+$("#tutGo").addEventListener("click", () => {
+  closeTutInvite();
+  sfx.unlock();
+  startEndless();
+});
+$("#tutSkip").addEventListener("click", () => {
+  closeTutInvite();
+  local.setItem("lr:endlessTut", "1"); // they can still play it from Settings → How to run
+  local.setItem("lr:tutDone", "1");
+});
+$("#endlessBtn").addEventListener("click", closeTutInvite);
+
 // ── first endless run: the tutorial happens in the run ──
 // When something you haven't learned yet comes up in your lane, the game drops
 // into slow motion and shows the move; make it and it speeds back up. Then a
@@ -5959,7 +6007,7 @@ function coachTick(dt) {
     return 1;
   }
   const w = coach.wait;
-  coach.scale += ((w ? COACH_SLOW : 1) - coach.scale) * Math.min(1, dt * 12);
+  coach.scale += ((w ? COACH_SLOW : 0.8) - coach.scale) * Math.min(1, dt * 12); // a bit slower than a real run
   if (me.d > COACH_UNTIL_M) {
     coachEnd(true);
     return 1;
@@ -8620,11 +8668,8 @@ world
     world.buildScenery();
     world.setShowcase(preferredChar());
     if (net.view?.phase === "lobby") renderLobby(net.view);
-    // a brand-new player goes straight into their first run, which teaches them as they play
-    if (!local.getItem("lr:endlessTut") && !local.getItem("lr:tutAuto") && game.mode === "home") {
-      local.setItem("lr:tutAuto", "1");
-      setTimeout(() => game.mode === "home" && startEndless(), 600);
-    }
+    // a brand-new player first sees the game; then Nia invites them to a first run that teaches as they play
+    if (!local.getItem("lr:endlessTut") && !local.getItem("lr:tutAuto")) setTimeout(showTutInvite, 1800);
   })
   .catch((err) => {
     console.error(err);

@@ -2570,3 +2570,17 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 #lineup.lx .lx-stage { position: relative; z-index: 2; left: auto; bottom: auto; transform: none; flex: 1 1 auto; min-height: 0; height: auto; width: min(96vw, 560px); margin: 8px auto 0; }
 #lineup.lx .lx-char { height: auto; max-height: min(58%, 250px); width: auto; max-width: 135%; }
 #lineup.lx .lx-bottom { position: relative; z-index: 3; left: auto; right: auto; bottom: auto; flex: none; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); }
+
+/* first visit: Nia's invite to the first run, pointing down at Endless Run (which glows) */
+.tut-invite { position: fixed; z-index: 60; left: 0; right: 0; top: 30%; display: grid; justify-items: center; padding: 0 16px; pointer-events: none; }
+.tut-invite[hidden] { display: none; }
+.ti-card { position: relative; display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: end; gap: 6px; width: min(360px, 100%); padding: 12px 14px 14px 6px; border: 3px solid #fff; border-radius: 22px; background: linear-gradient(180deg, #5b8fff, #2a3fc0); color: #fff; box-shadow: 0 6px 0 #121c63, 0 18px 40px rgba(0, 0, 0, 0.5); pointer-events: auto; animation: gpop 360ms cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+.ti-card::after { content: ""; position: absolute; left: 50%; bottom: -18px; margin-left: -14px; border: 14px solid transparent; border-top-color: #fff; border-bottom: 0; animation: pointDown 0.8s ease-in-out infinite; }
+.ti-card img { height: 120px; margin-top: -40px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4)); }
+.ti-txt { display: grid; gap: 4px; }
+.ti-txt b { font-family: var(--display); font-weight: 900; font-size: 22px; line-height: 1.05; text-transform: uppercase; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3); }
+.ti-txt span { font-weight: 800; font-size: 14px; opacity: 0.95; }
+.ti-btns { display: flex; gap: 8px; margin-top: 6px; }
+.ti-skip { flex: none; padding: 8px 14px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.7); background: none; color: #fff; font: inherit; font-weight: 900; font-size: 14px; cursor: pointer; }
+.ti-go { flex: 1; padding: 8px 14px; border-radius: 12px; border: 2px solid #fff; background: linear-gradient(180deg, #d8ff6a, #8fe000); color: #1a3300; font-family: var(--display); font-weight: 900; font-size: 18px; text-transform: uppercase; box-shadow: 0 4px 0 #3f7a00; cursor: pointer; }
+#endlessBtn.tut-hl { position: relative; z-index: 59; animation: btnPulse 0.9s ease-in-out infinite; box-shadow: 0 0 0 4px #fff, 0 0 30px rgba(182, 247, 42, 0.9); }
