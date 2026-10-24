@@ -95,16 +95,11 @@ const PASS_RUNNERS = { [KIKO]: 2 };
  * (Anything bought under the old prices stays owned.)
  */
 const COLLECTION = [
-  { id: "luna", name: "Luna", color: "#9b5cff", rarity: "common", via: "coins", coins: 800 },
-  { id: "toto", name: "Toto", color: "#f2f2f2", rarity: "common", via: "coins", coins: 1200 },
-  { id: "blaze", name: "Blaze", color: "#ff4b2b", rarity: "rare", via: "coins", coins: 1800 },
   { id: "zara", name: "Zara", color: "#ff6fb5", rarity: "rare", via: "coins", coins: 2400 },
-  { id: "jax", name: "Jax", color: "#c98a3c", rarity: "rare", via: "coins", coins: 3000 },
   { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "coins", coins: 4500 },
   { id: "leo", name: "Sir Leo", color: "#4c8dff", rarity: "epic", via: "road", legacy: { medal: "silver", count: 4 } },
   { id: "kai", name: "Kai", color: "#21c7d9", rarity: "epic", via: "road", legacy: { medal: "silver", count: 6 } },
   { id: "zed", name: "Zed", color: "#7be3b0", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 3 } },
-  { id: "aria", name: "Aria", color: "#e03cff", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 5 } },
   { id: "porky", name: "Porky", color: "#ff9ec4", rarity: "common", via: "coins", coins: 900 },
   { id: "foxy", name: "Flash Fox", color: "#ff7a1a", rarity: "rare", via: "coins", coins: 2200 },
   { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "coins", coins: 2800 },
@@ -1287,7 +1282,6 @@ const PACK_CHARS = [
   { id: "brainz", name: "Prof. Brainz", rarity: "legendary", dupe: 1500 },
   { id: "frosty", name: "Frosty", rarity: "epic", dupe: 600 },
   { id: "ra", name: "Pharaoh Ra", rarity: "epic", dupe: 600 },
-  { id: "fin", name: "Captain Fin", rarity: "rare", dupe: 300 },
   { id: "mo", name: "Mecha Mo", rarity: "rare", dupe: 300 },
   { id: "zorp", name: "Zorp", rarity: "rare", dupe: 300 },
   { id: "glorb", name: "Glorb", rarity: "epic", dupe: 600 },
@@ -1993,7 +1987,6 @@ function untilText(ms) {
 
 /** Characters only found on the Trophy Road (the others on it are in COLLECTION, via "road"). */
 const ROAD_CHARS = [
-  { id: "ace", name: "Ace", rarity: "epic" },
   { id: "titan", name: "Titan", rarity: "legendary" },
   { id: "aurum", name: "Aurum", rarity: "legendary" },
 ];
@@ -2014,11 +2007,11 @@ const ROAD = [
   { pts: 360, char: "zed" },
   { pts: 420, coins: 1500 },
   { pts: 480, pack: "mega" },
-  { pts: 560, char: "aria" },
+  { pts: 560, char: "hoops" },
   { pts: 700, coins: 2500 },
-  { pts: 850, char: "ace" },
+  { pts: 850, pack: "mega" },
   { pts: 1000, pack: "mega" },
-  { pts: 1300, char: "hoops" },
+  { pts: 1300, coins: 3000 },
   { pts: 1600, coins: 4000 },
   { pts: 2000, char: "striker" },
   { pts: 2500, char: "titan" },
@@ -8648,6 +8641,20 @@ function checkForUpdate() {
 checkForUpdate();
 document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && checkForUpdate());
 
+// characters taken out of the game: whoever owned one gets coins for it, once
+{
+  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500 };
+  const owned = wallet.owned();
+  const had = owned.filter((id) => id in GONE && !local.getItem(`lr:refund:${id}`));
+  if (had.length) {
+    const coins = had.reduce((a, id) => a + GONE[id], 0);
+    for (const id of had) local.setItem(`lr:refund:${id}`, "1");
+    local.setItem("lr:owned", JSON.stringify(owned.filter((id) => !(id in GONE))));
+    if (had.includes(local.getItem("lr:avatar"))) local.removeItem("lr:avatar");
+    wallet.addCoins(coins);
+    setTimeout(() => toast(`Some characters left the game: +${coins.toLocaleString()} coins`), 1500);
+  }
+}
 // win celebrations were taken out of the game: whoever bought one gets its coins back, once
 {
   const RETIRED = { "cel:confetti": 300, "cel:hearts": 400, "cel:goldrain": 500, "cel:mega": 1000 };
