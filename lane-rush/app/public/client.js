@@ -2522,8 +2522,9 @@ function renderLobby(v) {
       const b = el(
         "button",
         { class: `mode-card${gm === key ? " on" : ""}`, type: "button" },
+        el("img", { class: "mode-ico", src: `/assets/mode_${key}.webp`, alt: "" }),
         el("em", { text: info.tag }),
-        el("b", { text: `${info.icon} ${key === "survival" && n < 2 && !botsOn() ? "Endless run" : info.label}` }),
+        el("b", { text: key === "survival" && n < 2 && !botsOn() ? "Endless run" : info.label }),
         el("span", { text: key === "survival" && n < 2 && !botsOn() ? "Alone: how far can you get?" : info.text }),
       );
       b.disabled = !isHost;
@@ -2535,12 +2536,10 @@ function renderLobby(v) {
   $("#mapPick").replaceChildren(
     ...["random", ...MAPS].map((key) => {
       const info = MAP_INFO[key];
-      const t = THEME[key];
-      // themed maps have no picture: their sky over their ground, and an icon
-      const style = key === "random" ? "" : t ? `background:linear-gradient(180deg, ${t.sky.top} 0%, ${t.sky.mid} 35%, ${t.sky.horizon} 58%, ${t.ground.colors[0]} 60%, ${t.ground.colors[1] ?? t.ground.colors[0]} 100%)` : `--pic:url(/assets/map_${key}.webp)`;
+      const style = key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)`;
       const b = el(
         "button",
-        { class: `map-card${mp === key ? " on" : ""}${key === "random" ? " random" : ""}${t ? " themed" : ""}`, type: "button", style, "data-icon": info.icon ?? "" },
+        { class: `map-card${mp === key ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style },
         el("b", { text: info.label }),
         el("span", { text: info.text }),
       );
@@ -6751,13 +6750,13 @@ function rankTab(friends) {
   $("#friendList").hidden = !friends;
   $("#leagueList").hidden = friends;
 }
+// your league, medals and rewards all live on the Trophy Road
 function openRank() {
-  renderRank();
-  rankTab(true);
-  rankModal.hidden = false;
+  openRoad();
 }
 $("#rankBadgeBtn").addEventListener("click", openRank);
 $("#leagueCard").addEventListener("click", openRank);
+for (const chip of document.querySelectorAll(".medal-chip")) chip.addEventListener("click", openRank);
 $("#profileCard").addEventListener("click", openStats);
 // ── Stats page: places, records, modes, and how you stand among your friends ──
 const statsModal = $("#statsModal");

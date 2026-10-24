@@ -1498,7 +1498,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 /* Play / Tournaments / Skins keep the top bar light: medals and settings; the Shop page shows everything */
 .home:not([data-page="shop"]) .tb-shop { display: none; }
 .home:not([data-page="shop"]):not([data-page="skins"]) .tb-coins { display: none; }
-.medal-chip { display: flex; align-items: center; gap: 4px; height: 40px; padding: 0 12px 0 6px; border-radius: 999px; background: rgba(8, 12, 30, 0.7); border: 2px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(8px); }
+.medal-chip { cursor: pointer; display: flex; align-items: center; gap: 4px; height: 40px; padding: 0 12px 0 6px; border-radius: 999px; background: rgba(8, 12, 30, 0.7); border: 2px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(8px); }
 .medal-chip .mc { display: flex; align-items: center; gap: 2px; }
 .medal-chip .mc + .mc { margin-left: 6px; }
 .medal-chip img { width: 28px; height: 28px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4)); }
@@ -2334,3 +2334,8 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 #skinGrid.cv3 .ccard.sel img { border-color: #b6f72a; box-shadow: 0 0 0 4px rgba(182, 247, 42, 0.45), 0 0 20px rgba(182, 247, 42, 0.8); }
 #skinGrid.cv3 .ccard .fav, #skinGrid.cv3 .ccard .padlock { top: 0; left: 0; }
 #skinGrid.cv3 .ccard .cinfo, #skinGrid.cv3 .ccard .padlock { top: 0; left: auto; right: 0; }
+
+/* game mode cards: a picture on the left */
+.mode-card { grid-template-columns: 46px minmax(0, 1fr); column-gap: 10px; align-items: center; }
+.mode-card > :not(.mode-ico) { grid-column: 2; }
+.mode-card .mode-ico { grid-column: 1; grid-row: 1 / span 3; width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35)); }
