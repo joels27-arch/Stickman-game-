@@ -8407,6 +8407,26 @@ function updateHud() {
 
 // ── boot ────────────────────────────────────────────────────────────────────
 
+// a phone that kept an old copy of the game reloads itself once a newer version is live
+function checkForUpdate() {
+  if (game.mode === "race") return; // never in the middle of a race
+  fetch("/", { cache: "no-store" })
+    .then((r) => r.text())
+    .then((html) => {
+      const live = html.match(/client\.js\?v=([a-z0-9]+)/)?.[1];
+      const mine = new URL(import.meta.url).searchParams.get("v");
+      if (!live || !mine || live === mine) return;
+      try {
+        if (sessionStorage.getItem("lr:reloadedFor") === live) return; // tried once already
+        sessionStorage.setItem("lr:reloadedFor", live);
+      } catch {}
+      location.reload();
+    })
+    .catch(() => {});
+}
+checkForUpdate();
+document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && checkForUpdate());
+
 // win celebrations were taken out of the game: whoever bought one gets its coins back, once
 {
   const RETIRED = { "cel:confetti": 300, "cel:hearts": 400, "cel:goldrain": 500, "cel:mega": 1000 };
