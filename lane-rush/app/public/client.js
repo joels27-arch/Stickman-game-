@@ -5724,10 +5724,9 @@ function enterRace(v) {
   renderModeHud();
   const touch = TOUCH;
   coachStart();
-  $("#swipeTut").hidden = !(touch && !local.getItem("lr:tutDone")) || coach.on;
   const hint = $("#controlsHint");
-  // phones get the swipe card the first time; after that the HUD speaks for itself
-  hint.textContent = touch ? "" : "↑ jump · ↓ slide · ← → lane · E use power-up · hold C to look back";
+  // the in-run coach teaches the moves; on a keyboard, a one-line reminder
+  hint.textContent = touch ? "" : "↑ jump · ↓ slide · ← → lane · E use power-up · C to look back";
   hint.style.opacity = "1";
   setTimeout(() => (hint.style.opacity = "0"), 6000);
   $("#banner").classList.remove("show");
@@ -5882,10 +5881,6 @@ function canControl() {
 }
 
 function input(kind) {
-  if (!$("#swipeTut").hidden && kind !== "use") {
-    $("#swipeTut").hidden = true;
-    local.setItem("lr:tutDone", "1");
-  }
   if (me.out && game.mode === "race" && (kind === "left" || kind === "right")) return cycleSpectate(kind === "left" ? -1 : 1);
   if (!canControl()) return;
   if (me.stumbleT > 0) return; // knocked over — wait until you're back up
