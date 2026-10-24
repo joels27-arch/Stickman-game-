@@ -1752,7 +1752,7 @@ codeInput.addEventListener("keydown", (e) => e.key === "Enter" && $("#joinBtn").
 
 // ── home: three pages · Tournaments | Play | Shop ──
 const homePages = $("#homePages");
-const PAGE = { compete: 0, skins: 1, play: 2, missions: 3, shop: 4 };
+const PAGE = { missions: 0, skins: 1, play: 2, compete: 3, shop: 4 };
 const PAGE_NAMES = Object.keys(PAGE);
 let homePage = PAGE.play;
 // ── the home picture on phones: the runners always stand in the free space between
@@ -1895,6 +1895,69 @@ function tourneyPrize(v) {
   local.setItem("lr:tourney", JSON.stringify(paid));
   wallet.addCoins(prize - before);
   return prize - before;
+}
+
+// Endless Run Tournament: one run a go, as far as you can; today's board of rivals is the
+// same for everyone. Only runs started from the tournament count; the best place each day pays once.
+const ENDLESS_T = { id: "endless", label: "Endless Run Tournament", img: "/assets/ui_flame.webp", tag: "Daily · solo", text: "One life. Run further than the board!", prize: [600, 300, 150] };
+const ENDLESS_RIVALS = ["Turbo Tim", "Zippy", "Rocket Rita", "Dash", "Flash Fred", "Sprinty", "Max Speed", "Bolt Bot"];
+/** Today's board: three rivals with set distances. */
+function endlessBoard() {
+  const h = dayHash("endlessT");
+  const pick = (k) => ENDLESS_RIVALS[(h + k * 3) % ENDLESS_RIVALS.length];
+  return [
+    { name: pick(0), d: 1500 + (h % 600) },
+    { name: pick(1), d: 900 + ((h >>> 8) % 400) },
+    { name: pick(2), d: 500 + ((h >>> 16) % 300) },
+  ];
+}
+function endlessTPlace(d) {
+  return endlessBoard().filter((r) => r.d > d).length + 1;
+}
+/** A finished endless run from the tournament: pay the place, once a day (a better place pays the difference). */
+function endlessTPrize(v) {
+  if (game.fixed?.kind !== "endlessT" || v.kind !== "survival" || v.players.length !== 1) return 0;
+  game.fixed = null;
+  const d = Math.round(v.players[0]?.d ?? 0);
+  const place = endlessTPlace(d);
+  const paid = tourneyPaid();
+  const was = paid.endless ?? { coins: 0 };
+  const prize = ENDLESS_T.prize[place - 1] ?? 0;
+  paid.endless = { ...was, best: Math.max(was.best ?? 0, d) };
+  if (prize > was.coins) paid.endless = { ...paid.endless, coins: prize, place };
+  local.setItem("lr:tourney", JSON.stringify(paid));
+  if (prize <= was.coins) return 0;
+  wallet.addCoins(prize - was.coins);
+  return prize - was.coins;
+}
+function endlessTCard() {
+  const t = ENDLESS_T;
+  const mine = tourneyPaid().endless;
+  const best = mine?.best ?? 0;
+  const rows = [...endlessBoard().map((r) => ({ ...r, me: false })), { name: "You", d: best, me: true }].sort((a, b) => b.d - a.d || (a.me ? 1 : -1));
+  return el(
+    "div",
+    { class: "tcard t-endless" },
+    el(
+      "div",
+      { class: "tc-head" },
+      el("img", { src: t.img, alt: "" }),
+      el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${t.prize[0].toLocaleString()}`)),
+    ),
+    el("p", { class: "tc-desc", text: t.text }),
+    el(
+      "ol",
+      { class: "et-board" },
+      ...rows.map((r, i) => el("li", { class: r.me ? "me" : "" }, el("b", { text: PLACE_SHORT[i] }), el("span", { text: r.name }), el("em", { text: r.me && !best ? "–" : `${r.d.toLocaleString()} m` }))),
+    ),
+    el(
+      "div",
+      { class: "tc-prizes" },
+      el("small", { text: "Daily prize" }),
+      ...t.prize.map((c, i) => el("span", { class: `prz${mine?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), el("i", { class: "coin" }), String(c))),
+    ),
+    el("div", { class: "tc-btns" }, el("button", { class: "btn big go", type: "button", "data-endless": "1", text: "▶ Run" })),
+  );
 }
 
 // Weekend League: Friday 18:00 to Sunday midnight, 10 matches vs bots, each one a set mode
@@ -2209,7 +2272,7 @@ function openRoad() {
   renderRoadFull();
   roadModal.hidden = false;
 }
-$("#trophyRoad").addEventListener("click", openRoad);
+$("#trophyRoad")?.addEventListener("click", openRoad);
 $("#roadClose").addEventListener("click", () => (roadModal.hidden = true));
 roadModal.addEventListener("click", (e) => e.target === roadModal && (roadModal.hidden = true));
 
@@ -2325,6 +2388,7 @@ function renderCompete() {
   $("#tourneyList").replaceChildren(
     row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0).toLocaleString(), { live: w.open, ready }),
     ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, t.prize[0].toLocaleString())),
+    row("endless", ENDLESS_T.img, ENDLESS_T.label, tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, ENDLESS_T.prize[0].toLocaleString()),
   );
   if (!tourneyModal.hidden) renderTourneySheet();
 }
@@ -2332,10 +2396,10 @@ const tourneyModal = $("#tourneyModal");
 let tourneyOpen = null;
 function renderTourneySheet() {
   const t = TOURNEYS.find((x) => x.id === tourneyOpen);
-  const card = tourneyOpen === "weekend" ? weekendCard() : t ? tourneyCard(t) : null;
+  const card = tourneyOpen === "weekend" ? weekendCard() : tourneyOpen === "endless" ? endlessTCard() : t ? tourneyCard(t) : null;
   if (!card) return;
   card.classList.add("open"); // all the details show in the sheet
-  $("#tourneyTitle").textContent = tourneyOpen === "weekend" ? "Weekend League" : t.label;
+  $("#tourneyTitle").textContent = tourneyOpen === "weekend" ? "Weekend League" : tourneyOpen === "endless" ? ENDLESS_T.label : t.label;
   $("#tourneyBody").replaceChildren(card);
 }
 function openTourney(id) {
@@ -2365,6 +2429,15 @@ $("#hpCompete").addEventListener("click", (e) => {
   if (open) openTourney(open.dataset.open);
 });
 $("#tourneyBody").addEventListener("click", (e) => {
+  if (e.target.closest("[data-endless]")) {
+    tourneyModal.hidden = true;
+    sfx.unlock();
+    if (endlessBtn.disabled) return toast("Still loading the runners…");
+    if (!requireName()) return;
+    startEndless();
+    game.fixed = { kind: "endlessT" }; // this run counts for the tournament
+    return;
+  }
   const b = e.target.closest("[data-mode]");
   if (b) {
     tourneyModal.hidden = true;
@@ -2868,7 +2941,7 @@ function renderResults(v) {
     reward.append(el("span", { class: "nomedal", text: "No medal this time. Top 3 win medals!" }));
   }
   if (rpChange) {
-    reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
+    reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: game.runCoins && v.kind !== "coinrush" ? `incl. ${game.runCoins} picked up` : rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
     if (rpChange.xp) reward.append(el("span", { class: "xpchip", text: `+${rpChange.xp} XP` }));
     if (rpChange.prize) reward.append(el("span", { class: "xpchip prizechip", text: `🏆 Prize +${rpChange.prize}` }));
     if (roomPrize) reward.append(el("span", { class: "xpchip prizechip", text: roomPrize }));
@@ -2955,6 +3028,19 @@ function renderCup(v) {
 
 // ── world (three.js) ────────────────────────────────────────────────────────
 
+// Frame rate: three.js recomputes every object's position each frame, hidden or not, and the
+// track holds thousands of hidden pieces. A hidden object (and all inside it) is skipped
+// and marked to catch up the moment it shows again.
+{
+  const update = THREE.Object3D.prototype.updateMatrixWorld;
+  THREE.Object3D.prototype.updateMatrixWorld = function (force) {
+    if (!this.visible) {
+      this.matrixWorldNeedsUpdate = true;
+      return;
+    }
+    update.call(this, force);
+  };
+}
 const canvas = $("#scene");
 let renderer;
 try {
@@ -2988,7 +3074,7 @@ let slowFor = 0;
 function adaptQuality(dt) {
   if (!renderer || game.mode !== "race" || !Number.isFinite(dt) || dt <= 0) return;
   slowFor = dt > 1 / 45 ? slowFor + dt : Math.max(0, slowFor - dt * 0.5);
-  if (slowFor < 2.5 || qualityIdx >= QUALITY_STEPS.length - 1) return;
+  if (slowFor < 1.5 || qualityIdx >= QUALITY_STEPS.length - 1) return;
   slowFor = 0;
   qualityIdx += 1;
   const ratio = Math.min(window.devicePixelRatio || 1, QUALITY_STEPS[qualityIdx]);
@@ -5195,8 +5281,60 @@ const world = (() => {
       /* not supported: it compiles on first draw */
     }
   }
+  // coin lines along the track in every mode but Coin Rush (which has its own):
+  // all drawn as one batch, only the ones just ahead of you
+  const RUN_COIN_MAX = 120;
+  const runCoinMesh = new THREE.InstancedMesh(coinGeo, coinRim, RUN_COIN_MAX);
+  runCoinMesh.frustumCulled = false;
+  runCoinMesh.count = 0;
+  scene.add(runCoinMesh);
+  let runCoins = [];
+  let runLo = 0;
+  const rcM = new THREE.Matrix4();
+  const rcQ = new THREE.Quaternion();
+  const rcE = new THREE.Euler(Math.PI / 2, 0, 0, "YXZ");
+  const rcP = new THREE.Vector3();
+  const rcS = new THREE.Vector3();
+  function setupRunCoins(course, on) {
+    runCoins = on ? coinLines(course).map((c) => ({ z: c.z, lane: c.lane, v: c.v, got: false })).sort((a, b) => a.z - b.z) : [];
+    runLo = 0;
+    runCoinMesh.count = 0;
+    runCoinMesh.visible = on;
+  }
+  function stepRunCoins(d) {
+    if (!runCoins.length) return;
+    while (runLo < runCoins.length && runCoins[runLo].z < d - 4) runLo++;
+    const k = performance.now() / 1000;
+    let n = 0;
+    for (let i = runLo; i < runCoins.length && n < RUN_COIN_MAX; i++) {
+      const c = runCoins[i];
+      if (c.z > d + VIEW_AHEAD) break;
+      if (c.got) continue;
+      rcE.y = k * 3 + c.z;
+      rcQ.setFromEuler(rcE);
+      rcP.set(laneX(c.lane), 1.1 + Math.sin(k * 4 + c.z) * 0.1, -c.z);
+      rcS.setScalar(c.v > 1 ? 1.5 : 1);
+      runCoinMesh.setMatrixAt(n++, rcM.compose(rcP, rcQ, rcS));
+    }
+    runCoinMesh.count = n;
+    runCoinMesh.instanceMatrix.needsUpdate = true;
+  }
+  /** Coins you ran through between two distances: their total value. */
+  function grabRunCoins(d0, d1, x, y) {
+    let got = 0;
+    if (y > 2.2) return 0;
+    for (let i = runLo; i < runCoins.length; i++) {
+      const c = runCoins[i];
+      if (c.z > d1 + 0.8) break;
+      if (c.got || c.z < d0 - 0.8 || Math.abs(x - c.lane) > 0.6) continue;
+      c.got = true;
+      got += c.v;
+    }
+    return got;
+  }
   function setupMode(kind, course) {
     modeKind = kind;
+    setupRunCoins(course, kind !== "coinrush");
     if (brainObj) scene.remove(brainObj);
     if (bombObj) scene.remove(bombObj);
     brainObj = null;
@@ -5546,6 +5684,8 @@ const world = (() => {
     },
     explode,
     punchFx,
+    stepRunCoins,
+    grabRunCoins,
     get coins() {
       return coinList;
     },
@@ -5715,6 +5855,9 @@ function enterRace(v) {
   game.bestBeaten = false;
   game.bananasThrown = 0;
   game.kos = 0;
+  game.runCoins = 0;
+  $("#runCoinsChip").hidden = game.kind === "coinrush";
+  setText(hudEl.coins ?? (hudEl.coins = $("#runCoins")), "0");
   game.boxesGrabbed = 0;
   game.lastHitD = 0;
   world.setBestMarker(game.soloRun ? personalBest() : 0);
@@ -6892,9 +7035,10 @@ function recordRace(v, place) {
   if (v.kind === "chase") stats.max("chaseBest", Math.round(((mine?.outAt ?? v.endAt ?? Date.now()) - v.startAt) / 1000));
   if (v.cup && v.cup.race >= v.cup.races.length && v.cup.table?.[0] === playerId) stats.add("cupWins", 1);
   // rounds of a multi-round match pay double
-  const coins = ((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1);
+  const picked = v.kind === "coinrush" ? 0 : game.runCoins ?? 0; // coins grabbed on the track
+  const coins = ((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1) + picked;
   wallet.addCoins(coins);
-  const prize = tourneyPrize(v);
+  const prize = tourneyPrize(v) + endlessTPrize(v);
   const league = leagueMatch(v, n, place);
   const res = {};
   res.coins = coins;
@@ -7977,6 +8121,14 @@ function myCoins() {
 /** Per-frame: brain catch, coin pickups. */
 function modeTick(prevD, v) {
   if (me.finished || me.out) return;
+  // coin lines on the track
+  const got = me.power === "rocket" ? 0 : world.grabRunCoins(prevD, me.d, me.x, me.y);
+  if (got) {
+    game.runCoins = (game.runCoins ?? 0) + got;
+    setText(hudEl.coins ?? (hudEl.coins = $("#runCoins")), String(game.runCoins));
+    sfx.pickup();
+    if (got > 1) banner(`+${got} 🪙`, 600);
+  }
   const elapsed = (serverNow() - v.startAt) / 1000;
   // moving obstacles: jump the low ones, slide under the bees, dodge the rest
   if (me.power !== "rocket") {
@@ -8476,6 +8628,7 @@ function frame(now) {
     world.cull(0);
   }
 
+  if (game.mode === "race" || game.mode === "results-pending") world.stepRunCoins(me.d);
   world.tick(camera.position.z, dt);
   renderer?.render(scene, camera);
   renderMirror();
@@ -8585,9 +8738,11 @@ function updateHud() {
   for (const dot of hudEl.dots.children) {
     const id = dot.getAttribute("data-id");
     const e = entries.find((x) => x.id === id);
-    const top = `${((1 - clamp(((e ? e.d : 0) - lo) / span, 0, 1)) * 100).toFixed(1)}%`;
+    // whole percent steps: far fewer style changes per second (each one costs a layout)
+    const top = `${Math.round((1 - clamp(((e ? e.d : 0) - lo) / span, 0, 1)) * 100)}%`;
     if (dot.style.top !== top) dot.style.top = top;
-    dot.style.display = e && e.outAt == null ? "" : "none";
+    const show = e && e.outAt == null ? "" : "none";
+    if (dot.style.display !== show) dot.style.display = show;
   }
 }
 

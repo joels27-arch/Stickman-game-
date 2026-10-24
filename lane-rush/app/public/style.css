@@ -2678,3 +2678,7 @@ html, body { background: var(--k1); }
 .hud .look-btn small { font-family: var(--display); font-weight: 900; font-size: 10px; text-transform: uppercase; line-height: 1.1; }
 .hud .look-btn.on { border-color: var(--lime); background: radial-gradient(circle at 50% 35%, #d8ff6a, #8fd400); color: #10141f; transform: scale(1.08); }
 .hud .track-bar { top: calc(max(10px, env(safe-area-inset-top)) + 170px); }
+/* coins picked up this run */
+.hud .run-coins { position: absolute; z-index: 6; top: calc(max(10px, env(safe-area-inset-top)) + 162px); left: calc(max(12px, env(safe-area-inset-left)) + 2px); display: flex; align-items: center; gap: 5px; padding: 3px 10px 3px 4px; border-radius: 999px; background: rgba(10, 14, 40, 0.6); color: #ffd23f; font-family: var(--display); font-weight: 900; font-size: 16px; pointer-events: none; }
+.hud .run-coins[hidden] { display: none; }
+.hud .run-coins i.coin { width: 20px; height: 20px; }

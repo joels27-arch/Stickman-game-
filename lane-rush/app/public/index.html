@@ -72,21 +72,20 @@
         </div>
       </header>
       <div id="homePages" class="home-pages">
-        <!-- LEFT: tournaments -->
-        <div class="hpage hp-side hp-compete" id="hpCompete" aria-label="Tournaments">
+        <!-- MISSIONS: daily, career and trophies, open right on the page -->
+        <div class="hpage hp-side hp-missions" id="hpMissions" aria-label="Missions">
           <div class="hp-scroll">
-            <div class="ribbon teal hp-ribbon"><h2>Tournaments</h2></div>
-            <button id="leagueCard" class="league-card" type="button">
-              <img id="leagueImg" src="/assets/lg_bronze.webp" alt="" />
-              <span class="lc-info">
-                <small>Your league</small>
-                <b id="leagueName">Bronze I</b>
-                <span class="qbar"><i id="leagueBar"></i></span>
-                <span id="leagueNext" class="lc-next">0 pts</span>
-              </span>
-              <span class="lc-go">Rankings ›</span>
-            </button>
-            <div id="tourneyList" class="tourney-list"></div>
+            <div class="ribbon pink hp-ribbon"><h2>Missions</h2></div>
+            <section class="m-head">
+              <h3>Daily missions <i class="dot" id="dailyDot" hidden></i></h3>
+              <p>New in <b id="questReset">--:--:--</b> · <span id="questSub"></span></p>
+            </section>
+            <div id="questList" class="quest-list"></div>
+            <section class="m-head">
+              <h3>Career <i class="dot" id="careerDot" hidden></i></h3>
+              <p id="careerSub"></p>
+            </section>
+            <div id="careerList" class="career-road"></div>
           </div>
         </div>
         <!-- SKINS: your runners first, then every one still to get -->
@@ -119,21 +118,21 @@
             </div>
           </div>
         </div>
-        <!-- MISSIONS: daily, career and trophies, open right on the page -->
-        <div class="hpage hp-side hp-missions" id="hpMissions" aria-label="Missions">
+        <!-- TOURNAMENTS -->
+        <div class="hpage hp-side hp-compete" id="hpCompete" aria-label="Tournaments">
           <div class="hp-scroll">
-            <div class="ribbon pink hp-ribbon"><h2>Missions</h2></div>
-            <div id="trophyRoad" class="gold-road"></div>
-            <section class="m-head">
-              <h3>Daily missions <i class="dot" id="dailyDot" hidden></i></h3>
-              <p>New in <b id="questReset">--:--:--</b> · <span id="questSub"></span></p>
-            </section>
-            <div id="questList" class="quest-list"></div>
-            <section class="m-head">
-              <h3>Career <i class="dot" id="careerDot" hidden></i></h3>
-              <p id="careerSub"></p>
-            </section>
-            <div id="careerList" class="career-road"></div>
+            <div class="ribbon teal hp-ribbon"><h2>Tournaments</h2></div>
+            <button id="leagueCard" class="league-card" type="button">
+              <img id="leagueImg" src="/assets/lg_bronze.webp" alt="" />
+              <span class="lc-info">
+                <small>Your league</small>
+                <b id="leagueName">Bronze I</b>
+                <span class="qbar"><i id="leagueBar"></i></span>
+                <span id="leagueNext" class="lc-next">0 pts</span>
+              </span>
+              <span class="lc-go">Rankings ›</span>
+            </button>
+            <div id="tourneyList" class="tourney-list"></div>
           </div>
         </div>
         <!-- RIGHT: shop, season pass and the rest -->
@@ -156,10 +155,10 @@
         </div>
       </div>
       <nav class="home-tabs" role="tablist" aria-label="Home pages">
-        <button class="htab" type="button" role="tab" data-page="0"><img src="/assets/tab_trophy.webp" alt="" /><span>Tournaments</span></button>
+        <button class="htab" type="button" role="tab" data-page="0"><img src="/assets/tab_missions.webp" alt="" /><span>Missions</span><i class="dot" hidden></i></button>
         <button class="htab" type="button" role="tab" data-page="1"><img src="/assets/tab_skins.webp" alt="" /><span>Skins</span></button>
         <button class="htab on" type="button" role="tab" data-page="2"><img src="/assets/tab_play.webp" alt="" /><span>Play</span></button>
-        <button class="htab" type="button" role="tab" data-page="3"><img src="/assets/tab_missions.webp" alt="" /><span>Missions</span><i class="dot" hidden></i></button>
+        <button class="htab" type="button" role="tab" data-page="3"><img src="/assets/tab_trophy.webp" alt="" /><span>Tournaments</span></button>
         <button class="htab" type="button" role="tab" data-page="4"><img src="/assets/tab_shop.webp" alt="" /><span>Shop</span><i class="dot" hidden></i></button>
       </nav>
     </section>
@@ -250,6 +249,7 @@
       </div>
       <div id="hearts" class="hearts"></div>
       <div id="distText" class="dist-chip"></div>
+      <div id="runCoinsChip" class="run-coins"><i class="coin"></i><b id="runCoins">0</b></div>
       <!-- who's where: a dot per runner on a bar up the right side, the leader at the top -->
       <div class="track-bar"><div class="flag">🏁</div><div id="dots"></div></div>
       <div id="combo" class="combo"></div>
