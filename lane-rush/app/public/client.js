@@ -7931,7 +7931,7 @@ function renderModeHud() {
     box.hidden = !v.bomb || me.out;
     const left = v.bomb ? Math.max(0, (v.bomb.until - serverNow()) / 1000) : 0;
     box.className = `mode-hud bomb${mineBomb ? " mine" : ""}${left < 5 ? " hot" : ""}`;
-    setText(box, mineBomb ? `💣 ${Math.ceil(left)} s · You're last! Overtake!` : `💣 ${Math.ceil(left)} s · ${nameOf(v.bomb?.holder)}`);
+    setText(box, mineBomb ? `💣 ${Math.ceil(left)}s · Overtake!` : `💣 ${Math.ceil(left)}s · ${nameOf(v.bomb?.holder)}`);
   } else box.hidden = true;
 }
 
