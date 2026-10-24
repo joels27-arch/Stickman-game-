@@ -1056,7 +1056,7 @@ const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
 const STARTER_RARITY = ["common", "common", "common", "rare", "common", "rare", "rare", "epic"];
 function allChars() {
   return [
-    ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : "starter", img: portrait(i), hero: `/assets/full_${r.file}.webp`, playable: true })),
+    ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
     ...COLLECTION.map((c) => ({ ...c, img: `/assets/sc_${c.id}.webp`, hero: `/assets/sc_${c.id}.webp` })),
     ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp` })),
     { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp` },
@@ -7148,7 +7148,7 @@ function claimPass(level, track, tile) {
       giveItem(r.runner);
       renderCollPill();
       passModal.hidden = true;
-      showUnlock({ kind: "char", char: { name: r.label, rarity: STARTER_RARITY[r.runner], img: `/assets/full_${RUNNERS[r.runner].file}.webp` } });
+      showUnlock({ kind: "char", char: { name: r.label, rarity: STARTER_RARITY[r.runner], img: `/assets/lu_${RUNNERS[r.runner].file}.webp` } });
     }
   }
   else if (r.pack) {
