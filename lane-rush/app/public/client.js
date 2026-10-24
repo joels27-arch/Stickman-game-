@@ -2145,43 +2145,70 @@ function renderTrophyRoad() {
   renderMissionDots(); // a reward waiting on the road lights the Missions tab
   if (!roadModal.hidden) renderRoadFull();
 }
-/** The whole Trophy Road, top to bottom: every reward, where each league starts, and where you are. */
+/**
+ * The whole Trophy Road, top to bottom: a road down the middle with a numbered stop for each reward,
+ * the rewards on alternating sides, a big banner where each league starts (its character rides on it),
+ * and you on the road where you are.
+ */
 const roadModal = $("#roadModal");
 function renderRoadFull() {
   const p = rank.points();
   const done = road.claimed();
   const rows = [];
+  let side = 0;
   let youShown = false;
-  for (const step of ROAD) {
-    const league = LEAGUES.find((l) => l.min === step.pts);
-    if (!youShown && step.pts > p) {
-      youShown = true;
-      rows.push(el("div", { class: "rf-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: `You · ${p.toLocaleString()} 🏆` })));
-    }
-    if (league) rows.push(el("div", { class: `rf-league lg-${league.id}` }, el("img", { src: `/assets/lg_${league.id}.webp`, alt: "" }), el("b", { text: league.name })));
+  const you = () => el("div", { class: "rv-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: `You · ${p.toLocaleString()} 🏆` }));
+  const card = (step) => {
     const info = roadInfo(step);
     const got = done.includes(step.pts);
     const ready = step.pts <= p && !got;
-    const btn = el("button", { class: `rf-btn${ready ? " ready" : ""}`, type: "button", text: got ? "✓" : ready ? "Claim!" : "🔒" });
-    btn.disabled = !ready;
-    btn.addEventListener("click", () => claimRoad(step, btn));
+    const b = el(
+      "button",
+      { class: `rv-card${step.char ? ` char ${info.rarity}` : ""}${got ? " got" : ""}${ready ? " ready" : ""}${step.pts > p ? " locked" : ""}`, type: "button" },
+      el("img", { src: info.img, alt: "" }),
+      el("small", { text: info.label }),
+      got ? el("i", { class: "rv-tick", text: "✓" }) : ready ? el("em", { class: "rv-claim", text: "Claim!" }) : el("i", { class: "rv-lock", text: "🔒" }),
+    );
+    b.addEventListener("click", () => ready && claimRoad(step, b));
+    return b;
+  };
+  for (const step of ROAD) {
+    if (!youShown && step.pts > p) {
+      youShown = true;
+      rows.push(you());
+    }
+    const reached = step.pts <= p ? " reached" : "";
+    const league = LEAGUES.find((l) => l.min === step.pts);
+    if (league) {
+      rows.push(
+        el(
+          "div",
+          { class: `rv-league lg-${league.id}${reached}` },
+          el("span", { class: "rv-lname" }, el("b", { text: league.name }), el("small", { text: "League" })),
+          el("img", { class: "rv-badge", src: `/assets/lg_${league.id}.webp`, alt: "" }),
+          el("em", { class: "rv-pts", text: step.pts.toLocaleString() }),
+          card(step),
+        ),
+      );
+      continue;
+    }
+    const left = side++ % 2 === 0;
     rows.push(
       el(
         "div",
-        { class: `rf-row${got ? " got" : ""}${ready ? " ready" : ""}${step.char ? ` star ${info.rarity}` : ""}` },
-        el("span", { class: "rf-pts", text: `${step.pts.toLocaleString()} 🏆` }),
-        el("span", { class: "rf-pic" }, el("img", { src: info.img, alt: "" })),
-        el("b", { class: "rf-label", text: info.label }),
-        btn,
+        { class: `rv-row ${left ? "l" : "r"}${reached}` },
+        card(step),
+        el("i", { class: "rv-link" }),
+        el("b", { class: "rv-node", text: step.pts.toLocaleString() }),
       ),
     );
   }
-  if (!youShown) rows.push(el("div", { class: "rf-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: `You · ${p.toLocaleString()} 🏆` })));
+  if (!youShown) rows.push(you());
   const list = $("#roadFull");
   list.replaceChildren(...rows);
   requestAnimationFrame(() => {
-    const you = list.querySelector(".rf-you");
-    if (you) list.scrollTop = you.offsetTop - list.clientHeight / 2;
+    const y = list.querySelector(".rv-you");
+    if (y) list.scrollTop = y.offsetTop - list.clientHeight / 2;
   });
 }
 function openRoad() {

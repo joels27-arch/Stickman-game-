@@ -2495,3 +2495,49 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .coll-grid .ccard.locked .cpic img, .hp-skins .coll-grid .ccard.locked .cpic img { filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.35)); }
 .coll-grid .ccard.locked .padlock { top: auto; left: auto; right: 5px; bottom: 5px; transform: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; border: 2px solid #fff; background: rgba(10, 14, 40, 0.75); font-size: 13px; }
 .av-tile.locked img { filter: none; }
+
+/* ── Trophy Road, full view: a road down the middle, rewards either side, league banners across ── */
+.road-sheet .road-full { position: relative; display: grid; gap: 14px; max-height: min(66vh, 560px); overflow-y: auto; margin: 0 -14px -14px; padding: 18px 12px 26px; border-radius: 0 0 22px 22px;
+  background: radial-gradient(ellipse 40% 6% at 20% 12%, rgba(255, 255, 255, 0.9), transparent 70%), radial-gradient(ellipse 35% 5% at 80% 38%, rgba(255, 255, 255, 0.85), transparent 70%), radial-gradient(ellipse 40% 6% at 25% 70%, rgba(255, 255, 255, 0.85), transparent 70%), linear-gradient(180deg, #a9d8ff 0%, #d7e9ff 45%, #e6dcff 100%); }
+/* the road itself: gold edges, a green middle */
+.road-full::before { content: ""; position: absolute; z-index: 0; left: 50%; top: 0; bottom: 0; width: 22px; margin-left: -11px; border-radius: 6px; background: linear-gradient(90deg, #c98a00 0 3px, #ffd65a 3px 6px, #7ac943 6px 16px, #ffd65a 16px 19px, #c98a00 19px); }
+.rv-row { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 22px 52px 22px minmax(0, 1fr); align-items: center; }
+.rv-row.l .rv-card { grid-column: 1; grid-row: 1; justify-self: end; }
+.rv-row.l .rv-link { grid-column: 2; grid-row: 1; }
+.rv-row.r .rv-card { grid-column: 5; grid-row: 1; justify-self: start; }
+.rv-row.r .rv-link { grid-column: 4; grid-row: 1; }
+.rv-node { grid-column: 3; grid-row: 1; display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; border: 4px solid #ffd65a; background: radial-gradient(circle at 50% 35%, #6fd04a, #2f8f1f); color: #fff; font-family: var(--display); font-weight: 900; font-size: 18px; -webkit-text-stroke: 2px #1b5a10; paint-order: stroke fill; box-shadow: 0 3px 0 #8a5a00, 0 4px 8px rgba(0, 0, 0, 0.25); }
+.rv-row:not(.reached) .rv-node { background: radial-gradient(circle at 50% 35%, #9fb38f, #5f7354); }
+.rv-link { height: 6px; background: #7ac943; border-radius: 3px; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15); }
+.rv-row:not(.reached) .rv-link { background: #a8b89b; }
+/* a reward: a light card with a picture and a small label; a padlock until you get there */
+.rv-card { position: relative; display: grid; justify-items: center; gap: 2px; width: 100%; max-width: 116px; padding: 8px 6px 6px; border: 2px solid #fff; border-radius: 14px; background: linear-gradient(180deg, #f2f4f8, #d7dce6); box-shadow: 0 4px 0 #9aa3b6, 0 6px 12px rgba(0, 0, 0, 0.2); color: #4a5068; font: inherit; cursor: default; }
+.rv-card img { width: 56px; height: 52px; object-fit: contain; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.25)); }
+.rv-card small { font-weight: 900; font-size: 11px; line-height: 1.1; text-align: center; }
+.rv-card.got { opacity: 0.6; }
+.rv-card.ready { cursor: pointer; border-color: #ffd23f; background: linear-gradient(180deg, #fffbe0, #ffe9a0); box-shadow: 0 4px 0 #b07a00, 0 0 16px rgba(255, 210, 63, 0.8); animation: btnPulse 1s ease-in-out infinite; }
+.rv-lock, .rv-tick { position: absolute; right: -6px; bottom: -6px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; border: 2px solid #fff; background: #4a5068; font-style: normal; font-size: 12px; }
+.rv-tick { background: #2fb36a; color: #fff; font-weight: 900; }
+.rv-claim { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); padding: 0 8px; border-radius: 8px; border: 2px solid #fff; background: #2fb36a; color: #fff; font-style: normal; font-family: var(--display); font-weight: 900; font-size: 11px; text-transform: uppercase; white-space: nowrap; }
+/* a character reward: a glowing card in its rarity colour */
+.rv-card.char { padding: 4px 4px 6px; border-color: #e3c4ff; background: linear-gradient(180deg, #a35bff, #5a1fc0); color: #fff; box-shadow: 0 4px 0 #34086e, 0 0 18px rgba(194, 123, 255, 0.85); }
+.rv-card.char.legendary { border-color: #fff1b0; background: linear-gradient(180deg, #ffcf4a, #d97a00); box-shadow: 0 4px 0 #7a4600, 0 0 18px rgba(255, 207, 74, 0.9); }
+.rv-card.char img { width: 84px; height: 84px; object-fit: cover; object-position: top; border-radius: 10px; }
+/* where a league starts: a big banner across the road */
+.rv-league { --lg-a: #f3c99a; --lg-b: #b8743a; --lg-ink: #5a3410; position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr); align-items: center; gap: 6px; min-height: 92px; margin: 6px 0; padding: 8px 10px; border: 3px solid #fff; border-radius: 18px; background: linear-gradient(180deg, var(--lg-a), var(--lg-b)); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.25), 0 10px 18px rgba(0, 0, 0, 0.2); }
+.rv-league.lg-silver { --lg-a: #f2f5fa; --lg-b: #a9b6c9; --lg-ink: #3a4660; }
+.rv-league.lg-gold { --lg-a: #fff0a8; --lg-b: #e8a400; --lg-ink: #6a4200; }
+.rv-league.lg-platinum { --lg-a: #d8fbf7; --lg-b: #5cc4bc; --lg-ink: #0e5450; }
+.rv-league.lg-diamond { --lg-a: #d9ecff; --lg-b: #5a9cf0; --lg-ink: #10366e; }
+.rv-league.lg-master { --lg-a: #f0d9ff; --lg-b: #9a52f0; --lg-ink: #3e0f78; }
+.rv-lname { display: grid; line-height: 0.95; font-family: var(--display); font-weight: 900; text-transform: uppercase; color: #fff; -webkit-text-stroke: 3px var(--lg-ink); paint-order: stroke fill; }
+.rv-lname b { font-size: 26px; }
+.rv-lname small { font-size: 18px; }
+.rv-badge { width: 70px; height: 70px; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.35)); }
+.rv-pts { position: absolute; left: 50%; bottom: -14px; transform: translateX(-50%); padding: 1px 10px; border-radius: 999px; border: 2px solid #fff; background: #2f8f1f; color: #fff; font-style: normal; font-family: var(--display); font-weight: 900; font-size: 13px; }
+.rv-league .rv-card { justify-self: end; transform: rotate(4deg); }
+.rv-league:not(.reached) { filter: saturate(0.6); }
+/* you, standing on the road */
+.rv-you { position: relative; z-index: 2; justify-self: center; display: flex; align-items: center; gap: 8px; padding: 4px 14px 4px 4px; border-radius: 999px; border: 3px solid #fff; background: linear-gradient(180deg, #d8ff6a, #8fe000); box-shadow: 0 4px 0 #3f7a00, 0 0 16px rgba(182, 247, 42, 0.8); }
+.rv-you img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; object-position: top; background: #4d7cff; border: 2px solid #fff; }
+.rv-you b { font-family: var(--display); font-weight: 900; font-size: 16px; color: #1a3300; }
