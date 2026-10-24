@@ -283,6 +283,7 @@
       <div id="combo" class="combo"></div>
       <div id="stylePop" class="style-pop"></div>
       <div id="feed" class="feed" aria-live="polite"></div>
+      <button id="sprintBtn" class="sprint-btn" type="button" aria-label="Sprint" hidden><img src="/assets/ui_bolt.webp" alt="" /><b>0/20</b></button>
       <button id="emoteToggle" class="emote-toggle" type="button" aria-label="Emotes">😀</button>
       <div id="emoteMenu" class="emote-menu emote-row"></div>
       <div id="raceTag" class="race-tag"></div>
@@ -359,6 +360,16 @@
     </section>
 
     <!-- COUNTRY / SETTINGS -->
+    <!-- after your first round: your name, and the country you run for (both optional) -->
+    <div id="askModal" class="modal ask-modal" hidden>
+      <div class="sheet ask-sheet" role="dialog" aria-modal="true" aria-labelledby="askTitle">
+        <h2 id="askTitle">What's your name?</h2>
+        <input id="askName" maxlength="14" autocomplete="nickname" placeholder="Your name" />
+        <button id="askCountry" class="country-chip ask-country" type="button"></button>
+        <button id="askSave" class="btn big go" type="button">Save</button>
+        <button id="askLater" class="ask-later" type="button">Later</button>
+      </div>
+    </div>
     <div id="countryModal" class="modal" hidden>
       <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="countryTitle">
         <header class="sheet-head">

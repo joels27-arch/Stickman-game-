@@ -887,6 +887,27 @@ $("#countryClose").addEventListener("click", closeCountry);
 countryModal.addEventListener("click", (e) => e.target === countryModal && closeCountry());
 window.addEventListener("keydown", (e) => e.key === "Escape" && !countryModal.hidden && closeCountry());
 for (const chip of document.querySelectorAll(".country-chip")) chip.addEventListener("click", () => openCountry("Country you cheer for"));
+// after the first round (any mode): ask for a name and, if they like, a country. Asked once.
+const askModal = $("#askModal");
+function maybeAskName() {
+  if (local.getItem("lr:asked")) return;
+  local.setItem("lr:asked", "1");
+  setTimeout(() => {
+    const n = local.getItem("lr:name") || "";
+    $("#askName").value = /^Runner\d{3}$/.test(n) ? "" : n;
+    $("#askName").placeholder = n || "Your name";
+    renderCountryChips();
+    askModal.hidden = false;
+  }, 1400);
+}
+$("#askSave").addEventListener("click", () => {
+  sfx.tap();
+  if ($("#askName").value.trim()) saveName($("#askName").value);
+  askModal.hidden = true;
+  toast("Saved!");
+});
+$("#askLater").addEventListener("click", () => (askModal.hidden = true));
+$("#askName").addEventListener("keydown", (e) => e.key === "Enter" && $("#askSave").click());
 // settings sheet
 const setModal = $("#setModal");
 function renderSettings() {
@@ -2486,6 +2507,8 @@ function leaveToHome(message = "") {
   game.solo = false;
   game.endless = false;
   game.fixed = null;
+  game.warm = null;
+  game.prepped = null;
   renderEndlessBest();
   world.clearRace();
   showScreen("home");
@@ -2711,6 +2734,13 @@ function renderLobby(v) {
     isHost && n < 2 ? "Share the code. Bots fill empty spots." : "";
   world.setShowcase(me?.char ?? 0);
   if (world.ready) for (const p of v.players) world.ensureChar(p.char).catch(() => {});
+  // a set map gets downloaded and built while people pick, so the race starts smooth
+  if (world.ready && v.map && v.map !== "random" && game.prepped !== v.map) {
+    game.prepped = v.map;
+    Promise.all([world.ensureMap(v.map), world.preloadMovers(v.map)])
+      .then(() => setTimeout(() => game.mode === "lobby" && world.prebuild(v.map), 300))
+      .catch(() => {});
+  }
   renderWallet();
 }
 
@@ -2842,6 +2872,7 @@ function showResults(v) {
   game.mode = "results";
   showScreen("results");
   renderResults(v);
+  maybeAskName();
 }
 
 const PLACE = ["1st", "2nd", "3rd", "4th"];
@@ -5300,13 +5331,49 @@ const world = (() => {
     const kinds = Object.keys(MOVER_KINDS).filter((k) => MOVER_KINDS[k].map === base && MOVER_MODEL[k].file);
     return Promise.all(kinds.map((k) => loadModeProp(MOVER_MODEL[k].file, { width: MOVER_MODEL[k].size, maxHeight: MOVER_MODEL[k].size * 1.5 })));
   }
-  /** Get the GPU ready for the scene (shaders), so the first frames don't stutter. */
+  /**
+   * Get the GPU ready before the race shows: every shader compiled and every picture uploaded,
+   * hidden things (the rest of the track, power-up models) included, so nothing stutters later.
+   */
   function warmUp() {
+    if (!renderer) return;
+    const hidden = [];
+    const extra = new THREE.Group();
+    for (const p of Object.values(assets.props)) if (p?.isObject3D && !p.parent) extra.add(p);
+    scene.add(extra);
+    scene.traverse((o) => {
+      if (!o.visible) {
+        hidden.push(o);
+        o.visible = true;
+      }
+    });
     try {
-      renderer?.compile(scene, camera);
+      renderer.compile(scene, camera);
+      const seen = new Set();
+      scene.traverse((o) => {
+        const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+        for (const m of mats)
+          for (const k of ["map", "emissiveMap", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "alphaMap"]) {
+            const t = m[k];
+            if (t?.isTexture && !seen.has(t)) {
+              seen.add(t);
+              renderer.initTexture(t);
+            }
+          }
+      });
     } catch {
       /* not supported: it compiles on first draw */
     }
+    for (const o of hidden) o.visible = false;
+    for (const p of [...extra.children]) extra.remove(p);
+    scene.remove(extra);
+  }
+  /** Build a map's scenery ahead of time (in the lobby), hidden until the race. */
+  function prebuild(map) {
+    if (!mapReady(map) || mapScenery[map]) return;
+    const m = buildMap(map);
+    m.group.visible = false;
+    mapScenery[map] = m;
   }
   // coin lines along the track in every mode but Coin Rush (which has its own):
   // all drawn as one batch, only the ones just ahead of you
@@ -5317,13 +5384,32 @@ const world = (() => {
   scene.add(runCoinMesh);
   let runCoins = [];
   let runLo = 0;
+  // energy bolts (races with other runners): 20 charge the sprint button
+  const boltShape = new THREE.Shape();
+  [[0.12, 0.62], [-0.3, -0.02], [-0.02, -0.02], [-0.16, -0.62], [0.32, 0.1], [0.04, 0.1], [0.2, 0.62]].forEach(([x, y], i) => (i ? boltShape.lineTo(x, y) : boltShape.moveTo(x, y)));
+  const boltGeo = new THREE.ExtrudeGeometry(boltShape, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.04, bevelSegments: 1 });
+  boltGeo.center();
+  const boltMat = new THREE.MeshStandardMaterial({ color: 0x3fe0ff, emissive: 0x00a8ff, emissiveIntensity: 0.9, metalness: 0.1, roughness: 0.3 });
+  const boltMesh = new THREE.InstancedMesh(boltGeo, boltMat, 60);
+  boltMesh.frustumCulled = false;
+  boltMesh.count = 0;
+  scene.add(boltMesh);
   const rcM = new THREE.Matrix4();
   const rcQ = new THREE.Quaternion();
   const rcE = new THREE.Euler(Math.PI / 2, 0, 0, "YXZ");
   const rcP = new THREE.Vector3();
   const rcS = new THREE.Vector3();
-  function setupRunCoins(course, on) {
+  function setupRunCoins(course, on, bolts = false) {
     runCoins = on ? coinLines(course).map((c) => ({ z: c.z, lane: c.lane, v: c.v, got: false })).sort((a, b) => a.z - b.z) : [];
+    if (bolts) {
+      // every third gap between obstacle rows holds bolts instead of coins
+      const zs = course.rows.map((r) => r.z);
+      let i = 0;
+      for (const c of runCoins) {
+        while (i + 1 < zs.length && zs[i + 1] < c.z) i++;
+        if (i % 3 === 1) c.bolt = true;
+      }
+    }
     runLo = 0;
     runCoinMesh.count = 0;
     runCoinMesh.visible = on;
@@ -5333,10 +5419,19 @@ const world = (() => {
     while (runLo < runCoins.length && runCoins[runLo].z < d - 4) runLo++;
     const k = performance.now() / 1000;
     let n = 0;
+    let nb = 0;
     for (let i = runLo; i < runCoins.length && n < RUN_COIN_MAX; i++) {
       const c = runCoins[i];
       if (c.z > d + VIEW_AHEAD) break;
       if (c.got) continue;
+      if (c.bolt) {
+        if (nb >= 60) continue;
+        rcQ.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, k * 2.5 + c.z);
+        rcP.set(laneX(c.lane), 1.15 + Math.sin(k * 5 + c.z) * 0.12, -c.z);
+        rcS.setScalar(1.1);
+        boltMesh.setMatrixAt(nb++, rcM.compose(rcP, rcQ, rcS));
+        continue;
+      }
       rcE.y = k * 3 + c.z;
       rcQ.setFromEuler(rcE);
       rcP.set(laneX(c.lane), 1.1 + Math.sin(k * 4 + c.z) * 0.1, -c.z);
@@ -5345,23 +5440,27 @@ const world = (() => {
     }
     runCoinMesh.count = n;
     runCoinMesh.instanceMatrix.needsUpdate = true;
+    boltMesh.count = nb;
+    boltMesh.instanceMatrix.needsUpdate = true;
   }
-  /** Coins you ran through between two distances: their total value. */
+  /** Coins and bolts you ran through between two distances. */
   function grabRunCoins(d0, d1, x, y) {
-    let got = 0;
-    if (y > 2.2) return 0;
+    const got = { coins: 0, bolts: 0 };
+    if (y > 2.2) return got;
     for (let i = runLo; i < runCoins.length; i++) {
       const c = runCoins[i];
       if (c.z > d1 + 0.8) break;
       if (c.got || c.z < d0 - 0.8 || Math.abs(x - c.lane) > 0.6) continue;
       c.got = true;
-      got += c.v;
+      if (c.bolt) got.bolts++;
+      else got.coins += c.v;
     }
     return got;
   }
   function setupMode(kind, course) {
     modeKind = kind;
-    setupRunCoins(course, kind !== "coinrush");
+    setupRunCoins(course, kind !== "coinrush", Boolean(net.view && net.view.players.length > 1));
+    boltMesh.count = 0;
     if (brainObj) scene.remove(brainObj);
     if (bombObj) scene.remove(bombObj);
     brainObj = null;
@@ -5713,6 +5812,7 @@ const world = (() => {
     punchFx,
     stepRunCoins,
     grabRunCoins,
+    prebuild,
     get coins() {
       return coinList;
     },
@@ -5870,11 +5970,10 @@ function enterRace(v) {
     return;
   }
   game.pendingRace = false;
-  // the opening shot gets whatever is left of the countdown; the controls wait for the gun
+  // the cover stays up while the race is built and the GPU warms up (see readyToShow)
+  showCurtain(map);
   game.introLen = Math.max(0, (v.startAt - serverNow()) / 1000);
   $("#hud").classList.toggle("intro", game.introLen > 0.6);
-  world.warmUp();
-  requestAnimationFrame(() => requestAnimationFrame(liftCurtain));
   game.mode = "race";
   game.round = v.round;
   game.lookBack = false;
@@ -5922,6 +6021,8 @@ function enterRace(v) {
     stumbleT: 0,
     invulnT: 0,
     boostT: 0,
+    sprintT: 0,
+    bolts: 0,
     // everyone starts each race holding a random power-up
     items: mine?.outAt != null || mine?.finish != null ? [] : [startingItem()],
     frozenT: 0,
@@ -5948,6 +6049,7 @@ function enterRace(v) {
     lastZap: Math.max(0, ...(v.zaps || []).map((z) => z.id)),
   });
   renderPower();
+  renderSprint();
   me.x = me.lane;
   if (me.runner) scene.remove(me.runner.group);
   me.runner = world.makeRunner(mine?.char ?? 0, mine?.name ?? "", RUNNERS[mine?.char ?? 0].color, true);
@@ -5998,6 +6100,24 @@ function enterRace(v) {
   hint.style.opacity = "1";
   setTimeout(() => (hint.style.opacity = "0"), 6000);
   $("#banner").classList.remove("show");
+  // warm the GPU up once everything is in place; the cover lifts when frames run smooth
+  game.warm = { frames: 0, at: performance.now(), ready: false };
+  requestAnimationFrame(() => {
+    world.warmUp();
+    if (game.warm) game.warm.ready = true;
+  });
+}
+/** Per frame while the cover is up: lift it after a few smooth frames (or 2.5 s at most). */
+function readyToShow(dt) {
+  const w = game.warm;
+  if (!w || !w.ready) return;
+  w.frames = dt < 0.045 ? w.frames + 1 : 0;
+  if (w.frames < 4 && performance.now() - w.at < 2500) return;
+  game.warm = null;
+  // the opening shot gets whatever is left of the countdown; the controls wait for the gun
+  game.introLen = Math.max(0, (net.view ? net.view.startAt - serverNow() : 0) / 1000);
+  $("#hud").classList.toggle("intro", game.introLen > 0.6);
+  liftCurtain();
 }
 
 function finishRaceView(v) {
@@ -6251,6 +6371,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "ArrowDown" || k === "s" || k === "S") input("slide");
   else if (k === "e" || k === "E" || k === "Enter") useItem(me.lane, 1);
   else if (k === "q" || k === "Q") useItem(me.lane, -1);
+  else if (k === "Shift" || k === "x" || k === "X") useSprint();
   else if (/^Digit[1-4]$/.test(e.code)) useItem(Number(e.code.slice(5)) - 1, e.shiftKey ? -1 : 1);
   else if (k === "c" || k === "C" || k === "b" || k === "B") game.lookBack = game.lookKey = canControl() || game.mode === "race";
   else return;
@@ -6365,7 +6486,8 @@ function stepMe(dt) {
   if (net.view?.bomb?.holder === playerId) base *= 1.1; // a little push to get out of last
   const fast = base + (isSurvival() ? SURVIVAL_BOOST : BOOST_SPEED - BASE_SPEED);
   const rocket = isSurvival() ? base + SURVIVAL_ROCKET : ROCKET_SPEED;
-  let target = me.power === "rocket" ? rocket : me.boostT > 0 ? fast : base;
+  me.sprintT = Math.max(0, (me.sprintT ?? 0) - dt);
+  let target = me.power === "rocket" ? rocket : me.boostT > 0 || me.sprintT > 0 ? fast : base;
   // sliding along the grass while falling, then stopped while getting up
   if (me.stumbleT > 0) target = me.stumbleT > GETUP_S ? 3 : 0;
   if (me.finished) target = me.d > TRACK_LEN + 14 ? 0 : 6;
@@ -7835,6 +7957,7 @@ function renderHearts(pop) {
 
 /** Third hit in survival: down for good, then watch whoever is still running. */
 function knockOut(why = "") {
+  setTimeout(renderSprint, 0);
   me.out = true;
   saveBest();
   me.items = [];
@@ -8145,16 +8268,55 @@ function myCoins() {
   const server = net.view?.players.find((p) => p.id === playerId)?.coins ?? 0;
   return Math.max(server, game.coinsShown ?? 0);
 }
+// ── sprint: 20 energy bolts charge it, then 5 seconds of top speed ──
+const SPRINT_NEED = 20;
+const SPRINT_S = 5;
+function renderSprint() {
+  const b = hudEl.sprint ?? (hudEl.sprint = $("#sprintBtn"));
+  const on = game.mode === "race" && (net.view?.players.length ?? 0) > 1 && !me.out && !me.finished;
+  b.hidden = !on;
+  if (!on) return;
+  const full = me.bolts >= SPRINT_NEED;
+  b.classList.toggle("ready", full && me.sprintT <= 0);
+  b.classList.toggle("going", me.sprintT > 0);
+  b.style.setProperty("--p", String(me.sprintT > 0 ? me.sprintT / SPRINT_S : me.bolts / SPRINT_NEED));
+  setText(b.querySelector("b"), me.sprintT > 0 ? "GO!" : full ? "SPRINT" : `${me.bolts}/${SPRINT_NEED}`);
+}
+function useSprint() {
+  if (game.mode !== "race" || me.bolts < SPRINT_NEED || me.sprintT > 0 || me.out || me.finished || !canControl()) return;
+  me.bolts = 0;
+  me.sprintT = SPRINT_S;
+  sfx.boost();
+  buzz(30);
+  banner("⚡ SPRINT!", 800);
+  renderSprint();
+  setTimeout(renderSprint, SPRINT_S * 1000 + 50);
+}
+$("#sprintBtn").addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  useSprint();
+});
+
 /** Per-frame: brain catch, coin pickups. */
 function modeTick(prevD, v) {
   if (me.finished || me.out) return;
   // coin lines on the track
-  const got = me.power === "rocket" ? 0 : world.grabRunCoins(prevD, me.d, me.x, me.y);
-  if (got) {
-    game.runCoins = (game.runCoins ?? 0) + got;
+  const got = me.power === "rocket" ? { coins: 0, bolts: 0 } : world.grabRunCoins(prevD, me.d, me.x, me.y);
+  if (got.coins) {
+    game.runCoins = (game.runCoins ?? 0) + got.coins;
     setText(hudEl.coins ?? (hudEl.coins = $("#runCoins")), String(game.runCoins));
     sfx.pickup();
-    if (got > 1) banner(`+${got} 🪙`, 600);
+    if (got.coins > 1) banner(`+${got.coins} 🪙`, 600);
+  }
+  if (got.bolts && me.sprintT <= 0) {
+    const was = me.bolts;
+    me.bolts = Math.min(SPRINT_NEED, me.bolts + got.bolts);
+    sfx.pickup();
+    if (me.bolts >= SPRINT_NEED && was < SPRINT_NEED) {
+      banner("⚡ SPRINT READY!", 900);
+      sfx.boost();
+    }
+    renderSprint();
   }
   const elapsed = (serverNow() - v.startAt) / 1000;
   // moving obstacles: jump the low ones, slide under the bees, dodge the rest
@@ -8513,6 +8675,7 @@ function frame(now) {
     enterRace(net.view);
   }
 
+  if (game.warm) readyToShow(dt);
   if (game.mode === "race" || game.mode === "results-pending") {
     // substeps keep fast runners from tunnelling through thin obstacles
     const steps = Math.ceil(dt / (1 / 120));
@@ -8553,6 +8716,11 @@ function frame(now) {
       r.dispX += (laneX(p.lane) - r.dispX) * Math.min(1, dt * 12);
       r.dispY += (p.y - r.dispY) * Math.min(1, dt * 18);
       r.runner.group.position.set(r.dispX, r.dispY, -r.dispD);
+      // far behind or far ahead: off screen, so skip the animation work
+      if (!me.out && (r.dispD < me.d - 25 || r.dispD > me.d + VIEW_AHEAD)) {
+        r.runner.group.visible = false;
+        continue;
+      }
       if (r.p.trail && r.vel > 2 && !r.p.outAt) world.trail(r.p.trail, r.dispX, r.dispY, -r.dispD);
       r.runner.group.visible = !p.left;
       const waiting = net.view && serverNow() < net.view.startAt - 900; // the line-up before the gun
@@ -8635,12 +8803,12 @@ function frame(now) {
     }, serverNow());
     world.syncBowls(net.view?.bowls || [], serverNow());
     // feel the speed: wider view and speed lines on a rocket or boost
-    const zoom = me.power === "rocket" ? 80 : me.boostT > 0 ? 70 : 62;
+    const zoom = me.power === "rocket" ? 80 : me.boostT > 0 || me.sprintT > 0 ? 70 : 62;
     if (Math.abs(camera.fov - zoom) > 0.1) {
       camera.fov += (zoom - camera.fov) * Math.min(1, dt * 5);
       camera.updateProjectionMatrix();
     }
-    $("#speedFx").classList.toggle("on", game.mode === "race" && (me.power === "rocket" || me.boostT > 0));
+    $("#speedFx").classList.toggle("on", game.mode === "race" && (me.power === "rocket" || me.boostT > 0 || me.sprintT > 0));
     updateHud();
   } else {
     // menus: slow fly-over of the meadow with your runner idling
@@ -8667,6 +8835,7 @@ const hudEl = { timer: $("#timer"), dist: $("#distText"), place: $("#place"), do
 function updateHud() {
   const v = net.view;
   if (!v) return;
+  if (me.sprintT > 0 && (game.sprintTick = (game.sprintTick ?? 0) + 1) % 6 === 0) renderSprint(); // the ring drains
   const sn = serverNow();
 
   // countdown 3-2-1-GO
