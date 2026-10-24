@@ -8346,16 +8346,18 @@ function updateHud() {
     void cd.offsetWidth;
     if (label) cd.classList.add("pop");
     cd.dataset.n = label;
-    if (label === "GO!") {
-      sfx.go();
-      const hud = $("#hud");
-      if (hud.classList.contains("intro")) {
-        hud.classList.remove("intro");
-        hud.classList.add("reveal"); // the controls fade in on the gun
-        setTimeout(() => hud.classList.remove("reveal"), 500);
-      }
-    } else if (/^[123]$/.test(label)) sfx.beep();
+    if (label === "GO!") sfx.go();
+    else if (/^[123]$/.test(label)) sfx.beep();
     lastCount = label;
+  }
+  // the controls fade in on the gun (checked every frame: a slow frame can skip the "GO!" moment)
+  if (left <= 0) {
+    const hud = hudEl.hud ?? (hudEl.hud = $("#hud"));
+    if (hud.classList.contains("intro")) {
+      hud.classList.remove("intro");
+      hud.classList.add("reveal");
+      setTimeout(() => hud.classList.remove("reveal"), 500);
+    }
   }
 
   // timer
