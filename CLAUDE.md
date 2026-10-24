@@ -226,7 +226,7 @@ until the user approves it.
   test commands, which game to run in the browser and at what size), and
   **every commit, by its exact title** in the bracket-tag format below, in
   order, with the release-notes bullet that folds into the last one. It ends
-  with the squash merge into `dev`, its title and description, and the
+  with the squash merge into `main`, its title and description, and the
   worktree's removal.
 - **Execute only on a clear yes**, exactly as approved. Approval covers that
   plan and nothing else: a later task, or a follow-up the work turns up, gets
@@ -240,25 +240,28 @@ until the user approves it.
 
 ### Branching
 
-- **`dev`** is the integration branch. **`main` is protected** and only
-  changes through a pull request from `dev`. Never commit or push directly to
-  `main`, and never force-push either branch.
+- **`main`** is the integration branch: every piece of work lands on it as
+  one squash-merge commit. Never commit to it directly (the squash merges
+  are the only commits made on it) and never force-push it. `main` started
+  from `claude/inkfall-rts-game-c0g5po`, which is still GitHub's default
+  branch; nothing new goes there.
 - **One worktree per piece of work.** Every new feature, fix, request or
-  investigation opens its own git worktree, on its own branch cut from `dev`
-  (Claude Code puts them in `.claude/worktrees/<name>` on a `claude/<name>`
-  branch). All of the work, and every commit, happens in that worktree; the
-  main checkout stays on `dev` and is not edited directly.
-- If `dev` moves while the work is in progress, merge `dev` into the
+  investigation opens its own git worktree, on its own branch cut from
+  `main`, in `.claude/worktrees/<name>` (the branch is `claude/<name>` unless
+  the user names it). All of the work, and every commit, happens in that
+  worktree; the main checkout stays on `main` and is not edited directly.
+- If `main` moves while the work is in progress, merge `main` into the
   worktree's branch, never the other way round until the work is done.
 - **When it is finished,** squash-merge the worktree's committed branch into
-  `dev` from the main checkout (`git merge --squash <branch>`, then
-  `git commit`), so the whole piece of work lands on `dev` as one commit
+  `main` from the main checkout (`git merge --squash <branch>`, then
+  `git commit`), so the whole piece of work lands on `main` as one commit
   whose message follows "Squash-merge commits" below. Then remove the
   worktree and delete its branch (`git worktree remove <path>`,
   `git branch -D <branch>`: a squashed branch never reads as merged, so `-d`
-  refuses it; check the squash commit is on `dev` first). An investigation
+  refuses it; check the squash commit is on `main` first). An investigation
   that ends with nothing committed just removes its worktree. Never leave a
   finished worktree behind, and never merge one with uncommitted changes.
+- **Pushing** to GitHub happens only when the user asks.
 
 ### Commits
 
@@ -272,7 +275,7 @@ Bracket-symbol tags, **not** Conventional Commits:
 | `[#]` | modification |
 
 - **Title-only, single-line** messages — no body, no trailers
-  (`Co-Authored-By` and the like). The squash-merge commit on `dev` is the one
+  (`Co-Authored-By` and the like). The squash-merge commit on `main` is the one
   exception (below).
 - **Name the game** right after the tag, by its folder, when the change sits
   in one game: `[+] lane-rush: add a pause button`,
@@ -289,7 +292,7 @@ Bracket-symbol tags, **not** Conventional Commits:
 
 #### Squash-merge commits
 
-The commit a worktree's squash merge makes on `dev` is the **only** commit
+The commit a worktree's squash merge makes on `main` is the **only** commit
 that may carry a description:
 
 - **Title:** one line in the same bracket-tag style, summarizing everything
@@ -298,7 +301,7 @@ that may carry a description:
   the game as above. Example: `[+] lane-rush: add a weekly tournament`.
 - **Description:** after a blank line, the commits made in the worktree, one
   `- ` line each, oldest first, with their titles exactly as written (merges
-  of `dev` into the branch left out).
+  of `main` into the branch left out).
 - Still no trailers (`Co-Authored-By` and the like) in it.
 
 ```text
