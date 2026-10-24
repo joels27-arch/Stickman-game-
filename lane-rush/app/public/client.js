@@ -1131,7 +1131,16 @@ function renderSkins() {
   $("#skinGrid").replaceChildren(
     el("h3", { class: "coll-head", text: `Yours · ${mine.length}` }),
     ...mine.map((c) => {
-      const card = charCard(c, n++, inspectChar);
+      // a tap on one of your runners picks it straight away; the ⓘ shows its card
+      const card = charCard(c, n++, c.playable ? selectRunner : inspectChar);
+      if (c.playable) {
+        const info = el("button", { class: "cinfo", type: "button", "aria-label": `About ${c.name}`, text: "i" });
+        info.addEventListener("click", (e) => {
+          e.stopPropagation();
+          inspectChar(c);
+        });
+        card.append(info);
+      }
       const on = fav.includes(c.id);
       const star = el("button", { class: `fav${on ? " on" : ""}`, type: "button", "aria-label": on ? "Remove from favourites" : "Add to favourites", text: on ? "★" : "☆" });
       star.addEventListener("click", (e) => {
@@ -1204,6 +1213,21 @@ $("#buyOk").addEventListener("click", () => {
   });
   renderCollPill();
 });
+
+/** Race with this runner from now on. */
+function selectRunner(c) {
+  if (c.idx === preferredChar()) return;
+  local.setItem("lr:char", String(c.idx));
+  world.setShowcase?.(c.idx);
+  if (net.view?.phase === "lobby" && net.view.joined) act({ type: "pick", char: c.idx });
+  sfx.pop();
+  buzz(20);
+  renderProfile();
+  if (homePage === PAGE.skins) renderSkins();
+  if (shopShown()) renderShop();
+  const card = [...document.querySelectorAll("#skinGrid .ccard.sel")][0];
+  card?.classList.add("picked");
+}
 
 // inspect one character: big picture, rarity, how to get it, and the one action that makes sense
 const charModal = $("#charModal");
@@ -8138,10 +8162,11 @@ function frame(now) {
     // line-up, rises over the runners and settles exactly where the running camera
     // sits at the gun, so there is never a cut. It takes whatever countdown is left.
     const introLen = game.introLen ?? 0;
-    const intro = toGo > 0 && introLen > 0.6 && game.mode === "race";
+    const forced = game.introForce; // tests can hold the shot at any point (0 … 1)
+    const intro = forced != null || (toGo > 0 && introLen > 0.6 && game.mode === "race");
     let introLook = null;
     if (intro) {
-      const p = 1 - Math.max(0, toGo) / introLen;
+      const p = forced ?? 1 - Math.max(0, toGo) / introLen;
       const e = p * p * (3 - 2 * p);
       introPath.points[0].set(4.2, 1.5, fz - 7.5);
       introPath.points[1].set(1.2, 2.6, fz - 8.8);
