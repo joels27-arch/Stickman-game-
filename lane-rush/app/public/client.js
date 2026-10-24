@@ -1714,7 +1714,8 @@ function startEndless() {
 }
 function renderEndlessBest() {
   const best = stats.get("bestRun");
-  $("#endlessBest").textContent = best ? `Your best: ${best.toLocaleString()} m` : "How far can you get?";
+  const box = $("#endlessBest");
+  if (box) box.textContent = best ? `Your best: ${best.toLocaleString()} m` : "How far can you get?";
 }
 $("#endlessBtn").addEventListener("click", () => {
   sfx.unlock();
@@ -2381,14 +2382,14 @@ function renderCompete() {
       "button",
       { class: `trow${opts.live ? " live" : ""}${opts.ready ? " ready" : ""}`, type: "button", "data-open": id },
       el("img", { src: img, alt: "" }),
-      el("span", { class: "tr-txt" }, el("b", { text: name }), el("small", {}, opts.live ? el("i", { class: "live-dot" }) : "", status)),
+      el("span", { class: "tr-txt" }, el("b", { text: name }), el("small", {}, opts.live ? el("i", { class: "live-dot" }) : "", status), opts.desc ? el("span", { class: "tr-desc", text: opts.desc }) : ""),
       opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : el("span", { class: "tr-prize" }, el("i", { class: "coin" }), prize),
       el("i", { class: "tr-go", text: "›" }),
     );
   $("#tourneyList").replaceChildren(
-    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0).toLocaleString(), { live: w.open, ready }),
-    ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, t.prize[0].toLocaleString())),
-    row("endless", ENDLESS_T.img, ENDLESS_T.label, tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, ENDLESS_T.prize[0].toLocaleString()),
+    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0).toLocaleString(), { live: w.open, ready, desc: "10 matches vs bots. Win medals!" }),
+    ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, t.prize[0].toLocaleString(), { desc: t.text })),
+    row("endless", ENDLESS_T.img, "Endless Run", tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, ENDLESS_T.prize[0].toLocaleString(), { desc: ENDLESS_T.text }),
   );
   if (!tourneyModal.hidden) renderTourneySheet();
 }
@@ -2399,7 +2400,7 @@ function renderTourneySheet() {
   const card = tourneyOpen === "weekend" ? weekendCard() : tourneyOpen === "endless" ? endlessTCard() : t ? tourneyCard(t) : null;
   if (!card) return;
   card.classList.add("open"); // all the details show in the sheet
-  $("#tourneyTitle").textContent = tourneyOpen === "weekend" ? "Weekend League" : tourneyOpen === "endless" ? ENDLESS_T.label : t.label;
+  $("#tourneyTitle").textContent = tourneyOpen === "weekend" ? "Weekend League" : tourneyOpen === "endless" ? "Endless Run" : t.label;
   $("#tourneyBody").replaceChildren(card);
 }
 function openTourney(id) {

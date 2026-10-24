@@ -2682,3 +2682,26 @@ html, body { background: var(--k1); }
 .hud .run-coins { position: absolute; z-index: 6; top: calc(max(10px, env(safe-area-inset-top)) + 162px); left: calc(max(12px, env(safe-area-inset-left)) + 2px); display: flex; align-items: center; gap: 5px; padding: 3px 10px 3px 4px; border-radius: 999px; background: rgba(10, 14, 40, 0.6); color: #ffd23f; font-family: var(--display); font-weight: 900; font-size: 16px; pointer-events: none; }
 .hud .run-coins[hidden] { display: none; }
 .hud .run-coins i.coin { width: 20px; height: 20px; }
+
+/* the page ribbons: no drop-shadow filter (it flickered on iPhones while the pages move) */
+.ribbon, .ribbon.pink, .ribbon.teal, .ribbon.gold { filter: none; }
+.ribbon.hp-ribbon::before { box-shadow: none; }
+
+/* tournaments: bigger cards, each with a short line on what it is */
+.hp-compete .tourney-list { gap: 14px; }
+.hp-compete .league-card { grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; padding: 14px 14px; border-radius: 20px; }
+.hp-compete .league-card img { width: 64px; height: 64px; }
+.hp-compete .league-card b { font-size: 22px; }
+.trow { grid-template-columns: 76px minmax(0, 1fr) auto 14px; gap: 12px; min-height: 112px; padding: 14px 14px 14px 12px; border-radius: 20px; }
+.trow img { width: 76px; height: 76px; }
+.tr-txt { gap: 4px; }
+.tr-txt b { font-size: 22px; }
+.tr-txt small { font-size: 13px; }
+.tr-desc { font-size: 13px; font-weight: 700; line-height: 1.25; color: rgba(255, 255, 255, 0.7); }
+.tr-prize { padding: 6px 10px; border-radius: 12px; font-size: 16px; }
+/* the endless tournament's board */
+.et-board { display: grid; gap: 6px; margin: 10px 0; padding: 0; list-style: none; }
+.et-board li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); font-weight: 800; }
+.et-board li b { font-family: var(--display); font-style: italic; font-weight: 900; color: var(--lime); }
+.et-board li em { font-style: normal; font-family: var(--display); font-weight: 900; }
+.et-board li.me { background: rgba(182, 247, 42, 0.16); outline: 2px solid var(--lime); }
