@@ -2670,3 +2670,11 @@ html, body { background: var(--k1); }
 .boot-bar { width: 100%; height: 18px; padding: 3px; border-radius: 999px; border: 2px solid #fff; background: rgba(0, 0, 0, 0.55); box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35); }
 .boot-bar i { display: block; width: 0%; height: 100%; border-radius: 999px; background: linear-gradient(180deg, #e2ff8a, #b6f72a 55%, #8fd61a); box-shadow: 0 0 12px rgba(182, 247, 42, 0.8); transition: width 0.3s ease; }
 #bootText { font-family: var(--display); font-weight: 900; font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); }
+
+/* look behind: a round button top right, hold it and the camera turns round */
+.hud .look-btn { position: fixed; z-index: 8; top: calc(max(10px, env(safe-area-inset-top)) + 58px); right: max(12px, env(safe-area-inset-right)); display: grid; place-items: center; align-content: center; gap: 0; width: 64px; height: 64px; padding: 0; border-radius: 50%; border: 4px solid #fff; background: radial-gradient(circle at 50% 35%, #3a4560, #10141f); box-shadow: 0 4px 0 rgba(0, 0, 0, 0.45); color: #fff; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.hud .look-btn[hidden] { display: none; }
+.hud .look-btn i { font-style: normal; font-size: 24px; line-height: 1; }
+.hud .look-btn small { font-family: var(--display); font-weight: 900; font-size: 10px; text-transform: uppercase; line-height: 1.1; }
+.hud .look-btn.on { border-color: var(--lime); background: radial-gradient(circle at 50% 35%, #d8ff6a, #8fd400); color: #10141f; transform: scale(1.08); }
+.hud .track-bar { top: calc(max(10px, env(safe-area-inset-top)) + 170px); }

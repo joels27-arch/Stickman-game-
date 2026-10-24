@@ -2998,52 +2998,13 @@ function adaptQuality(dt) {
   }
 }
 
-// a round rear-view mirror in the top-right corner, always on in a race: you see who's coming without a button.
-// The view behind is drawn small into a texture, then onto a disc over the corner.
-const mirrorCam = new THREE.PerspectiveCamera(60, 1, 0.5, 300);
-const mirrorRT = new THREE.WebGLRenderTarget(256, 256);
-const mirrorScene = new THREE.Scene();
-const mirrorOrtho = new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1);
-const mirrorDisc = new THREE.Mesh(new THREE.CircleGeometry(0.5, 48), new THREE.MeshBasicMaterial({ map: mirrorRT.texture }));
-mirrorScene.add(mirrorDisc);
-const mirrorSize = new THREE.Vector2();
-let mirrorTick = 0;
+// look behind: hold the round button top right and the camera turns round (no second
+// render of the world, so it costs nothing in frame rate)
 function renderMirror() {
-  const on = renderer && game.mode === "race" && !me.out && me.runner && !game.lookBack && !game.noMirror && serverNow() >= (net.view?.startAt ?? Infinity);
-  const f = $("#mirrorFrame");
+  const on = game.mode === "race" && !me.out && me.runner && !game.noMirror && serverNow() >= (net.view?.startAt ?? Infinity);
+  const f = hudEl.look ?? (hudEl.look = $("#lookBtn"));
   if (f.hidden === Boolean(on)) f.hidden = !on;
-  if (!on) return;
-  renderer.getSize(mirrorSize);
-  const w = mirrorSize.x;
-  const h = mirrorSize.y;
-  const rect = renderer.domElement.getBoundingClientRect();
-  const sx = rect.width / w;
-  const sy = rect.height / h;
-  // the disc goes exactly inside the frame (placed by CSS under the pause button)
-  const size = Math.round(Math.min(116, window.innerWidth * 0.3));
-  const fr = f.getBoundingClientRect();
-  const cx = (fr.left + fr.width / 2 - rect.left) / sx;
-  const cy = h - (fr.top + fr.height / 2 - rect.top) / sy;
-  // the view behind is redrawn every other frame (it's small, nobody notices)
-  if ((mirrorTick = (mirrorTick + 1) % 2) === 0) {
-    const p = me.runner.group.position;
-    mirrorCam.position.set(p.x * 0.6, 2.6, p.z - 2.5);
-    mirrorCam.lookAt(p.x * 0.3, 1.4, p.z + 18);
-    renderer.setRenderTarget(mirrorRT);
-    renderer.render(scene, mirrorCam);
-    renderer.setRenderTarget(null);
-  }
-  mirrorOrtho.right = w;
-  mirrorOrtho.top = h;
-  mirrorOrtho.updateProjectionMatrix();
-  mirrorDisc.position.set(cx, cy, 0);
-  mirrorDisc.scale.setScalar(size / sx - 6 / sx);
-  const auto = renderer.autoClear;
-  renderer.autoClear = false;
-  renderer.clearDepth();
-  renderer.render(mirrorScene, mirrorOrtho);
-  renderer.autoClear = auto;
-  f.style.width = f.style.height = `${size}px`;
+  if (!on && game.lookBack && !game.lookKey) game.lookBack = false;
 }
 
 function resize() {
@@ -6121,13 +6082,24 @@ window.addEventListener("keydown", (e) => {
   else if (k === "e" || k === "E" || k === "Enter") useItem(me.lane, 1);
   else if (k === "q" || k === "Q") useItem(me.lane, -1);
   else if (/^Digit[1-4]$/.test(e.code)) useItem(Number(e.code.slice(5)) - 1, e.shiftKey ? -1 : 1);
-  else if (k === "c" || k === "C" || k === "b" || k === "B") game.lookBack = canControl() || game.mode === "race";
+  else if (k === "c" || k === "C" || k === "b" || k === "B") game.lookBack = game.lookKey = canControl() || game.mode === "race";
   else return;
   e.preventDefault();
 });
 window.addEventListener("keyup", (e) => {
-  if ("cCbB".includes(e.key)) game.lookBack = false;
+  if ("cCbB".includes(e.key)) game.lookBack = game.lookKey = false;
 });
+{
+  const btn = $("#lookBtn");
+  const hold = (on) => (e) => {
+    e.preventDefault();
+    game.lookBack = on && game.mode === "race";
+    btn.classList.toggle("on", game.lookBack);
+  };
+  btn.addEventListener("pointerdown", hold(true));
+  for (const ev of ["pointerup", "pointercancel", "pointerleave"]) btn.addEventListener(ev, hold(false));
+  btn.addEventListener("contextmenu", (e) => e.preventDefault());
+}
 {
   let sx = 0;
   let sy = 0;
@@ -8702,7 +8674,7 @@ world
 // test hooks for the local dev server only (headless browser checks)
 if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
   // test hooks (used by the automated play-tests)
-  window.__laneRush = { me, hit, grabBox, useItem, game, net, remote, world, race, camera, renderPower, MOVER_KINDS, moverCovers, raceElapsed: () => (net.view ? (serverNow() - net.view.startAt) / 1000 : 0) };
+  window.__laneRush = { renderer, scene, me, hit, grabBox, useItem, game, net, remote, world, race, camera, renderPower, MOVER_KINDS, moverCovers, raceElapsed: () => (net.view ? (serverNow() - net.view.startAt) / 1000 : 0) };
 }
 
 requestAnimationFrame(frame);
