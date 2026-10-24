@@ -8168,14 +8168,19 @@ function frame(now) {
     if (intro) {
       const p = forced ?? 1 - Math.max(0, toGo) / introLen;
       const e = p * p * (3 - 2 * p);
-      introPath.points[0].set(4.2, 1.5, fz - 7.5);
-      introPath.points[1].set(1.2, 2.6, fz - 8.8);
-      introPath.points[2].set(-2.6, 4.4, fz - 2.5);
+      // round your runner: from in front of your face, past your side, to behind you
+      // (kept between the start gate's posts)
+      const px = laneX(fx);
+      const side = px > 0 ? -1 : 1; // swing round on the open side
+      const cx = (x) => clamp(x, -3.4, 3.4);
+      introPath.points[0].set(cx(px + side * 1.6), 1.6, fz - 4.6);
+      introPath.points[1].set(cx(px + side * 3.0), 2.2, fz - 2.2);
+      introPath.points[2].set(cx(px + side * 3.0), 3.4, fz + 2.6);
       introPath.points[3].set(tx, 3.0, fz + 5.6);
       introPath.getPoint(e, camPos);
-      // look at the line-up, then turn to look down the track
-      const k = THREE.MathUtils.smoothstep(p, 0.55, 1);
-      introLook = new THREE.Vector3(0, 1.1, fz).lerp(new THREE.Vector3(tx * 0.8, 1.0, fz - 9), k);
+      // look at your runner, then turn to look down the track
+      const k = THREE.MathUtils.smoothstep(p, 0.5, 1);
+      introLook = new THREE.Vector3(px, 1.05, fz).lerp(new THREE.Vector3(tx * 0.8, 1.0, fz - 9), k);
     } else {
       camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     }
