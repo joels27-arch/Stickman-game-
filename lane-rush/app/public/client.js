@@ -8179,7 +8179,7 @@ function frame(now) {
       introPath.points[3].set(tx, 3.0, fz + 5.6);
       introPath.getPoint(e, camPos);
       // look at your runner, then turn to look down the track
-      const k = THREE.MathUtils.smoothstep(p, 0.5, 1);
+      const k = THREE.MathUtils.smoothstep(p, 0.68, 1);
       introLook = new THREE.Vector3(px, 1.05, fz).lerp(new THREE.Vector3(tx * 0.8, 1.0, fz - 9), k);
     } else {
       camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
