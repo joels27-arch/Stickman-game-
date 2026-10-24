@@ -2369,3 +2369,50 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .hp-missions .qreward b { font-size: 14px; color: #1d2150; }
 .hp-missions .quest.done { background: linear-gradient(180deg, #ecfff1, #c9f2d4); }
 .hp-missions .quest.ready { background: linear-gradient(180deg, #fffbe0, #ffecA0); box-shadow: 0 4px 0 #b07a00, 0 0 16px rgba(255, 210, 63, 0.6); }
+
+/* ── line-up: the runners on numbered start blocks in a stadium at sunset ── */
+.lx { background: #2a1d4a; }
+.lx-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; }
+.lx-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20, 10, 50, 0.55) 0%, rgba(20, 10, 50, 0) 30%, rgba(20, 10, 50, 0) 60%, rgba(20, 10, 40, 0.65) 100%); pointer-events: none; }
+.lx-top { position: absolute; z-index: 3; top: max(12px, env(safe-area-inset-top)); left: 12px; right: 12px; display: grid; justify-items: center; gap: 6px; text-align: center; }
+.lx-corner { display: flex; justify-content: space-between; width: 100%; }
+.lx-chip { padding: 6px 12px; border: 2px solid rgba(255, 255, 255, 0.7); border-radius: 999px; background: rgba(20, 12, 50, 0.6); color: #fff; font: inherit; font-weight: 900; font-size: 13px; cursor: pointer; }
+.lx-kicker { margin: 4px 0 0; font-family: var(--display); font-weight: 900; font-size: 17px; letter-spacing: 0.02em; text-transform: uppercase; color: #ffd23f; -webkit-text-stroke: 3px #4a1f00; paint-order: stroke fill; }
+.lx-pill { display: flex; align-items: baseline; gap: 6px; padding: 6px 18px; border-radius: 999px; border: 2px solid rgba(255, 255, 255, 0.75); background: rgba(40, 26, 90, 0.85); color: #fff; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3); }
+.lx-pill b { font-family: var(--display); font-weight: 900; font-size: 18px; text-transform: uppercase; }
+.lx-pill span { font-weight: 800; font-size: 14px; }
+.lx-pill span::before { content: "· "; }
+.lx-code { display: flex; align-items: center; gap: 6px; margin-top: -2px; padding: 3px 4px 3px 14px; border-radius: 999px; border: 2px solid rgba(255, 255, 255, 0.5); background: rgba(40, 26, 90, 0.75); color: #cfc6ff; font-family: var(--display); font-weight: 900; font-size: 14px; text-transform: uppercase; }
+.lx-code b { color: #ffd23f; letter-spacing: 0.12em; font-size: 16px; }
+.lx-copy { padding: 2px 10px; border: 0; border-radius: 999px; background: #4d7cff; color: #fff; font: inherit; font-size: 12px; cursor: pointer; }
+#lineup.solo-room .lx-code { display: none; }
+/* the four start blocks */
+.lx-stage { position: absolute; z-index: 2; left: 50%; transform: translateX(-50%); width: min(96vw, 560px); bottom: calc(max(16px, env(safe-area-inset-bottom)) + 170px); height: min(46vh, 420px); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; gap: 4px; }
+.lx-ped { --b1: #4d8bff; --b2: #1f4fc4; --bt: #9cc2ff; position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.lx-ped.p2 { --b1: #ff5a5a; --b2: #c21e2e; --bt: #ffa3a3; }
+.lx-ped.p3 { --b1: #ffb431; --b2: #e07000; --bt: #ffd98a; }
+.lx-ped.p4 { --b1: #b06bff; --b2: #6a2bd0; --bt: #dcb6ff; }
+.lx-char { position: relative; z-index: 2; width: 130%; max-width: none; height: 70%; margin-bottom: -10px; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.45)); }
+.lx-ped.gone .lx-char { filter: grayscale(1) brightness(0.6); }
+.lx-block { position: relative; z-index: 3; width: 100%; height: 76px; display: grid; justify-items: center; align-content: center; gap: 0; padding: 4px 3px 0; border-radius: 4px 4px 6px 6px; border: 2px solid rgba(255, 255, 255, 0.55); background: linear-gradient(180deg, var(--b1), var(--b2)); box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.2), 0 6px 10px rgba(0, 0, 0, 0.35); color: #fff; }
+.lx-block::before { content: ""; position: absolute; left: -2px; right: -2px; top: -14px; height: 14px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, var(--bt), var(--b1)); border: 2px solid rgba(255, 255, 255, 0.55); border-bottom: 0; }
+.lx-block b { font-family: var(--display); font-weight: 900; font-size: 38px; line-height: 1; -webkit-text-stroke: 3px rgba(0, 0, 0, 0.35); paint-order: stroke fill; text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25); }
+.lx-block small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 900; font-size: 11px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+.lx-ok { position: absolute; z-index: 4; top: -24px; right: -4px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; border: 2px solid #fff; background: #2fb36a; color: #fff; font-style: normal; font-weight: 900; font-size: 13px; }
+/* what they shout, and the YOU marker */
+.lx-say { position: relative; z-index: 4; margin-bottom: 8px; padding: 4px 8px; border-radius: 10px; border: 2px solid #2a2350; background: #fff; color: #1d1a40; font-weight: 900; font-size: 11px; line-height: 1.15; text-align: center; max-width: 100%; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25); }
+.lx-say::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px; transform: translateX(-50%) rotate(45deg); background: #fff; border-right: 2px solid #2a2350; border-bottom: 2px solid #2a2350; }
+.lx-ped.p3 .lx-say { margin-bottom: 18px; }
+.lx-you { position: relative; z-index: 4; margin-bottom: 10px; padding: 2px 12px; border-radius: 999px; border: 2px solid #fff; background: linear-gradient(180deg, #d8ff6a, #8fe000); color: #1a3300; font-family: var(--display); font-weight: 900; font-size: 15px; box-shadow: 0 3px 0 #3f7a00; }
+.lx-you::after { content: ""; position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #8fe000; }
+.lx-ped.empty .lx-ghost { display: grid; place-items: center; width: 80%; aspect-ratio: 1; margin-bottom: 18px; border-radius: 50%; border: 3px dashed rgba(255, 255, 255, 0.6); background: rgba(20, 12, 50, 0.4); color: #fff; font-family: var(--display); font-weight: 900; font-size: 30px; }
+.lx-ped.empty .lx-block { filter: saturate(0.4) brightness(0.8); }
+.lx-ped .emo { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); z-index: 6; font-size: 44px; animation: emofloat 2.2s ease-out forwards; }
+/* emotes, the big START button and a short status line */
+.lx-bottom { position: absolute; z-index: 3; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); display: grid; justify-items: center; gap: 10px; }
+.lx-emotes { display: flex; gap: 6px; padding: 6px 10px; border-radius: 999px; background: rgba(20, 12, 50, 0.65); border: 2px solid rgba(255, 255, 255, 0.25); }
+.lx-emotes .emote-btn { width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.12); font-size: 24px; line-height: 40px; cursor: pointer; }
+.lx-start { width: min(320px, 82vw); height: 64px; border: 3px solid #fff; border-radius: 999px; background: linear-gradient(180deg, #8ef05a 0%, #3fc42a 55%, #2a9e1c 100%); box-shadow: 0 6px 0 #1d6b12, 0 10px 20px rgba(0, 0, 0, 0.35); color: #fff; font-family: var(--display); font-weight: 900; font-size: 30px; letter-spacing: 0.02em; text-transform: uppercase; -webkit-text-stroke: 3px #1d6b12; paint-order: stroke fill; cursor: pointer; }
+.lx-start:active { transform: translateY(3px); box-shadow: 0 3px 0 #1d6b12; }
+.lx-start.waiting { background: linear-gradient(180deg, #8a90a8, #5d6380); box-shadow: 0 6px 0 #33384e; -webkit-text-stroke-color: #33384e; }
+.lx-status { min-height: 16px; font-weight: 800; font-size: 13px; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }

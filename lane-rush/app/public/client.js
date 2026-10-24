@@ -2524,7 +2524,6 @@ function renderLobby(v) {
   const gm = v.mode || "survival";
   // only the host chooses mode and map; invited friends just pick a runner
   $("#hostPicks").hidden = !isHost;
-  $("#luModeBox").hidden = !isHost;
   const modePick = $("#modePick");
   modePick.replaceChildren(
     ...Object.entries(GAME_MODE_INFO).map(([key, info]) => {
@@ -2600,9 +2599,8 @@ function renderLobby(v) {
   );
   $("#prizeNote").textContent =
     prize === "none" ? "" : isHost ? `You pay ${potOf(prize).toLocaleString()} coins. Bot places come back to you.` : `The host pays ${potOf(prize).toLocaleString()} coins for the top 3`;
-  const what = matchLabel(v, gm, gm === "survival" && n < 2 && !botsOn()).toLowerCase();
   $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
-  renderLineup(v, { isHost, gm, mp, mode, what });
+  renderLineup(v, { isHost, gm, mp });
   // once you've locked in your runner, the lobby is the line-up
   if (game.mode === "lobby" && !screens.shop.classList.contains("show")) showScreen(game.locked ? "lineup" : "lobby");
   $("#lobbyCount").textContent = `${mode} · ${GAME_MODE_INFO[gm].label} · ${n}/4 players`;
@@ -2646,47 +2644,43 @@ $("#luGo").addEventListener("click", () => {
  * with READY / NOT READY. Guests toggle Ready; the host's button becomes
  * Start once everybody else is ready.
  */
-function renderLineup(v, { isHost, gm, mp, mode, what }) {
+/** What each runner shouts from the start blocks (picked per player, so it doesn't flicker). */
+const TAUNTS = ["Too slow!", "You're toast!", "My win!", "Catch me!", "Eat my dust!", "Bring it!", "Let's go!", "Easy win!"];
+const LU_KICKER = { survival: "Every runner for themself", chase: "Outrun the brain!", coinrush: "Grab the most coins", potato: "Don't be last!", grandtour: "One of every mode", random: "Surprise mode!" };
+function renderLineup(v, { isHost, gm, mp }) {
   $("#lineup").classList.toggle("solo-room", Boolean(game.solo));
   $("#luCode").textContent = net.code;
+  $("#luKicker").textContent = LU_KICKER[gm] ?? "";
   $("#luMode").textContent = matchLabel(v, gm, gm === "survival" && v.players.length < 2 && !botsOn());
   const pz = PRIZE_INFO[v.prize ?? "none"];
-  $("#luMap").textContent = `${MAP_INFO[mp].label} map · ${botsOn() && v.players.length < 4 ? "with bots" : mode}${pz.pays.length ? ` · ${pz.icon} ${pz.label}` : ""}`;
-  const qs = dailyChallenges();
-  const qd = dailyState();
-  $("#luDaily").textContent = `📋 Challenges ${qs.filter((q) => qd.done[q.id]).length}/${qs.length}`;
+  $("#luMap").textContent = `${MAP_INFO[mp].label} map${pz.pays.length ? ` · ${pz.icon}` : ""}`;
   const present = v.players.filter((p) => !p.gone);
-  const order = [...v.players];
-  // you stand in the middle, like a real lobby
-  const mine = order.findIndex((p) => p.id === playerId);
-  if (mine >= 0) {
-    const [me] = order.splice(mine, 1);
-    order.splice(Math.min(1, order.length), 0, me);
-  }
-  const stage = $("#luStage");
-  const peds = order.map((p) => {
+  // you always stand on block 1
+  const order = [...v.players].sort((a, b) => Number(b.id === playerId) - Number(a.id === playerId));
+  const hash = (id) => [...String(id)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  const peds = order.map((p, i) => {
     const isMe = p.id === playerId;
     const ok = p.ready || p.id === v.host;
     const ped = el(
       "div",
-      { class: `ped${isMe ? " me" : ""}`, style: `--team:${RUNNERS[p.char]?.color ?? "#666"}` },
+      { class: `lx-ped p${i + 1}${isMe ? " me" : ""}${ok ? " ok" : ""}${p.gone ? " gone" : ""}` },
+      isMe ? el("span", { class: "lx-you", text: "YOU" }) : el("span", { class: "lx-say", text: p.gone ? "Away…" : TAUNTS[hash(p.id) % TAUNTS.length] }),
+      el("img", { class: "lx-char", src: `/assets/lu_${RUNNERS[p.char]?.file ?? "c0"}.webp`, alt: RUNNERS[p.char]?.name ?? "" }),
       el(
         "div",
-        { class: "tag" },
-        el("b", { text: `${p.id === v.host ? "👑 " : ""}${withFlag(p.name, p.country)}` }),
-        el("em", { class: "lgtag" }, el("img", { src: rankOf(p.rp ?? 0).img, alt: "" }), el("span", { text: rankOf(p.rp ?? 0).name })),
-        el("span", { class: p.gone ? "no" : ok ? "ok" : "no", text: p.gone ? "Away" : p.id === v.host ? "Host" + (isMe ? " · You" : "") : ok ? "Ready" + (isMe ? " · You" : "") : "Not ready" + (isMe ? " · You" : "") }),
+        { class: "lx-block" },
+        el("b", { text: String(i + 1) }),
+        el("small", { text: `${p.id === v.host ? "👑 " : ""}${withFlag(p.name, p.country)}` }),
+        ok ? el("i", { class: "lx-ok", text: "✓" }) : null,
       ),
-      el("img", { src: `/assets/full_${RUNNERS[p.char]?.file ?? "c0"}.webp`, alt: RUNNERS[p.char]?.name ?? "" }),
-      el("div", { class: "disc" }),
     );
     ped.dataset.id = p.id;
     return ped;
   });
   for (let i = order.length; i < 4; i++) {
-    peds.push(el("div", { class: "ped empty" }, el("div", { class: "ghost", text: botsOn() ? "🤖 Bot joins at the start" : `Waiting… code ${net.code}` }), el("div", { class: "disc" })));
+    peds.push(el("div", { class: `lx-ped p${i + 1} empty` }, el("span", { class: "lx-ghost", text: botsOn() ? "🤖" : "?" }), el("div", { class: "lx-block" }, el("b", { text: String(i + 1) }), el("small", { text: botsOn() ? "Bot" : "Waiting…" }))));
   }
-  stage.replaceChildren(...peds);
+  $("#luStage").replaceChildren(...peds);
   paintEmotes();
 
   const waiting = present.filter((p) => p.id !== v.host && !p.ready);
@@ -2695,13 +2689,13 @@ function renderLineup(v, { isHost, gm, mp, mode, what }) {
   const meP = v.players.find((p) => p.id === playerId);
   go.classList.remove("waiting");
   if (isHost) {
-    go.textContent = waiting.length ? "Waiting…" : `Start ${what} →`;
+    go.textContent = waiting.length ? "Waiting…" : "Start ▶";
     go.classList.toggle("waiting", waiting.length > 0);
-    status.textContent = waiting.length ? `Waiting for ${waiting.map((p) => p.name).join(", ")} to get ready` : present.length > 1 ? "Everyone's ready!" : "Start now, or share the code first";
+    status.textContent = waiting.length ? `Waiting for ${waiting.map((p) => p.name).join(", ")}` : present.length > 1 ? "Everyone's ready!" : "";
   } else {
     go.textContent = meP?.ready ? "Cancel ready" : "Ready ✓";
     go.classList.toggle("waiting", Boolean(meP?.ready));
-    status.textContent = meP?.ready ? (waiting.length ? `Waiting for ${waiting.map((p) => p.name).join(", ")}` : "Waiting for the host to start…") : "Press Ready when you're set";
+    status.textContent = meP?.ready ? (waiting.length ? `Waiting for ${waiting.map((p) => p.name).join(", ")}` : "Waiting for the host…") : "";
   }
 }
 $("#leaveBtn").addEventListener("click", leaveLobby);
@@ -6367,7 +6361,7 @@ const EMOTE_SHOW_MS = 2200;
 /** Put the emotes still floating back onto the (possibly redrawn) lobby cards. */
 function paintEmotes() {
   const now = Date.now();
-  for (const card of document.querySelectorAll("#slots .rcard, #luStage .ped")) {
+  for (const card of document.querySelectorAll("#slots .rcard, #luStage .lx-ped")) {
     const x = game.liveEmotes?.[card.dataset.id];
     const old = card.querySelector(".emo");
     if (!x || now - x.at > EMOTE_SHOW_MS) continue;

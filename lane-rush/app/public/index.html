@@ -201,33 +201,23 @@
     </section>
 
     <!-- LINE-UP: everyone's runner on a pedestal, waiting for READY -->
-    <section id="lineup" class="screen lineup">
-      <div class="lu-arena">
-        <picture class="lu-bg">
-          <source media="(max-aspect-ratio: 1/1)" srcset="/assets/lobby_tall.jpg" />
-          <img src="/assets/lobby_wide.jpg" alt="" />
-        </picture>
-        <div class="lu-shade"></div>
-      </div>
-      <header class="lu-top">
-        <div class="lu-code"><small>Lobby code</small><b id="luCode">----</b><button id="luCopy" class="btn small blue" type="button">Copy invite</button></div>
-        <div class="lu-mode" id="luModeBox"><small>Game mode</small><b id="luMode">Survival</b><span id="luMap">Meadow</span></div>
+    <section id="lineup" class="screen lineup lx">
+      <img class="lx-bg" src="/assets/lu_stadium.jpg" alt="" />
+      <div class="lx-shade"></div>
+      <header class="lx-top">
+        <div class="lx-corner">
+          <button id="changeRunner" class="lx-chip" type="button">‹ Runner</button>
+          <button id="luLeave" class="lx-chip" type="button">Leave</button>
+        </div>
+        <p id="luKicker" class="lx-kicker">Every runner for themself</p>
+        <div id="luModeBox" class="lx-pill"><b id="luMode">Survival</b><span id="luMap">Meadow</span></div>
+        <div class="lx-code"><span>Code</span><b id="luCode">----</b><button id="luCopy" class="lx-copy" type="button">Copy</button></div>
       </header>
-      <aside class="lu-card">
-        <div class="wallet" title="Your medals"></div>
-        <div id="luDaily" class="lu-daily"></div>
-      </aside>
-      <div id="luStage" class="lu-stage"></div>
-      <footer class="lu-bottom">
-        <div class="lu-left">
-          <button id="changeRunner" class="btn small ghost" type="button">‹ Change runner</button>
-          <button id="luLeave" class="btn small ghost" type="button">Leave</button>
-          <div class="emote-row lu-emotes" aria-label="Send an emote"></div>
-        </div>
-        <div class="lu-right">
-          <div id="luStatus" class="lu-status"></div>
-          <button id="luGo" class="btn big go" type="button">Ready ✓</button>
-        </div>
+      <div id="luStage" class="lx-stage"></div>
+      <footer class="lx-bottom">
+        <div class="emote-row lu-emotes lx-emotes" aria-label="Send an emote"></div>
+        <button id="luGo" class="lx-start" type="button">Start ▶</button>
+        <div id="luStatus" class="lx-status"></div>
       </footer>
     </section>
 
