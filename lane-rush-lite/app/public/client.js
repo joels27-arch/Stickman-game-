@@ -9187,9 +9187,9 @@ $("#mpBtn").addEventListener("click", () => {
 });
 $("#mpClose").addEventListener("click", () => (mpModal.hidden = true));
 mpModal.addEventListener("click", (e) => e.target === mpModal && (mpModal.hidden = true));
-$("#mpQuick").addEventListener("click", () => {
+$("#quickBtn").addEventListener("click", () => {
+  sfx.unlock();
   if (soloBtn.disabled) return toast("Still loading the runners…");
-  mpModal.hidden = true;
   soloBtn.click();
 });
 $("#mpCreate").addEventListener("click", () => {

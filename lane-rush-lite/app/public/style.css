@@ -2824,3 +2824,10 @@ html, body { background: var(--k1); }
 .hud .place sup { position: relative; top: -10px; margin-top: 0; }
 .hud .place sub { font-size: 14px; }
 #picker .card.locked img { filter: none !important; opacity: 1 !important; }
+/* three buttons on the home: a little shorter so they all fit */
+.home.lite .lite-dock { gap: 10px; }
+.home.lite .lite-btn { min-height: 74px; padding: 10px 16px; }
+.home.lite .lite-btn.mp { min-height: 88px; }
+.home.lite .lite-btn b { font-size: 27px; }
+.home.lite .lite-btn.mp b { font-size: 33px; }
+.home.lite .lite-btn .lb-ico { font-size: 32px; }
