@@ -2823,3 +2823,4 @@ html, body { background: var(--k1); }
 .hud .place b, .hud .place sup, .hud .place sub { align-self: baseline; }
 .hud .place sup { position: relative; top: -10px; margin-top: 0; }
 .hud .place sub { font-size: 14px; }
+#picker .card.locked img { filter: none !important; opacity: 1 !important; }

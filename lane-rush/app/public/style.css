@@ -2781,3 +2781,4 @@ html, body { background: var(--k1); }
 /* the level sits under the rarity, not on the picture */
 .ccard .cfoot .clvl { position: static; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 3px; padding: 2px 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.35); pointer-events: none; }
 .ccard .cfoot .clvl .cbar { width: 34px; }
+#picker .card.locked img { filter: none !important; opacity: 1 !important; }
