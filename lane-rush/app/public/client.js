@@ -3570,8 +3570,21 @@ const world = (() => {
     return mapLoads.get(map);
   }
 
+  // download progress per file (0 … 1), for the loading bar
+  const fileProgress = new Map();
   function loadGLB(url) {
-    return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
+    fileProgress.set(url, fileProgress.get(url) ?? 0);
+    return new Promise((resolve, reject) =>
+      loader.load(
+        url,
+        (g) => {
+          fileProgress.set(url, 1);
+          resolve(g);
+        },
+        (e) => e.total && fileProgress.set(url, Math.max(fileProgress.get(url) ?? 0, Math.min(0.99, e.loaded / e.total))),
+        reject,
+      ),
+    );
   }
 
   /** Normalise a static prop: long side across the lane, centred, base on the ground. */
@@ -3775,8 +3788,21 @@ const world = (() => {
       loadGLB("/assets/fence.glb").then((g) => (assets.props.fence = fitProp(g.scene, { width: 3.0, maxHeight: 0.9 }))),
       loadGLB("/assets/cloud.glb").then((g) => (assets.props.cloud = fitProp(g.scene, { width: 1 }))),
     ];
+    // the bar moves with the bytes downloaded (and finished files), never backwards
+    let shown = 0;
     let done = 0;
-    await Promise.all(jobs.map((j) => j.then(() => onProgress?.(++done / jobs.length))));
+    const report = () => {
+      let sum = 0;
+      for (const f of fileProgress.values()) sum += f;
+      const f = Math.min(0.99, Math.max(sum / Math.max(1, fileProgress.size), done / jobs.length) * 0.97);
+      if (f > shown) onProgress?.((shown = f));
+    };
+    const tick = setInterval(report, 150);
+    try {
+      await Promise.all(jobs.map((j) => j.then(() => (done++, report()))));
+    } finally {
+      clearInterval(tick);
+    }
     ready = true;
   }
 
@@ -8799,6 +8825,7 @@ const soloBtn = $("#soloBtn");
 const endlessBtn = $("#endlessBtn");
 createBtn.disabled = joinBtn.disabled = soloBtn.disabled = endlessBtn.disabled = true;
 renderEndlessBest();
+window.__bootStarted = true;
 world
   .load((f) => {
     const pct = Math.round(f * 100);

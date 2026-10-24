@@ -2705,3 +2705,7 @@ html, body { background: var(--k1); }
 .et-board li b { font-family: var(--display); font-style: italic; font-weight: 900; color: var(--lime); }
 .et-board li em { font-style: normal; font-family: var(--display); font-weight: 900; }
 .et-board li.me { background: rgba(182, 247, 42, 0.16); outline: 2px solid var(--lime); }
+.boot-retry { margin-top: 4px; padding: 10px 22px; border: 0; border-radius: 999px; background: var(--lime, #b6f72a); color: #10141f; font-family: var(--display); font-weight: 900; font-size: 16px; text-transform: uppercase; }
+.boot-retry[hidden] { display: none; }
+.boot #bootText { max-width: 90vw; text-align: center; }
+.boot { min-height: 100lvh; }

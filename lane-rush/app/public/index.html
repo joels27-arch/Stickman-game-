@@ -49,8 +49,36 @@
         <h1 class="logo boot-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
         <div class="boot-bar"><i id="bootFill"></i></div>
         <small id="bootText">Loading… 0%</small>
+        <button id="bootRetry" class="boot-retry" type="button" hidden onclick="location.reload()">Try again</button>
       </div>
     </div>
+    <script>
+      // the loading screen never just hangs: an error shows what went wrong, and a stalled load offers a retry
+      (function () {
+        var t0 = Date.now();
+        function show(msg) {
+          var b = document.getElementById("bootText");
+          var r = document.getElementById("bootRetry");
+          if (!b || !document.getElementById("boot")) return;
+          if (msg) b.textContent = msg;
+          if (r) r.hidden = false;
+        }
+        window.addEventListener("error", function (e) {
+          if (e && e.message) show("Something broke: " + String(e.message).slice(0, 90));
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          var m = e && e.reason && (e.reason.message || e.reason);
+          if (m) show("Something broke: " + String(m).slice(0, 90));
+        });
+        var iv = setInterval(function () {
+          if (!document.getElementById("boot")) return clearInterval(iv);
+          if (Date.now() - t0 > 25000) {
+            show(window.__bootStarted ? "" : "The game didn't start. Tap to try again.");
+            clearInterval(iv);
+          }
+        }, 1000);
+      })();
+    </script>
 
     <!-- HOME -->
     <section id="home" class="screen show home" data-page="play">
