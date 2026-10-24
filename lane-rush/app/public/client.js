@@ -613,14 +613,14 @@ $("#nameForm").addEventListener("submit", (e) => {
 // ── first-visit tour: a spotlight on each part of the app, skippable, ending on the endless run ──
 const TOUR = [
   { sel: null, welcome: true, title: "Hey {name}, I'm Nia!", text: "Race your friends! Quick tour?" },
-  { sel: "#roomRow", pose: "point", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room or join a friend's." },
-  { sel: "#soloBtn", pose: "box", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Race bots in any mode." },
-  { sel: ".stats-hero", open: "stats", pose: "point", img: "/assets/lg_bronze.webp", title: "Your profile", text: "Your stats and how you rank." },
-  { sel: "#tourneyList", page: "compete", pose: "cheer", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "Win coin prizes." },
-  { sel: "#skinGrid .ccard", page: "skins", pose: "point", img: "/assets/tab_skins.webp", title: "Skins", text: "Pick who you race with." },
-  { sel: "#trophyRoad", page: "missions", pose: "think", img: "/assets/tab_missions.webp", title: "Missions", text: "Missions and the Trophy Road." },
-  { sel: "#packRow .pack-card", page: "shop", pose: "box", img: "/assets/tab_shop.webp", title: "Shop", text: "Packs and characters." },
-  { sel: "#endlessBtn", pose: "run", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life. I'll teach you as you run!", last: true },
+  { sel: "#roomRow", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room or join a friend's." },
+  { sel: "#soloBtn", img: "/assets/pw_rocket.png", title: "Versus bots", text: "Race bots in any mode." },
+  { sel: ".stats-hero", open: "stats", img: "/assets/lg_bronze.webp", title: "Your profile", text: "Your stats and how you rank." },
+  { sel: "#tourneyList", page: "compete", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "Win coin prizes." },
+  { sel: "#skinGrid .ccard", page: "skins", img: "/assets/tab_skins.webp", title: "Skins", text: "Pick who you race with." },
+  { sel: "#trophyRoad", page: "missions", img: "/assets/tab_missions.webp", title: "Missions", text: "Missions and the Trophy Road." },
+  { sel: "#packRow .pack-card", page: "shop", img: "/assets/tab_shop.webp", title: "Shop", text: "Packs and characters." },
+  { sel: "#endlessBtn", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life. I'll teach you as you run!", last: true },
 ];
 const TOUR_PERKS = [
   ["/assets/pw_rocket.png", "Wild power-ups"],
@@ -664,7 +664,7 @@ function renderTour() {
   $("#tourCount").textContent = st.welcome ? "" : `${tourAt} / ${TOUR.length - 1}`;
   $("#tourNext").textContent = st.last ? "Run! →" : st.welcome ? "Show me around →" : "Next →";
   $("#tourBar").replaceChildren(...TOUR.slice(1).map((_, i) => el("i", { class: i + 1 < tourAt ? "done" : i + 1 === tourAt ? "on" : "" })));
-  $("#tourPose").src = `/assets/m_${st.pose ?? "point"}.webp`;
+  // Nia keeps one still pose for the whole tour
   const img = $("#tourImg");
   img.hidden = !st.img;
   if (st.img) img.src = st.img;
@@ -2134,7 +2134,6 @@ function renderTrophyRoad() {
     ),
     track,
     el("span", { class: "road-all", text: "See the whole road ›" }),
-    el("p", { class: "road-note", text: "Gold +10 · Silver +5 · Bronze +3 · 4th +1" }),
   );
   // keep the next reward in view
   requestAnimationFrame(() => {
@@ -5669,10 +5668,10 @@ function banner(text, ms = 1400) {
 // into slow motion and shows the move; make it and it speeds back up. Then a
 // power-up tip, and you're on your own.
 const COACH = {
-  lane: { title: "Swipe left or right", text: "A crate! Change lanes to dodge it.", keys: "← → on the keyboard", g: "side", pose: "dodge" },
-  jump: { title: "Swipe up to jump", text: "Jump over the hurdle!", keys: "↑ or Space on the keyboard", g: "up", pose: "jump" },
-  slide: { title: "Swipe down to slide", text: "Slide under the gate!", keys: "↓ on the keyboard", g: "down", pose: "slide" },
-  item: { title: "Tap to use it", text: "Tap the round button!", keys: "E on the keyboard", g: "tap", pose: "box" },
+  lane: { title: "Swipe left or right", text: "A crate! Change lanes to dodge it.", keys: "← → on the keyboard", g: "side" },
+  jump: { title: "Swipe up to jump", text: "Jump over the hurdle!", keys: "↑ or Space on the keyboard", g: "up" },
+  slide: { title: "Swipe down to slide", text: "Slide under the gate!", keys: "↓ on the keyboard", g: "down" },
+  item: { title: "Tap to use it", text: "Tap the round button!", keys: "E on the keyboard", g: "tap" },
 };
 const COACH_MOVES = ["lane", "jump", "slide"];
 const COACH_SLOW = 0; // the run waits until you make the move
@@ -5690,7 +5689,7 @@ function coachShow(kind, dir = COACH[kind].g, row = null) {
   coach.row = row;
   coach.items = me.items.length;
   coach.shownAt = performance.now();
-  $("#coachPose").src = `/assets/m_${c.pose}.webp`;
+  // Nia keeps one still pose in every lesson
   $("#coachTitle").textContent = c.title;
   $("#coachText").textContent = c.text;
   $("#coachKeys").textContent = TOUCH ? "" : c.keys;
@@ -6401,7 +6400,7 @@ function claimDaily(q, btn) {
   toast(`+${q.coins} coins · +150 XP`);
   renderDaily();
 }
-function missionRow({ icon, tier, tierClass, text, have, goal, reward, state, onClaim, extra }) {
+function missionRow({ icon, tierClass, text, have, goal, reward, state, onClaim, extra }) {
   // state: active | ready | claimed | locked
   const pct = Math.round((Math.min(have, goal) / goal) * 100);
   let right;
@@ -6416,7 +6415,6 @@ function missionRow({ icon, tier, tierClass, text, have, goal, reward, state, on
     el(
       "div",
       { class: "qmain" },
-      el("span", { class: "qtier", text: tier }),
       el("b", { text }),
       el("div", { class: "qbar" }, el("i", { style: `width:${state === "claimed" || state === "ready" ? 100 : pct}%` }), el("span", { text: state === "claimed" ? "Claimed ✓" : state === "ready" ? "Complete!" : state === "locked" ? "Locked" : `${Math.min(have, goal).toLocaleString()} / ${goal.toLocaleString()}` })),
       extra ?? null,
@@ -6431,14 +6429,12 @@ function renderDaily() {
   const n = qs.filter((q) => st.done[q.id]).length;
   const ready = qs.filter((q) => st.done[q.id] && !st.claimed[q.id]).length;
   $("#dailyDot").hidden = ready === 0;
-  $("#questSub").textContent = n === qs.length ? (ready ? "All done! Claim your rewards." : "All done! New missions tomorrow.") : `${n} of ${qs.length} done today`;
-  $("#dailyPips").replaceChildren(...qs.map((q) => el("i", { class: st.claimed[q.id] ? "claimed" : st.done[q.id] ? "done" : "" })));
+  $("#questSub").textContent = n === qs.length ? (ready ? "All done! Claim your rewards." : "All done! New missions tomorrow.") : `${n}/${qs.length} done`;
   $("#questReset").textContent = untilMidnight();
   $("#questList").replaceChildren(
     ...qs.map((q) =>
       missionRow({
         icon: STAT_ICON[q.stat],
-        tier: q.tier,
         tierClass: q.tier,
         text: q.text,
         have: st.best[q.id] ?? 0,
@@ -7317,7 +7313,6 @@ function renderCareer() {
       out.push(
         missionRow({
           icon: m.icon,
-          tier: `Chapter ${ci + 1}`,
           tierClass: ["easy", "easy", "medium", "medium", "hard", "hard"][ci],
           text: m.text,
           have,
