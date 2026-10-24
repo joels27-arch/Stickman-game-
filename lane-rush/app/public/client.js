@@ -5183,7 +5183,11 @@ const world = (() => {
       loadModeProp("bomb", { width: 0.95, maxHeight: 1.2 }).then((m) => {
         if (!m || !bombObj || modeKind !== "potato") return;
         body.remove(spr);
-        body.add(sizeTo(m.clone(), 0.9));
+        // centre the model on the body so it spins in place right over the runner's head
+        const bomb = sizeTo(m.clone(), 0.7);
+        const box = new THREE.Box3().setFromObject(bomb);
+        bomb.position.sub(box.getCenter(new THREE.Vector3()));
+        body.add(bomb);
       });
     }
   }
@@ -5245,7 +5249,7 @@ const world = (() => {
         const danger = 1 - Math.min(1, Math.max(0, (b.until - sn) / POTATO_FUSE_MS));
         const rate = 5 + danger * danger * 30;
         const x = at.x;
-        let y = at.y + CHAR_H + 0.9;
+        let y = at.y + CHAR_H + 0.55;
         let z = at.z;
         const hop = (now - bombHop.t0) / 380;
         if (bombHop.from && hop < 1) {
