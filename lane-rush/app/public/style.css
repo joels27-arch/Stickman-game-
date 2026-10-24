@@ -2273,3 +2273,23 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 #lobby .map-card span { display: none; }
 #lobby .map-card.themed::before { content: attr(data-icon); position: absolute; top: 8%; left: 0; right: 0; text-align: center; font-size: 34px; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35)); }
 #lobby .map-card.random::before { top: 8%; right: auto; left: 0; width: 100%; text-align: center; font-size: 34px; }
+
+/* race start: a curtain until everything is loaded, then a clean countdown with the controls hidden until GO */
+.race-curtain { position: fixed; inset: 0; z-index: 40; display: grid; place-content: center; justify-items: center; gap: 14px; background: radial-gradient(circle at 50% 42%, #5b3df0 0%, #2a1a8f 50%, #120b45 100%); transition: opacity 0.45s ease; }
+.race-curtain[hidden] { display: none; }
+.race-curtain.gone { opacity: 0; pointer-events: none; }
+.race-curtain .logo { margin: 0; font-size: clamp(54px, 15vw, 90px); filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.35)); }
+.race-curtain b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 22px; color: #fff; text-transform: uppercase; letter-spacing: 0.04em; }
+.curtain-spin { width: 44px; height: 44px; border-radius: 50%; border: 5px solid rgba(255, 255, 255, 0.2); border-top-color: #b6f72a; animation: curtainSpin 0.8s linear infinite; }
+@keyframes curtainSpin { to { transform: rotate(360deg); } }
+.hud.intro > :not(.countdown):not(.race-tag):not(.spin-wheel) { opacity: 0; pointer-events: none; }
+.hud.reveal > :not(.countdown):not(.race-tag) { animation: hudIn 0.45s ease both; }
+@keyframes hudIn { from { opacity: 0; } }
+.countdown { z-index: 6; top: 26%; color: #fff; -webkit-text-stroke: 4px #1d1a5c; paint-order: stroke fill; text-shadow: 0 8px 0 #1d1a5c, 0 0 40px rgba(255, 255, 255, 0.35); }
+.countdown[data-n="3"] { color: #ff5a6e; }
+.countdown[data-n="2"] { color: #ffd23f; }
+.countdown[data-n="1"] { color: #4fc3ff; }
+.countdown[data-n="GO!"] { color: #b6f72a; font-size: clamp(110px, 30vw, 220px); }
+.countdown[data-n="Ready?"] { font-size: clamp(54px, 14vw, 96px); }
+/* the logo sits a touch lower on the Play page */
+.hp-play .home-logo { margin-top: 14px; }

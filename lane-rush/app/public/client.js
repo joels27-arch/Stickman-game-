@@ -37,6 +37,7 @@ import {
   ROUND_OPTIONS,
   ROUND_KINDS,
   MAPS,
+  MAP_MOVERS,
   EMOTES,
   BANANA_AHEAD_M,
   BOWL_SPEED,
@@ -516,6 +517,7 @@ function showScreen(name) {
   sfx.music(name === "race" ? "race" : "menu");
   if (name !== "race") $("#quitModal").hidden = true;
   $("#hud").classList.toggle("show", name === "race");
+  if (name !== "race") $("#raceCurtain").hidden = true; // never left covering a menu
 }
 
 /** Write text/HTML only when it changed: no layout work on frames where nothing moved. */
@@ -1595,9 +1597,13 @@ function onState(msg) {
     if (v.host === playerId && !game.endlessSent) {
       game.endlessSent = true;
       if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
-      const map = local.getItem("lr:endlessTut") ? "random" : "meadow"; // the tutorial run is on the meadow
+      // the tutorial run is on the meadow; after that any map. Load it all, then start
+      const map = local.getItem("lr:endlessTut") ? MAPS[Math.floor(Math.random() * MAPS.length)] : "meadow";
       if (v.map !== map) act({ type: "map", map });
-      act({ type: "start", bots: false, endless: true });
+      showScreen("race");
+      showCurtain(map);
+      const ready = Promise.all([world.ensureMap(map), world.preloadMovers(map), world.ensureChar(preferredChar())]).catch(() => {});
+      Promise.race([ready, new Promise((ok) => setTimeout(ok, 8000))]).then(() => act({ type: "start", bots: false, endless: true }));
     }
     return;
   }
@@ -2514,7 +2520,11 @@ function renderLobby(v) {
     }),
   );
   // start fetching the map's 3D props while everyone is still in the lobby
-  for (const key of mp === "random" ? MAPS : [mp]) world.ensureMap(key).catch(() => {});
+  for (const key of mp === "random" ? MAPS : [mp]) {
+    world.ensureMap(key).catch(() => {});
+    world.preloadMovers(key).catch(() => {});
+  }
+  for (const p of v.players) world.ensureChar(p.char).catch(() => {});
   // rounds (the Grand Tour is always one of each mode) and the prize for the top 3
   const rounds = roundsOf(v);
   $("#roundPick").replaceChildren(
@@ -5031,12 +5041,29 @@ const world = (() => {
     obj.position.y -= b2.min.y;
     return obj;
   }
+  const propLoads = {};
   function loadModeProp(name, size) {
-    if (assets.props[name] !== undefined) return Promise.resolve(assets.props[name]);
-    assets.props[name] = null;
-    return loadGLB(`/assets/${name}.glb`)
-      .then((g) => (assets.props[name] = fitProp(g.scene, size)))
-      .catch(() => (assets.props[name] = null));
+    if (!propLoads[name]) {
+      assets.props[name] = null;
+      propLoads[name] = loadGLB(`/assets/${name}.glb`)
+        .then((g) => (assets.props[name] = fitProp(g.scene, size)))
+        .catch(() => (assets.props[name] = null));
+    }
+    return propLoads[name];
+  }
+  /** Download a map's moving obstacles ahead of time, so they never pop in as emoji. */
+  function preloadMovers(map) {
+    const base = MAP_MOVERS[map] ?? (MAPS.indexOf(map) > 5 ? "meadow" : map);
+    const kinds = Object.keys(MOVER_KINDS).filter((k) => MOVER_KINDS[k].map === base && MOVER_MODEL[k].file);
+    return Promise.all(kinds.map((k) => loadModeProp(MOVER_MODEL[k].file, { width: MOVER_MODEL[k].size, maxHeight: MOVER_MODEL[k].size * 1.5 })));
+  }
+  /** Get the GPU ready for the scene (shaders), so the first frames don't stutter. */
+  function warmUp() {
+    try {
+      renderer?.compile(scene, camera);
+    } catch {
+      /* not supported: it compiles on first draw */
+    }
   }
   function setupMode(kind, course) {
     modeKind = kind;
@@ -5270,6 +5297,8 @@ const world = (() => {
     buildScenery,
     ensureMap,
     mapReady,
+    preloadMovers,
+    warmUp,
     get activeMap() {
       return activeMap;
     },
@@ -5413,6 +5442,19 @@ const race = {
   },
 };
 
+/** A cover over the race until everything is loaded and the first frame is drawn. */
+const curtain = $("#raceCurtain");
+function showCurtain(map) {
+  curtain.hidden = false;
+  curtain.classList.remove("gone");
+  const info = MAP_INFO[map];
+  $("#curtainMap").textContent = info ? `${info.icon ?? "🏁"} ${info.label}` : "Get ready!";
+}
+function liftCurtain() {
+  if (curtain.hidden || curtain.classList.contains("gone")) return;
+  curtain.classList.add("gone");
+  setTimeout(() => curtain.classList.contains("gone") && (curtain.hidden = true), 500);
+}
 function enterRace(v) {
   if (!v.cup || v.cup.race === 1) chargePot(v); // the host pays the prize pot as the match starts
   const needed = v.players.map((p) => p.char);
@@ -5428,10 +5470,15 @@ function enterRace(v) {
     // assets still loading — try again on the next state message / frame
     game.pendingRace = true;
     showScreen("race");
-    $("#countdown").textContent = "Loading…";
+    showCurtain(map);
     return;
   }
   game.pendingRace = false;
+  // the opening shot gets whatever is left of the countdown; the controls wait for the gun
+  game.introLen = Math.max(0, (v.startAt - serverNow()) / 1000);
+  $("#hud").classList.toggle("intro", game.introLen > 0.6);
+  world.warmUp();
+  requestAnimationFrame(() => requestAnimationFrame(liftCurtain));
   game.mode = "race";
   game.round = v.round;
   game.lookBack = false;
@@ -8087,21 +8134,23 @@ function frame(now) {
     // countdown intro: a sweeping fly-past in front of the whole line-up (everyone
     // cheering), then a glide in behind your runner just before the gun
     const toGo = net.view ? (net.view.startAt - serverNow()) / 1000 : 0;
-    const intro = toGo > 0.35 && game.mode === "race";
+    // The opening shot: one slow, continuous move. It starts low in front of the
+    // line-up, rises over the runners and settles exactly where the running camera
+    // sits at the gun, so there is never a cut. It takes whatever countdown is left.
+    const introLen = game.introLen ?? 0;
+    const intro = toGo > 0 && introLen > 0.6 && game.mode === "race";
+    let introLook = null;
     if (intro) {
-      const behind = new THREE.Vector3(tx, 3.0, fz + 5.6);
-      const ORBIT_END = 1.35; // seconds before the gun when the fly-past hands over
-      // the fly-past stays over the track (never into the stands or buildings at the side)
-      const flyAt = (k) => new THREE.Vector3(3.2 * (2 * k - 1), 2.0 + Math.sin(k * Math.PI) * 1.2, fz - 7.2 + Math.sin(k * Math.PI) * 1.6);
-      if (toGo > ORBIT_END) {
-        camPos.copy(flyAt(Math.min(1, (toGo - ORBIT_END) / 2.1))); // right → left in front of everyone
-      } else {
-        // smooth hand-over to the running camera, arcing up over the runners' heads
-        const u = 1 - (toGo - 0.35) / (ORBIT_END - 0.35);
-        const e = u * u * (3 - 2 * u);
-        camPos.copy(flyAt(0).lerp(behind, e));
-        camPos.y += Math.sin(e * Math.PI) * 2.2;
-      }
+      const p = 1 - Math.max(0, toGo) / introLen;
+      const e = p * p * (3 - 2 * p);
+      introPath.points[0].set(4.2, 1.5, fz - 7.5);
+      introPath.points[1].set(1.2, 2.6, fz - 8.8);
+      introPath.points[2].set(-2.6, 4.4, fz - 2.5);
+      introPath.points[3].set(tx, 3.0, fz + 5.6);
+      introPath.getPoint(e, camPos);
+      // look at the line-up, then turn to look down the track
+      const k = THREE.MathUtils.smoothstep(p, 0.55, 1);
+      introLook = new THREE.Vector3(0, 1.1, fz).lerp(new THREE.Vector3(tx * 0.8, 1.0, fz - 9), k);
     } else {
       camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     }
@@ -8111,7 +8160,7 @@ function frame(now) {
       camera.position.x += (Math.random() - 0.5) * shake * 0.6;
       camera.position.y += (Math.random() - 0.5) * shake * 0.6;
     }
-    if (intro) camLook.set(toGo > 1.35 ? 0 : tx * 0.5, 1.0, toGo > 1.35 ? fz : fz - 9 * (1 - (toGo - 0.35)));
+    if (intro) camLook.copy(introLook);
     else if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
     else camLook.set(tx * 0.8, 1.0 + fy * 0.6, fz - 9);
     camera.lookAt(camLook);
@@ -8156,6 +8205,7 @@ function frame(now) {
   adaptQuality(dt);
 }
 
+const introPath = new THREE.CatmullRomCurve3([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], false, "centripetal");
 const hudEl = { timer: $("#timer"), dist: $("#distText"), place: $("#place"), dots: $("#dots") };
 function updateHud() {
   const v = net.view;
@@ -8174,8 +8224,16 @@ function updateHud() {
     cd.classList.remove("pop");
     void cd.offsetWidth;
     if (label) cd.classList.add("pop");
-    if (label === "GO!") sfx.go();
-    else if (/^[123]$/.test(label)) sfx.beep();
+    cd.dataset.n = label;
+    if (label === "GO!") {
+      sfx.go();
+      const hud = $("#hud");
+      if (hud.classList.contains("intro")) {
+        hud.classList.remove("intro");
+        hud.classList.add("reveal"); // the controls fade in on the gun
+        setTimeout(() => hud.classList.remove("reveal"), 500);
+      }
+    } else if (/^[123]$/.test(label)) sfx.beep();
     lastCount = label;
   }
 
