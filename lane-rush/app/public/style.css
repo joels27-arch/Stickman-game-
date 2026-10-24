@@ -2302,7 +2302,7 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .coll-grid .ccard .cpic img { position: relative; display: block; width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; object-position: 50% 8%; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.35)); }
 .coll-grid .ccard.locked .cpic { background: radial-gradient(circle at 50% 42%, #3b4766 0%, #232a42 60%, #151a2c 100%); }
 .coll-grid .ccard.locked .cpic img { filter: brightness(0) opacity(0.55); }
-.coll-grid .ccard.locked { --rc-hi: #56607a; --rc-dark: #0f1322; --rc-bg: #1d2338; }
+.coll-grid .ccard.locked { --rc-bg: #1d2338; }
 .coll-grid .ccard .padlock { position: absolute; top: 50%; left: 50%; right: auto; width: auto; height: auto; transform: translate(-50%, -50%); border: 0; background: none; font-style: normal; font-size: 34px; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.6)); }
 /* the name: chunky yellow letters with a dark outline */
 .coll-grid .ccard .cfoot { display: grid; justify-items: center; gap: 3px; padding: 5px 4px 7px; border-top: 2px solid rgba(255, 255, 255, 0.25); background: linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.28)); }
@@ -2358,7 +2358,9 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .hp-missions .quest { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; padding: 8px 8px 8px 8px; border-radius: 16px; border: 2px solid #fff; color: #1d2150; background: linear-gradient(180deg, #f6f7ff, #dde2fa); box-shadow: 0 4px 0 #7d86c4, 0 8px 16px rgba(0, 0, 0, 0.25); }
 .hp-missions .quest .qicon { width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(180deg, #c9d2f6, #a9b4ea); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12); }
 .hp-missions .quest .qicon img { width: 40px; height: 40px; }
-.hp-missions .qmain > b { font-size: 15px; font-weight: 900; color: #1d2150; }
+.hp-missions .quest .qmain > b { font-size: 15px; font-weight: 900; color: #1d2150; }
+.hp-missions .quest .qbar span, .hp-missions .quest .qreward b { color: inherit; }
+.hp-missions .quest .qbar span { color: #fff; }
 .hp-missions .qbar { height: 18px; background: #262c6c; box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.4); }
 .hp-missions .qbar i { background: linear-gradient(180deg, #ffe680, #ffb300); animation: none; box-shadow: none; }
 .hp-missions .qbar span { line-height: 18px; font-size: 12px; color: #fff; -webkit-text-stroke: 0; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
