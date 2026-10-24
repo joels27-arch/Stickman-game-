@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>4 Friends Run</title>
+    <meta property="og:title" content="4 Friends" />
+    <meta
+      property="og:description"
+      content="Race your friends in a cartoon running game."
+    />
+    <meta property="og:image" content="/assets/cover.jpg" />
+    <meta name="theme-color" content="#231a6b" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/assets/icon.png" />
+    <!-- home-screen icon: the blue runner -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="4 Friends" />
+    <meta name="application-name" content="4 Friends" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800;1,900&family=Barlow:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="importmap">
+      { "imports": { "three": "/vendor/three.module.js" } }
+    </script>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div class="veil" aria-hidden="true"></div>
+    <!-- loading screen: the picture, the logo and a bar, until the 3D runners and maps are downloaded -->
+    <div id="boot" class="boot" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100">
+      <picture class="boot-art">
+        <source media="(max-aspect-ratio: 1/1)" srcset="/assets/home_tall.jpg" />
+        <img src="/assets/home_wide.jpg" alt="" />
+      </picture>
+      <div class="boot-shade"></div>
+      <div class="boot-main">
+        <h1 class="logo boot-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+        <div class="boot-bar"><i id="bootFill"></i></div>
+        <small id="bootText">Loading… 0%</small>
+        <button id="bootRetry" class="boot-retry" type="button" hidden onclick="location.reload()">Try again</button>
+      </div>
+    </div>
+    <script>
+      // the loading screen never just hangs: an error shows what went wrong, and a stalled load offers a retry
+      (function () {
+        var t0 = Date.now();
+        function show(msg) {
+          var b = document.getElementById("bootText");
+          var r = document.getElementById("bootRetry");
+          if (!b || !document.getElementById("boot")) return;
+          if (msg) b.textContent = msg;
+          if (r) r.hidden = false;
+        }
+        window.addEventListener("error", function (e) {
+          if (e && e.message) show("Something broke: " + String(e.message).slice(0, 90));
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          var m = e && e.reason && (e.reason.message || e.reason);
+          if (m) show("Something broke: " + String(m).slice(0, 90));
+        });
+        var iv = setInterval(function () {
+          if (!document.getElementById("boot")) return clearInterval(iv);
+          if (Date.now() - t0 > 25000) {
+            show(window.__bootStarted ? "" : "The game didn't start. Tap to try again.");
+            clearInterval(iv);
+          }
+        }, 1000);
+      })();
+    </script>
+
+    <!-- HOME -->
+    <section id="home" class="screen show home lite" data-page="play">
+      <picture class="home-art">
+        <source media="(max-aspect-ratio: 1/1)" srcset="/assets/home_tall.jpg" />
+        <img src="/assets/home_wide.jpg" alt="" />
+      </picture>
+      <div class="home-shade"></div>
+      <header class="lite-top">
+        <button id="liteName" class="lite-name" type="button" aria-label="Your name"><img id="liteAvatar" src="/assets/pp0.webp" alt="" /><b id="liteNameTxt">Runner</b></button>
+        <button id="settingsBtn" class="btn small ghost icon-btn" type="button" aria-label="Settings">⚙</button>
+      </header>
+      <div class="lite-main">
+        <h1 class="logo lite-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+        <div class="lite-dock">
+          <button id="mpBtn" class="lite-btn mp" type="button"><span class="lb-ico">👥</span><span class="lb-txt"><b>Multiplayer</b><small>Race with friends or anyone</small></span></button>
+          <button id="soloGoBtn" class="lite-btn solo" type="button"><span class="lb-ico">♾️</span><span class="lb-txt"><b>Endless Run</b><small>Solo · how far can you get?</small></span></button>
+          <p id="homeMsg" class="msg" role="alert"></p>
+          <p class="hint" id="loadHint">Loading 3D runners…</p>
+        </div>
+      </div>
+      <!-- the full game's pages, kept out of sight (the code still talks to them) -->
+      <div id="legacy" hidden>
+      <header class="home-top">
+        <button id="rankBadgeBtn" class="rank-badge-btn tb-shop" type="button" aria-label="Your league"><img id="rankPillImg" src="/assets/lg_bronze.webp" alt="" /></button>
+        <button id="profileCard" class="profile-card" type="button" aria-label="Your profile and league">
+          <img id="profAvatar" src="/assets/pp0.webp" alt="" />
+          <span class="pc-txt"><b id="profName">Runner</b><small><img id="profLeagueImg" src="/assets/lg_bronze.webp" alt="" /><i id="profLeague">Bronze I</i></small></span>
+        </button>
+        <div class="medal-chip" title="Your medals"></div>
+        <div class="topbar-btns">
+          <span class="coin-chip tb-coins" title="Coins"><i class="coin"></i><b class="coinCount">0</b></span>
+          <button id="oldSettingsBtn" class="btn small ghost icon-btn" type="button" aria-label="Settings">⚙</button>
+        </div>
+      </header>
+      <div id="homePages" class="home-pages">
+        <!-- MISSIONS: daily, career and trophies, open right on the page -->
+        <div class="hpage hp-side hp-missions" id="hpMissions" aria-label="Missions">
+          <div class="hp-scroll">
+            <div class="ribbon pink hp-ribbon"><h2>Missions</h2></div>
+            <section class="m-head">
+              <h3>Daily missions <i class="dot" id="dailyDot" hidden></i></h3>
+              <p>New in <b id="questReset">--:--:--</b> · <span id="questSub"></span></p>
+            </section>
+            <div id="questList" class="quest-list"></div>
+            <section class="m-head">
+              <h3>Career <i class="dot" id="careerDot" hidden></i></h3>
+              <p id="careerSub"></p>
+            </section>
+            <div id="careerList" class="career-road"></div>
+          </div>
+        </div>
+        <!-- SKINS: your runners first, then every one still to get -->
+        <div class="hpage hp-side hp-skins" id="hpSkins" aria-label="Skins">
+          <div class="hp-scroll">
+            <div class="ribbon teal hp-ribbon"><h2>Skins</h2></div>
+            <div class="coll-progress"><b id="skinCount">0/0</b><div class="qbar"><i id="skinBar"></i><span id="skinPct"></span></div></div>
+            <div id="skinGrid" class="coll-grid"></div>
+          </div>
+        </div>
+        <!-- PLAY -->
+        <div class="hpage hp-play" id="hpPlay" aria-label="Play">
+          <h1 class="logo home-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+          <div class="roster" id="homeRoster" hidden></div>
+          <div class="home-dock">
+            <div class="play-card">
+              <button id="soloBtn" class="btn big go endless-btn" type="button"><span class="eb-main"><span class="flagico">⚡</span> Quick Race <span class="arrow">→</span></span><small>Jump into a race, any mode</small></button>
+              <div class="room-row three" id="roomRow">
+                <button id="endlessBtn" class="btn room-btn purple" type="button"><span class="flagico">♾️</span> Endless run</button>
+                <button id="createBtn" class="btn room-btn blue" type="button"><span class="flagico">👥</span> Create</button>
+                <button id="joinOpen" class="btn room-btn green" type="button"><span class="flagico">🔑</span> Join</button>
+              </div>
+              <div class="join-row" id="joinRow" hidden>
+                <input id="oldCodeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" />
+                <button id="oldJoinBtn" class="btn big go">Join</button>
+                <button id="joinClose" class="btn big ghost x" type="button" aria-label="Cancel">✕</button>
+              </div>
+              <p id="oldHomeMsg" class="msg" role="alert"></p>
+              <p class="hint" id="oldLoadHint">Loading 3D runners…</p>
+            </div>
+          </div>
+        </div>
+        <!-- TOURNAMENTS -->
+        <div class="hpage hp-side hp-compete" id="hpCompete" aria-label="Tournaments">
+          <div class="hp-scroll">
+            <div class="ribbon teal hp-ribbon"><h2>Tournaments</h2></div>
+            <button id="leagueCard" class="league-card" type="button">
+              <img id="leagueImg" src="/assets/lg_bronze.webp" alt="" />
+              <span class="lc-info">
+                <small>Your league</small>
+                <b id="leagueName">Bronze I</b>
+                <span class="qbar"><i id="leagueBar"></i></span>
+                <span id="leagueNext" class="lc-next">0 pts</span>
+              </span>
+              <span class="lc-go">Rankings ›</span>
+            </button>
+            <div id="tourneyList" class="tourney-list"></div>
+          </div>
+        </div>
+        <!-- RIGHT: shop, season pass and the rest -->
+        <div class="hpage hp-side hp-store" id="hpStore" aria-label="Shop">
+          <div class="hp-scroll">
+            <div class="ribbon gold hp-ribbon"><h2>Shop</h2></div>
+            <button id="passPill" class="store-card pass-card" type="button">
+              <img src="/assets/ui_chest.webp" alt="" />
+              <span class="sc-info">
+                <em>Season Pass</em>
+                <b id="passPillLv">Lv 1</b>
+                <span class="qbar"><i id="passPillBar"></i></span>
+                <small id="passPillSub">Play races to earn XP</small>
+              </span>
+              <span class="sc-go">Open ›</span>
+              <i class="dot" hidden></i>
+            </button>
+            <div id="shopHome" class="shop-mount"></div>
+          </div>
+        </div>
+      </div>
+      <nav class="home-tabs" role="tablist" aria-label="Home pages">
+        <button class="htab" type="button" role="tab" data-page="0"><img src="/assets/tab_missions.webp" alt="" /><span>Missions</span><i class="dot" hidden></i></button>
+        <button class="htab" type="button" role="tab" data-page="1"><img src="/assets/tab_skins.webp" alt="" /><span>Skins</span></button>
+        <button class="htab on" type="button" role="tab" data-page="2"><img src="/assets/tab_play.webp" alt="" /><span>Play</span></button>
+        <button class="htab" type="button" role="tab" data-page="3"><img src="/assets/tab_trophy.webp" alt="" /><span>Tournaments</span></button>
+        <button class="htab" type="button" role="tab" data-page="4"><img src="/assets/tab_shop.webp" alt="" /><span>Shop</span><i class="dot" hidden></i></button>
+      </nav>
+      </div>
+    </section>
+
+    <!-- MULTIPLAYER: a quick race, or a room with your friends -->
+    <div id="mpModal" class="modal lite-modal" hidden>
+      <div class="sheet lite-sheet" role="dialog" aria-modal="true" aria-labelledby="mpTitle">
+        <button id="mpClose" class="lite-x" type="button" aria-label="Close">✕</button>
+        <h2 id="mpTitle">Multiplayer</h2>
+        <button id="mpQuick" class="lite-btn mp" type="button"><span class="lb-ico">⚡</span><span class="lb-txt"><b>Quick Race</b><small>Jump in now · any mode</small></span></button>
+        <button id="mpCreate" class="lite-btn friends" type="button"><span class="lb-ico">🎉</span><span class="lb-txt"><b>Play with friends</b><small>Make a room, share the code</small></span></button>
+        <div class="lite-join">
+          <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" />
+          <button id="joinBtn" class="btn big go" type="button">Join</button>
+        </div>
+        <small class="lite-note">Got a code from a friend? Type it in.</small>
+      </div>
+    </div>
+
+    <!-- PICK YOUR RUNNER (before an endless run) -->
+    <div id="pickModal" class="modal lite-modal" hidden>
+      <div class="sheet lite-sheet pick-sheet" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+        <button id="pickClose" class="lite-x" type="button" aria-label="Close">✕</button>
+        <h2 id="pickTitle">Pick your runner</h2>
+        <div id="pickGrid" class="pick-grid"></div>
+        <h3 class="pick-soon">Coming soon</h3>
+        <div id="soonGrid" class="pick-grid soon"></div>
+        <button id="pickRun" class="btn big go" type="button">Run! ▶</button>
+      </div>
+    </div>
+
+    <!-- LOBBY -->
+    <section id="lobby" class="screen">
+      <div class="frame">
+        <header class="strip top"><span class="runner-ico">🏃</span><span>Lobby</span><i>/</i><span>Code <b id="lobbyCodeStrip">----</b></span><i>/</i><span id="lobbyCount">1/4 players</span></header>
+        <div class="panel lobby-panel">
+          <div class="lobby-head">
+            <div class="brand small-brand">
+              <h1 class="logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+            </div>
+            <div class="code-box">
+              <div class="label">Lobby code</div>
+              <div id="lobbyCode" class="code">----</div>
+              <button id="copyBtn" class="btn small blue">Copy invite link</button>
+              <div id="copyMsg" class="small"></div>
+            </div>
+          </div>
+          <div class="topbar">
+            <div class="wallet" title="Your medals"></div>
+            <button class="country-chip" type="button" aria-label="Country you cheer for"></button>
+          </div>
+          <div id="slots" class="slots"></div>
+          <div class="emote-row lobby-emotes" aria-label="Send an emote"></div>
+          <div id="hostPicks" class="host-picks">
+            <h3 class="pick-title">Game mode</h3>
+            <div id="modePick" class="mode-pick"></div>
+            <label class="bot-toggle"><input type="checkbox" id="botToggle" checked /> <span>🤖 Fill empty spots with bots</span></label>
+            <h3 class="pick-title">Map</h3>
+            <div id="mapPick" class="map-pick"></div>
+            <h3 class="pick-title">Rounds</h3>
+            <div id="roundPick" class="chip-pick"></div>
+            <h3 class="pick-title">Prize for the top 3</h3>
+            <div id="prizePick" class="chip-pick prize-pick"></div>
+            <p id="prizeNote" class="pick-note"></p>
+          <h3 class="pick-title" id="botLevelTitle">Bot opponents</h3>
+          <div id="botLevelPick" class="chip-pick"></div>
+          </div>
+          <h3 class="pick-title">Choose your runner</h3>
+          <div id="lobbySpot" class="spotlight"></div>
+          <div id="picker" class="picker"></div>
+          <div class="lobby-actions">
+            <button id="leaveBtn" class="btn small ghost">Leave</button>
+            <button id="lockBtn" class="btn big go"><span class="flagico">✓</span> Lock in <span class="arrow">→</span></button>
+          </div>
+          <div class="panel-foot"><span id="readyCount">👥 1/4 players ready</span><span class="motto">Same track. Different dreams.</span></div>
+          <p id="lobbyMsg" class="msg" role="alert"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- LINE-UP: everyone's runner on a pedestal, waiting for READY -->
+    <section id="lineup" class="screen lineup lx">
+      <img class="lx-bg" src="/assets/lu_stadium.jpg" alt="" />
+      <div class="lx-shade"></div>
+      <header class="lx-top">
+        <div class="lx-corner">
+          <button id="changeRunner" class="lx-chip" type="button">‹ Runner</button>
+          <button id="luLeave" class="lx-chip" type="button">Leave</button>
+        </div>
+        <p id="luKicker" class="lx-kicker">Every runner for themself</p>
+        <div id="luModeBox" class="lx-pill"><b id="luMode">Survival</b><span id="luMap">Meadow</span></div>
+        <div class="lx-code"><span>Code</span><b id="luCode">----</b><button id="luCopy" class="lx-copy" type="button">Copy</button></div>
+      </header>
+      <div id="luStage" class="lx-stage"></div>
+      <footer class="lx-bottom">
+        <div class="emote-row lu-emotes lx-emotes" aria-label="Send an emote"></div>
+        <button id="luGo" class="lx-start" type="button">Start ▶</button>
+        <div id="luStatus" class="lx-status"></div>
+      </footer>
+    </section>
+
+    <!-- RACE HUD -->
+    <!-- covers the race until everything is loaded and drawn -->
+    <div id="raceCurtain" class="race-curtain" hidden>
+      <h1 class="logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+      <b id="curtainMap"></b>
+      <i class="curtain-spin" aria-hidden="true"></i>
+    </div>
+    <section id="hud" class="hud">
+      <div class="hud-top">
+        <div id="place" class="place">1<sup>st</sup></div>
+        <button id="quitBtn" class="quit-btn" type="button" aria-label="Pause">❚❚</button>
+        <div id="timer" class="timer" hidden>0.0</div>
+        <div id="aliveChip" class="alive-chip" hidden title="Runners still in the race"></div>
+      </div>
+      <div id="hearts" class="hearts"></div>
+      <div id="distText" class="dist-chip"></div>
+      <div id="runCoinsChip" class="run-coins"><i class="coin"></i><b id="runCoins">0</b></div>
+      <!-- who's where: a dot per runner on a bar up the right side, the leader at the top -->
+      <div class="track-bar"><div class="flag">🏁</div><div id="dots"></div></div>
+      <div id="combo" class="combo"></div>
+      <div id="stylePop" class="style-pop"></div>
+      <div id="feed" class="feed" aria-live="polite"></div>
+      <button id="sprintBtn" class="sprint-btn" type="button" aria-label="Sprint" hidden><img src="/assets/ui_bolt.webp" alt="" /><b>0/20</b></button>
+      <button id="emoteToggle" class="emote-toggle" type="button" aria-label="Emotes">😀</button>
+      <div id="emoteMenu" class="emote-menu emote-row"></div>
+      <div id="raceTag" class="race-tag"></div>
+      <div id="countdown" class="countdown"></div>
+      <div id="banner" class="banner"></div>
+      <div id="zapFlash" class="zap-flash"></div>
+      <div id="hitFx" class="hit-fx"></div>
+      <div id="frostFx" class="frost-fx"></div>
+      <div id="mudFx" class="mud-fx" aria-hidden="true"><i class="m1"></i><i class="m2"></i><i class="m3"></i></div>
+      <div id="cloudHud" class="cloud-hud" hidden></div>
+      <div id="modeHud" class="mode-hud" hidden></div>
+      <div id="brainFx" class="brain-fx"></div>
+      <button id="lookBtn" class="look-btn" type="button" aria-label="Hold to look behind" hidden><i>👀</i><small>Behind</small></button>
+      <div id="spectate" class="spectate"><button id="specPrev" type="button" aria-label="Watch the previous runner">◀</button><div><small>Watching</small><b id="spectateName"></b><small id="spectateCount"></small></div><button id="specNext" type="button" aria-label="Watch the next runner">▶</button></div>
+      <div id="speedFx" class="speed-fx"></div>
+      <button id="powerSlot" class="power-slot" type="button" aria-label="Use power-up">
+        <svg class="ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" /><circle class="fill" cx="50" cy="50" r="46" /></svg>
+        <img src="/assets/pw_shield.png" alt="" />
+        <div class="lbl"><b>Shield</b><span class="bar"><i></i></span><span class="use"></span></div>
+      </button>
+      <div id="savedSlot" class="saved-slot" aria-label="Saved power-up"><img src="/assets/pw_shield.png" alt="" /><small>Next</small></div>
+      <div id="throwHint" class="throw-hint" aria-hidden="true"><i class="up"></i><span>↑ throw · ↓ drop<br />↗ ↖ other lane</span><i class="down"></i></div>
+      <div id="powerToast" class="power-toast"></div>
+      <div id="controlsHint" class="controls-hint"></div>
+      <!-- first endless run: the tutorial happens in the run (slow motion until you make the move) -->
+      <div id="coach" class="coach" hidden>
+        <div class="coach-card">
+          <img id="coachPose" class="coach-pose" src="/assets/m_point.webp" alt="" />
+          <div id="coachGesture" class="coach-gesture"><i class="hand"></i></div>
+          <b id="coachTitle"></b>
+          <p id="coachText"></p>
+          <small id="coachKeys" class="coach-keys"></small>
+        </div>
+        <button id="coachSkip" class="coach-skip" type="button">Skip tutorial</button>
+      </div>
+      <div id="netWarn" class="net-warn">Reconnecting…</div>
+    </section>
+
+    <!-- LEAVE THE RACE: always one tap away -->
+    <div id="quitModal" class="modal" hidden>
+      <div class="sheet quit-sheet" role="dialog" aria-modal="true" aria-labelledby="quitTitle">
+        <h2 id="quitTitle">Leave the race?</h2>
+        <p id="quitText">The race keeps going without you, and you won't get rewards for it.</p>
+        <div class="quit-btns">
+          <button id="quitStay" class="btn big go" type="button">Keep running</button>
+          <button id="quitGo" class="btn big ghost" type="button">Leave race</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <section id="results" class="screen">
+      <div class="frame">
+        <header class="strip top"><span class="runner-ico">🏁</span><span>Race complete</span><i>/</i><span>Final standings</span></header>
+        <div class="panel results-panel">
+          <div id="resHead" class="res-head">
+            <div id="resPlace" class="res-place">1<sup>st</sup></div>
+            <div>
+              <div id="resTitle" class="title">Race results</div>
+              <div id="resReward" class="res-reward"></div>
+            </div>
+          </div>
+          <ol id="podium" class="podium"></ol>
+          <div id="cupBox" class="cup"></div>
+          <div class="lobby-actions">
+            <button id="leave2Btn" class="btn small ghost">Leave</button>
+            <button id="nextBtn" class="btn big go"><span class="flagico">🏆</span> Next race <span class="arrow">→</span></button>
+            <button id="rematchBtn" class="btn big go"><span class="flagico">🔁</span> <span id="rematchTxt">Rematch</span> <span class="arrow">→</span></button>
+            <button id="againBtn" class="btn small ghost">Back to lobby</button>
+            <div id="waitHost2" class="wait">Waiting for the host…</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COUNTRY / SETTINGS -->
+    <!-- after your first round: your name, and the country you run for (both optional) -->
+    <div id="askModal" class="modal ask-modal" hidden>
+      <div class="sheet ask-sheet" role="dialog" aria-modal="true" aria-labelledby="askTitle">
+        <h2 id="askTitle">What's your name?</h2>
+        <input id="askName" maxlength="14" autocomplete="nickname" placeholder="Your name" />
+        <button id="askCountry" class="country-chip ask-country" type="button"></button>
+        <button id="askSave" class="btn big go" type="button">Save</button>
+        <button id="askLater" class="ask-later" type="button">Later</button>
+      </div>
+    </div>
+    <div id="countryModal" class="modal" hidden>
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="countryTitle">
+        <header class="sheet-head">
+          <h2 id="countryTitle">Country you cheer for</h2>
+          <button id="countryClose" class="btn small ghost" type="button">Done</button>
+        </header>
+        <input id="countrySearch" class="search" placeholder="Search countries" autocomplete="off" />
+        <div id="flagGrid" class="flag-grid"></div>
+      </div>
+    </div>
+
+    <!-- DAILY CHALLENGES: three a day, coins for each -->
+    <!-- SETTINGS -->
+    <div id="setModal" class="modal gmodal" hidden>
+      <div class="gsheet set-sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+        <div class="ribbon"><h2 id="setTitle">Settings</h2></div>
+        <button id="setClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div class="set-list">
+          <label class="set-row name-row"><span><b>✏️ Name</b><small>What other players see</small></span><input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Your name" /></label>
+          <label class="set-row"><span><b>🔊 Sound effects</b><small>Jumps, coins, hits, menus</small></span><input type="checkbox" id="setSound" /></label>
+          <label class="set-row"><span><b>🎵 Music</b><small>Menu and race music</small></span><input type="checkbox" id="setMusic" /></label>
+          <label class="set-row"><span><b>📳 Vibration</b><small>Buzz on hits and big moments</small></span><input type="checkbox" id="setBuzz" /></label>
+          <label class="set-row"><span><b>🔋 Battery saver</b><small>Sharper picture off, smoother on older phones</small></span><input type="checkbox" id="setLow" /></label>
+          <button id="setCountry" class="set-row btnrow" type="button"><span><b>🌍 Country</b><small id="setCountryName">Not set</small></span><i>›</i></button>
+          <button id="setTut" class="set-row btnrow" type="button"><span><b>👆 How to run</b><small>Play the tutorial again on your next endless run</small></span><i>›</i></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FIRST RUN: pick a name once (changeable later in Settings) -->
+    <!-- first visit: Nia asks your name -->
+    <!-- first visit: Nia invites you to a first run that teaches as you play -->
+    <div id="tutInvite" class="tut-invite" hidden>
+      <div class="ti-card">
+        <img src="/assets/m_point.webp" alt="" />
+        <div class="ti-txt">
+          <b>Ready for your first run?</b>
+          <span>I'll show you every move. Tap Endless Run!</span>
+          <div class="ti-btns">
+            <button id="tutSkip" class="ti-skip" type="button">Skip</button>
+            <button id="tutGo" class="ti-go" type="button">Let's go →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEASON PASS -->
+    <div id="passModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet pass-sheet" role="dialog" aria-modal="true" aria-labelledby="passTitle">
+        <div class="ribbon gold"><h2 id="passTitle">Season Pass</h2></div>
+        <button id="passClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div class="pass-head">
+          <div><b id="passSeason">Season</b><small id="passEnds"></small></div>
+          <div class="pass-lv"><span>LEVEL</span><b id="passLv">1</b></div>
+        </div>
+        <div class="qbar pbar"><i id="passBar"></i><span id="passXp"></span></div>
+        <div class="pass-rows-label"><span>FREE</span><span class="gold">GOLD</span></div>
+        <div id="passTrack" class="pass-track"></div>
+        <button id="passBuy" class="gbtn gold-buy" type="button">Unlock Gold Pass</button>
+        <p class="pass-note">Earn XP in every race. New season every month.</p>
+      </div>
+    </div>
+
+    <!-- RANKING: leagues + friends -->
+    <!-- first visit: a quick tour of the pages, ending on the endless run -->
+    <div id="tour" class="tour" hidden>
+      <div id="tourHole" class="tour-hole"></div>
+      <div id="tourPoint" class="tour-point" aria-hidden="true"></div>
+      <div id="tourTip" class="tour-tip" role="dialog" aria-live="polite">
+        <div id="tourBar" class="tour-bar"></div>
+        <img class="tour-hero" src="/assets/m_point.webp" alt="" />
+        <div class="tour-body">
+          <span class="tour-face"><img id="tourPose" class="pose" src="/assets/m_point.webp" alt="" /><img id="tourImg" class="tour-sticker" alt="" /></span>
+          <div>
+            <small class="tour-kicker">Nia</small>
+            <b id="tourTitle"></b>
+            <p id="tourText"></p>
+          </div>
+        </div>
+        <div id="tourPerks" class="tour-perks"></div>
+        <div class="tour-foot">
+          <button id="tourSkip" class="tour-skip" type="button">Skip tour</button>
+          <span id="tourCount"></span>
+          <button id="tourNext" class="btn small go" type="button">Next</button>
+        </div>
+      </div>
+    </div>
+    <div id="statsModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet stats-sheet" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+        <div class="ribbon teal"><h2 id="statsTitle">Your stats</h2></div>
+        <button id="statsClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div id="statsBody" class="stats-body"></div>
+      </div>
+    </div>
+    <div id="tourneyModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet tourney-sheet" role="dialog" aria-modal="true" aria-labelledby="tourneyTitle">
+        <div class="ribbon teal"><h2 id="tourneyTitle">Tournament</h2></div>
+        <button id="tourneyClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div id="tourneyBody" class="tourney-body"></div>
+      </div>
+    </div>
+    <div id="roadModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet road-sheet" role="dialog" aria-modal="true" aria-labelledby="roadTitle">
+        <div class="ribbon gold"><h2 id="roadTitle">Trophy Road</h2></div>
+        <button id="roadClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div id="roadFull" class="road-full"></div>
+      </div>
+    </div>
+    <div id="avatarModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet avatar-sheet" role="dialog" aria-modal="true" aria-labelledby="avatarTitle">
+        <div class="ribbon teal"><h2 id="avatarTitle">Profile picture</h2></div>
+        <button id="avatarClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <p class="avatar-hint">Pick any character you own.</p>
+        <div id="avatarGrid" class="avatar-grid"></div>
+      </div>
+    </div>
+    <div id="rankModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet rank-sheet" role="dialog" aria-modal="true" aria-labelledby="rankTitle">
+        <div class="ribbon teal"><h2 id="rankTitle">Ranking</h2></div>
+        <button id="rankClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div class="rank-hero">
+          <img id="rankBadge" src="/assets/lg_bronze.webp" alt="" />
+          <div class="rank-info">
+            <b id="rankName">Bronze I</b>
+            <span id="rankRp">0 league pts</span>
+            <div class="qbar rbar"><i id="rankBar"></i><span id="rankNext"></span></div>
+          </div>
+        </div>
+        <div class="gtabs" role="tablist">
+          <button id="tabFriends" class="gtab on" type="button">Friends</button>
+          <button id="tabLeagues" class="gtab" type="button">Leagues</button>
+        </div>
+        <div id="friendList" class="rank-list"></div>
+        <div id="leagueList" class="rank-list" hidden></div>
+      </div>
+    </div>
+
+    <!-- SHOP -->
+    <section id="shop" class="screen shop-screen">
+      <div class="grays" aria-hidden="true"></div>
+      <div class="shop-wrap">
+        <header class="shop-top">
+          <button id="shopBack" class="gback" type="button" aria-label="Back">‹</button>
+          <div class="ribbon gold static"><h2>Shop</h2></div>
+        </header>
+        <div class="wallet shop-wallet" title="Your coins and medals"></div>
+        <div id="shopMount" class="shop-mount">
+          <div id="shopBody" class="shop-body">
+            <div id="sec-packs" class="pack-view">
+              <div id="packRow" class="pack-row"></div>
+              <p class="shop-note" id="packOdds"></p>
+            </div>
+            <h3 class="shop-sec" id="sec-chars"><img src="/assets/sc_luna.webp" alt="" /><span>Characters</span><small id="collCount">0 for sale</small></h3>
+            <div id="shopGrid" class="coll-grid shop-chars"></div>
+            <h3 class="shop-sec" id="sec-items"><img src="/assets/ui_shoe.webp" alt="" /><span>Items</span><small>Trails · emotes</small></h3>
+            <div id="itemView" class="pack-view item-view"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PARTY CUP: the round reveal -->
+    <div id="spinWheel" class="spin-wheel" hidden>
+      <small id="spinTitle">Round 2</small>
+      <div class="spin-window"><div id="spinReel" class="spin-reel"></div></div>
+    </div>
+
+    <div id="charModal" class="modal gmodal" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="gsheet char-sheet" role="dialog" aria-modal="true" aria-labelledby="charName">
+        <button id="charClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div id="charHero" class="char-hero"></div>
+        <h2 id="charName" class="char-name"></h2>
+        <div id="charTags" class="char-tags"></div>
+        <p id="charHow" class="char-how"></p>
+        <div id="charLvl" class="char-lvl" hidden></div>
+        <button id="charAct" class="gbtn" type="button"></button>
+      </div>
+    </div>
+
+    <div id="buyModal" class="modal gmodal" hidden>
+      <div class="gsheet buy-sheet" role="dialog" aria-modal="true" aria-labelledby="buyTitle">
+        <div class="ribbon gold"><h2 id="buyTitle">Unlock?</h2></div>
+        <div id="buyPreview" class="buy-preview"></div>
+        <div id="buyPrice" class="buy-price"></div>
+        <div class="buy-row">
+          <button id="buyCancel" class="gbtn grey" type="button">Cancel</button>
+          <button id="buyOk" class="gbtn" type="button">Buy</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PACK OPENING -->
+    <div id="packOpen" class="pack-open" hidden>
+      <div class="grays" aria-hidden="true"></div>
+      <div class="po-rays" aria-hidden="true"></div>
+      <div class="po-flash"></div>
+      <div id="poFx" class="po-fx" aria-hidden="true"></div>
+      <img id="poPack" class="po-pack" src="/assets/pack_mega.webp" alt="" />
+      <div id="poCard" class="po-card" hidden></div>
+      <p id="poHint" class="po-hint">Tap to open!</p>
+      <div id="poSummary" class="po-summary" hidden></div>
+      <button id="poDone" class="gbtn po-done" type="button" hidden>Collect</button>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script type="module" src="/client.js"></script>
+  </body>
+</html>

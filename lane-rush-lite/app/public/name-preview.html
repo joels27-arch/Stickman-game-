@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Name screen options</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800;1,900&family=Barlow:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/style.css" />
+    <style>
+      /* five takes on the first-visit name screen (pick one; ?v=1 … ?v=5) */
+      body { margin: 0; min-height: 100vh; overflow: hidden; font-family: var(--body, "Barlow", sans-serif); color: #fff; }
+      .v { position: fixed; inset: 0; display: none; place-content: center; justify-items: center; gap: 14px; padding: 24px 22px; text-align: center; overflow: hidden; }
+      .v.on { display: grid; }
+      .disp { font-family: var(--display); font-style: italic; font-weight: 900; text-transform: uppercase; line-height: 1; }
+      .go { position: relative; width: 100%; height: 64px; border: 4px solid #fff; border-radius: 20px; background: linear-gradient(180deg, #d8ff6a, #8ad800); color: #1a2a00; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 28px; text-transform: uppercase; box-shadow: 0 6px 0 #4a7a00, 0 10px 18px rgba(0, 0, 0, 0.35); }
+      .field { display: flex; align-items: center; gap: 10px; width: 100%; height: 64px; padding: 0 18px; border-radius: 20px; background: #fff; color: #1d1a5c; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 26px; box-sizing: border-box; }
+      .field .ph { color: #b5b3d6; }
+      .note { font-size: 13px; font-weight: 700; opacity: 0.7; }
+      .logo { margin: 0; }
+
+      /* 1 · Nia says hi: spinning light, the logo, Nia waving with a speech bubble */
+      .v1 { background: radial-gradient(circle at 50% 38%, #5b3df0 0%, #2a1a8f 45%, #120b45 100%); }
+      .rays { position: absolute; left: 50%; top: 38%; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; background: repeating-conic-gradient(rgba(255, 255, 255, 0.09) 0 9deg, transparent 9deg 18deg); }
+      .v1 > *:not(.rays) { position: relative; width: min(340px, 100%); }
+      .v1 .logo { font-size: 64px; }
+      .v1 .hero { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px; }
+      .v1 .hero img { height: 175px; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.45)); }
+      .bubble { position: relative; justify-self: start; display: grid; gap: 2px; padding: 12px 16px; border-radius: 20px; background: #fff; color: #1d1a5c; text-align: left; box-shadow: 0 5px 0 rgba(0, 0, 0, 0.25); }
+      .bubble::before { content: ""; position: absolute; left: -12px; top: 50%; margin-top: -10px; border: 10px solid transparent; border-right: 14px solid #fff; border-left: 0; }
+      .bubble b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 22px; text-transform: uppercase; }
+      .v1 .field { border: 4px solid #ffd23f; box-shadow: 0 5px 0 #b07a00; }
+
+      /* 2 · The squad: the four starter runners on a podium under the logo, the name card above them */
+      .v2 { align-content: start; padding-top: 70px; background: linear-gradient(180deg, #4aa8f0 0%, #9fd8ff 46%, #6fcf5a 46.2%, #3f9a35 100%); }
+      .v2 .logo { font-size: 66px; filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.3)); }
+      .v2 .card { width: min(340px, 100%); display: grid; gap: 12px; padding: 18px; border-radius: 26px; background: rgba(20, 16, 70, 0.82); border: 3px solid rgba(255, 255, 255, 0.5); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+      .v2 .card .disp { font-size: 26px; }
+      .squad { position: absolute; left: 0; right: 0; bottom: 0; height: 290px; display: flex; justify-content: center; align-items: flex-end; gap: 0; }
+      .squad img { height: 250px; margin: 0 -26px; filter: drop-shadow(0 10px 8px rgba(0, 0, 0, 0.35)); }
+      .squad img:nth-child(2), .squad img:nth-child(3) { height: 275px; z-index: 1; }
+
+      /* 3 · Runner licence: an ID card with your photo and a stamp */
+      .v3 { background: radial-gradient(circle at 50% 30%, #ffcf4a, #f08a00 60%, #b05a00); }
+      .v3 .logo { font-size: 56px; filter: drop-shadow(0 4px 0 #6a2a00) drop-shadow(0 0 2px #6a2a00); }
+      .licence { position: relative; width: min(340px, 100%); display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 16px; border-radius: 22px; background: #fffaf0; color: #3a2a10; text-align: left; box-shadow: 0 8px 0 #8a4a00, 0 16px 30px rgba(0, 0, 0, 0.35); transform: rotate(-2deg); }
+      .licence .top { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px dashed #e0c890; padding-bottom: 8px; }
+      .licence .top b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 22px; text-transform: uppercase; color: #c86a00; }
+      .licence .photo { width: 110px; height: 130px; border-radius: 14px; overflow: hidden; background: linear-gradient(180deg, #7ab8ff, #2f6fe0); border: 3px solid #3a2a10; }
+      .licence .photo img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+      .licence .rows { display: grid; gap: 6px; align-content: start; }
+      .licence small { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #a08050; }
+      .licence .line { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 24px; border-bottom: 3px solid #3a2a10; padding-bottom: 2px; color: #b5a080; }
+      .licence .stamp { position: absolute; right: 14px; bottom: 10px; padding: 4px 10px; border: 3px solid #e83a2a; border-radius: 10px; color: #e83a2a; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 16px; transform: rotate(-12deg); opacity: 0.85; }
+      .v3 .go { width: min(340px, 100%); }
+
+      /* 4 · Arcade: neon on black, "enter your name" with a blinking cursor, PRESS START */
+      .v4 { background: radial-gradient(circle at 50% 110%, #ff3ad0 0%, #5a0a6a 35%, #0a0220 70%); }
+      .v4::before { content: ""; position: absolute; left: -20%; right: -20%; bottom: 0; height: 40%; background: repeating-linear-gradient(90deg, rgba(58, 240, 255, 0.5) 0 2px, transparent 2px 46px), repeating-linear-gradient(0deg, rgba(58, 240, 255, 0.5) 0 2px, transparent 2px 30px); transform: perspective(300px) rotateX(60deg); transform-origin: bottom; }
+      .v4 > * { position: relative; }
+      .v4 .logo { font-size: 60px; filter: drop-shadow(0 0 18px #ff3ad0); }
+      .v4 .disp { font-size: 30px; color: #3af0ff; text-shadow: 0 0 12px #3af0ff; letter-spacing: 0.06em; }
+      .v4 .slots { display: flex; gap: 8px; }
+      .v4 .slots span { width: 46px; height: 60px; display: grid; place-items: center; border-bottom: 5px solid #ffd23f; font-family: var(--display); font-weight: 900; font-size: 44px; color: #ffd23f; text-shadow: 0 0 14px #ffd23f; }
+      .v4 .slots span.cur { animation: blink 1s steps(1) infinite; }
+      @keyframes blink { 50% { border-color: transparent; } }
+      .v4 .go { width: min(320px, 100%); background: linear-gradient(180deg, #ff6ad8, #c81ea0); color: #fff; border-color: #ffd0f4; box-shadow: 0 0 24px #ff3ad0, 0 6px 0 #6a0a50; letter-spacing: 0.08em; }
+
+      /* 5 · Race bib: your name pinned on a runner's bib on the starting line */
+      .v5 { background: linear-gradient(180deg, #4aa8f0 0%, #bfe6ff 38%, #c94a32 38.2%, #a8402f 100%); }
+      .v5::before { content: ""; position: absolute; left: 0; right: 0; top: 38%; bottom: 0; background: repeating-linear-gradient(90deg, transparent 0 22%, rgba(255, 255, 255, 0.85) 22% 23%); transform: perspective(240px) rotateX(55deg); transform-origin: top; }
+      .v5 > * { position: relative; }
+      .v5 .logo { font-size: 58px; filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.3)); }
+      .bib { width: min(300px, 100%); padding: 22px 18px 18px; border-radius: 10px; background: #fff; color: #1d1a5c; box-shadow: 0 10px 0 rgba(0, 0, 0, 0.25); position: relative; }
+      .bib::before, .bib::after { content: ""; position: absolute; top: 10px; width: 14px; height: 14px; border-radius: 50%; background: #c8c8d0; box-shadow: inset 0 2px 2px rgba(0, 0, 0, 0.3); }
+      .bib::before { left: 10px; } .bib::after { right: 10px; }
+      .bib small { font-size: 12px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: #e83a2a; }
+      .bib .num { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 62px; line-height: 1; color: #b5b3d6; border-bottom: 4px solid #1d1a5c; margin: 6px 10px 0; }
+      .v5 .go { width: min(300px, 100%); }
+      .v5 .runner { height: 160px; margin-bottom: -10px; filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.35)); }
+    </style>
+  </head>
+  <body>
+    <div class="v v1">
+      <div class="rays"></div>
+      <h1 class="logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+      <div class="hero"><img src="/assets/m_wave.webp" alt="" /><div class="bubble"><b>Hi, I'm Nia!</b><span>What's your name?</span></div></div>
+      <div class="field">✏️ <span class="ph">Your name</span></div>
+      <button class="go">Let's run! →</button>
+      <span class="note">Change it any time in ⚙ Settings</span>
+    </div>
+
+    <div class="v v2">
+      <h1 class="logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+      <div class="card">
+        <span class="disp">Join the squad!</span>
+        <div class="field">✏️ <span class="ph">Your name</span></div>
+        <button class="go">Let's run! →</button>
+      </div>
+      <div class="squad"><img src="/assets/full_c0.webp" alt="" /><img src="/assets/full_c1b.webp" alt="" /><img src="/assets/full_c2.webp" alt="" /><img src="/assets/full_c3.webp" alt="" /></div>
+    </div>
+
+    <div class="v v3">
+      <h1 class="logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+      <div class="licence">
+        <div class="top"><b>Runner licence</b><span>🏃 No. 0001</span></div>
+        <div class="photo"><img src="/assets/pp0.webp" alt="" /></div>
+        <div class="rows"><small>Name</small><div class="line">Your name</div><small>League</small><div class="line" style="color:#3a2a10">Bronze I</div></div>
+        <div class="stamp">APPROVED</div>
+      </div>
+      <button class="go">Get my licence →</button>
+    </div>
+
+    <div class="v v4">
+      <h1 class="logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+      <span class="disp">Enter your name</span>
+      <div class="slots"><span>J</span><span>J</span><span class="cur"> </span><span> </span><span> </span></div>
+      <button class="go">Press start</button>
+      <span class="note">Change it any time in ⚙ Settings</span>
+    </div>
+
+    <div class="v v5">
+      <h1 class="logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+      <img class="runner" src="/assets/m_run.webp" alt="" />
+      <div class="bib"><small>Your race bib</small><div class="num">YOUR NAME</div></div>
+      <button class="go">Ready, set, GO! →</button>
+    </div>
+    <script>
+      const v = new URLSearchParams(location.search).get("v") || "1";
+      document.querySelector(`.v${v}`).classList.add("on");
+    </script>
+  </body>
+</html>
