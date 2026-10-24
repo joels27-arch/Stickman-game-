@@ -2584,3 +2584,77 @@ input:focus, select.countrySel:focus { border-color: var(--lime); box-shadow: 0 
 .ti-skip { flex: none; padding: 8px 14px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.7); background: none; color: #fff; font: inherit; font-weight: 900; font-size: 14px; cursor: pointer; }
 .ti-go { flex: 1; padding: 8px 14px; border-radius: 12px; border: 2px solid #fff; background: linear-gradient(180deg, #d8ff6a, #8fe000); color: #1a3300; font-family: var(--display); font-weight: 900; font-size: 18px; text-transform: uppercase; box-shadow: 0 4px 0 #3f7a00; cursor: pointer; }
 #endlessBtn.tut-hl { position: relative; z-index: 59; animation: btnPulse 0.9s ease-in-out infinite; box-shadow: 0 0 0 4px #fff, 0 0 30px rgba(182, 247, 42, 0.9); }
+
+/* ════ lime & black: back to the original look — black and dark-green surfaces, lime accents ════ */
+:root { --k0: #070a07; --k1: #0b0f0c; --k2: #121812; --k3: #1a221a; --k4: #243024; --edge: #2b3a12; --lime2: #8fd61a; }
+html, body { background: var(--k1); }
+/* pages, sheets and pop-ups */
+.hp-side, .hp-missions, .hp-skins, .hp-store, .hp-compete { background: radial-gradient(ellipse at 50% -10%, rgba(182, 247, 42, 0.16), transparent 55%), linear-gradient(180deg, rgba(14, 19, 14, 0.94) 0%, rgba(7, 10, 7, 0.98) 45%); }
+.gmodal { background: rgba(0, 0, 0, 0.78); }
+.gsheet, .road-sheet, .avatar-sheet { background: linear-gradient(180deg, var(--k3) 0%, var(--k2) 30%, var(--k1) 100%); border: 3px solid var(--lime); box-shadow: 0 8px 0 var(--edge), 0 24px 50px rgba(0, 0, 0, 0.7); }
+/* title banners: lime with black letters */
+.ribbon, .ribbon.pink, .ribbon.teal, .ribbon.gold { --rb-a: #e2ff8a; --rb-b: #a6ea24; --rb-dark: #3b6400; }
+.ribbon h2, .ribbon.pink h2, .ribbon.teal h2, .ribbon.gold h2 { color: var(--lime-ink); -webkit-text-stroke: 0; text-shadow: 0 2px 0 rgba(255, 255, 255, 0.45); }
+.gclose { background: var(--k1); border-color: var(--lime); color: var(--lime); }
+/* the tab bar */
+.home-tabs { background: linear-gradient(180deg, var(--k2), var(--k0)); border-top: 3px solid var(--lime); }
+.htab.on::after { background: linear-gradient(180deg, #e2ff8a, var(--lime) 55%, var(--lime2)); box-shadow: 0 4px 0 #3b6400; }
+.htab.on span { color: var(--lime-ink); -webkit-text-stroke: 0; text-shadow: none; }
+/* cards and rows */
+.league-card, .store-card, .store-tile, .trow, .tcard { background: linear-gradient(180deg, var(--k3), var(--k2)); border-color: var(--edge); box-shadow: 0 5px 0 var(--k0), 0 12px 22px rgba(0, 0, 0, 0.45); }
+.trow.live, .trow.ready { border-color: var(--lime); }
+.icard { background: linear-gradient(180deg, var(--k4), var(--k2)); border-color: var(--edge); box-shadow: 0 4px 0 var(--k0); }
+.icard.owned { background: linear-gradient(180deg, #2c4a12, #18300a); border-color: var(--lime2); }
+.icard.on { border-color: var(--lime); box-shadow: 0 4px 0 #3b6400, 0 0 14px rgba(182, 247, 42, 0.5); }
+.gbtn:not(.ghost):not(.gold-btn) { background: linear-gradient(180deg, #e2ff8a, var(--lime) 55%, var(--lime2)); color: var(--lime-ink); border-color: #fff; box-shadow: 0 6px 0 #3b6400; -webkit-text-stroke: 0; }
+/* missions */
+.m-head h3 { color: #fff; }
+.m-head p { color: var(--muted); }
+.m-head p b { color: var(--lime); }
+.hp-missions .quest { color: var(--text); border: 2px solid var(--edge); background: linear-gradient(180deg, var(--k3), var(--k2)); box-shadow: 0 4px 0 var(--k0), 0 8px 16px rgba(0, 0, 0, 0.35); }
+.hp-missions .quest .qmain > b { color: var(--text); }
+.hp-missions .quest .qicon { background: var(--k4); box-shadow: none; }
+.hp-missions .qbar { background: var(--k0); }
+.hp-missions .qbar i { background: linear-gradient(180deg, #e2ff8a, var(--lime)); }
+.hp-missions .qbar span { color: #fff; }
+.hp-missions .qreward { background: var(--k4); border-color: var(--edge); box-shadow: none; }
+.hp-missions .quest .qreward b { color: var(--lime); }
+.hp-missions .quest.done { background: linear-gradient(180deg, #1c2e12, #12200a); }
+.hp-missions .quest.ready { border-color: var(--lime); background: linear-gradient(180deg, #2a3a12, #182408); box-shadow: 0 4px 0 #3b6400, 0 0 16px rgba(182, 247, 42, 0.45); }
+/* Trophy Road */
+.gold-road { background: linear-gradient(160deg, var(--k3), var(--k1) 70%); border-color: var(--lime); box-shadow: 0 5px 0 var(--edge); }
+.road-head b { color: var(--lime); }
+.road-head em { background: rgba(182, 247, 42, 0.12); border-color: var(--lime); }
+.road-all { color: var(--lime); }
+.rbubble { background: linear-gradient(180deg, var(--k4), var(--k3)); border-color: var(--edge); box-shadow: 0 3px 0 var(--k0); }
+.rbubble::after { background: var(--k3); border-color: var(--edge); }
+.rbar { background: var(--k0); }
+.rbar i { background: linear-gradient(180deg, #e2ff8a, var(--lime)); }
+.rknob { background: radial-gradient(circle at 40% 35%, #f2ffc8, var(--lime) 60%, var(--lime2)); box-shadow: 0 0 10px rgba(182, 247, 42, 0.9); }
+.road-sheet .road-full { background-image: linear-gradient(90deg, transparent calc(50% - 11px), #3b6400 calc(50% - 11px) calc(50% - 8px), var(--lime) calc(50% - 8px) calc(50% - 5px), #2c4a12 calc(50% - 5px) calc(50% + 5px), var(--lime) calc(50% + 5px) calc(50% + 8px), #3b6400 calc(50% + 8px) calc(50% + 11px), transparent calc(50% + 11px)), radial-gradient(ellipse at 50% 0%, rgba(182, 247, 42, 0.12), transparent 50%), linear-gradient(180deg, var(--k2), var(--k1)); }
+.rv-card { background: linear-gradient(180deg, var(--k4), var(--k3)); border-color: var(--edge); color: #dfe7d3; box-shadow: 0 4px 0 var(--k0), 0 6px 12px rgba(0, 0, 0, 0.4); }
+.rv-card.ready { background: linear-gradient(180deg, #2c4a12, #182408); border-color: var(--lime); box-shadow: 0 4px 0 #3b6400, 0 0 16px rgba(182, 247, 42, 0.7); }
+.rv-node { border-color: var(--lime); background: radial-gradient(circle at 50% 35%, #4a6a1a, #1f3008); -webkit-text-stroke: 0; box-shadow: 0 3px 0 var(--k0); }
+.rv-row:not(.reached) .rv-node { background: var(--k3); border-color: var(--edge); color: var(--muted); }
+.rv-link { background: var(--lime); }
+.rv-row:not(.reached) .rv-link { background: var(--edge); }
+.rv-you { background: linear-gradient(180deg, #e2ff8a, var(--lime)); }
+/* lobby */
+#lobby::before, #results::before { background: linear-gradient(180deg, rgba(5, 8, 5, 0.75), rgba(3, 5, 3, 0.94)); }
+#lobby .panel, #results .panel { background: linear-gradient(180deg, rgba(20, 27, 20, 0.96), rgba(10, 14, 10, 0.98)); border: 2px solid var(--lime); box-shadow: 0 6px 0 var(--edge), 0 20px 40px rgba(0, 0, 0, 0.6); }
+#lobby .lobby-actions, #results .lobby-actions { background: linear-gradient(180deg, rgba(10, 14, 10, 0), rgba(10, 14, 10, 0.98) 30%); }
+#lobby .mode-card { background: var(--k3); border-color: var(--edge); }
+/* line-up */
+.lx-pill, .lx-code, .lx-chip { background: rgba(8, 11, 8, 0.85); border-color: var(--lime); }
+.lx-code b { color: var(--lime); }
+.lx-copy { background: var(--lime); color: var(--lime-ink); }
+.lx-kicker { color: var(--lime); -webkit-text-stroke-color: #000; }
+.lx-emotes { background: rgba(8, 11, 8, 0.8); border-color: var(--edge); }
+.lx-start { background: linear-gradient(180deg, #e2ff8a 0%, var(--lime) 55%, var(--lime2) 100%); color: var(--lime-ink); -webkit-text-stroke: 0; box-shadow: 0 6px 0 #3b6400, 0 10px 20px rgba(0, 0, 0, 0.4); }
+/* tutorial and tips */
+.coach-card, .tour-tip, .ti-card { background: linear-gradient(180deg, var(--k3), var(--k1)); border-color: var(--lime); box-shadow: 0 6px 0 var(--edge), 0 18px 40px rgba(0, 0, 0, 0.6); }
+.ti-card::after { border-top-color: var(--lime); }
+/* race screen */
+.hud .quit-btn { background: rgba(8, 11, 8, 0.85); border-color: var(--lime); color: var(--lime); box-shadow: none; }
+.hud .track-bar { border-color: var(--lime); background: rgba(8, 11, 8, 0.6); }
+.hud .dist-chip { background: rgba(8, 11, 8, 0.8); color: var(--lime); }
