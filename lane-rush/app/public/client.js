@@ -713,7 +713,7 @@ if (!nameInput.value.trim()) {
   local.setItem("lr:name", nameInput.value);
 }
 local.setItem("lr:named", "1");
-if (!local.getItem("lr:tour")) setTimeout(startTour, 900); // first visit: straight into the quick tour
+local.setItem("lr:tour", "1"); // the page tour is gone: new players learn in their first run
 // Join room opens the code box inside the same card
 function openJoin(open) {
   $("#roomRow").hidden = open;
@@ -5828,9 +5828,13 @@ const COACH = {
   lane: { title: "Swipe left or right", text: "A crate! Change lanes to dodge it.", keys: "← → on the keyboard", g: "side" },
   jump: { title: "Swipe up to jump", text: "Jump over the hurdle!", keys: "↑ or Space on the keyboard", g: "up" },
   slide: { title: "Swipe down to slide", text: "Slide under the gate!", keys: "↓ on the keyboard", g: "down" },
-  item: { title: "Tap to use it", text: "Tap the round button!", keys: "E on the keyboard", g: "tap" },
+  // then a banana, and the three ways to throw it (all on the item button, bottom right)
+  throw: { title: "Swipe UP on the button", text: "Throw the banana ahead of you!", keys: "E on the keyboard", g: "bup" },
+  drop: { title: "Swipe DOWN on the button", text: "Drop it behind you!", keys: "Q on the keyboard", g: "bdown" },
+  aim: { title: "Swipe up and SIDEWAYS", text: "Throw it into another lane!", keys: "1 2 3 4 on the keyboard = that lane", g: "bside" },
 };
 const COACH_MOVES = ["lane", "jump", "slide"];
+const COACH_ITEMS = ["throw", "drop", "aim"];
 const COACH_SLOW = 0; // the run waits until you make the move
 const COACH_UNTIL_M = 1500; // after this, it stops teaching either way
 const coach = { on: false, wait: null, row: null, done: new Set(), scale: 1, items: 0, shownAt: 0 };
@@ -5852,7 +5856,9 @@ function coachShow(kind, dir = COACH[kind].g, row = null) {
   $("#coachKeys").textContent = TOUCH ? "" : c.keys;
   $("#coachGesture").className = `coach-gesture ${dir}`;
   const box = $("#coach");
-  box.classList.toggle("item", kind === "item");
+  const onButton = COACH_ITEMS.includes(kind);
+  box.classList.toggle("item", onButton);
+  $("#powerSlot").classList.toggle("coach-hl", onButton); // the button to swipe glows
   box.hidden = false;
   sfx.tap();
 }
@@ -5860,6 +5866,7 @@ function coachHide() {
   coach.wait = null;
   coach.row = null;
   $("#coach").hidden = true;
+  $("#powerSlot").classList.remove("coach-hl");
 }
 function coachEnd(learned) {
   coach.on = false;
@@ -5872,8 +5879,8 @@ function coachLearned(kind) {
   coach.done.add(kind);
   coachHide();
   sfx.pickup();
-  banner(kind === "item" ? "NICE!" : "PERFECT!", 700);
-  if (COACH_MOVES.every((k) => coach.done.has(k)) && coach.done.has("item")) {
+  banner(COACH_ITEMS.includes(kind) ? "NICE THROW!" : "PERFECT!", 700);
+  if ([...COACH_MOVES, ...COACH_ITEMS].every((k) => coach.done.has(k))) {
     coachEnd(true);
     setTimeout(() => {
       banner("YOU'RE READY!", 1600);
@@ -5889,17 +5896,26 @@ function coachTick(dt) {
     return 1;
   }
   const w = coach.wait;
-  coach.scale += ((w && w !== "item" ? COACH_SLOW : 1) - coach.scale) * Math.min(1, dt * 12);
+  coach.scale += ((w ? COACH_SLOW : 1) - coach.scale) * Math.min(1, dt * 12);
   if (me.d > COACH_UNTIL_M) {
     coachEnd(true);
     return 1;
   }
-  if (w === "item" && (me.items.length < coach.items || performance.now() - coach.shownAt > 6000)) coachLearned("item");
+  // a throw lesson: make sure there's a banana on the button to throw
+  if (COACH_ITEMS.includes(w) && me.items[0] !== "banana") {
+    me.items.unshift("banana");
+    renderPower();
+  }
   if (coach.wait || !canControl() || me.stumbleT > 0 || me.power === "rocket") return coach.scale;
-  // holding a power-up (once you've learned a move): how to use it
-  if (!coach.done.has("item") && me.items.length && coach.done.size > 0) {
-    coachShow("item");
-    return coach.scale;
+  // the moves first; then a banana and the three ways to throw it
+  if (COACH_MOVES.every((k) => coach.done.has(k))) {
+    const next = COACH_ITEMS.find((k) => !coach.done.has(k));
+    if (next) {
+      if (me.items[0] !== "banana") me.items.unshift("banana");
+      renderPower();
+      coachShow(next);
+      return coach.scale;
+    }
   }
   const course = race.course;
   if (!course) return coach.scale;
@@ -5922,10 +5938,20 @@ function coachTick(dt) {
 /** A move you just made: does it answer what the coach is showing? */
 function coachInput(kind) {
   const w = coach.wait;
-  if (!w || w === "item") return;
+  if (!w || COACH_ITEMS.includes(w)) return;
   if (w === "lane" && (kind === "left" || kind === "right")) {
     if (!coach.row?.lanes[me.lane]) coachLearned("lane"); // into a free lane
   } else if (w === kind) coachLearned(w);
+}
+/** You threw something: does it answer the throw lesson on screen? */
+function coachThrew(dir, lane, from) {
+  const w = coach.wait;
+  if (!COACH_ITEMS.includes(w)) return;
+  if ((w === "throw" && dir > 0 && lane === from) || (w === "drop" && dir < 0) || (w === "aim" && lane !== from)) coachLearned(w);
+  else {
+    // not quite: try again (another banana is on its way)
+    banner(w === "aim" ? "SWIPE SIDEWAYS TOO!" : w === "drop" ? "SWIPE DOWN!" : "SWIPE UP!", 900);
+  }
 }
 $("#coachSkip").addEventListener("click", () => coachEnd(true));
 
@@ -7627,7 +7653,10 @@ function useItem(lane = me.lane, dir = 1) {
   if (!me.items.length || !canControl() || me.stumbleT > 0) return;
   const kind = me.items.shift();
   stats.add("used", 1);
-  if (THROWN.has(kind)) me.runner?.throwIt?.();
+  if (THROWN.has(kind)) {
+    me.runner?.throwIt?.();
+    coachThrew(dir, lane, me.lane);
+  }
   if (kind === "banana") {
     game.bananasThrown = (game.bananasThrown ?? 0) + 1;
     stats.add("bananas", 1);
@@ -8113,19 +8142,24 @@ function renderPower() {
 {
   const slot = $("#powerSlot");
   let y0 = null;
+  let x0 = 0;
   slot.addEventListener("pointerdown", (e) => {
     y0 = e.clientY;
+    x0 = e.clientX;
     slot.setPointerCapture?.(e.pointerId);
   });
   slot.addEventListener("pointerup", (e) => {
     if (y0 == null) return;
     const dy = e.clientY - y0;
+    const dx = e.clientX - x0;
     y0 = null;
     buzz(15);
     const throws = !me.power && THROWN.has(me.items[0]);
-    if (throws && dy > 22) useItem(me.lane, -1);
-    else if (throws) useItem(me.lane, 1);
-    else useItem();
+    if (!throws) return useItem();
+    // the sideways part of the swipe picks the lane: a short swipe one lane over, a long one further
+    const shift = Math.abs(dx) > 26 ? Math.sign(dx) * Math.max(1, Math.round(Math.abs(dx) / 55)) : 0;
+    const lane = clamp(me.lane + shift, 0, LANES - 1);
+    useItem(lane, dy > 22 ? -1 : 1);
   });
   slot.addEventListener("pointercancel", () => (y0 = null));
 }
@@ -8521,6 +8555,11 @@ world
     world.buildScenery();
     world.setShowcase(preferredChar());
     if (net.view?.phase === "lobby") renderLobby(net.view);
+    // a brand-new player goes straight into their first run, which teaches them as they play
+    if (!local.getItem("lr:endlessTut") && !local.getItem("lr:tutAuto") && game.mode === "home") {
+      local.setItem("lr:tutAuto", "1");
+      setTimeout(() => game.mode === "home" && startEndless(), 600);
+    }
   })
   .catch((err) => {
     console.error(err);
