@@ -998,8 +998,6 @@ function renderSettings() {
   $("#setSound").checked = p.sound !== false;
   $("#setMusic").checked = p.music !== false;
   $("#setBuzz").checked = p.buzz !== false;
-  for (const b of document.querySelectorAll("#setGfx button")) b.classList.toggle("on", b.dataset.gfx === gfxChoice());
-  $("#setGfxNow").textContent = gfxChoice() === "auto" ? `Auto · now ${gfxTier()}` : "";
   $("#setCountryName").textContent = myCountry() ? `${flagOf(myCountry())} ${countryName(myCountry())}` : "Not set";
 }
 $("#settingsBtn").addEventListener("click", () => {
@@ -1021,18 +1019,6 @@ $("#setBuzz").addEventListener("change", (e) => {
   setPref("buzz", e.target.checked);
   buzz(40);
 });
-for (const b of document.querySelectorAll("#setGfx button")) {
-  b.addEventListener("click", () => {
-    setPref("gfx", b.dataset.gfx);
-    setPref("low", false);
-    if (b.dataset.gfx === "auto") local.removeItem("lr:gfxAuto");
-    qualityIdx = 0;
-    applyQuality();
-    renderSettings();
-    const want = GFX[gfxTier()];
-    if (want.aa !== startGfx.aa || want.shadows !== startGfx.shadows) toast("Shadows and edge smoothing change next time you open the game");
-  });
-}
 $("#setCountry").addEventListener("click", () => {
   setModal.hidden = true;
   openCountry("Country you cheer for");
@@ -3331,15 +3317,14 @@ const canvas = $("#scene");
  *   full-detail scenery · env: sky light on materials · fx: share of particles and weather
  */
 const GFX = {
-  high: { ratio: 2, aa: true, shadows: true, lod: 60, env: true, fx: 1 },
+  high: { ratio: 2, aa: true, shadows: true, lod: 50, env: true, fx: 0.9 },
   balanced: { ratio: 1.6, aa: true, shadows: false, lod: 40, env: true, fx: 0.7 },
   performance: { ratio: 1.15, aa: false, shadows: false, lod: 22, env: false, fx: 0.4 },
 };
 const GFX_ORDER = ["high", "balanced", "performance"];
+/** One setting for everyone, tuned for phones: sharp (2× pixels), smooth edges, sun shadows, sky light. Nothing ever lowers it. */
 function gfxChoice() {
-  const p = prefs();
-  if (p.gfx && (p.gfx === "auto" || GFX[p.gfx])) return p.gfx;
-  return p.low ? "performance" : "auto"; // the old Battery saver switch
+  return "high";
 }
 // the old Auto stepped down for good on any slow patch (or a Low Power Mode 30 fps cap):
 // everyone starts at High again once, and the new pace-aware check decides from here
@@ -3422,6 +3407,7 @@ function learnPace(dt) {
 /** How the last race ran, for stepping a lowered Auto preset back up once the phone keeps up. */
 const raceRun = { ms: 0, n: 0, dropped: false };
 function judgeLastRace() {
+  return; // one fixed setting (kept for the ?perf numbers only)
   if (raceRun.n > 600 && !raceRun.dropped && gfxChoice() === "auto") {
     const avg = raceRun.ms / raceRun.n;
     const good = avg < paceMs * 1.12 ? Number(local.getItem("lr:gfxGood") || 0) + 1 : 0;
@@ -3440,6 +3426,7 @@ function judgeLastRace() {
 function adaptQuality(dt) {
   if (!Number.isFinite(dt) || dt <= 0) return;
   if (game.mode !== "race") return learnPace(dt);
+  return; // one fixed setting: the game never lowers its quality by itself
   if (noAdapt || !renderer) return;
   // only judge the frame rate once the race is really running: loading, warm-up and the
   // opening shot stutter on every phone, and must not cost the sharpness for the whole session
