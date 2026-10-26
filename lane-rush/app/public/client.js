@@ -949,9 +949,15 @@ $("#setCountry").addEventListener("click", () => {
   setModal.hidden = true;
   openCountry("Country you cheer for");
 });
+// start over as a brand-new player: everything this device saved is wiped, then the game reloads
+// into the first-visit flow (name, tutorial run, fresh coins, runners and progress)
 $("#setRestart").addEventListener("click", () => {
-  if (!confirm("Start the intro again? You'll be asked your name and get the tutorial run. Your runners, coins and progress stay.")) return;
-  for (const k of ["lr:asked", "lr:endlessTut", "lr:tutDone", "lr:tutAuto"]) local.removeItem(k);
+  if (!confirm("Start over with a new account? All your coins, runners, medals, missions and progress on this device will be deleted. This can't be undone.")) return;
+  try {
+    for (const store of [localStorage, sessionStorage]) for (const k of Object.keys(store)) if (k.startsWith("lr:")) store.removeItem(k);
+  } catch {
+    /* storage blocked: nothing saved anyway */
+  }
   location.reload();
 });
 $("#setTut").addEventListener("click", () => {
