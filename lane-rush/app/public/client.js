@@ -915,7 +915,8 @@ function renderSettings() {
   $("#setSound").checked = p.sound !== false;
   $("#setMusic").checked = p.music !== false;
   $("#setBuzz").checked = p.buzz !== false;
-  $("#setLow").checked = Boolean(p.low);
+  for (const b of document.querySelectorAll("#setGfx button")) b.classList.toggle("on", b.dataset.gfx === gfxChoice());
+  $("#setGfxNow").textContent = gfxChoice() === "auto" ? `Auto · now ${gfxTier()}` : "";
   $("#setCountryName").textContent = myCountry() ? `${flagOf(myCountry())} ${countryName(myCountry())}` : "Not set";
 }
 $("#settingsBtn").addEventListener("click", () => {
@@ -937,10 +938,18 @@ $("#setBuzz").addEventListener("change", (e) => {
   setPref("buzz", e.target.checked);
   buzz(40);
 });
-$("#setLow").addEventListener("change", (e) => {
-  setPref("low", e.target.checked);
-  applyQuality();
-});
+for (const b of document.querySelectorAll("#setGfx button")) {
+  b.addEventListener("click", () => {
+    setPref("gfx", b.dataset.gfx);
+    setPref("low", false);
+    if (b.dataset.gfx === "auto") local.removeItem("lr:gfxAuto");
+    qualityIdx = 0;
+    applyQuality();
+    renderSettings();
+    const want = GFX[gfxTier()];
+    if (want.aa !== startGfx.aa || want.shadows !== startGfx.shadows) toast("Shadows and edge smoothing change next time you open the game");
+  });
+}
 $("#setCountry").addEventListener("click", () => {
   setModal.hidden = true;
   openCountry("Country you cheer for");
@@ -3169,31 +3178,67 @@ function renderCup(v) {
   };
 }
 const canvas = $("#scene");
+
+/**
+ * Graphics presets. "Auto" starts on High and steps down by itself when a race runs slow
+ * (the step is remembered on this device). Edge smoothing and shadows are fixed when the
+ * game starts; the rest changes on the spot.
+ *   ratio: render scale cap · aa: edge smoothing · shadows: soft sun shadows · lod: metres of
+ *   full-detail scenery · env: sky light on materials · fx: share of particles and weather
+ */
+const GFX = {
+  high: { ratio: 2, aa: true, shadows: true, lod: 60, env: true, fx: 1 },
+  balanced: { ratio: 1.6, aa: true, shadows: false, lod: 40, env: true, fx: 0.7 },
+  performance: { ratio: 1.15, aa: false, shadows: false, lod: 22, env: false, fx: 0.4 },
+};
+const GFX_ORDER = ["high", "balanced", "performance"];
+function gfxChoice() {
+  const p = prefs();
+  if (p.gfx && (p.gfx === "auto" || GFX[p.gfx])) return p.gfx;
+  return p.low ? "performance" : "auto"; // the old Battery saver switch
+}
+/** The preset in use: the chosen one, or Auto's current step. */
+function gfxTier() {
+  const c = gfxChoice();
+  if (c !== "auto") return c;
+  const learned = local.getItem("lr:gfxAuto");
+  return GFX[learned] ? learned : "high";
+}
+let gfx = GFX[gfxTier()];
+const startGfx = gfx; // what the renderer was made with (edge smoothing, shadows)
+
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: gfx.aa, powerPreference: "high-performance", stencil: false });
 } catch {
   $("#loadHint").textContent = "Your browser can't show 3D (WebGL is off). Try Safari or Chrome.";
 }
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 400);
 if (renderer) {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, prefs().low ? 1 : 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gfx.ratio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.08;
+  renderer.debug.checkShaderErrors = false; // no driver round trip per shader (errors still show in the console as warnings)
+  if (startGfx.shadows) {
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.autoUpdate = true;
+  }
 }
 
 /**
- * Adaptive resolution: phones with very sharp screens (DPR 3) can't always
- * fill every pixel at 60 FPS. If frames run long for a couple of seconds we
- * step the render scale down (2 → 1.6 → 1.3 → 1); it never goes back up in a
- * session, so it can't oscillate.
+ * Adaptive quality: if a race runs slow for a few seconds (frames over 25 ms), the render scale
+ * steps down, and on Auto the preset steps down too (High → Balanced → Performance) and is
+ * remembered for next time. It never steps back up within a session, so it can't oscillate.
  */
-const QUALITY_STEPS = [2, 1.6, 1.3, 1];
+const QUALITY_STEPS = [1, 0.85, 0.72];
 function applyQuality() {
   if (!renderer) return;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, prefs().low ? 1 : QUALITY_STEPS[qualityIdx]));
+  gfx = GFX[gfxTier()];
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gfx.ratio * QUALITY_STEPS[qualityIdx]));
+  world?.setDetail?.(gfx);
   resize();
 }
 let qualityIdx = 0;
@@ -3205,15 +3250,53 @@ function adaptQuality(dt) {
   if (game.warm || !curtain.hidden || !net.view || serverNow() < net.view.startAt + 2000) return;
   if (dt > 0.25) return; // a one-off hitch (a tab switch, a notification) says nothing about the phone
   slowFor = dt > 1 / 40 ? slowFor + dt : Math.max(0, slowFor - dt * 0.5);
-  if (slowFor < 3 || qualityIdx >= QUALITY_STEPS.length - 1) return;
+  if (slowFor < 3) return;
   slowFor = 0;
-  qualityIdx += 1;
-  const ratio = Math.min(window.devicePixelRatio || 1, QUALITY_STEPS[qualityIdx]);
-  if (ratio < renderer.getPixelRatio()) {
-    renderer.setPixelRatio(ratio);
-    resize();
+  // on Auto, a lighter preset first; then a lower render scale
+  const tier = gfxTier();
+  const i = GFX_ORDER.indexOf(tier);
+  if (gfxChoice() === "auto" && i < GFX_ORDER.length - 1) {
+    local.setItem("lr:gfxAuto", GFX_ORDER[i + 1]);
+    applyQuality();
+    return;
   }
+  if (qualityIdx >= QUALITY_STEPS.length - 1) return;
+  qualityIdx += 1;
+  applyQuality();
 }
+
+// ── developer performance monitor: add ?perf to the address (always on for the local dev server) ──
+const perfHud = (() => {
+  if (!/[?&]perf\b/.test(location.search) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return null;
+  const box = document.createElement("pre");
+  box.style.cssText = "position:fixed;z-index:9999;left:50%;top:max(4px,env(safe-area-inset-top));transform:translateX(-50%);margin:0;padding:3px 7px;border-radius:6px;background:rgba(0,0,0,.72);color:#b6f72a;font:600 10px/1.3 ui-monospace,Menlo,monospace;pointer-events:none;white-space:pre";
+  document.body.append(box);
+  const times = new Float32Array(120);
+  let i = 0;
+  let n = 0;
+  let next = 0;
+  return {
+    frame(ms) {
+      times[i] = ms;
+      i = (i + 1) % times.length;
+      n = Math.min(times.length, n + 1);
+      const now = performance.now();
+      if (now < next || !renderer) return;
+      next = now + 500;
+      let sum = 0;
+      let worst = 0;
+      for (let k = 0; k < n; k++) {
+        sum += times[k];
+        worst = Math.max(worst, times[k]);
+      }
+      const r = renderer.info.render;
+      let objs = 0;
+      scene.traverseVisible(() => objs++);
+      const heap = performance.memory ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)}MB` : "n/a";
+      box.textContent = `${Math.round(1000 / ms)} fps · avg ${Math.round((1000 * n) / sum)} · ${ms.toFixed(1)}ms (worst ${worst.toFixed(0)})\n${r.calls} draws · ${Math.round(r.triangles / 1000)}k tris · ${objs} objs · heap ${heap}\n${gfxTier()} ×${renderer.getPixelRatio().toFixed(2)} · ${renderer.info.memory.textures} tex · ${renderer.info.programs.length} shaders`;
+    },
+  };
+})();
 
 // look behind: hold the round button top right and the camera turns round (no second
 // render of the world, so it costs nothing in frame rate)
@@ -3251,7 +3334,66 @@ const world = (() => {
   scene.add(hemi);
   const sun = new THREE.DirectionalLight("#fff1cc", 2.1);
   sun.position.set(-6, 14, 8);
-  scene.add(sun);
+  scene.add(sun, sun.target);
+  // soft sun shadows (High preset): one small shadow map that follows the runner, so the
+  // runners and obstacles near you cast real shadows on the track
+  const SUN_DIR = new THREE.Vector3(-6, 14, 8).normalize();
+  if (startGfx.shadows) {
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    const sc = sun.shadow.camera;
+    sc.left = -9;
+    sc.right = 9;
+    sc.top = 14;
+    sc.bottom = -10;
+    sc.near = 1;
+    sc.far = 60;
+    sun.shadow.bias = -0.0006;
+    sun.shadow.normalBias = 0.02;
+    sun.shadow.radius = 3;
+  }
+  /** Keep the sun's shadow box on the runner (whole texels, so the shadow edges don't shimmer). */
+  function followSun(x, z) {
+    const tx = Math.round(x * 20) / 20;
+    const tz = Math.round(z * 20) / 20;
+    sun.target.position.set(tx, 0, tz);
+    sun.position.set(tx + SUN_DIR.x * 30, SUN_DIR.y * 30, tz + SUN_DIR.z * 30);
+  }
+  // sky light: a tiny blurred picture of the sky and ground lights every PBR material from all
+  // round (soft fill, gentle sheen), which flat lamps alone can't do. Remade for each map's look.
+  let envRT = null;
+  const pmrem = renderer ? new THREE.PMREMGenerator(renderer) : null;
+  function skyLight(top, horizon, ground) {
+    if (!pmrem || !gfx.env) {
+      scene.environment = null;
+      return;
+    }
+    const c = document.createElement("canvas");
+    c.width = 128;
+    c.height = 64;
+    const g = c.getContext("2d");
+    const grd = g.createLinearGradient(0, 0, 0, 64);
+    grd.addColorStop(0, top);
+    grd.addColorStop(0.47, horizon);
+    grd.addColorStop(0.53, ground);
+    grd.addColorStop(1, ground);
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 128, 64);
+    // a warm sun spot high up
+    const sg = g.createRadialGradient(40, 14, 0, 40, 14, 18);
+    sg.addColorStop(0, "rgba(255,250,230,1)");
+    sg.addColorStop(1, "rgba(255,250,230,0)");
+    g.fillStyle = sg;
+    g.fillRect(0, 0, 128, 64);
+    const tex = new THREE.CanvasTexture(c);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const next = pmrem.fromEquirectangular(tex);
+    tex.dispose();
+    envRT?.dispose();
+    envRT = next;
+    scene.environment = envRT.texture;
+  }
 
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
@@ -3369,7 +3511,9 @@ const world = (() => {
   /** The day look (the meadow and the classic maps). */
   const DAY_LOOK = { sky: SKY, sun: "#fff3c4", fog: [SKY.horizon, 90, 300], light: { hemi: ["#e6f6ff", "#5fae3a", 1.1], sun: ["#fff1cc", 2.1] }, far: "#97b6e6", near: "#6cbf6a", nearFoot: "#cdebd8" };
   /** Sky, light and haze for a map's look (a theme from themes.js, or the day look). */
+  let lastLook = null;
   function applyLook(look) {
+    lastLook = look;
     domeMat.uniforms.top.value.set(look.sky.top);
     domeMat.uniforms.mid.value.set(look.sky.mid);
     domeMat.uniforms.horizon.value.set(look.sky.horizon);
@@ -3382,6 +3526,9 @@ const world = (() => {
     hemi.intensity = look.light.hemi[2];
     sun.color.set(look.light.sun[0]);
     sun.intensity = look.light.sun[1];
+    // with the sky light on, the flat fill lamp is turned down (the sky light does it better)
+    if (gfx.env) hemi.intensity = look.light.hemi[2] * 0.55;
+    skyLight(look.sky.top, look.sky.horizon, look.light.hemi[1]);
     sunGlow.visible = Boolean(look.sun);
     if (look.sun) sunGlow.material.color.set(look.sun);
     tintRing(farRing, look.far, look.sky.horizon);
@@ -3563,6 +3710,7 @@ const world = (() => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), shadowMat);
     m.rotation.x = -Math.PI / 2;
     m.position.y = 0.04;
+    m.visible = !startGfx.shadows; // with real sun shadows the soft blob isn't needed
     return m;
   }
 
@@ -3673,6 +3821,8 @@ const world = (() => {
               loadGLB("/assets/wheat.glb").then((g) => (P.wheat = fitProp(g.scene, { width: 6.8, maxHeight: 1.8 }))),
               loadGLB("/assets/tractor.glb").then((g) => (P.tractor = fitProp(g.scene, { width: 3.6 }))),
               loadGLB("/assets/sunflowers.glb").then((g) => (P.sunflowers = fitProp(g.scene, { height: 2.4 }))),
+              loadLod("wheat", "wheat", { width: 6.8, maxHeight: 1.8 }),
+              loadLod("sunflowers", "sunflowers", { height: 2.4 }),
               loadGLB("/assets/farm_tile.glb").then((g) => (P.farmTileNext = fitTile(g.scene))),
             ]
           : [
@@ -3680,6 +3830,8 @@ const world = (() => {
               loadGLB("/assets/hut.glb").then((g) => (P.hut = fitProp(g.scene, { height: 4.6 }))),
               loadGLB("/assets/lighthouse.glb").then((g) => (P.lighthouse = fitProp(g.scene, { height: 20 }))),
               loadGLB("/assets/umbrella.glb").then((g) => (P.umbrella = fitProp(g.scene, { width: 3.2 }))),
+              loadLod("palm", "palm", { height: 8 }),
+              loadLod("umbrella", "umbrella", { width: 3.2 }),
               loadGLB("/assets/board_tile.glb").then((g) => (P.boardTileNext = fitTile(g.scene))),
             ];
       // the tile goes in last, so mapReady() only says yes once every prop is there
@@ -3850,7 +4002,13 @@ const world = (() => {
     gltf.scene.traverse((o) => {
       if (o.isMesh) {
         o.frustumCulled = false;
-        if (o.material) o.material.side = THREE.FrontSide;
+        o.castShadow = startGfx.shadows;
+        if (o.material) {
+          o.material.side = THREE.FrontSide;
+          // a glossy, toy-like finish: the sky light gives them soft highlights
+          o.material.roughness = 0.5;
+          o.material.envMapIntensity = 0.9;
+        }
       }
     });
     // Measure the POSED, skinned mesh (precise box): the bind-pose bounds of a
@@ -3914,8 +4072,10 @@ const world = (() => {
       loadGLB("/assets/tree_pine.glb").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
       loadGLB("/assets/tree_blossom.glb").then((g) => (assets.props.blossom = fitProp(g.scene, { height: 5.4 }))),
       loadGLB("/assets/bush.glb").then((g) => (assets.props.bush = fitProp(g.scene, { width: 2.4 }))),
+      // light far versions (colour baked in, a few hundred triangles) for scenery past LOD_NEAR
+      ...[["oak", "tree_oak", { height: 6.5 }], ["pine", "tree_pine", { height: 6.2 }], ["blossom", "tree_blossom", { height: 5.4 }], ["bush", "bush", { width: 2.4 }], ["rocks", "rocks", { width: 2.2 }], ["cloud", "cloud", { width: 1 }]].map(([k, f, size]) => loadLod(k, f, size)),
       loadGLB("/assets/rocks.glb").then((g) => (assets.props.rocks = fitProp(g.scene, { width: 2.2 }))),
-      loadGLB("/assets/fence.glb").then((g) => (assets.props.fence = fitProp(g.scene, { width: 3.0, maxHeight: 0.9 }))),
+      Promise.resolve().then(() => (assets.props.fence = pickerFence())), // built in code: crisp and ~150 triangles
       loadGLB("/assets/cloud.glb").then((g) => (assets.props.cloud = fitProp(g.scene, { width: 1 }))),
     ];
     // the bar moves with the bytes downloaded (and finished files), never backwards
@@ -4239,6 +4399,7 @@ const world = (() => {
    */
   const mapScenery = {}; // map -> { group, cull: [] }
   let sceneryCull = [];
+  let sceneryBatches = [];
   let activeMap = "";
   const MAP_GROUND = {
     meadow: { color: "#ffffff", tex: true },
@@ -4263,6 +4424,7 @@ const world = (() => {
     scenery = mapScenery[map].group;
     scenery.position.z = -shift;
     sceneryCull = mapScenery[map].cull;
+    sceneryBatches = mapScenery[map].batches ?? [];
     activeMap = map;
     setSky(map);
     const theme = THEME[map];
@@ -4406,6 +4568,7 @@ const world = (() => {
     const side = new THREE.MeshLambertMaterial({ color: sideColor });
     const top = new THREE.MeshLambertMaterial({ map: tex });
     const deck = new THREE.Mesh(new THREE.BoxGeometry(TRACK_W, -MEADOW_Y, len), [side, side, top, side, side, side]);
+    deck.receiveShadow = true; // runners' and obstacles' shadows land on the track
     deck.position.set(0, MEADOW_Y / 2, -(len / 2 - 60));
     g.add(deck);
     const kerbMat = new THREE.MeshLambertMaterial({ color: kerbColor });
@@ -4461,22 +4624,22 @@ const world = (() => {
     const colors = ["#ffffff", "#ffe14d", "#ff7ab8", "#ffffff", "#c58bff", "#ff9f43"].map((c) => new THREE.Color(c));
     const geo = new THREE.IcosahedronGeometry(0.11, 0);
     const n = Math.round(((TRACK_LEN + 220) / 0.55) * 2);
-    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial(), n);
-    mesh.frustumCulled = false; // spread along the whole track
-    const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const sc = new THREE.Vector3();
     const at = new THREE.Vector3();
+    const entries = [];
     for (let i = 0; i < n; i++) {
       const side = i % 2 ? 1 : -1;
       const z = -60 + (i >> 1) * 0.55 + r() * 0.5;
       at.set(side * (edge + 0.75 + r() * 3.2), MEADOW_Y + 0.08, -z);
       const k = 0.7 + r() * 0.7;
       sc.set(k, k * 0.6, k);
-      mesh.setMatrixAt(i, m.compose(at, q, sc));
-      mesh.setColorAt(i, colors[Math.floor(r() * colors.length)]);
+      entries.push({ z, m: new THREE.Matrix4().compose(at, q, sc), color: colors[Math.floor(r() * colors.length)] });
     }
-    return mesh;
+    // tiny flowers: only drawn up close (they vanish into the grass further out anyway)
+    const b = windowBatch(geo, new THREE.MeshLambertMaterial(), entries, NEAR_FROM, 90);
+    batchSink?.push(b);
+    return b.inst;
   }
 
   // ── themed maps: everything built in code from a recipe in themes.js ──
@@ -4713,26 +4876,21 @@ const world = (() => {
               : new THREE.MeshLambertMaterial();
         // the window texture needs UVs: the building is a plain box
         const g = special === "windows" ? new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0) : geo;
-        const inst = new THREE.InstancedMesh(g, mat, k.items.length);
-        inst.frustumCulled = false;
-        k.items.forEach((it, i) => {
-          inst.setMatrixAt(i, m.compose(v.set(it.x, it.y, -it.z), q.setFromEuler(e.set(0, it.rot, 0)), sv.set(...it.sc)));
-          inst.setColorAt(i, cols[Math.floor(it.pick * cols.length) % cols.length]);
-        });
-        group.add(inst);
+        // one batch per part, holding only the stretch near the camera
+        const entries = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().compose(v.set(it.x, it.y, -it.z), q.setFromEuler(e.set(0, it.rot, 0)), sv.set(...it.sc)), color: cols[Math.floor(it.pick * cols.length) % cols.length] }));
+        const b = windowBatch(g, mat, entries, NEAR_FROM, FAR_TO + (PROP_PLACE[k.kind]?.d[1] > 40 ? 80 : 0));
+        group.add(b.inst);
+        batchSink?.push(b);
       }
     }
     // neon arches over the track
     if (theme.arches) {
       const zs = [];
       for (let z = 20; z < TRACK_LEN + 140; z += 45) zs.push(z);
-      const arch = new THREE.InstancedMesh(new THREE.TorusGeometry(TRACK_W / 2 + 0.7, 0.16, 6, 28, PI), new THREE.MeshBasicMaterial({ toneMapped: false }), zs.length);
-      arch.frustumCulled = false;
-      zs.forEach((z, i) => {
-        arch.setMatrixAt(i, m.compose(v.set(0, 0, -z), q.identity(), sv.set(1, 1, 1)));
-        arch.setColorAt(i, new THREE.Color(theme.arches[i % theme.arches.length]));
-      });
-      group.add(arch);
+      const entries = zs.map((z, i) => ({ z, m: new THREE.Matrix4().compose(v.set(0, 0, -z), q.identity(), sv.set(1, 1, 1)), color: new THREE.Color(theme.arches[i % theme.arches.length]) }));
+      const b = windowBatch(new THREE.TorusGeometry(TRACK_W / 2 + 0.7, 0.16, 6, 28, PI), new THREE.MeshBasicMaterial({ toneMapped: false }), entries, NEAR_FROM, FAR_TO);
+      group.add(b.inst);
+      batchSink?.push(b);
     }
   }
 
@@ -4749,7 +4907,7 @@ const world = (() => {
   const fxGroup = new THREE.Group();
   scene.add(fxGroup);
   let weather = null; // { points, spec, t }
-  const FX_N = 380;
+  const FX_N = Math.round(380 * gfx.fx);
   function setWeather(kind) {
     if (weather) {
       fxGroup.remove(weather.points);
@@ -4802,9 +4960,141 @@ const world = (() => {
     p.needsUpdate = true;
   }
 
+  // ── scenery in batches ──
+  // Every kind of prop along the track is ONE draw (an InstancedMesh), and it only holds the
+  // stretch near the camera: the instances are sorted by distance and the visible window is
+  // copied in whenever it moves. Props past LOD_NEAR switch to a light far version.
+  let LOD_NEAR = gfx.lod;
+  const lodProps = new Map(); // key → light far version (a holder fitted like the full one)
+  const lodFile = new Map(); // full prop → key
+  function loadLod(key, file, size) {
+    return loadGLB(`/assets/${file}_lod.glb`)
+      .then((g) => lodProps.set(key, fitProp(g.scene, size)))
+      .catch(() => {}); // no far version: the full one is used all the way
+  }
+  /** The single mesh inside a prop holder, and where it sits in the holder. */
+  function propMesh(holder) {
+    let mesh = null;
+    let n = 0;
+    holder.traverse((x) => {
+      if (x.isMesh) {
+        mesh = x;
+        n++;
+      }
+    });
+    if (n !== 1 || mesh.isSkinnedMesh || Array.isArray(mesh.material)) return null;
+    holder.updateWorldMatrix(true, true);
+    const local = new THREE.Matrix4().copy(holder.matrixWorld).invert().multiply(mesh.matrixWorld);
+    return { mesh, local };
+  }
+  const lowerZ = (zs, z) => {
+    let lo = 0;
+    let hi = zs.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (zs[mid] < z) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+  /** One batch: entries [{ z, m: Matrix4, color? }] in the group's space; drawn between z+from and z+to of the camera. */
+  function windowBatch(geo, mat, entries, from, to) {
+    entries.sort((a, b) => a.z - b.z);
+    const n = entries.length;
+    const inst = new THREE.InstancedMesh(geo, mat, n);
+    inst.frustumCulled = false; // the window already keeps it to what's near
+    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const all = new Float32Array(n * 16);
+    entries.forEach((e, i) => e.m.toArray(all, i * 16));
+    let cols = null;
+    if (entries[0].color) {
+      cols = new Float32Array(n * 3);
+      entries.forEach((e, i) => e.color.toArray(cols, i * 3));
+      inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+    }
+    inst.count = 0;
+    return { inst, zs: Float32Array.from(entries, (e) => e.z), all, cols, from, to, lo: -1, hi: -1 };
+  }
+  /** Move a batch's window to the camera at track distance d (in the group's own z). */
+  function windowUpdate(b, d) {
+    const lo = lowerZ(b.zs, d + (typeof b.from === "function" ? b.from() : b.from));
+    const hi = Math.max(lo, lowerZ(b.zs, d + (typeof b.to === "function" ? b.to() : b.to)));
+    if (lo === b.lo && hi === b.hi) return;
+    b.lo = lo;
+    b.hi = hi;
+    const im = b.inst.instanceMatrix;
+    im.array.set(b.all.subarray(lo * 16, hi * 16));
+    im.needsUpdate = true;
+    if (b.cols) {
+      b.inst.instanceColor.array.set(b.cols.subarray(lo * 3, hi * 3));
+      b.inst.instanceColor.needsUpdate = true;
+    }
+    b.inst.count = hi - lo;
+  }
+  const NEAR_FROM = -VIEW_BEHIND;
+  const FAR_TO = VIEW_AHEAD + 60;
+  /**
+   * Turn a map's cloned props into batches: every kind of prop with 3+ copies becomes one
+   * near batch (full model) and, when it has one, one far batch (light model).
+   */
+  function batchScenery(group, cull, batches) {
+    group.updateWorldMatrix(true, false);
+    const inv = new THREE.Matrix4().copy(group.matrixWorld).invert();
+    const kinds = new Map();
+    for (const c of cull) {
+      if (!c.proto || c.obj.parent !== group) continue;
+      let k = kinds.get(c.proto);
+      if (!k) kinds.set(c.proto, (k = { info: propMesh(c.proto), items: [] }));
+      if (!k.info) continue;
+      c.obj.updateWorldMatrix(false, false);
+      k.items.push({ z: c.z, c, world: c.obj.matrixWorld.clone() });
+    }
+    const done = new Set();
+    for (const [proto, k] of kinds) {
+      if (!k.info || k.items.length < 3) continue;
+      const lodHolder = lodProps.get(lodFile.get(proto));
+      const lod = lodHolder ? propMesh(lodHolder) : null;
+      // full model near the camera (all the way out if there's no far version)
+      const near = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().multiplyMatrices(inv, it.world).multiply(k.info.local) }));
+      const nb = windowBatch(k.info.mesh.geometry, k.info.mesh.material, near, NEAR_FROM, lod ? () => LOD_NEAR : FAR_TO);
+      nb.inst.receiveShadow = Boolean(proto.userData.ground); // the running surface
+      group.add(nb.inst);
+      batches.push(nb);
+      if (lod) {
+        const far = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().multiplyMatrices(inv, it.world).multiply(lod.local) }));
+        const fb = windowBatch(lod.mesh.geometry, lod.mesh.material, far, () => LOD_NEAR, FAR_TO);
+        group.add(fb.inst);
+        batches.push(fb);
+      }
+      for (const it of k.items) {
+        group.remove(it.c.obj);
+        done.add(it.c);
+      }
+    }
+    return cull.filter((c) => !done.has(c));
+  }
+  /** A white picket fence, built from boxes: 6 pickets with pointed tops on two rails (about 150 triangles). */
+  function pickerFence() {
+    const parts = [];
+    for (let i = 0; i < 6; i++) {
+      const x = -1.25 + i * 0.5;
+      parts.push([new THREE.BoxGeometry(0.13, 0.7, 0.045), x, 0.35]);
+      parts.push([new THREE.ConeGeometry(0.093, 0.15, 4, 1), x, 0.775, 0, 0, Math.PI / 4]);
+    }
+    parts.push([new THREE.BoxGeometry(2.95, 0.085, 0.05), 0, 0.24, -0.045]);
+    parts.push([new THREE.BoxGeometry(2.95, 0.085, 0.05), 0, 0.54, -0.045]);
+    const mesh = new THREE.Mesh(bake(...parts), new THREE.MeshStandardMaterial({ color: "#f3f0e6", roughness: 0.65 }));
+    const holder = new THREE.Group();
+    holder.add(mesh);
+    return holder;
+  }
+
   function buildMap(map) {
+    for (const k of ["oak", "pine", "blossom", "bush", "rocks", "wheat", "sunflowers", "palm", "umbrella"]) if (assets.props[k]) lodFile.set(assets.props[k], k);
     const group = new THREE.Group();
-    const cull = [];
+    let cull = [];
+    const batches = [];
+    batchSink = batches;
     let s = 12345 + map.length * 7919;
     const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
     const P = assets.props;
@@ -4814,7 +5104,7 @@ const world = (() => {
       o.rotation.y = rotY;
       o.position.set(x, y, -z);
       group.add(o);
-      cull.push({ obj: o, z, keep: true, wide: true });
+      cull.push({ obj: o, z, keep: true, wide: true, proto });
       return o;
     };
     const built = BUILT_MAPS.has(map);
@@ -4822,6 +5112,7 @@ const world = (() => {
     if (map === "meadow") group.add(runningTrack());
     else if (!theme) {
       const tile = built ? P[`${map}Tile`] : map === "farm" ? P.farmTile : map === "beach" ? P.boardTile : P.ground;
+      tile.userData.ground = true;
       const step = tile.userData.length * 0.97;
       for (let z = -60; z < TRACK_LEN + 160; z += step) add(tile, 0, 0, z, 1, 0);
     }
@@ -4899,9 +5190,12 @@ const world = (() => {
       // lighthouses out on the rocks
       for (let z = 80; z < TRACK_LEN + 160; z += 260) add(P.lighthouse, -(edge + 55 + r() * 20), MEADOW_Y, z, 1, r() * Math.PI * 2);
     }
+    cull = batchScenery(group, cull, batches);
+    batchSink = null;
     scene.add(group);
-    return { group, cull };
+    return { group, cull, batches };
   }
+  let batchSink = null; // the batch list of the map being built (themed props and flowers go in it)
 
   function buildShared() {
     sharedBuilt = true;
@@ -4924,12 +5218,12 @@ const world = (() => {
 
     // 3D clouds drifting in the sky; the group follows the camera
     for (let i = 0; i < 16; i++) {
-      const c = P.cloud.clone();
+      const c = (lodProps.get("cloud") ?? P.cloud).clone();
       c.scale.multiplyScalar(14 + r() * 22);
       c.position.set((r() - 0.5) * 320, 38 + r() * 40, -40 - r() * 230);
       c.rotation.y = (r() - 0.5) * 0.6;
       // unlit, so the clouds stay bright white instead of picking up grey shading
-      c.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ map: o.material.map, color: "#ffffff", fog: false }); });
+      c.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ map: o.material.map, vertexColors: Boolean(o.geometry.attributes.color), color: "#ffffff", fog: false }); });
       c.userData.drift = 0.6 + r() * 1.2;
       clouds.add(c);
     }
@@ -4950,6 +5244,7 @@ const world = (() => {
     return new THREE.CanvasTexture(c);
   })();
   function spray(x, y, z, colors, n, { speed = 6, life = 1, gravity = 9, size = 0.35, drag = 1.2, up = 0 } = {}) {
+    n = Math.max(4, Math.round(n * gfx.fx));
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
     const vel = new Float32Array(n * 3);
@@ -5055,6 +5350,11 @@ const world = (() => {
     return { ...course, rows, slows: [], boosts: (course.boosts || []).filter((b) => b.z > z) };
   }
   function buildCourseObjects(seed, len, boost = 0) {
+    const out = buildCourseObjectsInner(seed, len, boost);
+    if (startGfx.shadows) raceGroup.traverse((o) => o.isMesh && !o.isInstancedMesh && (o.castShadow = true));
+    return out;
+  }
+  function buildCourseObjectsInner(seed, len, boost = 0) {
     clearCourse();
     let course = buildCourse(seed, len, boost);
     if (world.easy) course = easyCourse(course);
@@ -5453,6 +5753,13 @@ const world = (() => {
     const t0 = performance.now();
     try {
       renderer.compile(scene, camera);
+      // draw it all once off screen: shaders get linked and every model and picture uploaded
+      // now, behind the cover, instead of stalling the first seconds of the race
+      const rt = new THREE.WebGLRenderTarget(64, 64);
+      renderer.setRenderTarget(rt);
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(null);
+      rt.dispose();
       const seen = new Set();
       scene.traverse((o) => {
         const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
@@ -5832,6 +6139,7 @@ const world = (() => {
       const z = c.z + shift;
       c.obj.visible = z > d - VIEW_BEHIND && z < d + VIEW_AHEAD + 60;
     }
+    for (const b of sceneryBatches) windowUpdate(b, d - shift);
     for (const r of rollers) r.obj.visible = r.z > d - VIEW_BEHIND && r.z < d + VIEW_AHEAD;
   }
 
@@ -5884,7 +6192,15 @@ const world = (() => {
     show = null;
   }
 
+  /** A new graphics preset: scenery detail distance and the sky light change right away. */
+  function setDetail(g) {
+    LOD_NEAR = g.lod;
+    for (const b of sceneryBatches) b.lo = b.hi = -1; // re-window with the new distance
+    if (lastLook) applyLook(lastLook);
+  }
   return {
+    followSun,
+    setDetail,
     load,
     get ready() {
       return ready;
@@ -8780,7 +9096,25 @@ function animateRunner(r, a, speed, dt, pw = "") {
   else r.play("run", 0.12, clamp(speed / BASE_SPEED, 0.45, 1.45));
   // a little forward lean while flying the rocket
   r.pivot.rotation.x = pw === "rocket" ? 0.35 : 0;
-  r.pivot.rotation.z = 0;
+  // body language: lean into lane changes and look where you're going; squash a little on landing
+  const x = r.group.position.x;
+  const y = r.group.position.y;
+  const vx = dt > 0 && r.lastX !== undefined ? (x - r.lastX) / dt : 0;
+  r.lastX = x;
+  const k = Math.min(1, dt * 14);
+  r.lean = (r.lean ?? 0) + (clamp(vx * 0.05, -0.3, 0.3) - (r.lean ?? 0)) * k;
+  r.yaw = (r.yaw ?? 0) + (clamp(vx * 0.045, -0.28, 0.28) - (r.yaw ?? 0)) * k;
+  if ((r.lastY ?? 0) > 0.25 && y <= 0.02 && a !== "slide") {
+    r.squash = 1;
+    if (r === me.runner) world.spray(x, 0.08, r.group.position.z, ["#f4ead8", "#ffffff", "#d9cbb0"], 10, { speed: 2.4, life: 0.4, gravity: -0.4, size: 0.3, drag: 3 });
+  }
+  r.lastY = y;
+  r.squash = Math.max(0, (r.squash ?? 0) - dt * 6);
+  r.pivot.rotation.z = r.lean;
+  r.pivot.rotation.y = Math.PI - r.yaw;
+  const base = (r.baseScale ??= r.pivot.scale.x);
+  const q = Math.sin(r.squash * Math.PI) * 0.6 + r.squash * 0.4; // quick in, soft out
+  r.pivot.scale.set(base * (1 + 0.07 * q), base * (1 - 0.12 * q), base * (1 + 0.07 * q));
   r.mixer.update(dt);
 }
 
@@ -8929,7 +9263,8 @@ function frame(now) {
     }, serverNow());
     world.syncBowls(net.view?.bowls || [], serverNow());
     // feel the speed: wider view and speed lines on a rocket or boost
-    const zoom = me.power === "rocket" ? 80 : me.boostT > 0 || me.sprintT > 0 ? 70 : 62;
+    // the view opens up a little as you speed up (and a lot on a rocket or boost)
+    const zoom = me.power === "rocket" ? 80 : me.boostT > 0 || me.sprintT > 0 ? 70 : 62 + clamp((me.speed - BASE_SPEED) * 0.45, 0, 5);
     if (Math.abs(camera.fov - zoom) > 0.1) {
       camera.fov += (zoom - camera.fov) * Math.min(1, dt * 5);
       camera.updateProjectionMatrix();
@@ -8950,8 +9285,10 @@ function frame(now) {
   }
 
   if (game.mode === "race" || game.mode === "results-pending") world.stepRunCoins(me.d);
+  if (startGfx.shadows) world.followSun(camera.position.x * 0.5, camera.position.z - 9);
   world.tick(camera.position.z, dt);
   renderer?.render(scene, camera);
+  perfHud?.frame(dt * 1000);
   renderMirror();
   adaptQuality(dt);
 }

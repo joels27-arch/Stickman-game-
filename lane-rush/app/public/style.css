@@ -2784,3 +2784,9 @@ html, body { background: var(--k1); }
 #picker .card.locked img { filter: none !important; opacity: 1 !important; }
 /* the invite's arrow points at the Endless Run button, wherever it sits */
 .ti-card::after { left: var(--ax, 50%); }
+
+/* settings: the graphics preset */
+.gfx-row { flex-wrap: wrap; gap: 8px; }
+.gfx-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; width: 100%; }
+.gfx-pick button { padding: 8px 2px; border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font: inherit; font-weight: 800; font-size: 13px; }
+.gfx-pick button.on { border-color: var(--lime); background: var(--lime); color: var(--lime-ink); }

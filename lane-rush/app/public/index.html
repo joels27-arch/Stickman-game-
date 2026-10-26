@@ -392,7 +392,9 @@
           <label class="set-row"><span><b>🔊 Sound effects</b><small>Jumps, coins, hits, menus</small></span><input type="checkbox" id="setSound" /></label>
           <label class="set-row"><span><b>🎵 Music</b><small>Menu and race music</small></span><input type="checkbox" id="setMusic" /></label>
           <label class="set-row"><span><b>📳 Vibration</b><small>Buzz on hits and big moments</small></span><input type="checkbox" id="setBuzz" /></label>
-          <label class="set-row"><span><b>🔋 Battery saver</b><small>Sharper picture off, smoother on older phones</small></span><input type="checkbox" id="setLow" /></label>
+          <div class="set-row gfx-row"><span><b>✨ Graphics</b><small id="setGfxNow"></small></span>
+            <div id="setGfx" class="gfx-pick" role="group" aria-label="Graphics"><button type="button" data-gfx="auto">Auto</button><button type="button" data-gfx="high">High</button><button type="button" data-gfx="balanced">Balanced</button><button type="button" data-gfx="performance">Smooth</button></div>
+          </div>
           <button id="setCountry" class="set-row btnrow" type="button"><span><b>🌍 Country</b><small id="setCountryName">Not set</small></span><i>›</i></button>
           <button id="setTut" class="set-row btnrow" type="button"><span><b>👆 How to run</b><small>Play the tutorial again on your next endless run</small></span><i>›</i></button>
         </div>
