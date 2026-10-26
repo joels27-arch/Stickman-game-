@@ -3820,14 +3820,16 @@ const world = (() => {
         });
       const jobs =
         map === "city"
-          ? [glb("ct_tower", "cityTower", { height: 30 }), glb("ct_shop", "cityShop", { height: 13 }), glb("ct_lamp", "cityLamp", { height: 5.2 }), glb("ct_taxi", "taxi", { width: 2.6 }), glb("ct_pigeon", "pigeon", { width: 1.0 }), loadGLB("/assets/ct_road.glb").then((g) => (P.cityTileNext = fitTile(g.scene, true)))]
+          ? [glb("ct_tower", "cityTower", { height: 30 }), glb("ct_shop", "cityShop", { height: 13 }), loadLod("cityTower", "ct_tower", { height: 30 }), loadLod("cityShop", "ct_shop", { height: 13 }), glb("ct_lamp", "cityLamp", { height: 5.2 }), glb("ct_taxi", "taxi", { width: 2.6 }), glb("ct_pigeon", "pigeon", { width: 1.0 }), loadGLB("/assets/ct_road.glb").then((g) => (P.cityTileNext = fitTile(g.scene, true)))]
           : map === "stadium"
-          ? [stand(), glb("st_light", "stadiumLight", { height: 30 }), glb("st_ball", "football", { width: 0.8 }), glb("st_cam", "spidercam", { width: 1.1 }), loadGLB("/assets/st_pitch.glb").then((g) => (P.stadiumTileNext = fitTile(g.scene)))]
+          ? [stand(), glb("st_light", "stadiumLight", { height: 30 }), loadLod("stadiumStand", "st_stand", { width: 34 }), loadLod("stadiumLight", "st_light", { height: 30 }), glb("st_ball", "football", { width: 0.8 }), glb("st_cam", "spidercam", { width: 1.1 }), loadGLB("/assets/st_pitch.glb").then((g) => (P.stadiumTileNext = fitTile(g.scene)))]
           : map === "space"
-          ? [glb("sp_dome", "spaceDome", { height: 7 }), glb("sp_rocket", "spaceRocket", { height: 14 }), glb("sp_dish", "spaceDish", { height: 5 }), glb("sp_asteroid", "asteroid", { width: 0.9 }), glb("sp_ufo", "ufo", { width: 2.4 }), loadGLB("/assets/sp_walk.glb").then((g) => (P.spaceTileNext = fitTile(g.scene, true)))]
+          ? [glb("sp_dome", "spaceDome", { height: 7 }), glb("sp_rocket", "spaceRocket", { height: 14 }), loadLod("spaceDome", "sp_dome", { height: 7 }), loadLod("spaceRocket", "sp_rocket", { height: 14 }), glb("sp_dish", "spaceDish", { height: 5 }), glb("sp_asteroid", "asteroid", { width: 0.9 }), glb("sp_ufo", "ufo", { width: 2.4 }), loadGLB("/assets/sp_walk.glb").then((g) => (P.spaceTileNext = fitTile(g.scene, true)))]
           : map === "farm"
           ? [
               loadGLB("/assets/barn.glb").then((g) => (P.barn = fitProp(g.scene, { height: 7.5 }))),
+              loadLod("barn", "barn", { height: 7.5 }),
+              loadLod("windmill", "windmill", { height: 13 }),
               loadGLB("/assets/windmill.glb").then((g) => (P.windmill = fitProp(g.scene, { height: 13 }))),
               loadGLB("/assets/wheat.glb").then((g) => (P.wheat = fitProp(g.scene, { width: 6.8, maxHeight: 1.8 }))),
               loadGLB("/assets/tractor.glb").then((g) => (P.tractor = fitProp(g.scene, { width: 3.6 }))),
@@ -3839,6 +3841,8 @@ const world = (() => {
           : [
               loadGLB("/assets/palm.glb").then((g) => (P.palm = fitProp(g.scene, { height: 8 }))),
               loadGLB("/assets/hut.glb").then((g) => (P.hut = fitProp(g.scene, { height: 4.6 }))),
+              loadLod("hut", "hut", { height: 4.6 }),
+              loadLod("lighthouse", "lighthouse", { height: 20 }),
               loadGLB("/assets/lighthouse.glb").then((g) => (P.lighthouse = fitProp(g.scene, { height: 20 }))),
               loadGLB("/assets/umbrella.glb").then((g) => (P.umbrella = fitProp(g.scene, { width: 3.2 }))),
               loadLod("palm", "palm", { height: 8 }),
@@ -5102,7 +5106,7 @@ const world = (() => {
   }
 
   function buildMap(map) {
-    for (const k of ["oak", "pine", "blossom", "bush", "rocks", "wheat", "sunflowers", "palm", "umbrella"]) if (assets.props[k]) lodFile.set(assets.props[k], k);
+    for (const k of ["oak", "pine", "blossom", "bush", "rocks", "wheat", "sunflowers", "palm", "umbrella", "cityTower", "cityShop", "stadiumStand", "stadiumLight", "spaceDome", "spaceRocket", "barn", "windmill", "hut", "lighthouse"]) if (assets.props[k]) lodFile.set(assets.props[k], k);
     const group = new THREE.Group();
     let cull = [];
     const batches = [];
@@ -6214,6 +6218,7 @@ const world = (() => {
   return {
     followSun,
     setDetail,
+    spray,
     load,
     get ready() {
       return ready;
