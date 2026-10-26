@@ -4438,6 +4438,19 @@ const world = (() => {
     if (!mapReady(map)) map = "meadow";
     if (!assets.props.ground) return;
     if (!mapScenery[map]) mapScenery[map] = buildMap(map);
+    mapScenery[map].used = performance.now();
+    // keep the last few maps built (quick rematches); free the rest so long sessions don't grow
+    const built = Object.entries(mapScenery).filter(([k]) => k !== map && k !== "meadow");
+    if (built.length > 2) {
+      built.sort((a, b) => (a[1].used ?? 0) - (b[1].used ?? 0));
+      for (const [k, m] of built.slice(0, built.length - 2)) {
+        scene.remove(m.group);
+        m.group.traverse((o) => {
+          if (o.isInstancedMesh) o.dispose(); // the instance buffers (models and pictures stay shared)
+        });
+        delete mapScenery[k];
+      }
+    }
     for (const [k, m] of Object.entries(mapScenery)) m.group.visible = k === map;
     scenery = mapScenery[map].group;
     scenery.position.z = -shift;
