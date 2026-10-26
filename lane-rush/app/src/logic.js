@@ -1157,8 +1157,8 @@ function fillBots(state, t = state.now ?? 0) {
     const id = `bot${n + 1}`;
     n += 1;
     if (state.players[id]) continue;
-    // a random runner nobody has taken (any of them, the collectible 3D ones too)
-    const free = Array.from({ length: CHARACTERS }, (_, c) => c).filter((c) => !used.has(c));
+    // a random runner nobody has taken (from the 8 every phone has loaded, so the gun never waits on a download)
+    const free = Array.from({ length: 8 }, (_, c) => c).filter((c) => !used.has(c));
     const char = free.length ? free[Math.floor(roll((Math.floor(t) ^ Math.imul(state.round + 1, 7919)) >>> 0, n, 11) * free.length)] : 0;
     used.add(char);
     const r = roll(state.seed + state.round, n, 3);

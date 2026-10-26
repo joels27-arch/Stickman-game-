@@ -2887,3 +2887,8 @@ html, body { background: var(--k1); }
 /* Leave sits at the top of the room page, always on screen */
 #lobby #leaveBtn { position: fixed; z-index: 30; top: max(10px, calc(env(safe-area-inset-top) + 6px)); left: max(10px, env(safe-area-inset-left)); width: auto; min-height: 0; padding: 8px 14px; border-radius: 999px; font-size: 14px; background: rgba(8, 12, 30, 0.85); border: 2px solid rgba(255, 255, 255, 0.8); color: #fff; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4); }
 #lobby .lobby-head { padding-top: 34px; }
+
+/* glows that pulse during a race: opacity on a layer (cheap) rather than an animated box-shadow (a repaint every frame) */
+.power-slot.held { animation: none; }
+.power-slot.held::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 2px var(--lime), 0 0 24px rgba(182, 247, 42, 0.45); animation: glowPulse 1.2s ease-in-out infinite; will-change: opacity; }
+@keyframes glowPulse { 50% { opacity: 0.35; } }

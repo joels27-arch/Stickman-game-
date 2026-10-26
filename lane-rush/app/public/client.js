@@ -815,6 +815,10 @@ function open() {
     $("#netWarn").classList.remove("show");
   });
   ws.addEventListener("message", (ev) => {
+    if (ev.data === "__pong" && net.pingAt) {
+      net.rtt = Math.round(performance.now() - net.pingAt); // shown on the ?perf overlay
+      net.pingAt = 0;
+    }
     if (ws !== net.socket || ev.data === "__pong") return;
     let msg;
     try {
@@ -1045,20 +1049,25 @@ const TRAIL_INFO = {
 };
 const EMOTE_PRICE = 200;
 const EMOTE_NAME = { "👑": "King", "🧠": "Big brain", "🤡": "Clown", "🥶": "Frozen", "💩": "Poop", "🫡": "Salute" };
+let equipCache = null;
 function equipped() {
+  if (equipCache) return equipCache;
   try {
     const e = JSON.parse(local.getItem("lr:equip") || "{}") || {};
-    return { trail: TRAILS.includes(e.trail) && wallet.has(`trail:${e.trail}`) ? e.trail : "" };
+    equipCache = { trail: TRAILS.includes(e.trail) && wallet.has(`trail:${e.trail}`) ? e.trail : "" };
   } catch {
-    return { trail: "" };
+    equipCache = { trail: "" };
   }
+  return equipCache;
 }
 function equip(slot, id) {
-  const e = equipped();
+  const e = { ...equipped() };
   e[slot] = e[slot] === id ? "" : id;
   local.setItem("lr:equip", JSON.stringify(e));
+  equipCache = null;
 }
 function giveItem(id) {
+  equipCache = null;
   if (!wallet.has(id)) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), id]));
 }
 
@@ -2949,7 +2958,9 @@ function renderLobby(v) {
   // bots join at the gun with any runner: have every runner downloaded while people pick
   if (world.ready && !game.allChars) {
     game.allChars = true;
-    setTimeout(() => RUNNERS.forEach((_, i) => world.ensureChar(i).catch(() => (game.allChars = false))), 600);
+    // the first 8 ahead of time; the collectible runners load when someone in the room picks one
+    // (all 13 at once is ~70 MB of textures: too much for an iPhone's WebGL memory)
+    setTimeout(() => RUNNERS.slice(0, STARTERS).forEach((_, i) => world.ensureChar(i).catch(() => (game.allChars = false))), 600);
   }
   // a set map gets downloaded and built while people pick, so the race starts smooth
   if (world.ready && v.map && v.map !== "random" && game.prepped !== v.map) {
@@ -3353,15 +3364,56 @@ function applyQuality() {
 let qualityIdx = 0;
 let slowFor = 0;
 const noAdapt = /[?&]noadapt\b/.test(location.search); // benchmarks: keep the settings fixed
+/**
+ * The pace the screen allows, learned on the menus (a light scene): about 16.7 ms on a 60 Hz
+ * screen, 33.3 ms on an iPhone in Low Power Mode (Safari caps it at 30 fps). A race is only
+ * "slow" when it misses that pace, so a capped phone never loses its sharpness for nothing.
+ */
+const paceWin = new Float32Array(60);
+let paceN = 0;
+let paceMs = 1000 / 60;
+function learnPace(dt) {
+  if (dt <= 0 || dt > 0.1) return;
+  paceWin[paceN++ % paceWin.length] = dt * 1000;
+  if (paceN % paceWin.length === 0) {
+    const sorted = Array.from(paceWin).sort((a, b) => a - b);
+    paceMs = clamp(sorted[Math.floor(sorted.length / 2)], 6, 40);
+  }
+}
+/** How the last race ran, for stepping a lowered Auto preset back up once the phone keeps up. */
+const raceRun = { ms: 0, n: 0, dropped: false };
+function judgeLastRace() {
+  if (raceRun.n > 600 && !raceRun.dropped && gfxChoice() === "auto") {
+    const avg = raceRun.ms / raceRun.n;
+    const good = avg < paceMs * 1.12 ? Number(local.getItem("lr:gfxGood") || 0) + 1 : 0;
+    local.setItem("lr:gfxGood", String(good));
+    const i = GFX_ORDER.indexOf(gfxTier());
+    // two smooth races in a row: try the next preset up (it steps down again if it can't keep up)
+    if (good >= 2 && i > 0) {
+      local.setItem("lr:gfxAuto", GFX_ORDER[i - 1]);
+      local.setItem("lr:gfxGood", "0");
+      applyQuality();
+    }
+  }
+  raceRun.ms = raceRun.n = 0;
+  raceRun.dropped = false;
+}
 function adaptQuality(dt) {
-  if (noAdapt || !renderer || game.mode !== "race" || !Number.isFinite(dt) || dt <= 0) return;
+  if (!Number.isFinite(dt) || dt <= 0) return;
+  if (game.mode !== "race") return learnPace(dt);
+  if (noAdapt || !renderer) return;
   // only judge the frame rate once the race is really running: loading, warm-up and the
   // opening shot stutter on every phone, and must not cost the sharpness for the whole session
   if (game.warm || !curtain.hidden || !net.view || serverNow() < net.view.startAt + 2000) return;
   if (dt > 0.25) return; // a one-off hitch (a tab switch, a notification) says nothing about the phone
-  slowFor = dt > 1 / 40 ? slowFor + dt : Math.max(0, slowFor - dt * 0.5);
+  raceRun.ms += dt * 1000;
+  raceRun.n += 1;
+  // slow = clearly missing the screen's own pace (and slower than 40 fps), for 3 seconds
+  const slow = dt * 1000 > Math.max(paceMs * 1.45, 25);
+  slowFor = slow ? slowFor + dt : Math.max(0, slowFor - dt * 0.5);
   if (slowFor < 3) return;
   slowFor = 0;
+  raceRun.dropped = true;
   // on Auto, a lighter preset first; then a lower render scale
   const tier = gfxTier();
   const i = GFX_ORDER.indexOf(tier);
@@ -3403,7 +3455,13 @@ const perfHud = (() => {
       let objs = 0;
       scene.traverseVisible(() => objs++);
       const heap = performance.memory ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)}MB` : "n/a";
-      box.textContent = `${Math.round(1000 / ms)} fps · avg ${Math.round((1000 * n) / sum)} · ${ms.toFixed(1)}ms (worst ${worst.toFixed(0)})\n${r.calls} draws · ${Math.round(r.triangles / 1000)}k tris · ${objs} objs · heap ${heap}\n${gfxTier()} ×${renderer.getPixelRatio().toFixed(2)} · ${renderer.info.memory.textures} tex · ${renderer.info.programs.length} shaders`;
+      // a ping now and then while the overlay is up (the round trip is shown next time)
+      if (net.socket?.readyState === WebSocket.OPEN && !net.pingAt && now - (net.pingSent ?? 0) > 2000) {
+        net.pingAt = net.pingSent = now;
+        net.socket.send("__ping");
+      }
+      const c = renderer.domElement;
+      box.textContent = `${Math.round(1000 / ms)} fps · avg ${Math.round((1000 * n) / sum)} · ${ms.toFixed(1)}ms (worst ${worst.toFixed(0)}) · pace ${paceMs.toFixed(1)}ms\n${r.calls} draws · ${Math.round(r.triangles / 1000)}k tris · ${objs} objs · heap ${heap}\n${gfxTier()} ×${renderer.getPixelRatio().toFixed(2)} (dpr ${(window.devicePixelRatio || 1).toFixed(1)}) · ${c.width}×${c.height} · ${renderer.info.memory.textures} tex · ${renderer.info.programs.length} shaders${net.rtt ? ` · ping ${net.rtt}ms` : ""}`;
     },
   };
 })();
@@ -6545,6 +6603,7 @@ function enterRace(v) {
   $("#hud").classList.toggle("intro", game.introLen > 0.6);
   game.mode = "race";
   // every race starts at full sharpness; it only steps down if this race really runs slow
+  judgeLastRace();
   slowFor = 0;
   if (qualityIdx) {
     qualityIdx = 0;
@@ -6926,7 +6985,7 @@ function input(kind) {
       me.y = 0.001;
       me.slideT = 0;
       sfx.jump();
-    }
+    } else if (me.y > 0.001) me.jumpBufT = 0.16; // remembered for the landing
   } else if (kind === "slide") {
     if (me.power === "rocket") return;
     if (me.y > 0.001) {
@@ -7001,12 +7060,13 @@ window.addEventListener("keyup", (e) => {
       const dx = t.clientX - sx;
       const dy = t.clientY - sy;
       if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE) return;
-      used = true;
       if (Math.abs(dx) > Math.abs(dy)) input(dx < 0 ? "left" : "right");
       else input(dy < 0 ? "jump" : "slide");
+      used = true; // one move per swipe: a long flick is still one lane
     },
     { passive: true },
   );
+  canvas.addEventListener("touchcancel", () => (tracking = false), { passive: true });
   canvas.addEventListener(
     "touchend",
     () => {
@@ -7024,9 +7084,9 @@ function stepMe(dt) {
   const v = net.view;
   const running = v && serverNow() >= v.startAt;
 
-  // lane change (smooth)
+  // lane change: quick off the mark, easing into the new lane (fast when far, gentle at the end)
   const dx = me.lane - me.x;
-  const stepX = LANE_SWITCH_SPEED * dt;
+  const stepX = Math.max(LANE_SWITCH_SPEED * 0.65, Math.abs(dx) * 22) * dt;
   me.x = Math.abs(dx) <= stepX ? me.lane : me.x + Math.sign(dx) * stepX;
 
   // vertical (the rocket holds you up in the air)
@@ -7034,13 +7094,23 @@ function stepMe(dt) {
     me.y += (ROCKET_Y - me.y) * Math.min(1, dt * 6);
     me.vy = 0;
   } else if (me.y > 0 || me.vy > 0) {
-    me.vy -= GRAVITY * dt;
+    // a little heavier on the way down: a snappy arc, not a float
+    me.vy -= GRAVITY * (me.vy < 0 ? 1.3 : 1) * dt;
     me.y += me.vy * dt;
     if (me.y <= 0) {
       me.y = 0;
       me.vy = 0;
+      // a jump tapped just before landing still happens
+      if (me.jumpBufT > 0 && me.stumbleT <= 0 && me.power !== "rocket") {
+        me.jumpBufT = 0;
+        me.vy = JUMP_V;
+        me.y = 0.001;
+        me.slideT = 0;
+        sfx.jump();
+      }
     }
   }
+  me.jumpBufT = Math.max(0, (me.jumpBufT ?? 0) - dt);
   me.slideT = Math.max(0, me.slideT - (me.y > 0 ? 0 : dt));
   me.stumbleT = Math.max(0, me.stumbleT - dt);
   me.invulnT = Math.max(0, me.invulnT - dt);
@@ -9520,6 +9590,10 @@ function updateHud() {
     remainingAfterFirst !== null && !me.finished ? `⏱${Math.ceil(remainingAfterFirst / 1000)}` : (t / 1000).toFixed(1),
   );
 
+  // places, distance and the side bar: 10 times a second is plenty (less DOM work and garbage per frame)
+  const hudNow = performance.now();
+  if (hudNow - (hudEl.placesAt ?? 0) < 100) return;
+  hudEl.placesAt = hudNow;
   // places by live distance (finished runners first, by time)
   const entries = v.players
     .filter((p) => !p.left)
