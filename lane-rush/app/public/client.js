@@ -1808,7 +1808,7 @@ function fitHomeArt() {
     return;
   }
   if (homePage !== PAGE.play) return; // keep it where it was; only the Play page decides
-  const logo = $(".hp-play .home-logo");
+  const logo = $(".hp-play .home-road");
   const dock = $(".hp-play .home-dock");
   const top0 = art.getBoundingClientRect().top;
   // offsetTop/Height ignore the logo's pop-in animation (a transform)
@@ -1826,9 +1826,9 @@ function fitHomeArt() {
 addEventListener("resize", fitHomeArt);
 if ("ResizeObserver" in window) {
   const ro = new ResizeObserver(() => fitHomeArt());
-  for (const sel of [".hp-play .home-dock", ".hp-play .home-logo"]) ro.observe($(sel));
+  for (const sel of [".hp-play .home-dock", ".hp-play .home-road"]) ro.observe($(sel));
 }
-$(".hp-play .home-logo").addEventListener("animationend", fitHomeArt);
+$(".hp-play .home-road").addEventListener("animationend", fitHomeArt);
 $(".home-art img").addEventListener("load", fitHomeArt);
 
 function setHomePage(i, animate = true) {

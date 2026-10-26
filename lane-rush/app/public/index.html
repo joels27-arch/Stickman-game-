@@ -126,7 +126,16 @@
         </div>
         <!-- PLAY -->
         <div class="hpage hp-play" id="hpPlay" aria-label="Play">
-          <h1 class="logo home-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+          <button id="leagueCard" class="league-card home-road" type="button">
+            <img id="leagueImg" src="/assets/lg_bronze.webp" alt="" />
+            <span class="lc-info">
+              <small>🏆 Trophy Road</small>
+              <b id="leagueName">Bronze I</b>
+              <span class="qbar"><i id="leagueBar"></i></span>
+              <span id="leagueNext" class="lc-next">0 pts</span>
+            </span>
+            <span class="lc-go">Open ›</span>
+          </button>
           <div class="roster" id="homeRoster" hidden></div>
           <div class="home-dock">
             <div class="play-card">
@@ -150,16 +159,6 @@
         <div class="hpage hp-side hp-compete" id="hpCompete" aria-label="Tournaments">
           <div class="hp-scroll">
             <div class="ribbon teal hp-ribbon"><h2>Tournaments</h2></div>
-            <button id="leagueCard" class="league-card" type="button">
-              <img id="leagueImg" src="/assets/lg_bronze.webp" alt="" />
-              <span class="lc-info">
-                <small>Your league</small>
-                <b id="leagueName">Bronze I</b>
-                <span class="qbar"><i id="leagueBar"></i></span>
-                <span id="leagueNext" class="lc-next">0 pts</span>
-              </span>
-              <span class="lc-go">Rankings ›</span>
-            </button>
             <div id="tourneyList" class="tourney-list"></div>
           </div>
         </div>
