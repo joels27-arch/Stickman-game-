@@ -3820,11 +3820,11 @@ const world = (() => {
         });
       const jobs =
         map === "city"
-          ? [glb("ct_tower", "cityTower", { height: 30 }), glb("ct_shop", "cityShop", { height: 13 }), loadLod("cityTower", "ct_tower", { height: 30 }), loadLod("cityShop", "ct_shop", { height: 13 }), glb("ct_lamp", "cityLamp", { height: 5.2 }), glb("ct_taxi", "taxi", { width: 2.6 }), glb("ct_pigeon", "pigeon", { width: 1.0 }), loadGLB("/assets/ct_road.glb").then((g) => (P.cityTileNext = fitTile(g.scene, true)))]
+          ? [glb("ct_tower", "cityTower", { height: 30 }), glb("ct_shop", "cityShop", { height: 13 }), loadLod("cityTower", "ct_tower", { height: 30 }), loadLod("cityShop", "ct_shop", { height: 13 }), glb("ct_lamp", "cityLamp", { height: 5.2 }), glb("ct_taxi", "taxi", { width: 2.6 }), glb("ct_pigeon", "pigeon", { width: 1.0 }), loadGLB("/assets/ct_road.glb").then((g) => (P.cityTileNext = fitTile(g.scene, true))), loadLodTile("cityTile", "ct_road", true)]
           : map === "stadium"
-          ? [stand(), glb("st_light", "stadiumLight", { height: 30 }), loadLod("stadiumStand", "st_stand", { width: 34 }), loadLod("stadiumLight", "st_light", { height: 30 }), glb("st_ball", "football", { width: 0.8 }), glb("st_cam", "spidercam", { width: 1.1 }), loadGLB("/assets/st_pitch.glb").then((g) => (P.stadiumTileNext = fitTile(g.scene)))]
+          ? [stand(), glb("st_light", "stadiumLight", { height: 30 }), loadLod("stadiumStand", "st_stand", { width: 34 }), loadLod("stadiumLight", "st_light", { height: 30 }), glb("st_ball", "football", { width: 0.8 }), glb("st_cam", "spidercam", { width: 1.1 }), loadGLB("/assets/st_pitch.glb").then((g) => (P.stadiumTileNext = fitTile(g.scene))), loadLodTile("stadiumTile", "st_pitch")]
           : map === "space"
-          ? [glb("sp_dome", "spaceDome", { height: 7 }), glb("sp_rocket", "spaceRocket", { height: 14 }), loadLod("spaceDome", "sp_dome", { height: 7 }), loadLod("spaceRocket", "sp_rocket", { height: 14 }), glb("sp_dish", "spaceDish", { height: 5 }), glb("sp_asteroid", "asteroid", { width: 0.9 }), glb("sp_ufo", "ufo", { width: 2.4 }), loadGLB("/assets/sp_walk.glb").then((g) => (P.spaceTileNext = fitTile(g.scene, true)))]
+          ? [glb("sp_dome", "spaceDome", { height: 7 }), glb("sp_rocket", "spaceRocket", { height: 14 }), loadLod("spaceDome", "sp_dome", { height: 7 }), loadLod("spaceRocket", "sp_rocket", { height: 14 }), glb("sp_dish", "spaceDish", { height: 5 }), glb("sp_asteroid", "asteroid", { width: 0.9 }), glb("sp_ufo", "ufo", { width: 2.4 }), loadGLB("/assets/sp_walk.glb").then((g) => (P.spaceTileNext = fitTile(g.scene, true))), loadLodTile("spaceTile", "sp_walk", true)]
           : map === "farm"
           ? [
               loadGLB("/assets/barn.glb").then((g) => (P.barn = fitProp(g.scene, { height: 7.5 }))),
@@ -3837,6 +3837,7 @@ const world = (() => {
               loadLod("wheat", "wheat", { width: 6.8, maxHeight: 1.8 }),
               loadLod("sunflowers", "sunflowers", { height: 2.4 }),
               loadGLB("/assets/farm_tile.glb").then((g) => (P.farmTileNext = fitTile(g.scene))),
+              loadLodTile("farmTile", "farm_tile"),
             ]
           : [
               loadGLB("/assets/palm.glb").then((g) => (P.palm = fitProp(g.scene, { height: 8 }))),
@@ -3848,6 +3849,7 @@ const world = (() => {
               loadLod("palm", "palm", { height: 8 }),
               loadLod("umbrella", "umbrella", { width: 3.2 }),
               loadGLB("/assets/board_tile.glb").then((g) => (P.boardTileNext = fitTile(g.scene))),
+              loadLodTile("boardTile", "board_tile"),
             ];
       // the tile goes in last, so mapReady() only says yes once every prop is there
       mapLoads.set(
@@ -4988,6 +4990,14 @@ const world = (() => {
       .then((g) => lodProps.set(key, fitProp(g.scene, size)))
       .catch(() => {}); // no far version: the full one is used all the way
   }
+  /** A running-surface tile's far version (fitted like the tile itself). */
+  function loadLodTile(key, file, lengthwise = false) {
+    return loadGLB(`/assets/${file}_lod.glb`)
+      .then((g) => lodProps.set(key, fitTile(g.scene, lengthwise)))
+      .catch(() => {});
+  }
+  /** How far out a kind keeps its full model, as a share of LOD_NEAR (big busy fields switch sooner). */
+  const NEAR_SCALE = { wheat: 0.45, sunflowers: 0.7, farmTile: 0.7, boardTile: 0.8 };
   /** The single mesh inside a prop holder, and where it sits in the holder. */
   function propMesh(holder) {
     let mesh = null;
@@ -5068,17 +5078,20 @@ const world = (() => {
     const done = new Set();
     for (const [proto, k] of kinds) {
       if (!k.info || k.items.length < 3) continue;
-      const lodHolder = lodProps.get(lodFile.get(proto));
+      const key = lodFile.get(proto);
+      const lodHolder = lodProps.get(key);
       const lod = lodHolder ? propMesh(lodHolder) : null;
+      const nearTo = () => LOD_NEAR * (NEAR_SCALE[key] ?? 1);
       // full model near the camera (all the way out if there's no far version)
       const near = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().multiplyMatrices(inv, it.world).multiply(k.info.local) }));
-      const nb = windowBatch(k.info.mesh.geometry, k.info.mesh.material, near, NEAR_FROM, lod ? () => LOD_NEAR : FAR_TO);
+      const nb = windowBatch(k.info.mesh.geometry, k.info.mesh.material, near, NEAR_FROM, lod ? nearTo : FAR_TO);
       nb.inst.receiveShadow = Boolean(proto.userData.ground); // the running surface
       group.add(nb.inst);
       batches.push(nb);
       if (lod) {
         const far = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().multiplyMatrices(inv, it.world).multiply(lod.local) }));
-        const fb = windowBatch(lod.mesh.geometry, lod.mesh.material, far, () => LOD_NEAR, FAR_TO);
+        const fb = windowBatch(lod.mesh.geometry, lod.mesh.material, far, nearTo, FAR_TO);
+        fb.inst.receiveShadow = Boolean(proto.userData.ground);
         group.add(fb.inst);
         batches.push(fb);
       }
@@ -5129,6 +5142,7 @@ const world = (() => {
     else if (!theme) {
       const tile = built ? P[`${map}Tile`] : map === "farm" ? P.farmTile : map === "beach" ? P.boardTile : P.ground;
       tile.userData.ground = true;
+      lodFile.set(tile, built ? `${map}Tile` : map === "farm" ? "farmTile" : map === "beach" ? "boardTile" : "ground");
       const step = tile.userData.length * 0.97;
       for (let z = -60; z < TRACK_LEN + 160; z += step) add(tile, 0, 0, z, 1, 0);
     }
@@ -8763,7 +8777,8 @@ function modeTick(prevD, v) {
   // coin lines on the track
   const got = me.power === "rocket" ? { coins: 0, bolts: 0 } : world.grabRunCoins(prevD, me.d, me.x, me.y);
   // a little sparkle where you grabbed it
-  if ((got.coins || got.bolts) && me.runner) {
+  if ((got.coins || got.bolts) && me.runner && performance.now() - (game.sparkleAt ?? 0) > 200) {
+    game.sparkleAt = performance.now(); // at most 5 a second, however fast the coins come
     const g = me.runner.group.position;
     world.spray(g.x, 1.0, g.z - 0.6, got.bolts ? ["#8ff3ff", "#3fe0ff", "#ffffff"] : ["#ffe36e", "#ffc928", "#ffffff"], 8, { speed: 3, life: 0.35, gravity: 2, size: 0.22, drag: 2.5, up: 1 });
   }
@@ -9148,6 +9163,7 @@ let lastCount = null;
 let last = performance.now();
 const camPos = new THREE.Vector3(0, 4, 8);
 const camLook = new THREE.Vector3();
+const camGoal = new THREE.Vector3();
 
 function frame(now) {
   requestAnimationFrame(frame);
@@ -9259,7 +9275,8 @@ function frame(now) {
       const k = THREE.MathUtils.smoothstep(p, 0.68, 1);
       introLook = new THREE.Vector3(px, 1.05, fz).lerp(new THREE.Vector3(tx * 0.8, 1.0, fz - 9), k);
     } else {
-      camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
+      camGoal.set(tx, back ? 2.5 + fy * 0.6 : 3.0 + fy * 0.75, back ? fz - 4.2 : fz + 5.6); // reused: no garbage per frame
+      camPos.lerp(camGoal, Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     }
     camera.position.copy(camPos);
     if (shake > 0) {
