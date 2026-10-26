@@ -98,21 +98,15 @@ const PASS_RUNNERS = { [KIKO]: 2, [PIP]: 12 };
 const COLLECTION = [
   { id: "zara", name: "Zara", color: "#ff6fb5", rarity: "rare", via: "pack" },
   { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "pack" },
-  { id: "leo", name: "Sir Leo", color: "#4c8dff", rarity: "epic", via: "road", legacy: { medal: "silver", count: 4 } },
-  { id: "kai", name: "Kai", color: "#21c7d9", rarity: "epic", via: "road", legacy: { medal: "silver", count: 6 } },
-  { id: "zed", name: "Zed", color: "#7be3b0", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 3 } },
-  { id: "porky", name: "Porky", color: "#ff9ec4", rarity: "rare", via: "pack" },
   { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pack" },
   { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pack" },
   { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "road", legacy: { medal: "silver", count: 5 } },
-  { id: "hoops", name: "Big Slam", color: "#ff8a00", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 4 } },
   { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 6 } },
   // heroes and stars (pictures only)
   { id: "captainstar", name: "Captain Star", color: "#2f5ae0", rarity: "rare", via: "pack" },
   { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "pack" },
   { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "pack" },
   { id: "boulder", name: "The Boulder", color: "#7a5a3a", rarity: "legendary", via: "pack" },
-  { id: "thunderjack", name: "Thunderjack", color: "#b02a2a", rarity: "legendary", via: "pack" },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
 const MEDAL_ICON = { gold: "🥇", silver: "🥈", bronze: "🥉" };
@@ -893,6 +887,7 @@ function maybeAskName() {
   if (local.getItem("lr:asked")) return;
   local.setItem("lr:asked", "1");
   setTimeout(() => {
+    if (game.mode !== "home" && game.mode !== "results") return;
     const n = local.getItem("lr:name") || "";
     $("#askName").value = /^Runner\d{3}$/.test(n) ? "" : n;
     $("#askName").placeholder = n || "Your name";
@@ -953,6 +948,11 @@ for (const b of document.querySelectorAll("#setGfx button")) {
 $("#setCountry").addEventListener("click", () => {
   setModal.hidden = true;
   openCountry("Country you cheer for");
+});
+$("#setRestart").addEventListener("click", () => {
+  if (!confirm("Start the intro again? You'll be asked your name and get the tutorial run. Your runners, coins and progress stay.")) return;
+  for (const k of ["lr:asked", "lr:endlessTut", "lr:tutDone", "lr:tutAuto"]) local.removeItem(k);
+  location.reload();
 });
 $("#setTut").addEventListener("click", () => {
   local.setItem("lr:tutDone", "");
@@ -1331,9 +1331,7 @@ charModal.addEventListener("click", (e) => e.target === charModal && (charModal.
 
 const PACK_CHARS = [
   { id: "brainz", name: "Prof. Brainz", rarity: "legendary", dupe: 1500 },
-  { id: "frosty", name: "Frosty", rarity: "epic", dupe: 600 },
   { id: "ra", name: "Pharaoh Ra", rarity: "epic", dupe: 600 },
-  { id: "mo", name: "Mecha Mo", rarity: "rare", dupe: 300 },
   { id: "zorp", name: "Zorp", rarity: "rare", dupe: 300 },
   { id: "glorb", name: "Glorb", rarity: "epic", dupe: 600 },
   { id: "rapstar", name: "MC Gold", rarity: "epic", dupe: 600 },
@@ -2179,19 +2177,19 @@ const ROAD = [
   { pts: 10, coins: 200 },
   { pts: 20, pack: "mega" },
   { pts: 30, coins: 300 },
-  { pts: 40, char: "leo" },
+  { pts: 40, pack: "brain" },
   { pts: 60, coins: 400 },
   { pts: 80, pack: "mega" },
-  { pts: 110, char: "kai" },
+  { pts: 110, pack: "brain" },
   { pts: 140, coins: 600 },
   { pts: 170, pack: "mega" },
   { pts: 220, char: "unitx" },
   { pts: 260, coins: 1000 },
   { pts: 300, pack: "mega" },
-  { pts: 360, char: "zed" },
+  { pts: 360, pack: "legend" },
   { pts: 420, coins: 1500 },
   { pts: 480, pack: "mega" },
-  { pts: 560, char: "hoops" },
+  { pts: 560, pack: "legend" },
   { pts: 700, coins: 2500 },
   { pts: 850, pack: "mega" },
   { pts: 1000, pack: "mega" },
@@ -2209,7 +2207,7 @@ const ROAD_DUPE = { epic: 800, legendary: 1500 };
 const roadChar = (id) => ROAD_CHARS.find((c) => c.id === id) ?? COLLECTION.find((c) => c.id === id);
 function roadInfo(step) {
   if (step.coins) return { label: `${step.coins.toLocaleString()} coins`, img: step.coins >= 2500 ? "/assets/ui_c3.webp" : step.coins >= 1000 ? "/assets/ui_c2.webp" : "/assets/ui_c1.webp" };
-  if (step.pack) return { label: "Mega Pack", img: `/assets/pack_${step.pack}.webp` };
+  if (step.pack) return { label: PACKS.find((x) => x.id === step.pack)?.name ?? "Pack", img: `/assets/pack_${step.pack}.webp` };
   const c = roadChar(step.char);
   return { label: c.name, img: ROAD_CHARS.includes(c) ? `/assets/rd_${c.id}.webp` : `/assets/sc_${c.id}.webp`, rarity: c.rarity };
 }
@@ -2331,7 +2329,14 @@ const roadModal = $("#roadModal");
 function renderRoadFull() {
   const p = rank.points();
   const done = road.claimed();
-  const rows = [];
+  const rows = [
+    el(
+      "div",
+      { class: "rv-how" },
+      el("b", { text: "How you earn 🏆" }),
+      el("span", { text: `Medals in races with friends: 🥇 +${MEDAL_PTS.gold} · 🥈 +${MEDAL_PTS.silver} · 🥉 +${MEDAL_PTS.bronze} · any other place +${LAST_PLACE_PTS}` }),
+    ),
+  ];
   let side = 0;
   let youShown = false;
   const you = () => el("div", { class: "rv-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: `You · ${p.toLocaleString()} 🏆` }));
@@ -9490,7 +9495,7 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 
 // characters taken out of the game: whoever owned one gets coins for it, once
 {
-  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000 };
+  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000, mo: 300, porky: 900, frosty: 600, thunderjack: 1500, kai: 800, leo: 800, zed: 1500, hoops: 1500 };
   const owned = wallet.owned();
   const had = owned.filter((id) => id in GONE && !local.getItem(`lr:refund:${id}`));
   if (had.length) {
@@ -9539,7 +9544,8 @@ world
     world.setShowcase(preferredChar());
     if (net.view?.phase === "lobby") renderLobby(net.view);
     // a brand-new player first sees the game; then Nia invites them to a first run that teaches as they play
-    if (!local.getItem("lr:endlessTut") && !local.getItem("lr:tutAuto")) setTimeout(showTutInvite, 1800);
+    // a brand-new player is asked their name first (the first endless run then teaches the moves by itself)
+    if (!local.getItem("lr:asked")) setTimeout(() => game.mode === "home" && maybeAskName(), 900);
   })
   .catch((err) => {
     console.error(err);

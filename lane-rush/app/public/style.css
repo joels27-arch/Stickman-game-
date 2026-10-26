@@ -2790,3 +2790,15 @@ html, body { background: var(--k1); }
 .gfx-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; width: 100%; }
 .gfx-pick button { padding: 8px 2px; border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font: inherit; font-weight: 800; font-size: 13px; }
 .gfx-pick button.on { border-color: var(--lime); background: var(--lime); color: var(--lime-ink); }
+
+/* Trophy Road: how trophies are earned, always in view at the top */
+.road-full .rv-how { position: sticky; top: 0; z-index: 3; display: grid; gap: 2px; margin: 0 0 10px; padding: 9px 12px; border-radius: 14px; background: rgba(10, 14, 10, 0.92); border: 2px solid var(--lime); text-align: center; }
+.road-full .rv-how b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 16px; text-transform: uppercase; color: var(--lime); }
+.road-full .rv-how span { font-size: 13px; font-weight: 800; color: #fff; }
+/* Tournaments: a bigger "Your league" card */
+.hp-compete .league-card { grid-template-columns: 84px minmax(0, 1fr) auto; min-height: 118px; padding: 16px 14px; }
+.hp-compete .league-card img { width: 84px; height: 84px; }
+.hp-compete .league-card b { font-size: 26px; }
+.hp-compete .league-card small { font-size: 12px; }
+.hp-compete .league-card .lc-next { font-size: 13px; }
+.hp-compete .league-card .qbar { height: 12px; }
