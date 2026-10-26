@@ -172,7 +172,7 @@ const MAP_INFO = {
   city: { label: "City", text: "Down the main street between skyscrapers" },
   stadium: { label: "Stadium", text: "Across the pitch in front of the fans" },
   space: { label: "Space", text: "A neon walkway over the moon" },
-  random: { label: "All maps", text: "A different map every race" },
+  random: { label: "Random", text: "A different map every round" },
 };
 // the themed maps, built in code (public/themes.js)
 const THEME = Object.fromEntries(THEMES.map((t) => [t.id, t]));
@@ -213,7 +213,7 @@ const POWER_INFO = {
 const WAVE_S = 4; // brain wave: controls flipped this long
 const GLUE_SLOW = 0.45; // speed factor while stuck in glue
 const STAGGER_S = 0.7; // after a punch
-const THROWN = new Set(["banana", "bowling", "glue", "fake"]); // items you aim: ahead or behind, any lane
+const THROWN = new Set(["banana", "bowling", "glue", "fake"]); // items you throw: ahead or behind, in your own lane
 const POWER_TIPS = 3; // how many times a power-up is explained when you pick it up
 // phones and tablets (iPads can report a fine pointer, so check for touch too)
 const TOUCH = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0 || "ontouchstart" in window;
@@ -2727,15 +2727,30 @@ function renderLobby(v) {
       return b;
     }),
   );
+  // Party: tap a mode to leave it out (at least 2 stay on)
+  const party = v.party ?? PARTY_KINDS;
+  $("#partyPick").hidden = gm !== "random";
+  if (gm === "random" && changed($("#partyPick"), party, isHost))
+    $("#partyPick").replaceChildren(
+      ...PARTY_KINDS.map((k) => {
+        const on = party.includes(k);
+        const b = el("button", { class: `chip${on ? " on" : ""}`, type: "button", text: `${on ? "✓ " : ""}${GAME_MODE_INFO[k].icon} ${GAME_MODE_INFO[k].label}` });
+        b.disabled = !isHost;
+        b.addEventListener("click", () => {
+          const next = on ? party.filter((x) => x !== k) : [...party, k];
+          if (next.length < 2) return toast("Keep at least 2 modes");
+          act({ type: "party", kinds: next });
+        });
+        return b;
+      }),
+    );
   const mp = v.map || "meadow";
-  // tap maps to tick them: one = that map, several = a different one of them each round
-  const ticked = v.maps ?? (mp === "random" ? [] : [mp]);
   const rounds = roundsOf(v);
-  if (changed($("#mapPick"), mp, ticked, isHost, rounds)) $("#mapPick").replaceChildren(
+  if (changed($("#mapPick"), mp, isHost)) $("#mapPick").replaceChildren(
     ...["random", ...MAPS].map((key) => {
       const info = MAP_INFO[key];
       const style = key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)`;
-      const on = key === "random" ? mp === "random" && !v.maps : ticked.includes(key);
+      const on = mp === key;
       const b = el(
         "button",
         { class: `map-card${on ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style },
@@ -2743,20 +2758,13 @@ function renderLobby(v) {
         el("span", { text: info.text }),
       );
       b.disabled = !isHost;
-      b.addEventListener("click", () => {
-        if (key === "random") return !on && act({ type: "map", map: "random" });
-        // one round: one map; more rounds: up to one map a round
-        if (!ticked.length || rounds <= 1) return !on && act({ type: "map", map: key });
-        if (!on && ticked.length >= rounds) return toast(`${rounds} rounds: up to ${rounds} maps`);
-        const next = on ? ticked.filter((m) => m !== key) : [...ticked, key];
-        if (next.length) act({ type: "maps", maps: next });
-      });
+      b.addEventListener("click", () => !on && act({ type: "map", map: key }));
       return b;
     }),
   );
-  $("#mapNote").textContent = !isHost ? "" : ticked.length > 1 ? `${ticked.length}/${rounds} maps · a different one each round` : rounds > 1 ? `Pick up to ${rounds} maps` : "";
+  $("#mapNote").textContent = mp === "random" ? "A different map every round" : "";
   // start fetching the map's 3D props while everyone is still in the lobby
-  for (const key of v.maps ?? (mp === "random" ? MAPS : [mp])) {
+  for (const key of mp === "random" ? MAPS : [mp]) {
     world.ensureMap(key).catch(() => {});
     world.preloadMovers(key).catch(() => {});
   }
@@ -2798,10 +2806,14 @@ function renderLobby(v) {
   );
   $("#prizeNote").textContent =
     prize === "none" ? "" : "For real players in the top 3 (2+ players)";
-  $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
+  // no line-up screen: the host starts right here once the others are ready; the others tap Ready
+  const waitingFor = v.players.filter((p) => !p.gone && !p.bot && p.id !== v.host && !p.ready);
+  const lockText = isHost ? (waitingFor.length ? `Waiting for ${waitingFor.map((p) => p.name).join(", ")}…` : "Start") : me?.ready ? "Ready ✓ · tap to cancel" : "Ready";
+  $("#lockBtn").classList.toggle("waiting", isHost ? waitingFor.length > 0 : Boolean(me?.ready));
+  $("#lockBtn").replaceChildren(el("span", { text: lockText }), isHost && !waitingFor.length ? el("span", { class: "arrow", text: "▶" }) : "");
   renderLineup(v, { isHost, gm, mp });
   // once you've locked in your runner, the lobby is the line-up
-  if (game.mode === "lobby" && !screens.shop.classList.contains("show")) showScreen(game.locked ? "lineup" : "lobby");
+  if (game.mode === "lobby" && !screens.shop.classList.contains("show") && !screens.lobby.classList.contains("show")) showScreen("lobby");
   $("#lobbyCount").textContent = `${mode} · ${GAME_MODE_INFO[gm].label} · ${n}/4 players`;
   $("#readyCount").textContent = `👥 ${n}/4 players ready`;
   $("#lobbyMsg").textContent =
@@ -2825,11 +2837,13 @@ function renderLobby(v) {
 
 $("#lockBtn").addEventListener("click", () => {
   sfx.unlock();
-  game.locked = true;
-  // locking in your runner means you're ready; tap again on the line-up to cancel
-  const me = net.view?.players.find((p) => p.id === playerId);
-  if (me && net.view.host !== playerId && !me.ready) act({ type: "ready", ready: true });
-  if (net.view) renderLobby(net.view);
+  const v = net.view;
+  if (!v) return;
+  const me = v.players.find((p) => p.id === playerId);
+  if (v.host !== playerId) return act({ type: "ready", ready: !me?.ready });
+  const waiting = v.players.filter((p) => !p.gone && !p.bot && p.id !== v.host && !p.ready);
+  if (waiting.length) return toast(`Waiting for ${waiting.map((p) => p.name).join(", ")} to be ready`);
+  act({ type: "start", bots: botsOn() });
 });
 $("#changeRunner").addEventListener("click", () => {
   game.locked = false;
@@ -2862,7 +2876,7 @@ function renderLineup(v, { isHost, gm, mp }) {
   $("#luKicker").textContent = LU_KICKER[gm] ?? "";
   $("#luMode").textContent = matchLabel(v, gm, gm === "survival" && v.players.length < 2 && !botsOn());
   const pz = PRIZE_INFO[v.prize ?? "none"];
-  $("#luMap").textContent = `${v.maps ? `${v.maps.length} maps` : mp === "random" ? "All maps" : `${MAP_INFO[mp].label} map`}${pz.pays.length ? ` · ${pz.icon}` : ""}`;
+  $("#luMap").textContent = `${mp === "random" ? "Random maps" : `${MAP_INFO[mp].label} map`}${pz.pays.length ? ` · ${pz.icon}` : ""}`;
   const present = v.players.filter((p) => !p.gone);
   // you always stand on block 1
   const order = [...v.players].sort((a, b) => Number(b.id === playerId) - Number(a.id === playerId));
@@ -5822,12 +5836,12 @@ const world = (() => {
   function setupRunCoins(course, on, bolts = false) {
     runCoins = on ? coinLines(course).map((c) => ({ z: c.z, lane: c.lane, v: c.v, got: false })).sort((a, b) => a.z - b.z) : [];
     if (bolts) {
-      // every third gap between obstacle rows holds bolts instead of coins
+      // every other gap between obstacle rows holds bolts instead of coins
       const zs = course.rows.map((r) => r.z);
       let i = 0;
       for (const c of runCoins) {
         while (i + 1 < zs.length && zs[i + 1] < c.z) i++;
-        if (i % 3 === 1) c.bolt = true;
+        if (i % 2 === 1) c.bolt = true;
       }
     }
     runLo = 0;
@@ -6632,7 +6646,7 @@ const COACH = {
   aim: { title: "Swipe up and SIDEWAYS", text: "Throw it into another lane!", keys: "1 2 3 4 on the keyboard = that lane", g: "bside" },
 };
 const COACH_MOVES = ["lane", "jump", "slide"];
-const COACH_ITEMS = ["throw", "drop", "aim"];
+const COACH_ITEMS = ["throw", "drop"];
 const COACH_SLOW = 0; // the run waits until you make the move
 const COACH_UNTIL_M = 1500; // after this, it stops teaching either way
 const coach = { on: false, wait: null, row: null, done: new Set(), scale: 1, items: 0, shownAt: 0 };
@@ -6817,7 +6831,6 @@ window.addEventListener("keydown", (e) => {
   else if (k === "e" || k === "E" || k === "Enter") useItem(me.lane, 1);
   else if (k === "q" || k === "Q") useItem(me.lane, -1);
   else if (k === "Shift" || k === "x" || k === "X") useSprint();
-  else if (/^Digit[1-4]$/.test(e.code)) useItem(Number(e.code.slice(5)) - 1, e.shiftKey ? -1 : 1);
   else if (k === "c" || k === "C" || k === "b" || k === "B") game.lookBack = game.lookKey = canControl() || game.mode === "race";
   else return;
   e.preventDefault();
@@ -8765,7 +8778,8 @@ function renderSprint() {
   setText(b.querySelector("b"), me.sprintT > 0 ? "GO!" : full ? "SPRINT" : `${me.bolts}/${SPRINT_NEED}`);
 }
 function useSprint() {
-  if (game.mode !== "race" || me.bolts < SPRINT_NEED || me.sprintT > 0 || me.out || me.finished || !canControl()) return;
+  if (game.mode !== "race" || me.sprintT > 0 || me.out || me.finished || !canControl()) return;
+  if (me.bolts < SPRINT_NEED) return banner(`⚡ ${me.bolts}/${SPRINT_NEED} · grab the blue bolts`, 900);
   me.bolts = 0;
   me.sprintT = SPRINT_S;
   sfx.boost();
@@ -9053,24 +9067,19 @@ function renderPower() {
 {
   const slot = $("#powerSlot");
   let y0 = null;
-  let x0 = 0;
   slot.addEventListener("pointerdown", (e) => {
     y0 = e.clientY;
-    x0 = e.clientX;
     slot.setPointerCapture?.(e.pointerId);
   });
   slot.addEventListener("pointerup", (e) => {
     if (y0 == null) return;
     const dy = e.clientY - y0;
-    const dx = e.clientX - x0;
     y0 = null;
     buzz(15);
     const throws = !me.power && THROWN.has(me.items[0]);
     if (!throws) return useItem();
-    // the sideways part of the swipe picks the lane: a short swipe one lane over, a long one further
-    const shift = Math.abs(dx) > 26 ? Math.sign(dx) * Math.max(1, Math.round(Math.abs(dx) / 55)) : 0;
-    const lane = clamp(me.lane + shift, 0, LANES - 1);
-    useItem(lane, dy > 22 ? -1 : 1);
+    // always in your own lane: swipe down to drop it behind, anything else throws it ahead
+    useItem(me.lane, dy > 22 ? -1 : 1);
   });
   slot.addEventListener("pointercancel", () => (y0 = null));
 }

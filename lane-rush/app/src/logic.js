@@ -856,7 +856,7 @@ function startRace(state, t) {
     : state.map === "random"
       ? Math.floor(pick() * MAPS.length)
       : Math.max(0, MAPS.indexOf(state.map ?? "meadow"));
-  state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode === "random" ? PARTY_KINDS[Math.floor(pick() * PARTY_KINDS.length)] : state.mode;
+  state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode === "random" ? partyOf(state)[Math.floor(pick() * partyOf(state).length)] : state.mode;
   // later Party Cup rounds open further into the difficulty curve
   state.courseBoost = state.cup ? Math.min(state.cup.race - 1, 4) * CUP_ROUND_BOOST_M : 0; // 10-round matches stop getting harder after round 5
   state.raceMap = MAPS[baseMap]; // a random map is drawn again every round
@@ -895,7 +895,12 @@ function knockOut(p, t) {
  * once; any other mode over several rounds repeats that mode (Random draws a
  * different kind each round where it can). A one-round match isn't a cup.
  */
-function newCup(mode, t, rounds = 1) {
+/** The modes a Party match draws from: all of them, minus any the host switched off. */
+export function partyOf(state) {
+  const k = (state.party ?? PARTY_KINDS).filter((x) => PARTY_KINDS.includes(x));
+  return k.length >= 2 ? k : PARTY_KINDS;
+}
+function newCup(mode, t, rounds = 1, party = PARTY_KINDS) {
   if (!CUP_MODES.includes(mode) && rounds <= 1) return null;
   const r = rng(Math.floor(t) % 2147483647);
   const shuffled = (kinds = ROUND_KINDS) => {
@@ -910,7 +915,7 @@ function newCup(mode, t, rounds = 1) {
   if (mode === "random") {
     const races = [];
     while (races.length < rounds) {
-      const next = shuffled(PARTY_KINDS).filter((k, i) => i > 0 || k !== races[races.length - 1]);
+      const next = shuffled(party).filter((k, i) => i > 0 || k !== races[races.length - 1]);
       races.push(...next);
     }
     return { race: 1, points: {}, races: races.slice(0, rounds) };
@@ -1512,6 +1517,14 @@ export function validateAction(state, playerId, action) {
       if (m.length > Math.max(1, state.rounds ?? 1)) return { ok: false, error: "more maps than rounds" };
       return { ok: true };
     }
+    case "party": {
+      if (state.phase !== "lobby") return { ok: false, error: "only in the lobby" };
+      if (state.host !== playerId) return { ok: false, error: "Only the host can change that" };
+      const k = action.kinds;
+      if (!Array.isArray(k) || new Set(k).size !== k.length || !k.every((x) => PARTY_KINDS.includes(x))) return { ok: false, error: "bad modes" };
+      if (k.length < 2) return { ok: false, error: "Keep at least 2 modes" };
+      return { ok: true };
+    }
     case "rounds":
     case "prize":
     case "botlevel": {
@@ -1742,6 +1755,9 @@ export function applyAction(state0, playerId, action) {
     case "prize":
       state.prize = action.prize;
       break;
+    case "party":
+      state.party = [...action.kinds];
+      break;
     case "botlevel":
       state.botLevel = action.level;
       // bots already waiting in the lobby take the new level too
@@ -1752,7 +1768,7 @@ export function applyAction(state0, playerId, action) {
       break;
     case "start":
       state.lives = action.endless ? 1 : LIVES; // endless run: one hit and it's over
-      state.cup = newCup(state.mode, t, state.rounds ?? 1);
+      state.cup = newCup(state.mode, t, state.rounds ?? 1, partyOf(state));
       state.botFill = action.bots !== false;
       if (state.botFill) fillBots(state);
       startRace(state, t);
@@ -1761,7 +1777,7 @@ export function applyAction(state0, playerId, action) {
       state.rematch = [...new Set([...(state.rematch ?? []), playerId])];
       const voters = present(state).filter((id) => !state.players[id].bot);
       if (voters.every((id) => state.rematch.includes(id))) {
-        state.cup = newCup(state.mode, t, state.rounds ?? 1);
+        state.cup = newCup(state.mode, t, state.rounds ?? 1, partyOf(state));
         startRace(state, t);
       }
       break;
@@ -1990,6 +2006,7 @@ export function viewFor(state, playerId) {
     maps: state.maps ?? null,
     rounds: state.rounds ?? 1,
     botLevel: state.botLevel ?? "normal",
+    party: partyOf(state),
     prize: state.prize ?? "none",
     raceMap: state.raceMap ?? state.map ?? "meadow",
     courseBoost: state.courseBoost ?? 0,

@@ -578,6 +578,17 @@ describe("random mode and map", () => {
     expect(s.cup.races).toHaveLength(10);
     expect(new Set(s.cup.races)).toEqual(new Set(L.PARTY_KINDS));
   });
+  it("Party: the host can switch modes off (at least 2 stay on)", () => {
+    let s = act(lobbyOf(2), "p0", { type: "mode", mode: "random" });
+    s = act(s, "p0", { type: "party", kinds: ["survival", "sprint"] });
+    expect((L.viewFor(s, "p1") as S).party).toEqual(["survival", "sprint"]);
+    s = act(s, "p0", { type: "rounds", rounds: 10 });
+    s = act(s, "p0", { type: "start", bots: true, t: T0 });
+    expect(new Set(s.cup.races)).toEqual(new Set(["survival", "sprint"]));
+    expect(reject(lobbyOf(2), "p0", { type: "party", kinds: ["survival"] })).toMatch(/2 modes/);
+    expect(reject(lobbyOf(2), "p0", { type: "party", kinds: ["survival", "potato"] })).toMatch(/bad/);
+    expect(reject(lobbyOf(2), "p1", { type: "party", kinds: ["survival", "chase"] })).toMatch(/host/);
+  });
   it("the host can tick several maps: each race is one of those", () => {
     const pick = ["farm", "space", "candy"];
     expect(reject(lobbyOf(2), "p0", { type: "maps", maps: pick })).toMatch(/rounds/); // 1 round: 1 map
