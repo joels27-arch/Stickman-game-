@@ -398,7 +398,7 @@ describe("survival (3 hearts)", () => {
 describe("matches over several rounds", () => {
   const pos = (d: number, t: number, hits = 0) => ({ type: "pos", d, lane: 0, y: 0, act: "run", hits, t });
 
-  it("lets the host pick 1, 3 or 5 rounds and a prize", () => {
+  it("lets the host pick 1, 3, 5 or 10 rounds and a prize", () => {
     let s = act(lobbyOf(2), "p0", { type: "rounds", rounds: 5 });
     s = act(s, "p0", { type: "prize", prize: "huge" });
     expect((L.viewFor(s, "p1") as S).rounds).toBe(5);
@@ -422,7 +422,7 @@ describe("matches over several rounds", () => {
     s = act(s, "p0", { type: "rounds", rounds: 5 });
     s = act(s, "p0", { type: "start", bots: false, t: T0 });
     expect(s.cup.races).toHaveLength(5);
-    expect(s.cup.races.every((k: string) => L.ROUND_KINDS.includes(k))).toBe(true);
+    expect(s.cup.races.every((k: string) => L.PARTY_KINDS.includes(k))).toBe(true);
     expect(new Set(s.cup.races.slice(0, 4)).size).toBe(4);
     for (let i = 1; i < 5; i++) expect(s.cup.races[i]).not.toBe(s.cup.races[i - 1]);
     expect(s.kind).toBe(s.cup.races[0]);
@@ -561,7 +561,7 @@ describe("random mode and map", () => {
       let s = act(lobbyOf(2), "p0", { type: "mode", mode: "random" });
       s = act(s, "p0", { type: "map", map: "random" });
       s = act(s, "p0", { type: "start", bots: true, t: T0 + i * 7919 });
-      expect(L.ROUND_KINDS).toContain(s.kind);
+      expect(L.PARTY_KINDS).toContain(s.kind);
       expect(L.MAPS).toContain(s.raceMap);
       expect(s.mode).toBe("random");
       expect(s.cup).toBeNull();
@@ -570,6 +570,76 @@ describe("random mode and map", () => {
     }
     expect(kinds.size).toBeGreaterThan(1);
     expect(maps.size).toBeGreaterThan(1);
+  });
+  it("Party over 10 rounds plays every mode, the Classic Race too", () => {
+    let s = act(lobbyOf(2), "p0", { type: "mode", mode: "random" });
+    s = act(s, "p0", { type: "rounds", rounds: 10 });
+    s = act(s, "p0", { type: "start", bots: true, t: T0 });
+    expect(s.cup.races).toHaveLength(10);
+    expect(new Set(s.cup.races)).toEqual(new Set(L.PARTY_KINDS));
+  });
+  it("starting lanes are dealt at random each race", () => {
+    const seen = new Set<number>();
+    for (let i = 0; i < 20; i++) {
+      const s = act(lobbyOf(1), "p0", { type: "start", bots: true, t: T0 + i * 7777 });
+      const lanes = Object.values(s.players).map((p: any) => p.lane);
+      expect([...lanes].sort()).toEqual([0, 1, 2, 3]);
+      seen.add(s.players.p0.lane);
+    }
+    expect(seen.size).toBeGreaterThan(2);
+  });
+  it("bots get random runners, not the same ones every race", () => {
+    const sets = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      const s = act(lobbyOf(1), "p0", { type: "start", bots: true, t: T0 + i * 7777 });
+      const bots = Object.values(s.players).filter((p: any) => p.bot).map((p: any) => p.char);
+      expect(new Set(bots).size).toBe(bots.length); // never two the same
+      expect(bots.every((c: number) => c >= 0 && c < L.CHARACTERS)).toBe(true);
+      sets.add(bots.join(","));
+    }
+    expect(sets.size).toBeGreaterThan(5);
+  });
+  it("Party: the host can switch modes off (at least 2 stay on)", () => {
+    let s = act(lobbyOf(2), "p0", { type: "mode", mode: "random" });
+    s = act(s, "p0", { type: "party", kinds: ["survival", "sprint"] });
+    expect((L.viewFor(s, "p1") as S).party).toEqual(["survival", "sprint"]);
+    s = act(s, "p0", { type: "rounds", rounds: 10 });
+    s = act(s, "p0", { type: "start", bots: true, t: T0 });
+    expect(new Set(s.cup.races)).toEqual(new Set(["survival", "sprint"]));
+    expect(reject(lobbyOf(2), "p0", { type: "party", kinds: ["survival"] })).toMatch(/2 modes/);
+    expect(reject(lobbyOf(2), "p0", { type: "party", kinds: ["survival", "potato"] })).toMatch(/bad/);
+    expect(reject(lobbyOf(2), "p1", { type: "party", kinds: ["survival", "chase"] })).toMatch(/host/);
+  });
+  it("the host can tick several maps: each race is one of those", () => {
+    const pick = ["farm", "space", "candy"];
+    expect(reject(lobbyOf(2), "p0", { type: "maps", maps: pick })).toMatch(/rounds/); // 1 round: 1 map
+    let s = act(lobbyOf(2), "p0", { type: "rounds", rounds: 10 });
+    s = act(s, "p0", { type: "maps", maps: pick });
+    expect((L.viewFor(s, "p1") as S).maps).toEqual(pick);
+    s = act(s, "p0", { type: "start", bots: true, t: T0 });
+    const seen = [s.raceMap];
+    for (let r = 2; r <= 10; r++) {
+      s.cup.race = r - 1;
+      s.phase = "results";
+      s = act(s, "p0", { type: "next", t: T0 + r * 100000 });
+      expect(s.raceMap).not.toBe(seen[seen.length - 1]);
+      seen.push(s.raceMap);
+    }
+    expect(seen.every((m) => pick.includes(m))).toBe(true);
+    // one ticked map is just that map
+    s = act(lobbyOf(2), "p0", { type: "maps", maps: ["beach"] });
+    expect(s.map).toBe("beach");
+    expect(s.maps).toBeNull();
+    expect(reject(act(lobbyOf(2), "p0", { type: "rounds", rounds: 3 }), "p0", { type: "maps", maps: ["beach", "moon"] })).toMatch(/bad/);
+    // fewer rounds: the extra maps drop off
+    let t = act(lobbyOf(2), "p0", { type: "rounds", rounds: 5 });
+    t = act(t, "p0", { type: "maps", maps: ["beach", "farm", "city", "space", "candy"] });
+    t = act(t, "p0", { type: "rounds", rounds: 3 });
+    expect(t.maps).toEqual(["beach", "farm", "city"]);
+    t = act(t, "p0", { type: "rounds", rounds: 1 });
+    expect([t.map, t.maps]).toEqual(["beach", null]);
+    expect(reject(lobbyOf(2), "p0", { type: "maps", maps: [] })).toMatch(/bad/);
+    expect(reject(lobbyOf(2), "p1", { type: "maps", maps: ["beach"] })).toMatch(/host/);
   });
   it("only the host picks, and only real choices", () => {
     expect(reject(lobbyOf(2), "p1", { type: "map", map: "random" })).toMatch(/host/);
@@ -585,9 +655,9 @@ describe("tournaments", () => {
   it("Grand Tour plays every mode once, with harder courses each round", () => {
     let s = act(lobbyOf(2), "p0", { type: "mode", mode: "grandtour" });
     s = act(s, "p0", { type: "start", bots: true, t: T0 });
-    expect([...s.cup.races].sort()).toEqual([...L.ROUND_KINDS].sort());
+    expect([...s.cup.races].sort()).toEqual([...L.PARTY_KINDS].sort());
     const boosts = [s.courseBoost];
-    for (let r = 2; r <= L.ROUND_KINDS.length; r++) {
+    for (let r = 2; r <= L.PARTY_KINDS.length; r++) {
       s = { ...s, phase: "results", endAt: s.startAt + 1000 };
       s = act(s, "p0", { type: "next", t: s.endAt + 5000 });
       expect(s.kind).toBe(s.cup.races[r - 1]);
@@ -1033,28 +1103,6 @@ describe("new modes", () => {
     expect(L.standings(s)[0]).toBe("p1");
   });
 
-  it("hot potato: the bomb sits on whoever is last, jumps when they overtake, and blows on a fixed fuse", () => {
-    let s = start("potato");
-    s = act(s, "p0", pos(30, at(s, 2900)));
-    s = act(s, "p1", pos(20, at(s, 2900)));
-    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, L.POTATO_FIRST_MS + 10) });
-    expect(s.bomb.holder).toBe("p1");
-    expect(s.bomb.until - s.bomb.at).toBe(L.POTATO_FUSE_MS);
-    // p1 overtakes: now p0 is last and holds it
-    s = act(s, "p1", pos(45, at(s, 5000)));
-    s = act(s, "p0", pos(40, at(s, 5000)));
-    s = L.applyAction(s, "SYS", { type: "tick", t: at(s, 5100) });
-    expect(s.bomb.holder).toBe("p0");
-    // obstacle hits don't cost lives in hot potato
-    s = act(s, "p0", pos(50, at(s, 5500), { hits: 2 }));
-    expect(s.players.p0.outAt).toBeNull();
-    s = act(s, "p1", pos(80, at(s, 6000)));
-    s = L.applyAction(s, "SYS", { type: "tick", t: s.bomb.until + 1 });
-    expect(s.players.p0.booms).toBe(1);
-    expect(s.blasts).toHaveLength(1);
-    expect(s.bomb).toBeNull();
-  });
-
   it("coin rush: taken coins come back after a while", () => {
     let s = start("coinrush");
     const coins = L.coinLines(L.buildCourse(s.seed, L.SURVIVAL_LEN));
@@ -1067,20 +1115,6 @@ describe("new modes", () => {
     expect(s.coinsTaken).not.toContain(0);
   });
 
-  it("hot potato: three blasts and you're out", () => {
-    let s = start("potato");
-    s = act(s, "p0", pos(30, at(s, 2900)));
-    s = act(s, "p1", pos(20, at(s, 2900)));
-    let t = L.POTATO_FIRST_MS + 10;
-    for (let i = 0; i < L.livesOf(s); i++) {
-      s = L.applyAction(s, "SYS", { type: "tick", t: at(s, t) });
-      expect(s.bomb.holder).toBe("p1");
-      s = L.applyAction(s, "SYS", { type: "tick", t: s.bomb.until + 1 });
-      t = s.bomb ? t : s.nextBombAt - s.startAt + 10;
-    }
-    expect(s.players.p1.booms).toBe(L.livesOf(s));
-    expect(s.players.p1.outAt).not.toBeNull();
-  });
 });
 
 describe("moving obstacles", () => {
@@ -1101,7 +1135,7 @@ describe("moving obstacles", () => {
   it("has a recipe for every themed map, with the same movers", async () => {
     const { THEMES } = await import("../public/themes.js");
     expect(L.MAPS.slice(6)).toEqual(THEMES.map((t: { id: string }) => t.id));
-    expect(L.MAPS.length).toBe(25);
+    expect(L.MAPS.length).toBe(19);
     for (const t of THEMES as { id: string; movers?: string }[]) expect(L.MAP_MOVERS[t.id]).toBe(t.movers);
   });
 

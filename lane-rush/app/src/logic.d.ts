@@ -82,6 +82,7 @@ export const HEART_EVERY_M: number;
 export const ROUND_OPTIONS: number[];
 export const PRIZES: string[];
 export const ROUND_KINDS: string[];
+export const PARTY_KINDS: string[];
 export function isEndless(kind: string): boolean;
 export const CHASE_GAP_M: number;
 export function brainDistance(s: number): number;
@@ -130,3 +131,4 @@ export function needSeconds(fromLane: number, fromAct: string, toLane: number, t
 export const CUP_ROUND_BOOST_M: number;
 export const REACT_S: number;
 export const LANE_S: number;
+export function partyOf(state: any): string[];

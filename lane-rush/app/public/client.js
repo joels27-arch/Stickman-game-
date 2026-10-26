@@ -37,6 +37,7 @@ import {
   SLOW_PAD_MS,
   ROUND_OPTIONS,
   ROUND_KINDS,
+  PARTY_KINDS,
   MAPS,
   MAP_MOVERS,
   EMOTES,
@@ -76,12 +77,46 @@ const RUNNERS = [
   { name: "Kiko", color: "#7c4dff", file: "c5", tag: "Shadow Ninja" },
   { name: "Dino", color: "#14b8a6", file: "c6", tag: "Rawr Runner" },
   { name: "Nova", color: "#8fa3bf", file: "c7", tag: "Space Cadet" },
+  // collectible characters that are 3D runners too: owned through their collection id
+  { name: "Gloop", color: "#5b2a8a", file: "c8", tag: "Slime Monster", cid: "gloop" },
+  { name: "Sharky", color: "#3f8fe0", file: "c9", tag: "Beach Boss", cid: "sharky" },
+  { name: "Captain Brainstorm", color: "#7c3aed", file: "c10", tag: "Storm Hero", cid: "brainstorm" },
+  { name: "Pandu", color: "#d23a2a", file: "c11", tag: "Karate Panda", cid: "pandu" },
+  { name: "Siete", color: "#e02424", file: "c12", tag: "Football Star", cid: "striker" },
 ];
-const STARTERS = RUNNERS.length;
+const STARTERS = 8; // the first 8 runners; the rest are collectibles
+/** Collection id → runner index, for the collectibles that are 3D runners. */
+const CID_RUNNER = Object.fromEntries(RUNNERS.map((r, i) => [r.cid, i]).filter(([c]) => c));
 /** 3D runners you don't start with: Kiko is the Season Pass reward (free track, level 2). */
 const KIKO = 5;
 const PIP = 4;
-const PASS_RUNNERS = { [KIKO]: 2, [PIP]: 12 };
+const PASS_RUNNERS = { [PIP]: 12 };
+/** 3D runners won on the Trophy Road for trophies (runner index → trophies). Kiko is on the games road now. */
+const ROAD_RUNNERS = {};
+/** A new player picks one of these five to start with; the rest come on the Trophy Road, by games played. */
+const FIRST_FIVE = [0, 1, 2, 3, 6];
+const NOVA = 7;
+const GAMES_STEPS = [1, 3, 5, 10, 20, 50, 100];
+/** "all" = played before the pick existed (keeps every starter), a runner index, or null = not picked yet. */
+function starterChoice() {
+  const v = local.getItem("lr:starter");
+  return v === null ? null : v === "all" ? "all" : Number(v);
+}
+function gamesPlayed() {
+  try {
+    return JSON.parse(local.getItem("lr:stats") || "{}").races ?? 0;
+  } catch {
+    return 0;
+  }
+}
+/** What each games step gives: the four starters you didn't pick, then Nova, Kiko and Gloop. */
+function gamesRoad() {
+  const s = starterChoice();
+  const list = s === "all" ? [{ runner: KIKO }, { char: "gloop" }] : [...FIRST_FIVE.filter((i) => i !== (s ?? 0)).map((i) => ({ runner: i })), { runner: NOVA }, { runner: KIKO }, { char: "gloop" }];
+  return list.map((r, k) => ({ ...r, games: GAMES_STEPS[k + GAMES_STEPS.length - list.length] }));
+}
+const gamesStepOf = (c) => gamesRoad().find((g) => (c.cid ?? c.id) === g.char || (g.runner !== undefined && g.runner === c.idx));
+
 
 /**
  * Collectible characters: bought in the shop with medals. They don't have 3D
@@ -98,21 +133,16 @@ const PASS_RUNNERS = { [KIKO]: 2, [PIP]: 12 };
 const COLLECTION = [
   { id: "zara", name: "Zara", color: "#ff6fb5", rarity: "rare", via: "pack" },
   { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "pack" },
-  { id: "leo", name: "Sir Leo", color: "#4c8dff", rarity: "epic", via: "road", legacy: { medal: "silver", count: 4 } },
-  { id: "kai", name: "Kai", color: "#21c7d9", rarity: "epic", via: "road", legacy: { medal: "silver", count: 6 } },
-  { id: "zed", name: "Zed", color: "#7be3b0", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 3 } },
-  { id: "porky", name: "Porky", color: "#ff9ec4", rarity: "rare", via: "pack" },
-  { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pack" },
-  { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pack" },
+  { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pass", passLv: 15 },
+  { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pass", passLv: 1 }, // yours the moment you buy the Gold Pass
   { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "road", legacy: { medal: "silver", count: 5 } },
-  { id: "hoops", name: "Big Slam", color: "#ff8a00", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 4 } },
   { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 6 } },
   // heroes and stars (pictures only)
   { id: "captainstar", name: "Captain Star", color: "#2f5ae0", rarity: "rare", via: "pack" },
   { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "pack" },
-  { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "pack" },
-  { id: "boulder", name: "The Boulder", color: "#7a5a3a", rarity: "legendary", via: "pack" },
-  { id: "thunderjack", name: "Thunderjack", color: "#b02a2a", rarity: "legendary", via: "pack" },
+  { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "road" },
+  { id: "boulder", name: "The Boulder", color: "#7a5a3a", rarity: "legendary", via: "road" },
+  { id: "rapstar", name: "MC Gold", color: "#f0b400", rarity: "epic", via: "road", pic: "/assets/pk_rapstar.webp" },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
 const MEDAL_ICON = { gold: "🥇", silver: "🥈", bronze: "🥉" };
@@ -123,28 +153,27 @@ const countryName = (code) => (COUNTRIES.find(([c]) => c === code) || [])[1] || 
 const MODES = ["Solo", "Duo", "Trio", "Squad"];
 const GAME_MODE_INFO = {
   survival: { label: "Survival", icon: "❤️", tag: "Main mode", text: "3 hearts. Last one standing wins." },
+  random: { label: "Party", icon: "🎉", tag: "All modes", text: "A random mode every round." },
   sprint: { label: "Classic Race", icon: "🏁", tag: "700 m", text: "First to the finish line wins." },
   chase: { label: "Brain Chase", icon: "🧠", tag: "Run for it", text: "Outrun the giant brain!" },
   coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins." },
-  potato: { label: "Hot Potato", icon: "💣", tag: "Don't be last", text: "Last place holds the bomb!" },
-  random: { label: "Random", icon: "🎲", tag: "Surprise", text: "A surprise mode each race." },
   grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "One round of every mode." },
 };
 /**
- * What the host can put up for the top 3 of a match, paid out of the host's own
- * coins: the whole pot when the match starts, and the shares of places nobody
- * real took (bots, or fewer than 2 real players) come back after the last round.
+ * What the host can put up for the top 3 of a match: coins (numbers) or packs (ids).
+ * The host doesn't pay; real players in the top 3 get them (2+ real players).
  */
 const PRIZE_INFO = {
   none: { label: "Just glory", icon: "🤝", pays: [] },
   coins: { label: "Small pot", icon: "🪙", pays: [150, 75, 40] },
   bigcoins: { label: "Big pot", icon: "💰", pays: [300, 150, 75] },
   huge: { label: "Huge pot", icon: "👑", pays: [600, 300, 150] },
+  packs: { label: "Packs", icon: "🎁", pays: ["legend", "mega", "mega"] },
 };
-const potOf = (prize) => (PRIZE_INFO[prize ?? "none"]?.pays ?? []).reduce((a, b) => a + b, 0);
+const prizeText = (x) => (typeof x === "number" ? `${x}` : x === "legend" ? "Legend Pack" : "Mega Pack");
 /** "3 rounds", or the Grand Tour's fixed 4. */
 function roundsOf(v) {
-  return v.mode === "grandtour" ? ROUND_KINDS.length : v.rounds ?? 1;
+  return v.mode === "grandtour" ? PARTY_KINDS.length : v.rounds ?? 1;
 }
 function matchLabel(v, gm, endless) {
   const base = endless ? "Endless run" : GAME_MODE_INFO[gm].label;
@@ -167,7 +196,7 @@ const MAP_INFO = {
   city: { label: "City", text: "Down the main street between skyscrapers" },
   stadium: { label: "Stadium", text: "Across the pitch in front of the fans" },
   space: { label: "Space", text: "A neon walkway over the moon" },
-  random: { label: "Random", text: "A different map every race" },
+  random: { label: "Random", text: "A different map every round" },
 };
 // the themed maps, built in code (public/themes.js)
 const THEME = Object.fromEntries(THEMES.map((t) => [t.id, t]));
@@ -208,7 +237,7 @@ const POWER_INFO = {
 const WAVE_S = 4; // brain wave: controls flipped this long
 const GLUE_SLOW = 0.45; // speed factor while stuck in glue
 const STAGGER_S = 0.7; // after a punch
-const THROWN = new Set(["banana", "bowling", "glue", "fake"]); // items you aim: ahead or behind, any lane
+const THROWN = new Set(["banana", "bowling", "glue", "fake"]); // items you throw: ahead or behind, in your own lane
 const POWER_TIPS = 3; // how many times a power-up is explained when you pick it up
 // phones and tablets (iPads can report a fine pointer, so check for touch too)
 const TOUCH = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0 || "ontouchstart" in window;
@@ -239,6 +268,8 @@ function store(kind) {
   }
 }
 const local = store("localStorage");
+// players from before the pick keep every starter
+if (starterChoice() === null && (local.getItem("lr:asked") || gamesPlayed() > 0)) local.setItem("lr:starter", "all");
 const session = store("sessionStorage");
 
 // ── wallet: medals and owned skins live on this device ─────────────────────
@@ -277,7 +308,13 @@ const wallet = {
     }
   },
   owns(i) {
-    return (i < STARTERS && !(i in PASS_RUNNERS)) || this.owned().includes(i);
+    if (RUNNERS[i]?.cid) return this.has(RUNNERS[i].cid);
+    if (this.owned().includes(i)) return true;
+    if (i >= STARTERS || i in PASS_RUNNERS || i in ROAD_RUNNERS || i === KIKO) return false;
+    const s = starterChoice();
+    if (s === "all") return true;
+    // the five and Nova: only the one you picked (Rex until you pick)
+    return i === (s ?? 0);
   },
   coins() {
     const c = Number(local.getItem("lr:coins"));
@@ -778,6 +815,10 @@ function open() {
     $("#netWarn").classList.remove("show");
   });
   ws.addEventListener("message", (ev) => {
+    if (ev.data === "__pong" && net.pingAt) {
+      net.rtt = Math.round(performance.now() - net.pingAt); // shown on the ?perf overlay
+      net.pingAt = 0;
+    }
     if (ws !== net.socket || ev.data === "__pong") return;
     let msg;
     try {
@@ -836,7 +877,7 @@ function sendHello() {
 
 function preferredChar() {
   const v = Number(local.getItem("lr:char"));
-  return Number.isInteger(v) && v >= 0 && v < RUNNERS.length && wallet.owns(v) ? v : 0;
+  return Number.isInteger(v) && v >= 0 && v < RUNNERS.length && wallet.owns(v) ? v : Math.max(0, RUNNERS.findIndex((_, i) => wallet.owns(i)));
 }
 
 function myCountry() {
@@ -893,6 +934,7 @@ function maybeAskName() {
   if (local.getItem("lr:asked")) return;
   local.setItem("lr:asked", "1");
   setTimeout(() => {
+    if (game.mode !== "home" && game.mode !== "results") return;
     const n = local.getItem("lr:name") || "";
     $("#askName").value = /^Runner\d{3}$/.test(n) ? "" : n;
     $("#askName").placeholder = n || "Your name";
@@ -900,13 +942,54 @@ function maybeAskName() {
     askModal.hidden = false;
   }, 1400);
 }
+/** First visit: pick your first runner out of five (the others come on the Trophy Road). Tap one, it lights up, then confirm. */
+let starterPick = null;
+function askStarter() {
+  if (starterChoice() !== null) return;
+  starterPick = null;
+  $("#starterGrid").replaceChildren(
+    ...FIRST_FIVE.map((i) => {
+      const b = el("button", { class: "pf-zone", type: "button", style: `--team:${RUNNERS[i].color}`, "aria-label": RUNNERS[i].name }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }));
+      b.addEventListener("click", () => {
+        sfx.tap();
+        buzz(15);
+        starterPick = i;
+        for (const z of $("#starterGrid").children) z.classList.toggle("on", z === b);
+        $("#starterGrid").classList.add("chosen");
+        const go = $("#starterGo");
+        go.disabled = false;
+        go.textContent = `Confirm ${RUNNERS[i].name} ✓`;
+      });
+      return b;
+    }),
+  );
+  $("#starterGrid").classList.remove("chosen");
+  $("#starterGo").disabled = true;
+  $("#starterGo").textContent = "Tap a runner";
+  $("#starterModal").hidden = false;
+}
+$("#starterGo").addEventListener("click", () => {
+  const i = starterPick;
+  if (i == null) return;
+  sfx.finish();
+  local.setItem("lr:starter", String(i));
+  local.setItem("lr:char", String(i));
+  $("#starterModal").hidden = true;
+  world.setShowcase?.(i);
+  renderCollPill();
+  showUnlock({ kind: "char", char: { name: RUNNERS[i].name, rarity: STARTER_RARITY[i], img: `/assets/lu_${RUNNERS[i].file}.webp` } }, () => toast("Play games to unlock the others on the Trophy Road"));
+});
 $("#askSave").addEventListener("click", () => {
   sfx.tap();
   if ($("#askName").value.trim()) saveName($("#askName").value);
   askModal.hidden = true;
+  setTimeout(askStarter, 300);
   toast("Saved!");
 });
-$("#askLater").addEventListener("click", () => (askModal.hidden = true));
+$("#askLater").addEventListener("click", () => {
+  askModal.hidden = true;
+  setTimeout(askStarter, 300);
+});
 $("#askName").addEventListener("keydown", (e) => e.key === "Enter" && $("#askSave").click());
 // settings sheet
 const setModal = $("#setModal");
@@ -915,7 +998,8 @@ function renderSettings() {
   $("#setSound").checked = p.sound !== false;
   $("#setMusic").checked = p.music !== false;
   $("#setBuzz").checked = p.buzz !== false;
-  $("#setLow").checked = Boolean(p.low);
+  for (const b of document.querySelectorAll("#setGfx button")) b.classList.toggle("on", b.dataset.gfx === gfxChoice());
+  $("#setGfxNow").textContent = gfxChoice() === "auto" ? `Auto · now ${gfxTier()}` : "";
   $("#setCountryName").textContent = myCountry() ? `${flagOf(myCountry())} ${countryName(myCountry())}` : "Not set";
 }
 $("#settingsBtn").addEventListener("click", () => {
@@ -937,13 +1021,32 @@ $("#setBuzz").addEventListener("change", (e) => {
   setPref("buzz", e.target.checked);
   buzz(40);
 });
-$("#setLow").addEventListener("change", (e) => {
-  setPref("low", e.target.checked);
-  applyQuality();
-});
+for (const b of document.querySelectorAll("#setGfx button")) {
+  b.addEventListener("click", () => {
+    setPref("gfx", b.dataset.gfx);
+    setPref("low", false);
+    if (b.dataset.gfx === "auto") local.removeItem("lr:gfxAuto");
+    qualityIdx = 0;
+    applyQuality();
+    renderSettings();
+    const want = GFX[gfxTier()];
+    if (want.aa !== startGfx.aa || want.shadows !== startGfx.shadows) toast("Shadows and edge smoothing change next time you open the game");
+  });
+}
 $("#setCountry").addEventListener("click", () => {
   setModal.hidden = true;
   openCountry("Country you cheer for");
+});
+// start over as a brand-new player: everything this device saved is wiped, then the game reloads
+// into the first-visit flow (name, tutorial run, fresh coins, runners and progress)
+$("#setRestart").addEventListener("click", () => {
+  if (!confirm("Start over with a new account? All your coins, runners, medals, missions and progress on this device will be deleted. This can't be undone.")) return;
+  try {
+    for (const store of [localStorage, sessionStorage]) for (const k of Object.keys(store)) if (k.startsWith("lr:")) store.removeItem(k);
+  } catch {
+    /* storage blocked: nothing saved anyway */
+  }
+  location.reload();
 });
 $("#setTut").addEventListener("click", () => {
   local.setItem("lr:tutDone", "");
@@ -963,20 +1066,25 @@ const TRAIL_INFO = {
 };
 const EMOTE_PRICE = 200;
 const EMOTE_NAME = { "👑": "King", "🧠": "Big brain", "🤡": "Clown", "🥶": "Frozen", "💩": "Poop", "🫡": "Salute" };
+let equipCache = null;
 function equipped() {
+  if (equipCache) return equipCache;
   try {
     const e = JSON.parse(local.getItem("lr:equip") || "{}") || {};
-    return { trail: TRAILS.includes(e.trail) && wallet.has(`trail:${e.trail}`) ? e.trail : "" };
+    equipCache = { trail: TRAILS.includes(e.trail) && wallet.has(`trail:${e.trail}`) ? e.trail : "" };
   } catch {
-    return { trail: "" };
+    equipCache = { trail: "" };
   }
+  return equipCache;
 }
 function equip(slot, id) {
-  const e = equipped();
+  const e = { ...equipped() };
   e[slot] = e[slot] === id ? "" : id;
   local.setItem("lr:equip", JSON.stringify(e));
+  equipCache = null;
 }
 function giveItem(id) {
+  equipCache = null;
   if (!wallet.has(id)) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), id]));
 }
 
@@ -1054,13 +1162,15 @@ function renderItems() {
 // ── the character catalog: every character, its rarity and how you get it ──
 
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
-const STARTER_RARITY = ["rare", "rare", "rare", "rare", "epic", "epic", "rare", "epic"]; // nothing below rare
+const STARTER_RARITY = ["rare", "rare", "rare", "rare", "epic", "epic", "rare", "epic", "epic", "epic", "legendary", "rare", "legendary"]; // nothing below rare
+/** A collectible that is also a 3D runner: its runner index (you can race with it). */
+const runnerOf = (id) => (id in CID_RUNNER ? { idx: CID_RUNNER[id], playable: true, tag: RUNNERS[CID_RUNNER[id]].tag } : {});
 function allChars() {
   return [
-    ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
-    ...COLLECTION.map((c) => ({ ...c, img: `/assets/sc_${c.id}.webp`, hero: `/assets/sc_${c.id}.webp` })),
+    ...RUNNERS.slice(0, STARTERS).map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : i in ROAD_RUNNERS || gamesRoad().some((g) => g.runner === i) ? "road" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
+    ...COLLECTION.map((c) => ({ ...c, img: c.pic ?? `/assets/sc_${c.id}.webp`, hero: c.pic ?? `/assets/sc_${c.id}.webp`, ...runnerOf(c.id) })),
     ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp` })),
-    { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp` },
+    { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp`, ...runnerOf(PASS_CHAR.id) },
     ...ROAD_CHARS.map((c) => ({ ...c, via: "road", img: `/assets/rd_${c.id}.webp`, hero: `/assets/rd_${c.id}.webp` })),
   ];
 }
@@ -1072,12 +1182,17 @@ function howToGet(c) {
   if (c.via === "coins") return `${c.coins.toLocaleString()} coins in the Shop.`;
   if (c.via === "pack") return "Found in packs.";
   if (c.idx in PASS_RUNNERS) return `Season Pass, level ${PASS_RUNNERS[c.idx]}.`;
-  if (c.via === "road") return `Trophy Road, at ${ROAD.find((r) => r.char === c.id).pts.toLocaleString()} 🏆.`;
-  return "Gold Pass, level 30.";
+  if (gamesStepOf(c)) return `Trophy Road: play ${gamesStepOf(c).games} game${gamesStepOf(c).games > 1 ? "s" : ""}.`;
+  if (c.via === "road") return `Trophy Road, at ${ROAD.find((r) => (c.idx !== undefined ? r.runner === c.idx : r.char === c.id)).pts.toLocaleString()} 🏆.`;
+  return `Gold Pass, level ${c.passLv ?? 30}.`;
 }
 /** The short lock label on a runner card you can't race with yet. */
 function lockLabel(i) {
-  return i in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[i]}` : "Locked";
+  const c = RUNNERS[i]?.cid && allChars().find((x) => x.id === RUNNERS[i].cid);
+  if (c) return `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}`;
+  const g = gamesRoad().find((x) => x.runner === i);
+  if (g) return `🏆 ${g.games} game${g.games > 1 ? "s" : ""}`;
+  return i in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[i]}` : i in ROAD_RUNNERS ? `🏆 ${ROAD_RUNNERS[i]}` : "Locked";
 }
 function collectionCount() {
   const all = allChars();
@@ -1093,7 +1208,7 @@ function renderCollPill() {
 const RARITY_ICON = { common: "●", rare: "◆", epic: "✦", legendary: "★" };
 function charCard(c, n, onClick) {
   const owned = ownsChar(c);
-  const sel = c.playable && c.idx === preferredChar();
+  const sel = false; // runners are picked when you play, not here
   const forCoins = !owned && c.via === "coins";
   const can = forCoins && wallet.coins() >= c.coins;
   const name = forCoins ? el("b", { class: `cname price${can ? "" : " short"}` }, el("i", { class: "coin" }), el("span", { text: c.coins.toLocaleString() })) : el("b", { class: "cname", text: c.name });
@@ -1104,22 +1219,11 @@ function charCard(c, n, onClick) {
     "button",
     { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${sel ? " sel" : ""}`, type: "button", style: `--i:${n}`, "aria-label": c.name },
     el("span", { class: "cpic" }, el("img", { src: c.img, alt: "" }), owned ? null : el("i", { class: "padlock", text: "🔒" })),
-    el("span", { class: "cfoot" }, name, tag, owned && (c.via === "pack" || c.via === "starter") ? levelBadge(c.id) : null),
+    el("span", { class: "cfoot" }, name, tag),
   );
   // the picture shows the character's card; the name (and the rest) does the main thing, e.g. select
   b.addEventListener("click", (e) => (e.target.closest(".cpic") ? inspectChar(c) : onClick(c)));
   return b;
-}
-/** Level and copies on a card; it glows when a level-up is ready. */
-function levelBadge(id) {
-  const n = nextLevel(id);
-  const have = cardCopies(id);
-  return el(
-    "span",
-    { class: `clvl${canLevel(id) ? " ready" : ""}` },
-    el("b", { text: `Lv ${cardLevel(id)}` }),
-    n ? el("span", { class: "cbar" }, el("i", { style: `width:${Math.min(100, Math.round((have / n.copies) * 100))}%` }), el("small", { text: `${have}/${n.copies}` })) : el("small", { text: "MAX" }),
-  );
 }
 const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
 const VIA_GROUP = { coins: "🪙 Buy with coins", pack: "🎁 From packs", pass: "⭐ Season Pass", road: "🏆 Trophy Road" };
@@ -1152,7 +1256,7 @@ function renderSkins() {
     ...mine.map((c) => {
       // a tap on one of your runners picks it straight away; the ⓘ shows its card
       // tap the name to race with them, the picture for their card
-      const card = charCard(c, n++, c.playable ? selectRunner : inspectChar);
+      const card = charCard(c, n++, inspectChar);
       const on = fav.includes(c.id);
       const star = el("button", { class: `fav${on ? " on" : ""}`, type: "button", "aria-label": on ? "Remove from favourites" : "Add to favourites", text: on ? "★" : "☆" });
       star.addEventListener("click", (e) => {
@@ -1245,20 +1349,7 @@ function inspectChar(c) {
   btn.className = "gbtn";
   btn.disabled = false;
   let action = null;
-  if (owned && c.playable) {
-    const sel = preferredChar() === c.idx;
-    btn.textContent = sel ? "Selected ✓" : "Select runner";
-    btn.disabled = sel;
-    action = () => {
-      local.setItem("lr:char", String(c.idx));
-      world.setShowcase?.(c.idx);
-      if (net.view?.phase === "lobby" && net.view.joined) act({ type: "pick", char: c.idx });
-      toast(`${c.name} selected`);
-      charModal.hidden = true;
-      if (shopShown()) renderShop();
-      if (homePage === PAGE.skins) renderSkins();
-    };
-  } else if (owned) {
+  if (owned) {
     btn.textContent = "In your collection ✓";
     btn.disabled = true;
   } else if (c.via === "road") {
@@ -1289,30 +1380,6 @@ function inspectChar(c) {
     };
   }
   btn.onclick = action;
-  // card level: copies from packs plus coins take it up a level
-  const lvBox = $("#charLvl");
-  if (owned && (c.via === "pack" || c.via === "starter")) {
-    const n = nextLevel(c.id);
-    const have = cardCopies(c.id);
-    lvBox.hidden = false;
-    const up = el("button", { class: "gbtn lvup", type: "button" }, n ? `Level up · ${n.coins.toLocaleString()} coins` : "Max level");
-    up.disabled = !canLevel(c.id);
-    up.addEventListener("click", () => {
-      if (!levelUp(c.id)) return;
-      sfx.finish();
-      buzz([30, 40, 80]);
-      toast(`${c.name} is now level ${cardLevel(c.id)}!`);
-      renderWallet();
-      inspectChar(c);
-      if (homePage === PAGE.skins) renderSkins();
-    });
-    lvBox.replaceChildren(
-      el("div", { class: "lv-row" }, el("b", { text: `Level ${cardLevel(c.id)}` }), n ? el("span", { text: `${have}/${n.copies} copies for level ${n.lv}` }) : el("span", { text: "Max level!" })),
-      n ? el("span", { class: "cbar big" }, el("i", { style: `width:${Math.min(100, Math.round((have / n.copies) * 100))}%` })) : null,
-      c.playable ? el("small", { text: `+${(cardLevel(c.id) - 1) * 5}% race coins with this runner` }) : null,
-      up,
-    );
-  } else lvBox.hidden = true;
   charModal.hidden = false;
 }
 $("#charClose").addEventListener("click", () => (charModal.hidden = true));
@@ -1322,71 +1389,23 @@ charModal.addEventListener("click", (e) => e.target === charModal && (charModal.
 
 const PACK_CHARS = [
   { id: "brainz", name: "Prof. Brainz", rarity: "legendary", dupe: 1500 },
-  { id: "frosty", name: "Frosty", rarity: "epic", dupe: 600 },
   { id: "ra", name: "Pharaoh Ra", rarity: "epic", dupe: 600 },
-  { id: "mo", name: "Mecha Mo", rarity: "rare", dupe: 300 },
   { id: "zorp", name: "Zorp", rarity: "rare", dupe: 300 },
   { id: "glorb", name: "Glorb", rarity: "epic", dupe: 600 },
-  { id: "rapstar", name: "MC Gold", rarity: "epic", dupe: 600 },
   { id: "magic", name: "Diez", rarity: "legendary", dupe: 1500 },
   { id: "dancer", name: "Disco Dash", rarity: "legendary", dupe: 1500 },
 ];
 /**
- * Four packs, each a set number of character cards. Every card is a character: a new one
- * unlocks it, one you have already is a copy that goes toward its next level.
- * odds: chance per card for each rarity · sure: the last card is at least this rarity.
+ * Two packs, one character each: a new one unlocks it, one you already have pays coins instead.
+ * odds: chance for each rarity.
  */
 const PACKS = [
-  { id: "starter", name: "Starter Pack", price: 250, cards: 2, img: "/assets/pack_starter.webp", odds: { rare: 0.88, epic: 0.11, legendary: 0.01 } },
-  { id: "brain", name: "Brain Pack", price: 750, cards: 4, img: "/assets/pack_brain.webp", odds: { rare: 0.78, epic: 0.19, legendary: 0.03 } },
-  { id: "mega", name: "Mega Pack", price: 2000, cards: 8, img: "/assets/pack_mega.webp", odds: { rare: 0.66, epic: 0.28, legendary: 0.06 }, sure: "epic" },
-  { id: "legend", name: "Legend Pack", price: 5000, cards: 12, img: "/assets/pack_legend.webp", odds: { rare: 0.5, epic: 0.38, legendary: 0.12 }, sure: "legendary" },
+  { id: "mega", name: "Mega Pack", price: 900, img: "/assets/pack_mega.webp", odds: { rare: 0.55, epic: 0.37, legendary: 0.08 } },
+  { id: "legend", name: "Legend Pack", price: 2500, img: "/assets/pack_legend.webp", odds: { rare: 0, epic: 0.65, legendary: 0.35 } },
 ];
+/** Coins for a character you already have. */
+const DUPE_COINS = { common: 60, rare: 100, epic: 300, legendary: 800 };
 const pct = (x) => `${Math.round(x * 1000) / 10}%`;
-
-// ── card levels: copies from packs level your characters up (a little coin bonus when you race with one) ──
-const LEVEL_COPIES = [2, 4, 10, 20, 50, 100]; // copies needed for level 2, 3, … 7
-const LEVEL_COINS = [50, 150, 400, 1000, 2000, 4000]; // and coins to do it
-const MAX_LEVEL = LEVEL_COPIES.length + 1;
-function cardStore(key) {
-  try {
-    const o = JSON.parse(local.getItem(key) || "{}");
-    return o && typeof o === "object" ? o : {};
-  } catch {
-    return {};
-  }
-}
-const cardCopies = (id) => cardStore("lr:cards")[id] ?? 0;
-const cardLevel = (id) => cardStore("lr:lv")[id] ?? 1;
-function addCopy(id) {
-  const c = cardStore("lr:cards");
-  c[id] = (c[id] ?? 0) + 1;
-  local.setItem("lr:cards", JSON.stringify(c));
-}
-/** What the next level needs, or null at max level. */
-function nextLevel(id) {
-  const lv = cardLevel(id);
-  if (lv >= MAX_LEVEL) return null;
-  return { lv: lv + 1, copies: LEVEL_COPIES[lv - 1], coins: LEVEL_COINS[lv - 1] };
-}
-const canLevel = (id) => {
-  const n = nextLevel(id);
-  return Boolean(n && cardCopies(id) >= n.copies && wallet.coins() >= n.coins);
-};
-function levelUp(id) {
-  const n = nextLevel(id);
-  if (!n || cardCopies(id) < n.copies || wallet.coins() < n.coins) return false;
-  wallet.addCoins(-n.coins);
-  const c = cardStore("lr:cards");
-  c[id] -= n.copies;
-  local.setItem("lr:cards", JSON.stringify(c));
-  const l = cardStore("lr:lv");
-  l[id] = n.lv;
-  local.setItem("lr:lv", JSON.stringify(l));
-  return true;
-}
-/** Race coins bonus for the runner you race with: +5% a level above 1. */
-const levelBonus = () => 1 + 0.05 * (cardLevel(`r${preferredChar()}`) - 1);
 
 /** Every character a pack can hold: the starters and the pack characters (not Trophy Road or Season Pass ones). */
 const packPool = () => allChars().filter((c) => c.via === "pack" || c.via === "starter");
@@ -1409,45 +1428,31 @@ function freePackLeft() {
 }
 /** Pay, roll and credit everything right away (so closing the animation can't lose items). */
 function buyPack(pack) {
-  const free = pack.id === "brain" && freePackLeft();
+  const free = pack.id === "mega" && freePackLeft();
   if (!free && wallet.coins() < pack.price) return null;
   if (free) local.setItem("lr:freePack", "1");
   else wallet.addCoins(-pack.price);
   return grantPack(pack);
 }
-/** Roll a pack's cards and credit them: new characters unlock, the rest are copies toward levels. */
+/** Roll a pack's one character and credit it: a new one unlocks, one you have pays coins. */
 function grantPack(pack) {
-  const opened = stats.get("packs");
-  const rarities = Array.from({ length: pack.cards }, () => rollRarity(pack.odds));
-  // the last card is at least the pack's sure rarity
-  if (pack.sure) {
-    const last = rarities.length - 1;
-    if (RARITY_ORDER.indexOf(rarities[last]) < RARITY_ORDER.indexOf(pack.sure)) rarities[last] = pack.sure;
-  }
-  const items = rarities.map(packCard);
-  // your very first pack always has a character you don't have yet
-  if (opened === 0 && !items.some((it) => !ownsChar(it.char))) {
-    const left = packPool().filter((c) => !ownsChar(c) && c.rarity !== "legendary");
-    if (left.length) items[items.length - 1] = { kind: "char", char: left[Math.floor(Math.random() * left.length)] };
-  }
-  // rarest last: the best card is the big finish
-  items.sort((a, b) => RARITY_ORDER.indexOf(a.char.rarity) - RARITY_ORDER.indexOf(b.char.rarity));
-  for (const it of items) {
-    const c = it.char;
-    if (ownsChar(c)) {
-      it.dupe = true;
-      addCopy(c.id);
-    } else if (c.idx === undefined) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), c.id]));
-    it.copies = cardCopies(c.id);
-    it.next = nextLevel(c.id);
-  }
+  const it = packCard(rollRarity(pack.odds));
+  // the 3D runners you can race with come first (not the Season Pass ones: those come from the pass)
+  const runners = allChars().filter((c) => c.playable && c.via !== "pass" && c.via !== "starter" && !gamesStepOf(c) && !ownsChar(c));
+  if (runners.length) it.char = runners[Math.floor(Math.random() * runners.length)];
+  const c = it.char;
+  if (ownsChar(c)) {
+    it.dupe = true;
+    it.coins = DUPE_COINS[c.rarity] ?? 100;
+    wallet.addCoins(it.coins);
+  } else giveItem(c.idx !== undefined && !RUNNERS[c.idx].cid ? c.idx : c.id);
   stats.add("packs", 1);
-  return items;
+  return [it];
 }
 function renderPacks() {
   $("#packRow").replaceChildren(
     ...PACKS.map((pk) => {
-      const free = pk.id === "brain" && freePackLeft();
+      const free = pk.id === "mega" && freePackLeft();
       const btn = el("button", { class: "sbuy", type: "button" }, ...(free ? [el("span", { text: "Free!" })] : [el("i", { class: "coin" }), el("span", { text: pk.price.toLocaleString() })]));
       btn.disabled = !free && wallet.coins() < pk.price;
       btn.addEventListener("click", () => {
@@ -1460,19 +1465,20 @@ function renderPacks() {
         free ? el("span", { class: "freetag", text: "1 free" }) : null,
         el("img", { class: "pack-img", src: pk.img, alt: "" }),
         el("b", { text: pk.name }),
-        el("small", { class: "pk-cards", text: `${pk.cards} cards${pk.sure ? ` · 1 ${pk.sure}+` : ""}` }),
+        el("small", { class: "pk-cards", text: "1 character" }),
         el("small", { class: "pk-odds", text: `Legendary ${pct(pk.odds.legendary)} · Epic ${pct(pk.odds.epic)}` }),
         btn,
       );
     }),
   );
-  $("#packOdds").textContent = "Copies of characters you have level them up";
+  $("#packOdds").textContent = "One you already have pays coins";
   renderWallet();
 }
 
 // the opening: shake → tap → flash → one card at a time
 const packOpen = $("#packOpen");
 let po = null;
+const PACK_TAPS = 4; // taps to burst a pack open
 function openPackAnim(pack, items) {
   po = { pack, items, i: -1, stage: "sealed" };
   // big packs: skip straight to all the cards
@@ -1498,7 +1504,8 @@ function openPackAnim(pack, items) {
   $("#poSummary").hidden = true;
   $("#poDone").hidden = true;
   $("#poHint").hidden = false;
-  $("#poHint").textContent = "Tap to open!";
+  $("#poHint").textContent = `Tap ${PACK_TAPS}× to open!`;
+  $("#poPack").style.setProperty("--shake", "1");
   packOpen.hidden = false;
   sfx.unlock();
 }
@@ -1511,8 +1518,7 @@ function itemCard(it) {
       el("i", { class: "pglow" }),
       el("img", { src: it.char.img ?? `/assets/pk_${it.char.id}.webp`, alt: "" }),
       el("b", { text: it.char.name }),
-      it.dupe && it.next && it.copies >= it.next.copies ? el("em", { class: "plvl", text: "LEVEL UP READY" }) : null,
-      el("small", { text: it.dupe ? (it.next ? `+1 card · ${it.copies}/${it.next.copies} to Lv ${it.next.lv}` : "+1 card · max level") : it.unlocked ? "UNLOCKED!" : "NEW character!" }),
+      it.dupe ? el("small", { class: "pdupe" }, "Already yours · ", el("i", { class: "coin" }), `+${it.coins}`) : el("small", { text: it.unlocked ? "UNLOCKED!" : "NEW character!" }),
     );
   }
   if (it.kind === "medal") {
@@ -1523,6 +1529,19 @@ function itemCard(it) {
 function packStep() {
   if (!po) return;
   if (po.stage === "sealed") {
+    // tap, tap, tap: the pack shakes harder each time, then bursts open
+    po.taps = (po.taps ?? 0) + 1;
+    if (po.taps < PACK_TAPS) {
+      const pk = $("#poPack");
+      pk.style.setProperty("--shake", String(1 + po.taps * 0.8));
+      pk.className = "po-pack";
+      void pk.offsetWidth;
+      pk.className = "po-pack shake hit";
+      sfx.lane();
+      buzz(20 + po.taps * 10);
+      $("#poHint").textContent = `Tap! ${PACK_TAPS - po.taps} more`;
+      return;
+    }
     po.stage = "cards";
     $("#poPack").className = "po-pack burst";
     packOpen.classList.remove("flash");
@@ -1765,7 +1784,7 @@ function requireName() {
  */
 function renderSpotlight(box, cur, { takenBy = () => null, onPick }) {
   const n = RUNNERS.length;
-  const free = (i) => !takenBy(i) || i === cur;
+  const free = (i) => i === cur || (!takenBy(i) && wallet.owns(i)); // only runners you have
   const step = (dir) => {
     for (let k = 1; k < n; k++) {
       const i = (cur + dir * k + n * k) % n;
@@ -1881,7 +1900,7 @@ function fitHomeArt() {
     return;
   }
   if (homePage !== PAGE.play) return; // keep it where it was; only the Play page decides
-  const logo = $(".hp-play .home-logo");
+  const logo = $(".hp-play .home-road");
   const dock = $(".hp-play .home-dock");
   const top0 = art.getBoundingClientRect().top;
   // offsetTop/Height ignore the logo's pop-in animation (a transform)
@@ -1899,9 +1918,9 @@ function fitHomeArt() {
 addEventListener("resize", fitHomeArt);
 if ("ResizeObserver" in window) {
   const ro = new ResizeObserver(() => fitHomeArt());
-  for (const sel of [".hp-play .home-dock", ".hp-play .home-logo"]) ro.observe($(sel));
+  for (const sel of [".hp-play .home-dock", ".hp-play .home-road"]) ro.observe($(sel));
 }
-$(".hp-play .home-logo").addEventListener("animationend", fitHomeArt);
+$(".hp-play .home-road").addEventListener("animationend", fitHomeArt);
 $(".home-art img").addEventListener("load", fitHomeArt);
 
 function setHomePage(i, animate = true) {
@@ -1983,7 +2002,7 @@ for (const t of document.querySelectorAll(".htab")) {
 
 // Tournaments page: the Weekend League and two tournaments with daily prizes
 const TOURNEYS = [
-  { id: "grandtour", label: "Grand Tour", img: "/assets/medal_gold.png", tag: "Tournament · 4 rounds", text: "One round of every mode.", prize: [500, 250, 120] },
+  { id: "grandtour", label: "Grand Tour", img: "/assets/medal_gold.png", tag: "Tournament · 4 rounds", text: "One round of every mode.", prize: ["legend", 250, 120] },
 ];
 const PLACE_SHORT = ["1st", "2nd", "3rd", "4th"];
 /** Prize coins already paid today, per tournament: the best finish each day pays once (a better finish later pays the difference). */
@@ -1995,23 +2014,47 @@ function tourneyPaid() {
     return { day: dayKey() };
   }
 }
+/** A prize on a tournament card: coins, or a pack's picture and name. */
+function prizeEl(x) {
+  if (typeof x === "number") return el("span", { class: "prz-v" }, el("i", { class: "coin" }), x.toLocaleString());
+  return el("span", { class: "prz-v pack" }, el("img", { src: `/assets/pack_${x}.webp`, alt: "" }), prizeText(x));
+}
+/**
+ * Pay today's tournament prize for a place, once a day: 1st wins a Legend Pack (once),
+ * 2nd/3rd coins (a better place later pays the difference). Returns what was won, or "".
+ */
+function payDaily(key, place, prizes, extra = {}) {
+  const paid = tourneyPaid();
+  const was = paid[key] ?? { coins: 0 };
+  const prize = prizes[place - 1];
+  paid[key] = { ...was, ...extra };
+  let won = "";
+  if (typeof prize === "string") {
+    if (!was.pack) {
+      paid[key] = { ...paid[key], pack: true, place };
+      const pk = PACKS.find((x) => x.id === prize);
+      const items = grantPack(pk);
+      setTimeout(() => openPackAnim(pk, items), 1800);
+      won = prizeText(prize);
+    }
+  } else if ((prize ?? 0) > (was.coins ?? 0)) {
+    paid[key] = { ...paid[key], coins: prize, place: was.pack ? 1 : place };
+    wallet.addCoins(prize - (was.coins ?? 0));
+    won = `+${prize - (was.coins ?? 0)} coins`;
+  }
+  local.setItem("lr:tourney", JSON.stringify(paid));
+  return won;
+}
 function tourneyPrize(v) {
   const t = TOURNEYS.find((x) => x.id === v.mode);
-  if (!t || !v.cup || v.cup.race < v.cup.races.length) return 0;
+  if (!t || !v.cup || v.cup.race < v.cup.races.length) return "";
   const place = (v.cup.table ?? []).indexOf(playerId) + 1;
-  const prize = t.prize[place - 1] ?? 0;
-  const paid = tourneyPaid();
-  const before = paid[t.id]?.coins ?? 0;
-  if (prize <= before) return 0;
-  paid[t.id] = { coins: prize, place };
-  local.setItem("lr:tourney", JSON.stringify(paid));
-  wallet.addCoins(prize - before);
-  return prize - before;
+  return place ? payDaily(t.id, place, t.prize) : "";
 }
 
 // Endless Run Tournament: one run a go, as far as you can; today's board of rivals is the
 // same for everyone. Only runs started from the tournament count; the best place each day pays once.
-const ENDLESS_T = { id: "endless", label: "Endless Run Tournament", img: "/assets/ui_flame.webp", tag: "Daily · solo", text: "One life. Run further than the board!", prize: [600, 300, 150] };
+const ENDLESS_T = { id: "endless", label: "Endless Run Tournament", img: "/assets/ui_flame.webp", tag: "Daily · solo", text: "One life. Run further than the board!", prize: ["legend", 300, 150] };
 const ENDLESS_RIVALS = ["Turbo Tim", "Zippy", "Rocket Rita", "Dash", "Flash Fred", "Sprinty", "Max Speed", "Bolt Bot"];
 /** Today's board: three rivals with set distances. */
 function endlessBoard() {
@@ -2028,19 +2071,10 @@ function endlessTPlace(d) {
 }
 /** A finished endless run from the tournament: pay the place, once a day (a better place pays the difference). */
 function endlessTPrize(v) {
-  if (game.fixed?.kind !== "endlessT" || v.kind !== "survival" || v.players.length !== 1) return 0;
+  if (game.fixed?.kind !== "endlessT" || v.kind !== "survival" || v.players.length !== 1) return "";
   game.fixed = null;
   const d = Math.round(v.players[0]?.d ?? 0);
-  const place = endlessTPlace(d);
-  const paid = tourneyPaid();
-  const was = paid.endless ?? { coins: 0 };
-  const prize = ENDLESS_T.prize[place - 1] ?? 0;
-  paid.endless = { ...was, best: Math.max(was.best ?? 0, d) };
-  if (prize > was.coins) paid.endless = { ...paid.endless, coins: prize, place };
-  local.setItem("lr:tourney", JSON.stringify(paid));
-  if (prize <= was.coins) return 0;
-  wallet.addCoins(prize - was.coins);
-  return prize - was.coins;
+  return payDaily("endless", endlessTPlace(d), ENDLESS_T.prize, { best: Math.max(tourneyPaid().endless?.best ?? 0, d) });
 }
 function endlessTCard() {
   const t = ENDLESS_T;
@@ -2054,7 +2088,7 @@ function endlessTCard() {
       "div",
       { class: "tc-head" },
       el("img", { src: t.img, alt: "" }),
-      el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${t.prize[0].toLocaleString()}`)),
+      el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, "1st: ", prizeEl(t.prize[0]))),
     ),
     el("p", { class: "tc-desc", text: t.text }),
     el(
@@ -2066,7 +2100,7 @@ function endlessTCard() {
       "div",
       { class: "tc-prizes" },
       el("small", { text: "Daily prize" }),
-      ...t.prize.map((c, i) => el("span", { class: `prz${mine?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), el("i", { class: "coin" }), String(c))),
+      ...t.prize.map((c, i) => el("span", { class: `prz${mine?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), prizeEl(c))),
     ),
     el("div", { class: "tc-btns" }, el("button", { class: "btn big go", type: "button", "data-endless": "1", text: "▶ Run" })),
   );
@@ -2075,7 +2109,7 @@ function endlessTCard() {
 // Weekend League: Friday 18:00 to Sunday midnight, 10 matches vs bots, each one a set mode
 // (the modes take turns). Only matches started from the league count. Rewards go by medals won.
 const LEAGUE_MATCHES = 10;
-const LEAGUE_PLAN = ["survival", "chase", "coinrush", "potato", "survival", "chase", "coinrush", "potato", "chase", "survival"];
+const LEAGUE_PLAN = ["survival", "chase", "coinrush", "sprint", "survival", "chase", "coinrush", "sprint", "chase", "survival"];
 const LEAGUE_TIERS = [
   { medals: 2, coins: 300 },
   { medals: 4, coins: 800 },
@@ -2170,29 +2204,49 @@ const ROAD = [
   { pts: 10, coins: 200 },
   { pts: 20, pack: "mega" },
   { pts: 30, coins: 300 },
-  { pts: 40, char: "leo" },
-  { pts: 60, coins: 400 },
+  { pts: 40, pack: "mega" },
+  { pts: 50, pack: "mega" },
+  { pts: 65, coins: 400 },
   { pts: 80, pack: "mega" },
-  { pts: 110, char: "kai" },
-  { pts: 140, coins: 600 },
+  { pts: 95, coins: 500 },
+  { pts: 110, pack: "mega" },
+  { pts: 125, coins: 600 },
+  { pts: 140, char: "rapstar" },
   { pts: 170, pack: "mega" },
+  { pts: 195, coins: 800 },
   { pts: 220, char: "unitx" },
+  { pts: 240, pack: "mega" },
   { pts: 260, coins: 1000 },
   { pts: 300, pack: "mega" },
-  { pts: 360, char: "zed" },
+  { pts: 330, coins: 1100 },
+  { pts: 360, pack: "legend" },
+  { pts: 390, coins: 1200 },
   { pts: 420, coins: 1500 },
+  { pts: 450, pack: "mega" },
   { pts: 480, pack: "mega" },
-  { pts: 560, char: "hoops" },
-  { pts: 700, coins: 2500 },
+  { pts: 520, coins: 1800 },
+  { pts: 560, pack: "legend" },
+  { pts: 630, coins: 2000 },
+  { pts: 700, char: "boulder" },
+  { pts: 780, pack: "mega" },
   { pts: 850, pack: "mega" },
-  { pts: 1000, pack: "mega" },
-  { pts: 1300, coins: 3000 },
-  { pts: 1600, coins: 4000 },
+  { pts: 920, coins: 2500 },
+  { pts: 1000, pack: "legend" },
+  { pts: 1150, coins: 3000 },
+  { pts: 1300, pack: "mega" },
+  { pts: 1450, coins: 3500 },
+  { pts: 1600, pack: "legend" },
+  { pts: 1800, coins: 4000 },
   { pts: 2000, char: "striker" },
+  { pts: 2250, pack: "mega" },
   { pts: 2500, char: "titan" },
+  { pts: 3000, pack: "legend" },
   { pts: 3500, coins: 6000 },
+  { pts: 4200, pack: "legend" },
   { pts: 5000, pack: "mega" },
+  { pts: 6000, coins: 8000 },
   { pts: 7500, coins: 10000 },
+  { pts: 8500, pack: "legend" },
   { pts: 10000, char: "aurum" },
 ];
 /** Coins instead, for a road character you already own (from the old medal shop). */
@@ -2200,9 +2254,10 @@ const ROAD_DUPE = { epic: 800, legendary: 1500 };
 const roadChar = (id) => ROAD_CHARS.find((c) => c.id === id) ?? COLLECTION.find((c) => c.id === id);
 function roadInfo(step) {
   if (step.coins) return { label: `${step.coins.toLocaleString()} coins`, img: step.coins >= 2500 ? "/assets/ui_c3.webp" : step.coins >= 1000 ? "/assets/ui_c2.webp" : "/assets/ui_c1.webp" };
-  if (step.pack) return { label: "Mega Pack", img: `/assets/pack_${step.pack}.webp` };
+  if (step.pack) return { label: PACKS.find((x) => x.id === step.pack)?.name ?? "Pack", img: `/assets/pack_${step.pack}.webp` };
+  if (step.runner !== undefined) return { label: RUNNERS[step.runner].name, img: portrait(step.runner), rarity: STARTER_RARITY[step.runner] };
   const c = roadChar(step.char);
-  return { label: c.name, img: ROAD_CHARS.includes(c) ? `/assets/rd_${c.id}.webp` : `/assets/sc_${c.id}.webp`, rarity: c.rarity };
+  return { label: c.name, img: ROAD_CHARS.includes(c) ? `/assets/rd_${c.id}.webp` : c.pic ?? `/assets/sc_${c.id}.webp`, rarity: c.rarity };
 }
 /** Gold medals won, ever (a stat: spending them never counted back). */
 function goldEver() {
@@ -2240,6 +2295,16 @@ function claimRoad(step, node) {
   } else if (step.pack) {
     const pk = PACKS.find((x) => x.id === step.pack);
     openPackAnim(pk, grantPack(pk));
+  } else if (step.runner !== undefined) {
+    if (wallet.owns(step.runner)) {
+      wallet.addCoins(500);
+      coinRain(node, 14);
+      toast(`You already have ${info.label}: +500 coins`);
+    } else {
+      giveItem(step.runner);
+      renderCollPill();
+      showUnlock({ kind: "char", char: { name: info.label, rarity: info.rarity, img: `/assets/lu_${RUNNERS[step.runner].file}.webp` } });
+    }
   } else if (wallet.has(step.char)) {
     const n = ROAD_DUPE[info.rarity] ?? 800;
     wallet.addCoins(n);
@@ -2251,6 +2316,8 @@ function claimRoad(step, node) {
     showUnlock({ kind: "char", char: { name: info.label, rarity: info.rarity, img: info.img } });
   }
   renderTrophyRoad();
+  if (!roadModal.hidden) renderRoadFull();
+  renderRankPill();
 }
 function renderTrophyRoad() {
   const box = $("#trophyRoad");
@@ -2319,10 +2386,71 @@ function renderTrophyRoad() {
  * and you on the road where you are.
  */
 const roadModal = $("#roadModal");
+/** The games road: a new runner after 1, 3, 5, 10, 20, 50 and 100 games, collected on the Trophy Road. */
+function gamesClaimed() {
+  try {
+    const a = JSON.parse(local.getItem("lr:groad") || "[]");
+    return Array.isArray(a) ? a : [];
+  } catch {
+    return [];
+  }
+}
+/** Steps played for but not collected yet. */
+const gamesReady = () => gamesRoad().filter((g) => g.games <= gamesPlayed() && !gamesClaimed().includes(g.games));
+function claimGamesStep(step) {
+  if (step.games > gamesPlayed() || gamesClaimed().includes(step.games)) return;
+  local.setItem("lr:groad", JSON.stringify([...gamesClaimed(), step.games]));
+  const c = step.char ? allChars().find((x) => x.id === step.char) : allChars().find((x) => x.idx === step.runner);
+  if (ownsChar(c)) {
+    wallet.addCoins(300);
+    toast(`${c.name} is already yours: +300 coins`);
+  } else {
+    giveItem(step.char ?? step.runner);
+    renderCollPill();
+    showUnlock({ kind: "char", char: { name: c.name, rarity: c.rarity, img: c.hero } });
+  }
+  sfx.finish();
+  renderRoadFull();
+  renderRankPill();
+}
+function gamesRoadBox() {
+  const n = gamesPlayed();
+  return el(
+    "div",
+    { class: "rv-games" },
+    el("b", { text: `Runners for playing · ${n} game${n === 1 ? "" : "s"} played` }),
+    el(
+      "div",
+      { class: "rg-row" },
+      ...gamesRoad().map((g) => {
+        const c = g.char ? allChars().find((x) => x.id === g.char) : allChars().find((x) => x.idx === g.runner);
+        const done = gamesClaimed().includes(g.games);
+        const due = !done && n >= g.games;
+        const b = el(
+          "button",
+          { class: `rg-step${done ? " got" : due ? " due" : ""}`, type: "button" },
+          el("img", { src: c.img, alt: "" }),
+          due ? el("em", { class: "rg-claim", text: "Claim!" }) : el("small", { text: done ? "✓" : `${g.games} game${g.games > 1 ? "s" : ""}` }),
+          el("em", { text: c.name }),
+        );
+        b.addEventListener("click", () => due && claimGamesStep(g));
+        return b;
+      }),
+    ),
+  );
+}
 function renderRoadFull() {
   const p = rank.points();
   const done = road.claimed();
-  const rows = [];
+  const rows = [
+    el(
+      "div",
+      { class: "rv-how" },
+      el("b", { text: "How you earn 🏆" }),
+      el("span", { text: `Medals in races with friends: 🥇 +${MEDAL_PTS.gold} · 🥈 +${MEDAL_PTS.silver} · 🥉 +${MEDAL_PTS.bronze} · any other place +${LAST_PLACE_PTS}` }),
+    ),
+    gamesRoadBox(),
+  ];
   let side = 0;
   let youShown = false;
   const you = () => el("div", { class: "rv-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: `You · ${p.toLocaleString()} 🏆` }));
@@ -2466,14 +2594,14 @@ function tourneyCard(t) {
       "div",
       { class: "tc-head" },
       el("img", { src: t.img, alt: "" }),
-      el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${t.prize[0].toLocaleString()}`)),
+      el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, "1st: ", prizeEl(t.prize[0]))),
     ),
     el("p", { class: "tc-desc", text: t.text }),
     el(
       "div",
       { class: "tc-prizes" },
       el("small", { text: "Daily prize" }),
-      ...t.prize.map((c, i) => el("span", { class: `prz${paid[t.id]?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), el("i", { class: "coin" }), String(c))),
+      ...t.prize.map((c, i) => el("span", { class: `prz${paid[t.id]?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), prizeEl(c))),
     ),
     paid[t.id] ? el("p", { class: "tc-note", text: `Today: ${PLACE_SHORT[paid[t.id].place - 1]} ✓ · place higher for more` }) : "",
     el(
@@ -2494,13 +2622,13 @@ function renderCompete() {
       { class: `trow${opts.live ? " live" : ""}${opts.ready ? " ready" : ""}`, type: "button", "data-open": id },
       el("img", { src: img, alt: "" }),
       el("span", { class: "tr-txt" }, el("b", { text: name }), el("small", {}, opts.live ? el("i", { class: "live-dot" }) : "", status), opts.desc ? el("span", { class: "tr-desc", text: opts.desc }) : ""),
-      opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : el("span", { class: "tr-prize" }, el("i", { class: "coin" }), prize),
+      opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : el("span", { class: "tr-prize" }, prize),
       el("i", { class: "tr-go", text: "›" }),
     );
   $("#tourneyList").replaceChildren(
-    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0).toLocaleString(), { live: w.open, ready, desc: "10 matches vs bots. Win medals!" }),
-    ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, t.prize[0].toLocaleString(), { desc: t.text })),
-    row("endless", ENDLESS_T.img, "Endless Run", tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, ENDLESS_T.prize[0].toLocaleString(), { desc: ENDLESS_T.text }),
+    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, prizeEl(LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0)), { live: w.open, ready, desc: "10 matches vs bots. Win medals!" }),
+    ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, prizeEl(t.prize[0]), { desc: t.text })),
+    row("endless", ENDLESS_T.img, "Endless Run", tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, prizeEl(ENDLESS_T.prize[0]), { desc: ENDLESS_T.text }),
   );
   if (!tourneyModal.hidden) renderTourneySheet();
 }
@@ -2642,14 +2770,26 @@ function enterLobby() {
   history.replaceState(null, "", `?join=${net.code}`);
 }
 
+/**
+ * Rebuild a lobby section only when what it shows changed: room updates come for every
+ * pick and emote, and rebuilding everything each time made all screens blink and jump.
+ */
+function changed(node, ...key) {
+  const sig = JSON.stringify(key);
+  if (node.dataset.sig === sig) return false;
+  node.dataset.sig = sig;
+  return true;
+}
+const lobbySig = (v) => v.players.map((p) => [p.id, p.name, p.char, p.country, p.gone, p.ready, p.rp, p.bot]);
 function renderLobby(v) {
   rememberFriends(v);
   $("#lobby").classList.toggle("solo-room", Boolean(game.solo));
   $("#lobbyCode").textContent = net.code;
   $("#lobbyCodeStrip").textContent = net.code;
   const slots = $("#slots");
-  slots.replaceChildren();
-  for (let i = 0; i < 4; i++) {
+  const newSlots = changed(slots, lobbySig(v), v.host, playerId);
+  if (newSlots) slots.replaceChildren();
+  for (let i = 0; i < 4 && newSlots; i++) {
     const p = v.players[i];
     if (!p) {
       slots.append(el("div", { class: "rcard empty" }, el("span", { class: "num", text: String(i + 1) }), el("span", { class: "nm", text: "Waiting for player…" })));
@@ -2678,8 +2818,8 @@ function renderLobby(v) {
 
   const me = v.players.find((p) => p.id === playerId);
   const picker = $("#picker");
-  picker.replaceChildren();
-  RUNNERS.forEach((r, i) => {
+  if (changed(picker, lobbySig(v), RUNNERS.map((_, i) => wallet.owns(i)))) picker.replaceChildren();
+  if (!picker.children.length) RUNNERS.forEach((r, i) => {
     const owner = v.players.find((p) => p.char === i);
     const mine = owner?.id === playerId;
     const locked = !wallet.owns(i);
@@ -2711,9 +2851,9 @@ function renderLobby(v) {
     act({ type: "pick", char: i });
     toast(`🎲 ${RUNNERS[i].name}!`);
   });
-  picker.append(dice);
+  if (!picker.querySelector(".random-card")) picker.append(dice);
   if (me) {
-    renderSpotlight($("#lobbySpot"), me.char, {
+    if (changed($("#lobbySpot"), me.char, lobbySig(v))) renderSpotlight($("#lobbySpot"), me.char, {
       takenBy: (i) => v.players.find((p) => p.char === i && p.id !== playerId)?.name ?? null,
       onPick: (i) => {
         if (i === me.char) return;
@@ -2724,7 +2864,7 @@ function renderLobby(v) {
     local.setItem("lr:char", String(me.char));
     // a runner you don't own (e.g. assigned when yours was taken) is swapped for a free starter
     if (!wallet.owns(me.char)) {
-      const free = [0, 1, 2, 3].find((c) => !v.players.some((p) => p.char === c));
+      const free = RUNNERS.map((_, c) => c).find((c) => wallet.owns(c) && !v.players.some((p) => p.char === c));
       if (free !== undefined) act({ type: "pick", char: free });
     }
     if ((me.country || "") !== myCountry()) act({ type: "country", country: myCountry() });
@@ -2740,7 +2880,7 @@ function renderLobby(v) {
   // league and tournament matches have a set mode
   $("#modePick").hidden = $("#modePick").previousElementSibling.hidden = Boolean(game.fixed);
   const modePick = $("#modePick");
-  modePick.replaceChildren(
+  if (changed(modePick, gm, isHost, n < 2 && !botsOn())) modePick.replaceChildren(
     ...Object.entries(GAME_MODE_INFO).filter(([key]) => key !== "grandtour").map(([key, info]) => {
       const b = el(
         "button",
@@ -2755,22 +2895,42 @@ function renderLobby(v) {
       return b;
     }),
   );
+  // Party: tap a mode to leave it out (at least 2 stay on)
+  const party = v.party ?? PARTY_KINDS;
+  $("#partyPick").hidden = gm !== "random";
+  if (gm === "random" && changed($("#partyPick"), party, isHost))
+    $("#partyPick").replaceChildren(
+      ...PARTY_KINDS.map((k) => {
+        const on = party.includes(k);
+        const b = el("button", { class: `chip${on ? " on" : ""}`, type: "button", text: `${on ? "✓ " : ""}${GAME_MODE_INFO[k].icon} ${GAME_MODE_INFO[k].label}` });
+        b.disabled = !isHost;
+        b.addEventListener("click", () => {
+          const next = on ? party.filter((x) => x !== k) : [...party, k];
+          if (next.length < 2) return toast("Keep at least 2 modes");
+          act({ type: "party", kinds: next });
+        });
+        return b;
+      }),
+    );
   const mp = v.map || "meadow";
-  $("#mapPick").replaceChildren(
+  const rounds = roundsOf(v);
+  if (changed($("#mapPick"), mp, isHost)) $("#mapPick").replaceChildren(
     ...["random", ...MAPS].map((key) => {
       const info = MAP_INFO[key];
       const style = key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)`;
+      const on = mp === key;
       const b = el(
         "button",
-        { class: `map-card${mp === key ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style },
+        { class: `map-card${on ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style },
         el("b", { text: info.label }),
         el("span", { text: info.text }),
       );
       b.disabled = !isHost;
-      b.addEventListener("click", () => mp !== key && act({ type: "map", map: key }));
+      b.addEventListener("click", () => !on && act({ type: "map", map: key }));
       return b;
     }),
   );
+  $("#mapNote").textContent = mp === "random" ? "A different map every round" : "";
   // start fetching the map's 3D props while everyone is still in the lobby
   for (const key of mp === "random" ? MAPS : [mp]) {
     world.ensureMap(key).catch(() => {});
@@ -2778,8 +2938,8 @@ function renderLobby(v) {
   }
   for (const p of v.players) world.ensureChar(p.char).catch(() => {});
   // rounds (the Grand Tour is always one of each mode) and the prize for the top 3
-  const rounds = roundsOf(v);
-  $("#roundPick").replaceChildren(
+  // (rounds: worked out above, with the maps)
+  if (changed($("#roundPick"), rounds, isHost, gm)) $("#roundPick").replaceChildren(
     ...ROUND_OPTIONS.map((r) => {
       const b = el("button", { class: `chip${rounds === r ? " on" : ""}`, type: "button", text: r === 1 ? "1 round" : `${r} rounds` });
       b.disabled = !isHost || gm === "grandtour";
@@ -2793,7 +2953,7 @@ function renderLobby(v) {
   $("#botLevelTitle").hidden = $("#botLevelPick").hidden = !withBots;
   if (withBots) {
     const lv = v.botLevel ?? "normal";
-    $("#botLevelPick").replaceChildren(
+    if (changed($("#botLevelPick"), lv, isHost)) $("#botLevelPick").replaceChildren(
       ...[["easy", "😊 Easy"], ["normal", "🙂 Normal"], ["hard", "😈 Hard"]].map(([key, label]) => {
         const b = el("button", { class: `chip${lv === key ? " on" : ""}`, type: "button", text: label });
         b.disabled = !isHost;
@@ -2803,21 +2963,25 @@ function renderLobby(v) {
     );
   }
   const prize = v.prize ?? "none";
-  $("#prizePick").replaceChildren(
+  if (changed($("#prizePick"), prize, isHost)) $("#prizePick").replaceChildren(
     ...Object.entries(PRIZE_INFO).map(([key, info]) => {
-      const b = el("button", { class: `chip prize${prize === key ? " on" : ""}`, type: "button" }, el("b", { text: `${info.icon} ${info.label}` }), info.pays.length ? el("small", { text: info.pays.map((x, i) => `${["1st", "2nd", "3rd"][i]} ${x}`).join(" · ") }) : el("small", { text: "No prize" }));
+      const b = el("button", { class: `chip prize${prize === key ? " on" : ""}`, type: "button" }, el("b", { text: `${info.icon} ${info.label}` }), info.pays.length ? el("small", { text: info.pays.map((x, i) => `${["1st", "2nd", "3rd"][i]} ${prizeText(x)}`).join(" · ") }) : el("small", { text: "No prize" }));
       // the host pays the pot, so they can only pick one they can afford
-      b.disabled = !isHost || (prize !== key && potOf(key) > wallet.coins());
+      b.disabled = !isHost;
       b.addEventListener("click", () => prize !== key && act({ type: "prize", prize: key }));
       return b;
     }),
   );
   $("#prizeNote").textContent =
-    prize === "none" ? "" : isHost ? `You pay ${potOf(prize).toLocaleString()} coins. Bot places come back to you.` : `The host pays ${potOf(prize).toLocaleString()} coins for the top 3`;
-  $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
+    prize === "none" ? "" : "For real players in the top 3 (2+ players)";
+  // no line-up screen: the host starts right here once the others are ready; the others tap Ready
+  const waitingFor = v.players.filter((p) => !p.gone && !p.bot && p.id !== v.host && !p.ready);
+  const lockText = isHost ? (waitingFor.length ? `Waiting for ${waitingFor.map((p) => p.name).join(", ")}…` : "Start") : me?.ready ? "Ready ✓ · tap to cancel" : "Ready";
+  $("#lockBtn").classList.toggle("waiting", isHost ? waitingFor.length > 0 : Boolean(me?.ready));
+  $("#lockBtn").replaceChildren(el("span", { text: lockText }), isHost && !waitingFor.length ? el("span", { class: "arrow", text: "▶" }) : "");
   renderLineup(v, { isHost, gm, mp });
   // once you've locked in your runner, the lobby is the line-up
-  if (game.mode === "lobby" && !screens.shop.classList.contains("show")) showScreen(game.locked ? "lineup" : "lobby");
+  if (game.mode === "lobby" && !screens.shop.classList.contains("show") && !screens.lobby.classList.contains("show")) showScreen("lobby");
   $("#lobbyCount").textContent = `${mode} · ${GAME_MODE_INFO[gm].label} · ${n}/4 players`;
   $("#readyCount").textContent = `👥 ${n}/4 players ready`;
   $("#lobbyMsg").textContent =
@@ -2827,7 +2991,9 @@ function renderLobby(v) {
   // bots join at the gun with any runner: have every runner downloaded while people pick
   if (world.ready && !game.allChars) {
     game.allChars = true;
-    setTimeout(() => RUNNERS.forEach((_, i) => world.ensureChar(i).catch(() => (game.allChars = false))), 600);
+    // the first 8 ahead of time; the collectible runners load when someone in the room picks one
+    // (all 13 at once is ~70 MB of textures: too much for an iPhone's WebGL memory)
+    setTimeout(() => RUNNERS.slice(0, STARTERS).forEach((_, i) => world.ensureChar(i).catch(() => (game.allChars = false))), 600);
   }
   // a set map gets downloaded and built while people pick, so the race starts smooth
   if (world.ready && v.map && v.map !== "random" && game.prepped !== v.map) {
@@ -2841,11 +3007,13 @@ function renderLobby(v) {
 
 $("#lockBtn").addEventListener("click", () => {
   sfx.unlock();
-  game.locked = true;
-  // locking in your runner means you're ready; tap again on the line-up to cancel
-  const me = net.view?.players.find((p) => p.id === playerId);
-  if (me && net.view.host !== playerId && !me.ready) act({ type: "ready", ready: true });
-  if (net.view) renderLobby(net.view);
+  const v = net.view;
+  if (!v) return;
+  const me = v.players.find((p) => p.id === playerId);
+  if (v.host !== playerId) return act({ type: "ready", ready: !me?.ready });
+  const waiting = v.players.filter((p) => !p.gone && !p.bot && p.id !== v.host && !p.ready);
+  if (waiting.length) return toast(`Waiting for ${waiting.map((p) => p.name).join(", ")} to be ready`);
+  act({ type: "start", bots: botsOn() });
 });
 $("#changeRunner").addEventListener("click", () => {
   game.locked = false;
@@ -2860,8 +3028,6 @@ $("#luGo").addEventListener("click", () => {
   if (!v) return;
   const me = v.players.find((p) => p.id === playerId);
   if (v.host === playerId) {
-    const pot = potOf(v.prize);
-    if (pot > wallet.coins()) return toast(`You need ${pot.toLocaleString()} coins for this prize pot`);
     act({ type: "start", bots: botsOn() });
   } else act({ type: "ready", ready: !me?.ready });
 });
@@ -2873,14 +3039,14 @@ $("#luGo").addEventListener("click", () => {
  */
 /** What each runner shouts from the start blocks (picked per player, so it doesn't flicker). */
 const TAUNTS = ["Too slow!", "You're toast!", "My win!", "Catch me!", "Eat my dust!", "Bring it!", "Let's go!", "Easy win!"];
-const LU_KICKER = { survival: "Every runner for themself", chase: "Outrun the brain!", coinrush: "Grab the most coins", potato: "Don't be last!", grandtour: "One of every mode", random: "Surprise mode!" };
+const LU_KICKER = { survival: "Every runner for themself", chase: "Outrun the brain!", coinrush: "Grab the most coins", potato: "Don't be last!", grandtour: "One of every mode", random: "Party: every mode!" };
 function renderLineup(v, { isHost, gm, mp }) {
   $("#lineup").classList.toggle("solo-room", Boolean(game.solo));
   $("#luCode").textContent = net.code;
   $("#luKicker").textContent = LU_KICKER[gm] ?? "";
   $("#luMode").textContent = matchLabel(v, gm, gm === "survival" && v.players.length < 2 && !botsOn());
   const pz = PRIZE_INFO[v.prize ?? "none"];
-  $("#luMap").textContent = `${MAP_INFO[mp].label} map${pz.pays.length ? ` · ${pz.icon}` : ""}`;
+  $("#luMap").textContent = `${mp === "random" ? "Random maps" : `${MAP_INFO[mp].label} map`}${pz.pays.length ? ` · ${pz.icon}` : ""}`;
   const present = v.players.filter((p) => !p.gone);
   // you always stand on block 1
   const order = [...v.players].sort((a, b) => Number(b.id === playerId) - Number(a.id === playerId));
@@ -2907,7 +3073,7 @@ function renderLineup(v, { isHost, gm, mp }) {
   for (let i = order.length; i < 4; i++) {
     peds.push(el("div", { class: `lx-ped p${i + 1} empty` }, el("span", { class: "lx-ghost", text: botsOn() ? "🤖" : "?" }), el("div", { class: "lx-block" }, el("b", { text: String(i + 1) }), el("small", { text: botsOn() ? "Bot" : "Waiting…" }))));
   }
-  $("#luStage").replaceChildren(...peds);
+  if (changed($("#luStage"), lobbySig(v), v.host, playerId, botsOn())) $("#luStage").replaceChildren(...peds);
   paintEmotes();
 
   const waiting = present.filter((p) => p.id !== v.host && !p.ready);
@@ -3053,7 +3219,6 @@ function renderResults(v) {
   const rpChange = recordRace(v, v.standings.indexOf(playerId) + 1);
   // the host's prize for the top 3, once the whole match is over
   const roomPrize = rpChange && (!cup || cupDone) ? payRoomPrize(v, myPlace) : null;
-  const potBack = rpChange && (!cup || cupDone) ? refundPot(v, order) : null;
   if (rpChange && v.standings.length >= 2 && (cupDone ? cup.table[0] === playerId : !cup && myPlace === 1)) setTimeout(() => sfx.cheer(), 300);
   const ptsBefore = rank.points();
   if (mine?.medal) {
@@ -3070,7 +3235,7 @@ function renderResults(v) {
   if (rpChange) {
     reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: game.runCoins && v.kind !== "coinrush" ? `incl. ${game.runCoins} picked up` : rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
     if (rpChange.xp) reward.append(el("span", { class: "xpchip", text: `+${rpChange.xp} XP` }));
-    if (rpChange.prize) reward.append(el("span", { class: "xpchip prizechip", text: `🏆 Prize +${rpChange.prize}` }));
+    if (rpChange.prize) reward.append(el("span", { class: "xpchip prizechip", text: `🏆 Prize: ${rpChange.prize}` }));
     if (roomPrize) reward.append(el("span", { class: "xpchip prizechip", text: roomPrize }));
     if (potBack) reward.append(el("span", { class: "xpchip prizechip", text: potBack }));
     if (rpChange.league) reward.append(el("span", { class: "xpchip leaguechip", text: `Weekend League ${rpChange.league.medal ? MEDAL_ICON[rpChange.league.medal] : "—"} · match ${rpChange.league.matches}/${LEAGUE_MATCHES}` }));
@@ -3105,29 +3270,17 @@ function renderResults(v) {
   }
 }
 
-/** Your share of the host's prize pot for your final place (top 3, with 2+ real players). Returns a label, or null. */
+/** Your prize for your final place in the top 3 (2+ real players): coins, or a pack that opens right away. Returns a label, or null. */
 function payRoomPrize(v, place) {
   const x = (PRIZE_INFO[v.prize ?? "none"]?.pays ?? [])[place - 1];
   if (x === undefined || v.players.filter((p) => !p.bot).length < 2) return null;
-  wallet.addCoins(x);
-  return v.host === playerId ? `🏆 Your own prize back +${x}` : `🏆 Prize from ${nameOf(v.host)} +${x}`;
-}
-/** The host paid the whole pot when the match started: whatever nobody real won goes back to them. */
-function chargePot(v) {
-  const key = `${net.code}:${v.startAt}`;
-  if (v.host !== playerId || !potOf(v.prize) || local.getItem("lr:potKey") === key) return;
-  local.setItem("lr:potKey", key);
-  wallet.addCoins(-potOf(v.prize));
-  toast(`Prize pot: -${potOf(v.prize).toLocaleString()} coins`);
-}
-function refundPot(v, order) {
-  if (v.host !== playerId || !potOf(v.prize)) return null;
-  const pays = PRIZE_INFO[v.prize].pays;
-  const real = v.players.filter((p) => !p.bot);
-  const paid = real.length < 2 ? 0 : order.reduce((a, id, i) => a + (real.some((p) => p.id === id) ? pays[i] ?? 0 : 0), 0);
-  const back = potOf(v.prize) - paid;
-  if (back > 0) wallet.addCoins(back);
-  return back > 0 ? `↩ ${back.toLocaleString()} coins of your pot back` : null;
+  if (typeof x === "number") wallet.addCoins(x);
+  else {
+    const pk = PACKS.find((p) => p.id === x);
+    const items = grantPack(pk);
+    setTimeout(() => openPackAnim(pk, items), 1800);
+  }
+  return `🏆 ${PLACE_SHORT[place - 1]} place prize: ${typeof x === "number" ? `+${x} coins` : prizeText(x)}`;
 }
 function renderCup(v) {
   const box = $("#cupBox");
@@ -3169,51 +3322,188 @@ function renderCup(v) {
   };
 }
 const canvas = $("#scene");
+
+/**
+ * Graphics presets. "Auto" starts on High and steps down by itself when a race runs slow
+ * (the step is remembered on this device). Edge smoothing and shadows are fixed when the
+ * game starts; the rest changes on the spot.
+ *   ratio: render scale cap · aa: edge smoothing · shadows: soft sun shadows · lod: metres of
+ *   full-detail scenery · env: sky light on materials · fx: share of particles and weather
+ */
+const GFX = {
+  high: { ratio: 2, aa: true, shadows: true, lod: 60, env: true, fx: 1 },
+  balanced: { ratio: 1.6, aa: true, shadows: false, lod: 40, env: true, fx: 0.7 },
+  performance: { ratio: 1.15, aa: false, shadows: false, lod: 22, env: false, fx: 0.4 },
+};
+const GFX_ORDER = ["high", "balanced", "performance"];
+function gfxChoice() {
+  const p = prefs();
+  if (p.gfx && (p.gfx === "auto" || GFX[p.gfx])) return p.gfx;
+  return p.low ? "performance" : "auto"; // the old Battery saver switch
+}
+// the old Auto stepped down for good on any slow patch (or a Low Power Mode 30 fps cap):
+// everyone starts at High again once, and the new pace-aware check decides from here
+if (!local.getItem("lr:gfxV2")) {
+  local.setItem("lr:gfxV2", "1");
+  local.removeItem("lr:gfxAuto");
+}
+/** The preset in use: the chosen one, or Auto's current step. */
+function gfxTier() {
+  const c = gfxChoice();
+  if (c !== "auto") return c;
+  const learned = local.getItem("lr:gfxAuto");
+  return GFX[learned] ? learned : "high";
+}
+let gfx = GFX[gfxTier()];
+// developer override for measuring each feature on its own: ?aa=0&env=1&sh=0 (local dev server only)
+if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+  const q = new URLSearchParams(location.search);
+  const o = { ...gfx };
+  if (q.has("aa")) o.aa = q.get("aa") === "1";
+  if (q.has("env")) o.env = q.get("env") === "1";
+  if (q.has("sh")) o.shadows = q.get("sh") === "1";
+  gfx = o;
+}
+const startGfx = gfx; // what the renderer was made with (edge smoothing, shadows)
+
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: gfx.aa, powerPreference: "high-performance", stencil: false });
 } catch {
   $("#loadHint").textContent = "Your browser can't show 3D (WebGL is off). Try Safari or Chrome.";
 }
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 400);
 if (renderer) {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, prefs().low ? 1 : 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gfx.ratio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.14;
+  renderer.debug.checkShaderErrors = false; // no driver round trip per shader (errors still show in the console as warnings)
+  if (startGfx.shadows) {
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap; // filtered edges at a fraction of the soft filter's cost
+    renderer.shadowMap.autoUpdate = true;
+  }
 }
 
 /**
- * Adaptive resolution: phones with very sharp screens (DPR 3) can't always
- * fill every pixel at 60 FPS. If frames run long for a couple of seconds we
- * step the render scale down (2 → 1.6 → 1.3 → 1); it never goes back up in a
- * session, so it can't oscillate.
+ * Adaptive quality: if a race runs slow for a few seconds (frames over 25 ms), the render scale
+ * steps down, and on Auto the preset steps down too (High → Balanced → Performance) and is
+ * remembered for next time. It never steps back up within a session, so it can't oscillate.
  */
-const QUALITY_STEPS = [2, 1.6, 1.3, 1];
+const QUALITY_STEPS = [1, 0.85, 0.72];
 function applyQuality() {
   if (!renderer) return;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, prefs().low ? 1 : QUALITY_STEPS[qualityIdx]));
+  gfx = GFX[gfxTier()];
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gfx.ratio * QUALITY_STEPS[qualityIdx]));
+  world?.setDetail?.(gfx);
   resize();
 }
 let qualityIdx = 0;
 let slowFor = 0;
+const noAdapt = /[?&]noadapt\b/.test(location.search); // benchmarks: keep the settings fixed
+/**
+ * The pace the screen allows, learned on the menus (a light scene): about 16.7 ms on a 60 Hz
+ * screen, 33.3 ms on an iPhone in Low Power Mode (Safari caps it at 30 fps). A race is only
+ * "slow" when it misses that pace, so a capped phone never loses its sharpness for nothing.
+ */
+const paceWin = new Float32Array(60);
+let paceN = 0;
+let paceMs = 1000 / 60;
+function learnPace(dt) {
+  if (dt <= 0 || dt > 0.1) return;
+  paceWin[paceN++ % paceWin.length] = dt * 1000;
+  if (paceN % paceWin.length === 0) {
+    const sorted = Array.from(paceWin).sort((a, b) => a - b);
+    paceMs = clamp(sorted[Math.floor(sorted.length / 2)], 6, 40);
+  }
+}
+/** How the last race ran, for stepping a lowered Auto preset back up once the phone keeps up. */
+const raceRun = { ms: 0, n: 0, dropped: false };
+function judgeLastRace() {
+  if (raceRun.n > 600 && !raceRun.dropped && gfxChoice() === "auto") {
+    const avg = raceRun.ms / raceRun.n;
+    const good = avg < paceMs * 1.12 ? Number(local.getItem("lr:gfxGood") || 0) + 1 : 0;
+    local.setItem("lr:gfxGood", String(good));
+    const i = GFX_ORDER.indexOf(gfxTier());
+    // two smooth races in a row: try the next preset up (it steps down again if it can't keep up)
+    if (good >= 2 && i > 0) {
+      local.setItem("lr:gfxAuto", GFX_ORDER[i - 1]);
+      local.setItem("lr:gfxGood", "0");
+      applyQuality();
+    }
+  }
+  raceRun.ms = raceRun.n = 0;
+  raceRun.dropped = false;
+}
 function adaptQuality(dt) {
-  if (!renderer || game.mode !== "race" || !Number.isFinite(dt) || dt <= 0) return;
+  if (!Number.isFinite(dt) || dt <= 0) return;
+  if (game.mode !== "race") return learnPace(dt);
+  if (noAdapt || !renderer) return;
   // only judge the frame rate once the race is really running: loading, warm-up and the
   // opening shot stutter on every phone, and must not cost the sharpness for the whole session
   if (game.warm || !curtain.hidden || !net.view || serverNow() < net.view.startAt + 2000) return;
   if (dt > 0.25) return; // a one-off hitch (a tab switch, a notification) says nothing about the phone
-  slowFor = dt > 1 / 40 ? slowFor + dt : Math.max(0, slowFor - dt * 0.5);
-  if (slowFor < 3 || qualityIdx >= QUALITY_STEPS.length - 1) return;
+  raceRun.ms += dt * 1000;
+  raceRun.n += 1;
+  // slow = clearly missing the screen's own pace (and slower than 40 fps), for 3 seconds
+  const slow = dt * 1000 > Math.max(paceMs * 1.45, 25);
+  slowFor = slow ? slowFor + dt : Math.max(0, slowFor - dt * 0.5);
+  if (slowFor < 3) return;
   slowFor = 0;
-  qualityIdx += 1;
-  const ratio = Math.min(window.devicePixelRatio || 1, QUALITY_STEPS[qualityIdx]);
-  if (ratio < renderer.getPixelRatio()) {
-    renderer.setPixelRatio(ratio);
-    resize();
+  raceRun.dropped = true;
+  // on Auto, a lighter preset first; then a lower render scale
+  const tier = gfxTier();
+  const i = GFX_ORDER.indexOf(tier);
+  if (gfxChoice() === "auto" && i < GFX_ORDER.length - 1) {
+    local.setItem("lr:gfxAuto", GFX_ORDER[i + 1]);
+    applyQuality();
+    return;
   }
+  if (qualityIdx >= QUALITY_STEPS.length - 1) return;
+  qualityIdx += 1;
+  applyQuality();
 }
+
+// ── developer performance monitor: add ?perf to the address (always on for the local dev server) ──
+const perfHud = (() => {
+  if (!/[?&]perf\b/.test(location.search) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return null;
+  const box = document.createElement("pre");
+  box.style.cssText = "position:fixed;z-index:9999;left:50%;top:max(4px,env(safe-area-inset-top));transform:translateX(-50%);margin:0;padding:3px 7px;border-radius:6px;background:rgba(0,0,0,.72);color:#b6f72a;font:600 10px/1.3 ui-monospace,Menlo,monospace;pointer-events:none;white-space:pre";
+  document.body.append(box);
+  const times = new Float32Array(120);
+  let i = 0;
+  let n = 0;
+  let next = 0;
+  return {
+    frame(ms) {
+      times[i] = ms;
+      i = (i + 1) % times.length;
+      n = Math.min(times.length, n + 1);
+      const now = performance.now();
+      if (now < next || !renderer) return;
+      next = now + 500;
+      let sum = 0;
+      let worst = 0;
+      for (let k = 0; k < n; k++) {
+        sum += times[k];
+        worst = Math.max(worst, times[k]);
+      }
+      const r = renderer.info.render;
+      let objs = 0;
+      scene.traverseVisible(() => objs++);
+      const heap = performance.memory ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)}MB` : "n/a";
+      // a ping now and then while the overlay is up (the round trip is shown next time)
+      if (net.socket?.readyState === WebSocket.OPEN && !net.pingAt && now - (net.pingSent ?? 0) > 2000) {
+        net.pingAt = net.pingSent = now;
+        net.socket.send("__ping");
+      }
+      const c = renderer.domElement;
+      box.textContent = `${Math.round(1000 / ms)} fps · avg ${Math.round((1000 * n) / sum)} · ${ms.toFixed(1)}ms (worst ${worst.toFixed(0)}) · pace ${paceMs.toFixed(1)}ms\n${r.calls} draws · ${Math.round(r.triangles / 1000)}k tris · ${objs} objs · heap ${heap}\n${gfxTier()} ×${renderer.getPixelRatio().toFixed(2)} (dpr ${(window.devicePixelRatio || 1).toFixed(1)}) · ${c.width}×${c.height} · ${renderer.info.memory.textures} tex · ${renderer.info.programs.length} shaders${net.rtt ? ` · ping ${net.rtt}ms` : ""}`;
+    },
+  };
+})();
 
 // look behind: hold the round button top right and the camera turns round (no second
 // render of the world, so it costs nothing in frame rate)
@@ -3251,7 +3541,66 @@ const world = (() => {
   scene.add(hemi);
   const sun = new THREE.DirectionalLight("#fff1cc", 2.1);
   sun.position.set(-6, 14, 8);
-  scene.add(sun);
+  scene.add(sun, sun.target);
+  // soft sun shadows (High preset): one small shadow map that follows the runner, so the
+  // runners and obstacles near you cast real shadows on the track
+  const SUN_DIR = new THREE.Vector3(-6, 14, 8).normalize();
+  if (startGfx.shadows) {
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    const sc = sun.shadow.camera;
+    sc.left = -9;
+    sc.right = 9;
+    sc.top = 14;
+    sc.bottom = -10;
+    sc.near = 1;
+    sc.far = 60;
+    sun.shadow.bias = -0.0006;
+    sun.shadow.normalBias = 0.02;
+    sun.shadow.radius = 3;
+  }
+  /** Keep the sun's shadow box on the runner (whole texels, so the shadow edges don't shimmer). */
+  function followSun(x, z) {
+    const tx = Math.round(x * 20) / 20;
+    const tz = Math.round(z * 20) / 20;
+    sun.target.position.set(tx, 0, tz);
+    sun.position.set(tx + SUN_DIR.x * 30, SUN_DIR.y * 30, tz + SUN_DIR.z * 30);
+  }
+  // sky light: a tiny blurred picture of the sky and ground lights every PBR material from all
+  // round (soft fill, gentle sheen), which flat lamps alone can't do. Remade for each map's look.
+  let envRT = null;
+  const pmrem = renderer ? new THREE.PMREMGenerator(renderer) : null;
+  function skyLight(top, horizon, ground) {
+    if (!pmrem || !gfx.env) {
+      scene.environment = null;
+      return;
+    }
+    const c = document.createElement("canvas");
+    c.width = 128;
+    c.height = 64;
+    const g = c.getContext("2d");
+    const grd = g.createLinearGradient(0, 0, 0, 64);
+    grd.addColorStop(0, top);
+    grd.addColorStop(0.47, horizon);
+    grd.addColorStop(0.53, ground);
+    grd.addColorStop(1, ground);
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 128, 64);
+    // a warm sun spot high up
+    const sg = g.createRadialGradient(40, 14, 0, 40, 14, 18);
+    sg.addColorStop(0, "rgba(255,250,230,1)");
+    sg.addColorStop(1, "rgba(255,250,230,0)");
+    g.fillStyle = sg;
+    g.fillRect(0, 0, 128, 64);
+    const tex = new THREE.CanvasTexture(c);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const next = pmrem.fromEquirectangular(tex);
+    tex.dispose();
+    envRT?.dispose();
+    envRT = next;
+    scene.environment = envRT.texture;
+  }
 
   const skyGroup = new THREE.Group();
   scene.add(skyGroup);
@@ -3369,7 +3718,9 @@ const world = (() => {
   /** The day look (the meadow and the classic maps). */
   const DAY_LOOK = { sky: SKY, sun: "#fff3c4", fog: [SKY.horizon, 90, 300], light: { hemi: ["#e6f6ff", "#5fae3a", 1.1], sun: ["#fff1cc", 2.1] }, far: "#97b6e6", near: "#6cbf6a", nearFoot: "#cdebd8" };
   /** Sky, light and haze for a map's look (a theme from themes.js, or the day look). */
+  let lastLook = null;
   function applyLook(look) {
+    lastLook = look;
     domeMat.uniforms.top.value.set(look.sky.top);
     domeMat.uniforms.mid.value.set(look.sky.mid);
     domeMat.uniforms.horizon.value.set(look.sky.horizon);
@@ -3381,7 +3732,11 @@ const world = (() => {
     hemi.groundColor.set(look.light.hemi[1]);
     hemi.intensity = look.light.hemi[2];
     sun.color.set(look.light.sun[0]);
-    sun.intensity = look.light.sun[1];
+    // a sunnier, higher-contrast look: a stronger sun (so shadows read) and a softer fill
+    sun.intensity = look.light.sun[1] * (startGfx.shadows ? 1.3 : 1);
+    // with the sky light on, the flat fill lamp is turned down (the sky light does it better)
+    if (gfx.env) hemi.intensity = look.light.hemi[2] * 0.42;
+    skyLight(look.sky.top, look.sky.horizon, look.light.hemi[1]);
     sunGlow.visible = Boolean(look.sun);
     if (look.sun) sunGlow.material.color.set(look.sun);
     tintRing(farRing, look.far, look.sky.horizon);
@@ -3563,6 +3918,7 @@ const world = (() => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), shadowMat);
     m.rotation.x = -Math.PI / 2;
     m.position.y = 0.04;
+    m.visible = !startGfx.shadows; // with real sun shadows the soft blob isn't needed
     return m;
   }
 
@@ -3661,26 +4017,36 @@ const world = (() => {
         });
       const jobs =
         map === "city"
-          ? [glb("ct_tower", "cityTower", { height: 30 }), glb("ct_shop", "cityShop", { height: 13 }), glb("ct_lamp", "cityLamp", { height: 5.2 }), glb("ct_taxi", "taxi", { width: 2.6 }), glb("ct_pigeon", "pigeon", { width: 1.0 }), loadGLB("/assets/ct_road.glb").then((g) => (P.cityTileNext = fitTile(g.scene, true)))]
+          ? [glb("ct_tower", "cityTower", { height: 30 }), glb("ct_shop", "cityShop", { height: 13 }), loadLod("cityTower", "ct_tower", { height: 30 }), loadLod("cityShop", "ct_shop", { height: 13 }), glb("ct_lamp", "cityLamp", { height: 5.2 }), glb("ct_taxi", "taxi", { width: 2.6 }), glb("ct_pigeon", "pigeon", { width: 1.0 }), loadGLB("/assets/ct_road.glb").then((g) => (P.cityTileNext = fitTile(g.scene, true))), loadLodTile("cityTile", "ct_road", true)]
           : map === "stadium"
-          ? [stand(), glb("st_light", "stadiumLight", { height: 30 }), glb("st_ball", "football", { width: 0.8 }), glb("st_cam", "spidercam", { width: 1.1 }), loadGLB("/assets/st_pitch.glb").then((g) => (P.stadiumTileNext = fitTile(g.scene)))]
+          ? [stand(), glb("st_light", "stadiumLight", { height: 30 }), loadLod("stadiumStand", "st_stand", { width: 34 }), loadLod("stadiumLight", "st_light", { height: 30 }), glb("st_ball", "football", { width: 0.8 }), glb("st_cam", "spidercam", { width: 1.1 }), loadGLB("/assets/st_pitch.glb").then((g) => (P.stadiumTileNext = fitTile(g.scene))), loadLodTile("stadiumTile", "st_pitch")]
           : map === "space"
-          ? [glb("sp_dome", "spaceDome", { height: 7 }), glb("sp_rocket", "spaceRocket", { height: 14 }), glb("sp_dish", "spaceDish", { height: 5 }), glb("sp_asteroid", "asteroid", { width: 0.9 }), glb("sp_ufo", "ufo", { width: 2.4 }), loadGLB("/assets/sp_walk.glb").then((g) => (P.spaceTileNext = fitTile(g.scene, true)))]
+          ? [glb("sp_dome", "spaceDome", { height: 7 }), glb("sp_rocket", "spaceRocket", { height: 14 }), loadLod("spaceDome", "sp_dome", { height: 7 }), loadLod("spaceRocket", "sp_rocket", { height: 14 }), glb("sp_dish", "spaceDish", { height: 5 }), glb("sp_asteroid", "asteroid", { width: 0.9 }), glb("sp_ufo", "ufo", { width: 2.4 }), loadGLB("/assets/sp_walk.glb").then((g) => (P.spaceTileNext = fitTile(g.scene, true))), loadLodTile("spaceTile", "sp_walk", true)]
           : map === "farm"
           ? [
               loadGLB("/assets/barn.glb").then((g) => (P.barn = fitProp(g.scene, { height: 7.5 }))),
+              loadLod("barn", "barn", { height: 7.5 }),
+              loadLod("windmill", "windmill", { height: 13 }),
               loadGLB("/assets/windmill.glb").then((g) => (P.windmill = fitProp(g.scene, { height: 13 }))),
               loadGLB("/assets/wheat.glb").then((g) => (P.wheat = fitProp(g.scene, { width: 6.8, maxHeight: 1.8 }))),
               loadGLB("/assets/tractor.glb").then((g) => (P.tractor = fitProp(g.scene, { width: 3.6 }))),
               loadGLB("/assets/sunflowers.glb").then((g) => (P.sunflowers = fitProp(g.scene, { height: 2.4 }))),
+              loadLod("wheat", "wheat", { width: 6.8, maxHeight: 1.8 }),
+              loadLod("sunflowers", "sunflowers", { height: 2.4 }),
               loadGLB("/assets/farm_tile.glb").then((g) => (P.farmTileNext = fitTile(g.scene))),
+              loadLodTile("farmTile", "farm_tile"),
             ]
           : [
               loadGLB("/assets/palm.glb").then((g) => (P.palm = fitProp(g.scene, { height: 8 }))),
               loadGLB("/assets/hut.glb").then((g) => (P.hut = fitProp(g.scene, { height: 4.6 }))),
+              loadLod("hut", "hut", { height: 4.6 }),
+              loadLod("lighthouse", "lighthouse", { height: 20 }),
               loadGLB("/assets/lighthouse.glb").then((g) => (P.lighthouse = fitProp(g.scene, { height: 20 }))),
               loadGLB("/assets/umbrella.glb").then((g) => (P.umbrella = fitProp(g.scene, { width: 3.2 }))),
+              loadLod("palm", "palm", { height: 8 }),
+              loadLod("umbrella", "umbrella", { width: 3.2 }),
               loadGLB("/assets/board_tile.glb").then((g) => (P.boardTileNext = fitTile(g.scene))),
+              loadLodTile("boardTile", "board_tile"),
             ];
       // the tile goes in last, so mapReady() only says yes once every prop is there
       mapLoads.set(
@@ -3738,6 +4104,7 @@ const world = (() => {
     holder.traverse((o) => {
       if (o.isMesh) {
         o.material.side = THREE.FrontSide;
+        o.material.envMapIntensity = 0.6; // the sky light: a soft fill, not a glow
         o.frustumCulled = true;
       }
     });
@@ -3821,6 +4188,21 @@ const world = (() => {
     return clip;
   }
 
+  /**
+   * A soft warm rim round the runners' edges, so they pop off the track. Done in the
+   * material's own shader (a few instructions): no extra light, no extra pass.
+   */
+  function addRim(m) {
+    if (m.userData.rim) return;
+    m.userData.rim = true;
+    m.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace(
+        "#include <dithering_fragment>",
+        "#include <dithering_fragment>\n  float rimF = 1.0 - max(dot(normalize(vNormal), normalize(vViewPosition)), 0.0);\n  gl_FragColor.rgb += vec3(1.0, 0.95, 0.85) * pow(rimF, 3.0) * 0.3;",
+      );
+    };
+    m.customProgramCacheKey = () => "rim";
+  }
   async function loadChar(i) {
     const gltf = await loadGLB(`/assets/${RUNNERS[i].file}.glb`);
     const clips = {};
@@ -3850,7 +4232,14 @@ const world = (() => {
     gltf.scene.traverse((o) => {
       if (o.isMesh) {
         o.frustumCulled = false;
-        if (o.material) o.material.side = THREE.FrontSide;
+        o.castShadow = startGfx.shadows;
+        if (o.material) {
+          o.material.side = THREE.FrontSide;
+          // a glossy, toy-like finish: the sky light gives them soft highlights
+          o.material.roughness = 0.5;
+          o.material.envMapIntensity = 0.75;
+          addRim(o.material);
+        }
       }
     });
     // Measure the POSED, skinned mesh (precise box): the bind-pose bounds of a
@@ -3914,8 +4303,10 @@ const world = (() => {
       loadGLB("/assets/tree_pine.glb").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
       loadGLB("/assets/tree_blossom.glb").then((g) => (assets.props.blossom = fitProp(g.scene, { height: 5.4 }))),
       loadGLB("/assets/bush.glb").then((g) => (assets.props.bush = fitProp(g.scene, { width: 2.4 }))),
+      // light far versions (colour baked in, a few hundred triangles) for scenery past LOD_NEAR
+      ...[["oak", "tree_oak", { height: 6.5 }], ["pine", "tree_pine", { height: 6.2 }], ["blossom", "tree_blossom", { height: 5.4 }], ["bush", "bush", { width: 2.4 }], ["rocks", "rocks", { width: 2.2 }], ["cloud", "cloud", { width: 1 }]].map(([k, f, size]) => loadLod(k, f, size)),
       loadGLB("/assets/rocks.glb").then((g) => (assets.props.rocks = fitProp(g.scene, { width: 2.2 }))),
-      loadGLB("/assets/fence.glb").then((g) => (assets.props.fence = fitProp(g.scene, { width: 3.0, maxHeight: 0.9 }))),
+      Promise.resolve().then(() => (assets.props.fence = pickerFence())), // built in code: crisp and ~150 triangles
       loadGLB("/assets/cloud.glb").then((g) => (assets.props.cloud = fitProp(g.scene, { width: 1 }))),
     ];
     // the bar moves with the bytes downloaded (and finished files), never backwards
@@ -4239,6 +4630,7 @@ const world = (() => {
    */
   const mapScenery = {}; // map -> { group, cull: [] }
   let sceneryCull = [];
+  let sceneryBatches = [];
   let activeMap = "";
   const MAP_GROUND = {
     meadow: { color: "#ffffff", tex: true },
@@ -4259,10 +4651,24 @@ const world = (() => {
     if (!mapReady(map)) map = "meadow";
     if (!assets.props.ground) return;
     if (!mapScenery[map]) mapScenery[map] = buildMap(map);
+    mapScenery[map].used = performance.now();
+    // keep the last few maps built (quick rematches); free the rest so long sessions don't grow
+    const built = Object.entries(mapScenery).filter(([k]) => k !== map && k !== "meadow");
+    if (built.length > 2) {
+      built.sort((a, b) => (a[1].used ?? 0) - (b[1].used ?? 0));
+      for (const [k, m] of built.slice(0, built.length - 2)) {
+        scene.remove(m.group);
+        m.group.traverse((o) => {
+          if (o.isInstancedMesh) o.dispose(); // the instance buffers (models and pictures stay shared)
+        });
+        delete mapScenery[k];
+      }
+    }
     for (const [k, m] of Object.entries(mapScenery)) m.group.visible = k === map;
     scenery = mapScenery[map].group;
     scenery.position.z = -shift;
     sceneryCull = mapScenery[map].cull;
+    sceneryBatches = mapScenery[map].batches ?? [];
     activeMap = map;
     setSky(map);
     const theme = THEME[map];
@@ -4406,6 +4812,7 @@ const world = (() => {
     const side = new THREE.MeshLambertMaterial({ color: sideColor });
     const top = new THREE.MeshLambertMaterial({ map: tex });
     const deck = new THREE.Mesh(new THREE.BoxGeometry(TRACK_W, -MEADOW_Y, len), [side, side, top, side, side, side]);
+    deck.receiveShadow = true; // runners' and obstacles' shadows land on the track
     deck.position.set(0, MEADOW_Y / 2, -(len / 2 - 60));
     g.add(deck);
     const kerbMat = new THREE.MeshLambertMaterial({ color: kerbColor });
@@ -4436,7 +4843,7 @@ const world = (() => {
     const light = new THREE.Color("#ffffff");
     const shade = new THREE.Color("#b9d6a6");
     for (const side of [-1, 1]) {
-      const geo = new THREE.PlaneGeometry(width, len, 26, Math.round(len / 5));
+      const geo = new THREE.PlaneGeometry(width, len, 18, Math.round(len / 7)); // smooth hills don't need more
       geo.rotateX(-Math.PI / 2);
       const pos = geo.attributes.position;
       const col = [];
@@ -4461,22 +4868,22 @@ const world = (() => {
     const colors = ["#ffffff", "#ffe14d", "#ff7ab8", "#ffffff", "#c58bff", "#ff9f43"].map((c) => new THREE.Color(c));
     const geo = new THREE.IcosahedronGeometry(0.11, 0);
     const n = Math.round(((TRACK_LEN + 220) / 0.55) * 2);
-    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial(), n);
-    mesh.frustumCulled = false; // spread along the whole track
-    const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const sc = new THREE.Vector3();
     const at = new THREE.Vector3();
+    const entries = [];
     for (let i = 0; i < n; i++) {
       const side = i % 2 ? 1 : -1;
       const z = -60 + (i >> 1) * 0.55 + r() * 0.5;
       at.set(side * (edge + 0.75 + r() * 3.2), MEADOW_Y + 0.08, -z);
       const k = 0.7 + r() * 0.7;
       sc.set(k, k * 0.6, k);
-      mesh.setMatrixAt(i, m.compose(at, q, sc));
-      mesh.setColorAt(i, colors[Math.floor(r() * colors.length)]);
+      entries.push({ z, m: new THREE.Matrix4().compose(at, q, sc), color: colors[Math.floor(r() * colors.length)] });
     }
-    return mesh;
+    // tiny flowers: only drawn up close (they vanish into the grass further out anyway)
+    const b = windowBatch(geo, new THREE.MeshLambertMaterial(), entries, NEAR_FROM, 90);
+    batchSink?.push(b);
+    return b.inst;
   }
 
   // ── themed maps: everything built in code from a recipe in themes.js ──
@@ -4713,26 +5120,21 @@ const world = (() => {
               : new THREE.MeshLambertMaterial();
         // the window texture needs UVs: the building is a plain box
         const g = special === "windows" ? new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0) : geo;
-        const inst = new THREE.InstancedMesh(g, mat, k.items.length);
-        inst.frustumCulled = false;
-        k.items.forEach((it, i) => {
-          inst.setMatrixAt(i, m.compose(v.set(it.x, it.y, -it.z), q.setFromEuler(e.set(0, it.rot, 0)), sv.set(...it.sc)));
-          inst.setColorAt(i, cols[Math.floor(it.pick * cols.length) % cols.length]);
-        });
-        group.add(inst);
+        // one batch per part, holding only the stretch near the camera
+        const entries = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().compose(v.set(it.x, it.y, -it.z), q.setFromEuler(e.set(0, it.rot, 0)), sv.set(...it.sc)), color: cols[Math.floor(it.pick * cols.length) % cols.length] }));
+        const b = windowBatch(g, mat, entries, NEAR_FROM, FAR_TO + (PROP_PLACE[k.kind]?.d[1] > 40 ? 80 : 0));
+        group.add(b.inst);
+        batchSink?.push(b);
       }
     }
     // neon arches over the track
     if (theme.arches) {
       const zs = [];
       for (let z = 20; z < TRACK_LEN + 140; z += 45) zs.push(z);
-      const arch = new THREE.InstancedMesh(new THREE.TorusGeometry(TRACK_W / 2 + 0.7, 0.16, 6, 28, PI), new THREE.MeshBasicMaterial({ toneMapped: false }), zs.length);
-      arch.frustumCulled = false;
-      zs.forEach((z, i) => {
-        arch.setMatrixAt(i, m.compose(v.set(0, 0, -z), q.identity(), sv.set(1, 1, 1)));
-        arch.setColorAt(i, new THREE.Color(theme.arches[i % theme.arches.length]));
-      });
-      group.add(arch);
+      const entries = zs.map((z, i) => ({ z, m: new THREE.Matrix4().compose(v.set(0, 0, -z), q.identity(), sv.set(1, 1, 1)), color: new THREE.Color(theme.arches[i % theme.arches.length]) }));
+      const b = windowBatch(new THREE.TorusGeometry(TRACK_W / 2 + 0.7, 0.16, 6, 28, PI), new THREE.MeshBasicMaterial({ toneMapped: false }), entries, NEAR_FROM, FAR_TO);
+      group.add(b.inst);
+      batchSink?.push(b);
     }
   }
 
@@ -4749,7 +5151,7 @@ const world = (() => {
   const fxGroup = new THREE.Group();
   scene.add(fxGroup);
   let weather = null; // { points, spec, t }
-  const FX_N = 380;
+  const FX_N = Math.round(380 * gfx.fx);
   function setWeather(kind) {
     if (weather) {
       fxGroup.remove(weather.points);
@@ -4802,9 +5204,156 @@ const world = (() => {
     p.needsUpdate = true;
   }
 
+  // ── scenery in batches ──
+  // Every kind of prop along the track is ONE draw (an InstancedMesh), and it only holds the
+  // stretch near the camera: the instances are sorted by distance and the visible window is
+  // copied in whenever it moves. Props past LOD_NEAR switch to a light far version.
+  let LOD_NEAR = gfx.lod;
+  const lodProps = new Map(); // key → light far version (a holder fitted like the full one)
+  const lodFile = new Map(); // full prop → key
+  function loadLod(key, file, size) {
+    return loadGLB(`/assets/${file}_lod.glb`)
+      .then((g) => lodProps.set(key, fitProp(g.scene, size)))
+      .catch(() => {}); // no far version: the full one is used all the way
+  }
+  /** A running-surface tile's far version (fitted like the tile itself). */
+  function loadLodTile(key, file, lengthwise = false) {
+    return loadGLB(`/assets/${file}_lod.glb`)
+      .then((g) => lodProps.set(key, fitTile(g.scene, lengthwise)))
+      .catch(() => {});
+  }
+  /** How far out a kind keeps its full model, as a share of LOD_NEAR (big busy fields switch sooner). */
+  const NEAR_SCALE = { wheat: 0.45, sunflowers: 0.7, farmTile: 0.7, boardTile: 0.8 };
+  /** The meshes inside a prop holder, and where each sits in the holder (null if any can't be batched). */
+  function propMeshes(holder) {
+    const out = [];
+    let ok = true;
+    holder.updateWorldMatrix(true, true);
+    const inv = new THREE.Matrix4().copy(holder.matrixWorld).invert();
+    holder.traverse((x) => {
+      if (!x.isMesh && !x.isSprite) return;
+      if (x.isSprite || x.isSkinnedMesh || x.isInstancedMesh || Array.isArray(x.material)) ok = false;
+      else out.push({ mesh: x, local: new THREE.Matrix4().multiplyMatrices(inv, x.matrixWorld) });
+    });
+    return ok && out.length ? out : null;
+  }
+  const propMesh = (holder) => {
+    const l = propMeshes(holder);
+    return l && l.length === 1 ? l[0] : null;
+  };
+  const lowerZ = (zs, z) => {
+    let lo = 0;
+    let hi = zs.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (zs[mid] < z) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+  /** One batch: entries [{ z, m: Matrix4, color? }] in the group's space; drawn between z+from and z+to of the camera. */
+  function windowBatch(geo, mat, entries, from, to) {
+    entries.sort((a, b) => a.z - b.z);
+    const n = entries.length;
+    const inst = new THREE.InstancedMesh(geo, mat, n);
+    inst.frustumCulled = false; // the window already keeps it to what's near
+    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const all = new Float32Array(n * 16);
+    entries.forEach((e, i) => e.m.toArray(all, i * 16));
+    let cols = null;
+    if (entries[0].color) {
+      cols = new Float32Array(n * 3);
+      entries.forEach((e, i) => e.color.toArray(cols, i * 3));
+      inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+    }
+    inst.count = 0;
+    return { inst, zs: Float32Array.from(entries, (e) => e.z), all, cols, from, to, lo: -1, hi: -1 };
+  }
+  /** Move a batch's window to the camera at track distance d (in the group's own z). */
+  function windowUpdate(b, d) {
+    const lo = lowerZ(b.zs, d + (typeof b.from === "function" ? b.from() : b.from));
+    const hi = Math.max(lo, lowerZ(b.zs, d + (typeof b.to === "function" ? b.to() : b.to)));
+    if (lo === b.lo && hi === b.hi) return;
+    b.lo = lo;
+    b.hi = hi;
+    const im = b.inst.instanceMatrix;
+    im.array.set(b.all.subarray(lo * 16, hi * 16));
+    im.needsUpdate = true;
+    if (b.cols) {
+      b.inst.instanceColor.array.set(b.cols.subarray(lo * 3, hi * 3));
+      b.inst.instanceColor.needsUpdate = true;
+    }
+    b.inst.count = hi - lo;
+  }
+  const NEAR_FROM = -VIEW_BEHIND;
+  const FAR_TO = VIEW_AHEAD + 60;
+  /**
+   * Turn a map's cloned props into batches: every kind of prop with 3+ copies becomes one
+   * near batch (full model) and, when it has one, one far batch (light model).
+   */
+  function batchScenery(group, cull, batches) {
+    group.updateWorldMatrix(true, false);
+    const inv = new THREE.Matrix4().copy(group.matrixWorld).invert();
+    const kinds = new Map();
+    for (const c of cull) {
+      if (!c.proto || c.obj.parent !== group) continue;
+      let k = kinds.get(c.proto);
+      if (!k) kinds.set(c.proto, (k = { parts: propMeshes(c.proto), items: [] }));
+      if (!k.parts) continue;
+      c.obj.updateWorldMatrix(false, false);
+      k.items.push({ z: c.z, c, world: c.obj.matrixWorld.clone() });
+    }
+    const done = new Set();
+    for (const [proto, k] of kinds) {
+      if (!k.parts || k.items.length < 3) continue;
+      const key = lodFile.get(proto);
+      const lodHolder = lodProps.get(key);
+      const lod = lodHolder ? propMesh(lodHolder) : null;
+      const nearTo = () => LOD_NEAR * (NEAR_SCALE[key] ?? 1);
+      // full model near the camera (all the way out if there's no far version): one batch per part
+      for (const part of k.parts) {
+        const near = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().multiplyMatrices(inv, it.world).multiply(part.local) }));
+        const nb = windowBatch(part.mesh.geometry, part.mesh.material, near, NEAR_FROM, lod && k.parts.length === 1 ? nearTo : FAR_TO);
+        nb.inst.receiveShadow = Boolean(proto.userData.ground); // the running surface
+        group.add(nb.inst);
+        batches.push(nb);
+      }
+      if (lod && k.parts.length === 1) {
+        const far = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().multiplyMatrices(inv, it.world).multiply(lod.local) }));
+        const fb = windowBatch(lod.mesh.geometry, lod.mesh.material, far, nearTo, FAR_TO);
+        fb.inst.receiveShadow = Boolean(proto.userData.ground);
+        group.add(fb.inst);
+        batches.push(fb);
+      }
+      for (const it of k.items) {
+        group.remove(it.c.obj);
+        done.add(it.c);
+      }
+    }
+    return cull.filter((c) => !done.has(c));
+  }
+  /** A white picket fence, built from boxes: 6 pickets with pointed tops on two rails (about 150 triangles). */
+  function pickerFence() {
+    const parts = [];
+    for (let i = 0; i < 6; i++) {
+      const x = -1.25 + i * 0.5;
+      parts.push([new THREE.BoxGeometry(0.13, 0.7, 0.045), x, 0.35]);
+      parts.push([new THREE.ConeGeometry(0.093, 0.15, 4, 1), x, 0.775, 0, 0, Math.PI / 4]);
+    }
+    parts.push([new THREE.BoxGeometry(2.95, 0.085, 0.05), 0, 0.24, -0.045]);
+    parts.push([new THREE.BoxGeometry(2.95, 0.085, 0.05), 0, 0.54, -0.045]);
+    const mesh = new THREE.Mesh(bake(...parts), new THREE.MeshStandardMaterial({ color: "#f3f0e6", roughness: 0.65 }));
+    const holder = new THREE.Group();
+    holder.add(mesh);
+    return holder;
+  }
+
   function buildMap(map) {
+    for (const k of ["oak", "pine", "blossom", "bush", "rocks", "wheat", "sunflowers", "palm", "umbrella", "cityTower", "cityShop", "stadiumStand", "stadiumLight", "spaceDome", "spaceRocket", "barn", "windmill", "hut", "lighthouse"]) if (assets.props[k]) lodFile.set(assets.props[k], k);
     const group = new THREE.Group();
-    const cull = [];
+    let cull = [];
+    const batches = [];
+    batchSink = batches;
     let s = 12345 + map.length * 7919;
     const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
     const P = assets.props;
@@ -4814,7 +5363,7 @@ const world = (() => {
       o.rotation.y = rotY;
       o.position.set(x, y, -z);
       group.add(o);
-      cull.push({ obj: o, z, keep: true, wide: true });
+      cull.push({ obj: o, z, keep: true, wide: true, proto });
       return o;
     };
     const built = BUILT_MAPS.has(map);
@@ -4822,6 +5371,8 @@ const world = (() => {
     if (map === "meadow") group.add(runningTrack());
     else if (!theme) {
       const tile = built ? P[`${map}Tile`] : map === "farm" ? P.farmTile : map === "beach" ? P.boardTile : P.ground;
+      tile.userData.ground = true;
+      lodFile.set(tile, built ? `${map}Tile` : map === "farm" ? "farmTile" : map === "beach" ? "boardTile" : "ground");
       const step = tile.userData.length * 0.97;
       for (let z = -60; z < TRACK_LEN + 160; z += step) add(tile, 0, 0, z, 1, 0);
     }
@@ -4899,9 +5450,12 @@ const world = (() => {
       // lighthouses out on the rocks
       for (let z = 80; z < TRACK_LEN + 160; z += 260) add(P.lighthouse, -(edge + 55 + r() * 20), MEADOW_Y, z, 1, r() * Math.PI * 2);
     }
+    cull = batchScenery(group, cull, batches);
+    batchSink = null;
     scene.add(group);
-    return { group, cull };
+    return { group, cull, batches };
   }
+  let batchSink = null; // the batch list of the map being built (themed props and flowers go in it)
 
   function buildShared() {
     sharedBuilt = true;
@@ -4924,12 +5478,12 @@ const world = (() => {
 
     // 3D clouds drifting in the sky; the group follows the camera
     for (let i = 0; i < 16; i++) {
-      const c = P.cloud.clone();
+      const c = (lodProps.get("cloud") ?? P.cloud).clone();
       c.scale.multiplyScalar(14 + r() * 22);
       c.position.set((r() - 0.5) * 320, 38 + r() * 40, -40 - r() * 230);
       c.rotation.y = (r() - 0.5) * 0.6;
       // unlit, so the clouds stay bright white instead of picking up grey shading
-      c.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ map: o.material.map, color: "#ffffff", fog: false }); });
+      c.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ map: o.material.map, vertexColors: Boolean(o.geometry.attributes.color), color: "#ffffff", fog: false }); });
       c.userData.drift = 0.6 + r() * 1.2;
       clouds.add(c);
     }
@@ -4950,6 +5504,7 @@ const world = (() => {
     return new THREE.CanvasTexture(c);
   })();
   function spray(x, y, z, colors, n, { speed = 6, life = 1, gravity = 9, size = 0.35, drag = 1.2, up = 0 } = {}) {
+    n = Math.max(4, Math.round(n * gfx.fx));
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
     const vel = new Float32Array(n * 3);
@@ -5055,6 +5610,11 @@ const world = (() => {
     return { ...course, rows, slows: [], boosts: (course.boosts || []).filter((b) => b.z > z) };
   }
   function buildCourseObjects(seed, len, boost = 0) {
+    const out = buildCourseObjectsInner(seed, len, boost);
+    if (startGfx.shadows) raceGroup.traverse((o) => o.isMesh && !o.isInstancedMesh && (o.castShadow = true));
+    return out;
+  }
+  function buildCourseObjectsInner(seed, len, boost = 0) {
     clearCourse();
     let course = buildCourse(seed, len, boost);
     if (world.easy) course = easyCourse(course);
@@ -5387,7 +5947,8 @@ const world = (() => {
   // the Higgsfield "4" coin on both faces, a gold rim round the edge
   const coinFace = texLoader.load("/assets/coin_face.jpg");
   coinFace.colorSpace = THREE.SRGBColorSpace;
-  const coinRim = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.2, roughness: 0.35, emissive: 0xb07a00, emissiveIntensity: 0.55 });
+  // shiny gold: with the sky light it's real metal; without it, a warm glow does the job
+  const coinRim = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: gfx.env ? 0.6 : 0.2, roughness: gfx.env ? 0.3 : 0.35, emissive: 0xc88400, emissiveIntensity: gfx.env ? 0.38 : 0.55, envMapIntensity: 1.1 });
   const coinFaceMat = new THREE.MeshStandardMaterial({ map: coinFace, metalness: 0.1, roughness: 0.4, emissive: 0x6a4400, emissiveIntensity: 0.45 });
   const bigRim = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.2, roughness: 0.3, emissive: 0xc05000, emissiveIntensity: 0.6 });
   const bigFaceMat = new THREE.MeshStandardMaterial({ map: coinFace, color: 0xffb46a, metalness: 0.1, roughness: 0.35, emissive: 0x8a3a00, emissiveIntensity: 0.5 });
@@ -5453,6 +6014,13 @@ const world = (() => {
     const t0 = performance.now();
     try {
       renderer.compile(scene, camera);
+      // draw it all once off screen: shaders get linked and every model and picture uploaded
+      // now, behind the cover, instead of stalling the first seconds of the race
+      const rt = new THREE.WebGLRenderTarget(64, 64);
+      renderer.setRenderTarget(rt);
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(null);
+      rt.dispose();
       const seen = new Set();
       scene.traverse((o) => {
         const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
@@ -5507,12 +6075,12 @@ const world = (() => {
   function setupRunCoins(course, on, bolts = false) {
     runCoins = on ? coinLines(course).map((c) => ({ z: c.z, lane: c.lane, v: c.v, got: false })).sort((a, b) => a.z - b.z) : [];
     if (bolts) {
-      // every third gap between obstacle rows holds bolts instead of coins
+      // every other gap between obstacle rows holds bolts instead of coins
       const zs = course.rows.map((r) => r.z);
       let i = 0;
       for (const c of runCoins) {
         while (i + 1 < zs.length && zs[i + 1] < c.z) i++;
-        if (i % 3 === 1) c.bolt = true;
+        if (i % 2 === 1) c.bolt = true;
       }
     }
     runLo = 0;
@@ -5832,6 +6400,7 @@ const world = (() => {
       const z = c.z + shift;
       c.obj.visible = z > d - VIEW_BEHIND && z < d + VIEW_AHEAD + 60;
     }
+    for (const b of sceneryBatches) windowUpdate(b, d - shift);
     for (const r of rollers) r.obj.visible = r.z > d - VIEW_BEHIND && r.z < d + VIEW_AHEAD;
   }
 
@@ -5884,7 +6453,16 @@ const world = (() => {
     show = null;
   }
 
+  /** A new graphics preset: scenery detail distance and the sky light change right away. */
+  function setDetail(g) {
+    LOD_NEAR = g.lod;
+    for (const b of sceneryBatches) b.lo = b.hi = -1; // re-window with the new distance
+    if (lastLook) applyLook(lastLook);
+  }
   return {
+    followSun,
+    setDetail,
+    spray,
     load,
     get ready() {
       return ready;
@@ -6057,7 +6635,6 @@ function liftCurtain() {
   setTimeout(() => curtain.classList.contains("gone") && (curtain.hidden = true), 500);
 }
 function enterRace(v) {
-  if (!v.cup || v.cup.race === 1) chargePot(v); // the host pays the prize pot as the match starts
   const needed = v.players.map((p) => p.char);
   const map = v.raceMap || "meadow";
   if (world.ready && !world.hasChars(needed)) for (const c of needed) world.ensureChar(c).catch(() => {});
@@ -6081,6 +6658,7 @@ function enterRace(v) {
   $("#hud").classList.toggle("intro", game.introLen > 0.6);
   game.mode = "race";
   // every race starts at full sharpness; it only steps down if this race really runs slow
+  judgeLastRace();
   slowFor = 0;
   if (qualityIdx) {
     qualityIdx = 0;
@@ -6125,7 +6703,7 @@ function enterRace(v) {
   const mine = v.players.find((p) => p.id === playerId);
   Object.assign(me, {
     d: mine?.d ?? 0,
-    lane: mine?.slot ?? 0,
+    lane: mine?.lane ?? mine?.slot ?? 0, // the server deals out random starting lanes
     y: 0,
     vy: 0,
     slideT: 0,
@@ -6308,7 +6886,7 @@ const COACH = {
   aim: { title: "Swipe up and SIDEWAYS", text: "Throw it into another lane!", keys: "1 2 3 4 on the keyboard = that lane", g: "bside" },
 };
 const COACH_MOVES = ["lane", "jump", "slide"];
-const COACH_ITEMS = ["throw", "drop", "aim"];
+const COACH_ITEMS = ["throw", "drop"];
 const COACH_SLOW = 0; // the run waits until you make the move
 const COACH_UNTIL_M = 1500; // after this, it stops teaching either way
 const coach = { on: false, wait: null, row: null, done: new Set(), scale: 1, items: 0, shownAt: 0 };
@@ -6393,12 +6971,18 @@ function coachTick(dt) {
   }
   const course = race.course;
   if (!course) return coach.scale;
-  const reach = Math.max(7, me.speed * 0.75);
+  // stop the run exactly where the move works if made right then (a jump clears a hurdle
+  // between ~0.1 s and ~0.6 s after take-off), not when the obstacle first comes into view
+  const v = Math.max(6, me.speed);
+  const AT = { jump: 0.33, slide: 0.35, lane: 0.45 };
   for (const row of course.rows) {
-    if (row.z <= me.d + 1.5 || row.z > me.d + reach) continue;
+    if (row.z <= me.d + 1) continue;
+    if (row.z > me.d + v) break;
     const k = row.lanes[me.lane];
     const need = k === "hurdle" ? "jump" : k === "gate" ? "slide" : k === "crate" ? "lane" : null;
     if (!need || coach.done.has(need)) continue;
+    if (row.z - me.d > Math.max(2.2, v * AT[need])) break; // not yet: keep running up to it
+    coach.scale = 0; // freeze right here, no easing past the spot
     let dir;
     if (need === "lane") {
       const free = [me.lane - 1, me.lane + 1].filter((l) => l >= 0 && l < LANES && !row.lanes[l]);
@@ -6456,7 +7040,7 @@ function input(kind) {
       me.y = 0.001;
       me.slideT = 0;
       sfx.jump();
-    }
+    } else if (me.y > 0.001) me.jumpBufT = 0.16; // remembered for the landing
   } else if (kind === "slide") {
     if (me.power === "rocket") return;
     if (me.y > 0.001) {
@@ -6487,7 +7071,6 @@ window.addEventListener("keydown", (e) => {
   else if (k === "e" || k === "E" || k === "Enter") useItem(me.lane, 1);
   else if (k === "q" || k === "Q") useItem(me.lane, -1);
   else if (k === "Shift" || k === "x" || k === "X") useSprint();
-  else if (/^Digit[1-4]$/.test(e.code)) useItem(Number(e.code.slice(5)) - 1, e.shiftKey ? -1 : 1);
   else if (k === "c" || k === "C" || k === "b" || k === "B") game.lookBack = game.lookKey = canControl() || game.mode === "race";
   else return;
   e.preventDefault();
@@ -6511,7 +7094,7 @@ window.addEventListener("keyup", (e) => {
   let sy = 0;
   let used = false;
   let tracking = false;
-  const SWIPE = 28;
+  const SWIPE = 22; // px: a short flick is enough (lower = quicker to react)
   canvas.addEventListener(
     "touchstart",
     (e) => {
@@ -6532,12 +7115,13 @@ window.addEventListener("keyup", (e) => {
       const dx = t.clientX - sx;
       const dy = t.clientY - sy;
       if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE) return;
-      used = true;
       if (Math.abs(dx) > Math.abs(dy)) input(dx < 0 ? "left" : "right");
       else input(dy < 0 ? "jump" : "slide");
+      used = true; // one move per swipe: a long flick is still one lane
     },
     { passive: true },
   );
+  canvas.addEventListener("touchcancel", () => (tracking = false), { passive: true });
   canvas.addEventListener(
     "touchend",
     () => {
@@ -6555,9 +7139,9 @@ function stepMe(dt) {
   const v = net.view;
   const running = v && serverNow() >= v.startAt;
 
-  // lane change (smooth)
+  // lane change: quick off the mark, easing into the new lane (fast when far, gentle at the end)
   const dx = me.lane - me.x;
-  const stepX = LANE_SWITCH_SPEED * dt;
+  const stepX = Math.max(LANE_SWITCH_SPEED * 0.65, Math.abs(dx) * 22) * dt;
   me.x = Math.abs(dx) <= stepX ? me.lane : me.x + Math.sign(dx) * stepX;
 
   // vertical (the rocket holds you up in the air)
@@ -6565,13 +7149,23 @@ function stepMe(dt) {
     me.y += (ROCKET_Y - me.y) * Math.min(1, dt * 6);
     me.vy = 0;
   } else if (me.y > 0 || me.vy > 0) {
-    me.vy -= GRAVITY * dt;
+    // a little heavier on the way down: a snappy arc, not a float
+    me.vy -= GRAVITY * (me.vy < 0 ? 1.3 : 1) * dt;
     me.y += me.vy * dt;
     if (me.y <= 0) {
       me.y = 0;
       me.vy = 0;
+      // a jump tapped just before landing still happens
+      if (me.jumpBufT > 0 && me.stumbleT <= 0 && me.power !== "rocket") {
+        me.jumpBufT = 0;
+        me.vy = JUMP_V;
+        me.y = 0.001;
+        me.slideT = 0;
+        sfx.jump();
+      }
     }
   }
+  me.jumpBufT = Math.max(0, (me.jumpBufT ?? 0) - dt);
   me.slideT = Math.max(0, me.slideT - (me.y > 0 ? 0 : dt));
   me.stumbleT = Math.max(0, me.stumbleT - dt);
   me.invulnT = Math.max(0, me.invulnT - dt);
@@ -7265,6 +7859,7 @@ function recordRace(v, place) {
   const mine = v.players.find((p) => p.id === playerId);
   const d = Math.round(mine?.d ?? 0);
   stats.add("races", 1);
+  setTimeout(renderRankPill, 500); // a runner to collect on the Trophy Road?
   stats.add("dist", d);
   // "with friends" trophies only count races with at least two real people
   const real = v.players.filter((p) => !p.bot).length;
@@ -7300,10 +7895,9 @@ function recordRace(v, place) {
   if (v.cup && v.cup.race >= v.cup.races.length && v.cup.table?.[0] === playerId) stats.add("cupWins", 1);
   // rounds of a multi-round match pay double
   const picked = v.kind === "coinrush" ? 0 : game.runCoins ?? 0; // coins grabbed on the track
-  // your runner's card level adds a little on top (+5% a level)
-  const coins = Math.round(((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1) * levelBonus()) + picked;
+  const coins = Math.round(((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1)) + picked;
   wallet.addCoins(coins);
-  const prize = tourneyPrize(v) + endlessTPrize(v);
+  const prize = [tourneyPrize(v), endlessTPrize(v)].filter(Boolean).join(" · ");
   const league = leagueMatch(v, n, place);
   const res = {};
   res.coins = coins;
@@ -7338,6 +7932,10 @@ function renderRankPill() {
   $("#leagueName").textContent = r.name;
   $("#leagueBar").style.width = r.next == null ? "100%" : `${Math.round(((rp - r.from) / (r.next - r.from)) * 100)}%`;
   $("#leagueNext").textContent = r.next == null ? `${rp} pts · top league` : `${rp} pts · ${r.next - rp} more to ${rankOf(r.next).name}`;
+  // something to collect (a reward for trophies or a runner for games played): the card says so
+  const waiting = road.ready().length + gamesReady().length;
+  $("#leagueCard").classList.toggle("ready", waiting > 0);
+  $("#leagueCard .lc-go").textContent = waiting ? `🎁 Claim ${waiting}` : "Open ›";
 }
 
 // ── friends: everyone you've been in a room with, and their rank ──
@@ -7427,7 +8025,7 @@ for (const chip of document.querySelectorAll(".medal-chip")) chip.addEventListen
 $("#profileCard").addEventListener("click", openStats);
 // ── Stats page: places, records, modes, and how you stand among your friends ──
 const statsModal = $("#statsModal");
-const MODE_STAT = [["survival", "❤️ Survival"], ["chase", "🧠 Brain Chase"], ["coinrush", "🪙 Coin Rush"], ["potato", "💣 Hot Potato"]];
+const MODE_STAT = [["survival", "❤️ Survival"], ["sprint", "🏁 Classic Race"], ["chase", "🧠 Brain Chase"], ["coinrush", "🪙 Coin Rush"]];
 function openStats() {
   sfx.tap();
   renderStats();
@@ -7651,7 +8249,7 @@ function savePass(p) {
 // Kiko moved to the Season Pass: anyone who already claimed that level this season gets him now
 if (!local.getItem("lr:kikoMove")) {
   local.setItem("lr:kikoMove", "1");
-  if (passState().free.includes(PASS_RUNNERS[KIKO])) giveItem(KIKO);
+  if (passState().free.includes(2)) giveItem(KIKO);
 }
 // Pip moved to the Season Pass: anyone who has already played keeps him
 if (!local.getItem("lr:pipMove")) {
@@ -7686,6 +8284,8 @@ function passReward(level, track) {
     return { coins: 50 + level * 10, label: `${50 + level * 10} coins`, img: "/assets/ui_c1.webp" };
   }
   if (level === 30) return { char: PASS_CHAR.id, label: PASS_CHAR.name, img: `/assets/pk_${PASS_CHAR.id}.webp` };
+  if (level === 1) return { char: "sharky", label: "Sharky", img: "/assets/sc_sharky.webp" };
+  if (level === 15) return { char: "pandu", label: "Pandu", img: "/assets/sc_pandu.webp" };
   if (level === 10) return { item: "trail:neon", label: "Neon trail", icon: "🌈" };
   if (level === 20) return { coins: 1000, label: "1,000 coins", img: "/assets/ui_c3.webp" };
   if (level === 15 || level === 25) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
@@ -7752,6 +8352,24 @@ function renderPassPill() {
   const n = passClaimable(p);
   $("#passPillSub").textContent = n ? `${n} reward${n > 1 ? "s" : ""} ready to claim!` : lv >= PASS_LEVELS ? "Max level reached" : `${into} / ${PASS_XP} XP to level ${lv + 1}`;
   $("#passPill .dot").hidden = n === 0;
+  // the next rewards, right on the card (gold ones locked until the Gold Pass)
+  const peek = [];
+  for (let l = Math.min(lv, PASS_LEVELS - 3); peek.length < 4 && l <= PASS_LEVELS; l++) {
+    for (const track of ["free", "gold"]) {
+      if (peek.length >= 4) break;
+      const r = passReward(l, track);
+      const done = p[track].includes(l) && l <= lv;
+      peek.push(
+        el(
+          "span",
+          { class: `pk-tile ${track}${done ? " done" : ""}${track === "gold" && !p.hasGold ? " locked" : ""}` },
+          r.img ? el("img", { src: r.img, alt: "" }) : el("i", { text: r.icon ?? "🎁" }),
+          el("small", { text: `Lv ${l}` }),
+        ),
+      );
+    }
+  }
+  $("#passPeek").replaceChildren(...peek);
   renderStoreDot();
 }
 function renderPass() {
@@ -7803,11 +8421,18 @@ $("#passBuy").addEventListener("click", () => {
   const p = passState();
   if (p.hasGold) return;
   p.hasGold = true;
+  p.gold = [...new Set([...(p.gold ?? []), 1])]; // level 1 is claimed on the spot: Sharky
   savePass(p);
   sfx.finish();
   coinRain($("#passBuy"), 20);
-  toast("Gold Pass unlocked! Claim your gold rewards");
   renderPass();
+  const fresh = !wallet.has("sharky");
+  giveItem("sharky");
+  renderCollPill();
+  if (fresh) {
+    passModal.hidden = true;
+    showUnlock({ kind: "char", char: { name: "Sharky", rarity: "epic", img: "/assets/sc_sharky.webp" } }, () => toast("Gold Pass unlocked! Claim your gold rewards"));
+  } else toast("Gold Pass unlocked! Claim your gold rewards");
 });
 $("#passPill").addEventListener("click", () => {
   renderPass();
@@ -7823,7 +8448,7 @@ renderCollPill();
 const CAREER = [
   {
     name: "Rookie",
-    chest: { pack: "brain" },
+    chest: { pack: "mega" },
     missions: [
       { stat: "races", goal: 3, text: "Play 3 races", coins: 50, icon: "/assets/ui_star.webp" },
       { stat: "dist", goal: 1000, text: "Run 1 km in total", coins: 50, icon: "/assets/ui_shoe.webp" },
@@ -7833,7 +8458,7 @@ const CAREER = [
   },
   {
     name: "Runner",
-    chest: { pack: "brain" },
+    chest: { pack: "mega" },
     missions: [
       { stat: "races", goal: 10, text: "Play 10 races", coins: 80, icon: "/assets/ui_star.webp" },
       { stat: "winsAny", goal: 1, text: "Win a race (bots count)", coins: 100, icon: "/assets/medal_gold.png" },
@@ -7845,7 +8470,7 @@ const CAREER = [
     name: "Contender",
     chest: { pack: "mega" },
     missions: [
-      { stat: "modes", goal: 4, text: "Play all 4 modes (Survival, Chase, Coin Rush, Potato)", coins: 150, icon: "/assets/ui_chest.webp" },
+      { stat: "modes", goal: 4, text: "Play all 4 modes (Survival, Race, Chase, Coin Rush)", coins: 150, icon: "/assets/ui_chest.webp" },
       { stat: "winsAny", goal: 3, text: "Win 3 races", coins: 150, icon: "/assets/medal_gold.png" },
       { stat: "kos", goal: 10, text: "Hit opponents 10 times", coins: 150, icon: "/assets/pw_boxing.png" },
       { stat: "rushCoins", goal: 100, text: "Collect 100 coins in Coin Rush", coins: 150, icon: "/assets/ui_c2.webp" },
@@ -8359,7 +8984,7 @@ function checkZaps() {
 
 /** Random / Grand Tour matches: a slot-machine reel lands on this round's mode during the countdown. */
 function spinReveal(round, kind, total) {
-  const kinds = ["survival", "chase", "coinrush", "potato"];
+  const kinds = ["survival", "sprint", "chase", "coinrush"];
   const reel = $("#spinReel");
   const cards = [];
   const loops = 5;
@@ -8409,7 +9034,8 @@ function renderSprint() {
   setText(b.querySelector("b"), me.sprintT > 0 ? "GO!" : full ? "SPRINT" : `${me.bolts}/${SPRINT_NEED}`);
 }
 function useSprint() {
-  if (game.mode !== "race" || me.bolts < SPRINT_NEED || me.sprintT > 0 || me.out || me.finished || !canControl()) return;
+  if (game.mode !== "race" || me.sprintT > 0 || me.out || me.finished || !canControl()) return;
+  if (me.bolts < SPRINT_NEED) return banner(`⚡ ${me.bolts}/${SPRINT_NEED} · grab the blue bolts`, 900);
   me.bolts = 0;
   me.sprintT = SPRINT_S;
   sfx.boost();
@@ -8428,6 +9054,12 @@ function modeTick(prevD, v) {
   if (me.finished || me.out) return;
   // coin lines on the track
   const got = me.power === "rocket" ? { coins: 0, bolts: 0 } : world.grabRunCoins(prevD, me.d, me.x, me.y);
+  // a little sparkle where you grabbed it
+  if ((got.coins || got.bolts) && me.runner && performance.now() - (game.sparkleAt ?? 0) > 200) {
+    game.sparkleAt = performance.now(); // at most 5 a second, however fast the coins come
+    const g = me.runner.group.position;
+    world.spray(g.x, 1.0, g.z - 0.6, got.bolts ? ["#8ff3ff", "#3fe0ff", "#ffffff"] : ["#ffe36e", "#ffc928", "#ffffff"], 8, { speed: 3, life: 0.35, gravity: 2, size: 0.22, drag: 2.5, up: 1 });
+  }
   if (got.coins) {
     game.runCoins = (game.runCoins ?? 0) + got.coins;
     setText(hudEl.coins ?? (hudEl.coins = $("#runCoins")), String(game.runCoins));
@@ -8691,24 +9323,19 @@ function renderPower() {
 {
   const slot = $("#powerSlot");
   let y0 = null;
-  let x0 = 0;
   slot.addEventListener("pointerdown", (e) => {
     y0 = e.clientY;
-    x0 = e.clientX;
     slot.setPointerCapture?.(e.pointerId);
   });
   slot.addEventListener("pointerup", (e) => {
     if (y0 == null) return;
     const dy = e.clientY - y0;
-    const dx = e.clientX - x0;
     y0 = null;
     buzz(15);
     const throws = !me.power && THROWN.has(me.items[0]);
     if (!throws) return useItem();
-    // the sideways part of the swipe picks the lane: a short swipe one lane over, a long one further
-    const shift = Math.abs(dx) > 26 ? Math.sign(dx) * Math.max(1, Math.round(Math.abs(dx) / 55)) : 0;
-    const lane = clamp(me.lane + shift, 0, LANES - 1);
-    useItem(lane, dy > 22 ? -1 : 1);
+    // always in your own lane: swipe down to drop it behind, anything else throws it ahead
+    useItem(me.lane, dy > 22 ? -1 : 1);
   });
   slot.addEventListener("pointercancel", () => (y0 = null));
 }
@@ -8780,7 +9407,25 @@ function animateRunner(r, a, speed, dt, pw = "") {
   else r.play("run", 0.12, clamp(speed / BASE_SPEED, 0.45, 1.45));
   // a little forward lean while flying the rocket
   r.pivot.rotation.x = pw === "rocket" ? 0.35 : 0;
-  r.pivot.rotation.z = 0;
+  // body language: lean into lane changes and look where you're going; squash a little on landing
+  const x = r.group.position.x;
+  const y = r.group.position.y;
+  const vx = dt > 0 && r.lastX !== undefined ? (x - r.lastX) / dt : 0;
+  r.lastX = x;
+  const k = Math.min(1, dt * 14);
+  r.lean = (r.lean ?? 0) + (clamp(vx * 0.05, -0.3, 0.3) - (r.lean ?? 0)) * k;
+  r.yaw = (r.yaw ?? 0) + (clamp(vx * 0.045, -0.28, 0.28) - (r.yaw ?? 0)) * k;
+  if ((r.lastY ?? 0) > 0.25 && y <= 0.02 && a !== "slide") {
+    r.squash = 1;
+    if (r === me.runner) world.spray(x, 0.08, r.group.position.z, ["#f4ead8", "#ffffff", "#d9cbb0"], 10, { speed: 2.4, life: 0.4, gravity: -0.4, size: 0.3, drag: 3 });
+  }
+  r.lastY = y;
+  r.squash = Math.max(0, (r.squash ?? 0) - dt * 6);
+  r.pivot.rotation.z = r.lean;
+  r.pivot.rotation.y = Math.PI - r.yaw;
+  const base = (r.baseScale ??= r.pivot.scale.x);
+  const q = Math.sin(r.squash * Math.PI) * 0.6 + r.squash * 0.4; // quick in, soft out
+  r.pivot.scale.set(base * (1 + 0.07 * q), base * (1 - 0.12 * q), base * (1 + 0.07 * q));
   r.mixer.update(dt);
 }
 
@@ -8791,6 +9436,7 @@ let lastCount = null;
 let last = performance.now();
 const camPos = new THREE.Vector3(0, 4, 8);
 const camLook = new THREE.Vector3();
+const camGoal = new THREE.Vector3();
 
 function frame(now) {
   requestAnimationFrame(frame);
@@ -8887,22 +9533,22 @@ function frame(now) {
     let introLook = null;
     if (intro) {
       const p = forced ?? 1 - Math.max(0, toGo) / introLen;
-      const e = p * p * (3 - 2 * p);
-      // round your runner: from in front of your face, past your side, to behind you
-      // (kept between the start gate's posts)
-      const px = laneX(fx);
-      const side = px > 0 ? -1 : 1; // swing round on the open side
-      const cx = (x) => clamp(x, -3.4, 3.4);
-      introPath.points[0].set(cx(px + side * 1.6), 1.6, fz - 4.6);
-      introPath.points[1].set(cx(px + side * 3.0), 2.2, fz - 2.2);
-      introPath.points[2].set(cx(px + side * 3.0), 3.4, fz + 2.6);
-      introPath.points[3].set(tx, 3.0, fz + 5.6);
+      // the whole line-up first (all four runners, cheering), held for a while,
+      // then one sweep over their heads to behind your runner for the gun
+      const q = THREE.MathUtils.smoothstep(p, 0.45, 1);
+      const e = p < 0.45 ? (0.06 * p) / 0.45 : 0.06 + 0.94 * q;
+      const side = laneX(fx) > 0 ? -1 : 1; // sweep round on the open side
+      introPath.points[0].set(0, 2.4, fz - 11.5);
+      introPath.points[1].set(side * 3.2, 4.2, fz - 5.5);
+      introPath.points[2].set(side * 2.4, 4.6, fz + 1.5);
+      introPath.points[3].set(tx, 2.65, fz + 4.7);
       introPath.getPoint(e, camPos);
-      // look at your runner, then turn to look down the track
-      const k = THREE.MathUtils.smoothstep(p, 0.68, 1);
-      introLook = new THREE.Vector3(px, 1.05, fz).lerp(new THREE.Vector3(tx * 0.8, 1.0, fz - 9), k);
+      // look at the middle of the line-up, then turn to look down the track
+      const k = THREE.MathUtils.smoothstep(p, 0.6, 1);
+      introLook = new THREE.Vector3(0, 1.0, fz).lerp(new THREE.Vector3(tx * 0.8, 1.15, fz - 10), k);
     } else {
-      camPos.lerp(back ? new THREE.Vector3(tx, 2.5 + fy * 0.6, fz - 4.2) : new THREE.Vector3(tx, 3.0 + fy * 0.75, fz + 5.6), Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
+      camGoal.set(tx, back ? 2.5 + fy * 0.6 : 2.65 + fy * 0.75, back ? fz - 4.2 : fz + 4.7); // reused: no garbage per frame (closer and lower: your runner big, the track fast)
+      camPos.lerp(camGoal, Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     }
     camera.position.copy(camPos);
     if (shake > 0) {
@@ -8912,7 +9558,7 @@ function frame(now) {
     }
     if (intro) camLook.copy(introLook);
     else if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
-    else camLook.set(tx * 0.8, 1.0 + fy * 0.6, fz - 9);
+    else camLook.set(tx * 0.8, 1.15 + fy * 0.6, fz - 10);
     camera.lookAt(camLook);
     world.cull(back ? fd - 30 : fd);
     world.syncBananas(net.view?.bananas || [], slipped);
@@ -8929,7 +9575,8 @@ function frame(now) {
     }, serverNow());
     world.syncBowls(net.view?.bowls || [], serverNow());
     // feel the speed: wider view and speed lines on a rocket or boost
-    const zoom = me.power === "rocket" ? 80 : me.boostT > 0 || me.sprintT > 0 ? 70 : 62;
+    // the view opens up a little as you speed up (and a lot on a rocket or boost)
+    const zoom = intro ? 66 + 10 * (1 - THREE.MathUtils.smoothstep(forced ?? 1 - Math.max(0, toGo) / Math.max(introLen, 0.01), 0.55, 1)) : me.power === "rocket" ? 80 : me.boostT > 0 || me.sprintT > 0 ? 70 : 62 + clamp((me.speed - BASE_SPEED) * 0.45, 0, 5);
     if (Math.abs(camera.fov - zoom) > 0.1) {
       camera.fov += (zoom - camera.fov) * Math.min(1, dt * 5);
       camera.updateProjectionMatrix();
@@ -8950,8 +9597,10 @@ function frame(now) {
   }
 
   if (game.mode === "race" || game.mode === "results-pending") world.stepRunCoins(me.d);
+  if (startGfx.shadows) world.followSun(camera.position.x * 0.5, camera.position.z - 9);
   world.tick(camera.position.z, dt);
   renderer?.render(scene, camera);
+  perfHud?.frame(dt * 1000);
   renderMirror();
   adaptQuality(dt);
 }
@@ -8999,6 +9648,10 @@ function updateHud() {
     remainingAfterFirst !== null && !me.finished ? `⏱${Math.ceil(remainingAfterFirst / 1000)}` : (t / 1000).toFixed(1),
   );
 
+  // places, distance and the side bar: 10 times a second is plenty (less DOM work and garbage per frame)
+  const hudNow = performance.now();
+  if (hudNow - (hudEl.placesAt ?? 0) < 100) return;
+  hudEl.placesAt = hudNow;
   // places by live distance (finished runners first, by time)
   const entries = v.players
     .filter((p) => !p.left)
@@ -9096,7 +9749,7 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 
 // characters taken out of the game: whoever owned one gets coins for it, once
 {
-  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000 };
+  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000, mo: 300, porky: 900, frosty: 600, thunderjack: 1500, kai: 800, leo: 800, zed: 1500, hoops: 1500 };
   const owned = wallet.owned();
   const had = owned.filter((id) => id in GONE && !local.getItem(`lr:refund:${id}`));
   if (had.length) {
@@ -9134,6 +9787,9 @@ world
     $("#boot").setAttribute("aria-valuenow", String(pct));
   })
   .then(() => {
+    try {
+      sessionStorage.removeItem("lr:bootFix"); // started fine: a later failure may reload again
+    } catch {}
     $("#loadHint").textContent = "";
     // the loading screen fills up, then fades away
     $("#bootFill").style.width = "100%";
@@ -9145,7 +9801,8 @@ world
     world.setShowcase(preferredChar());
     if (net.view?.phase === "lobby") renderLobby(net.view);
     // a brand-new player first sees the game; then Nia invites them to a first run that teaches as they play
-    if (!local.getItem("lr:endlessTut") && !local.getItem("lr:tutAuto")) setTimeout(showTutInvite, 1800);
+    // a brand-new player is asked their name first (the first endless run then teaches the moves by itself)
+    if (!local.getItem("lr:asked")) setTimeout(() => game.mode === "home" && maybeAskName(), 900);
   })
   .catch((err) => {
     console.error(err);
@@ -9156,7 +9813,7 @@ world
 // test hooks for the local dev server only (headless browser checks)
 if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
   // test hooks (used by the automated play-tests)
-  window.__laneRush = { renderer, scene, me, hit, grabBox, useItem, game, net, remote, world, race, camera, renderPower, MOVER_KINDS, moverCovers, raceElapsed: () => (net.view ? (serverNow() - net.view.startAt) / 1000 : 0) };
+  window.__laneRush = { renderer, scene, me, hit, grabBox, useItem, game, net, coach, remote, world, race, camera, renderPower, MOVER_KINDS, moverCovers, raceElapsed: () => (net.view ? (serverNow() - net.view.startAt) / 1000 : 0) };
 }
 
 requestAnimationFrame(frame);

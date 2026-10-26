@@ -2784,3 +2784,119 @@ html, body { background: var(--k1); }
 #picker .card.locked img { filter: none !important; opacity: 1 !important; }
 /* the invite's arrow points at the Endless Run button, wherever it sits */
 .ti-card::after { left: var(--ax, 50%); }
+
+/* settings: the graphics preset */
+.gfx-row { flex-wrap: wrap; gap: 8px; }
+.gfx-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; width: 100%; }
+.gfx-pick button { padding: 8px 2px; border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font: inherit; font-weight: 800; font-size: 13px; }
+.gfx-pick button.on { border-color: var(--lime); background: var(--lime); color: var(--lime-ink); }
+
+/* Trophy Road: how trophies are earned, always in view at the top */
+.road-full .rv-how { position: sticky; top: 0; z-index: 3; display: grid; gap: 2px; margin: 0 0 10px; padding: 9px 12px; border-radius: 14px; background: rgba(10, 14, 10, 0.92); border: 2px solid var(--lime); text-align: center; }
+.road-full .rv-how b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 16px; text-transform: uppercase; color: var(--lime); }
+.road-full .rv-how span { font-size: 13px; font-weight: 800; color: #fff; }
+/* Tournaments: a bigger "Your league" card */
+.hp-compete .league-card { grid-template-columns: 84px minmax(0, 1fr) auto; min-height: 118px; padding: 16px 14px; }
+.hp-compete .league-card img { width: 84px; height: 84px; }
+.hp-compete .league-card b { font-size: 26px; }
+.hp-compete .league-card small { font-size: 12px; }
+.hp-compete .league-card .lc-next { font-size: 13px; }
+.hp-compete .league-card .qbar { height: 12px; }
+/* your own tournament: the setup sheet and the invite card in the lobby */
+.t-custom { background: linear-gradient(160deg, #ffb02e, #e0561b); }
+.ct-title { position: relative; z-index: 1; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; }
+.ct-pick { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+.ct-pick .chip { text-transform: none; }
+.ct-pick .chip.on { background: #fff; color: #b3400f; border-color: #fff; }
+.tr-claim.new { background: #ffb02e; color: #3a1600; }
+.t-invite { display: grid; gap: 8px; margin: 10px 0; padding: 12px; border-radius: 18px; border: 2px solid #ffd23f; background: linear-gradient(160deg, rgba(255, 176, 46, 0.25), rgba(224, 86, 27, 0.25)); color: #fff; text-align: center; }
+.t-invite b { font-size: 18px; }
+.ti-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ti-slot { padding: 10px 4px; border-radius: 12px; border: 2px dashed rgba(255, 255, 255, 0.5); font-weight: 800; font-size: 13px; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ti-slot.in { border-style: solid; border-color: #b6f72a; background: rgba(182, 247, 42, 0.18); opacity: 1; }
+/* the Trophy Road card sits at the top of the Play page (where the logo was) */
+.hp-play .league-card.home-road { position: absolute; z-index: 2; left: 16px; right: 16px; top: max(66px, calc(env(safe-area-inset-top) + 56px)); max-width: 560px; margin: 0 auto; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 12px; padding: 12px 14px; animation: logoIn 700ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.hp-play .league-card.home-road img { width: 72px; height: 72px; }
+.hp-play .league-card.home-road b { font-size: 24px; }
+.hp-play .league-card.home-road .qbar { height: 10px; }
+/* the Season Pass card on the Shop page: bigger, with the next rewards on it */
+.store-card.pass-card { grid-template-columns: 84px minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 12px; padding: 16px 14px; min-height: 190px; }
+.store-card.pass-card > img { width: 84px; height: 84px; }
+.store-card.pass-card b { font-size: 26px; }
+.store-card.pass-card .qbar { height: 12px; }
+.pass-peek { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.pk-tile { position: relative; display: grid; justify-items: center; gap: 2px; padding: 8px 4px 6px; border-radius: 14px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.25); }
+.pk-tile.gold { background: linear-gradient(180deg, rgba(255, 210, 63, 0.35), rgba(224, 140, 0, 0.25)); border-color: #ffd23f; }
+.pk-tile img { width: 44px; height: 44px; object-fit: contain; }
+.pk-tile i { font-style: normal; font-size: 32px; line-height: 44px; }
+.pk-tile small { font-size: 11px; font-weight: 900; }
+.pk-tile.locked::after { content: "🔒"; position: absolute; top: 2px; right: 4px; font-size: 13px; }
+.pk-tile.done { opacity: 0.45; }
+/* the Trophy Road opens as a full page */
+#roadModal { padding: 0; }
+#roadModal .road-sheet { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border-radius: 0; border: 0; display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top) + 46px) 14px 0; }
+#roadModal .road-sheet > .ribbon { position: absolute; top: calc(env(safe-area-inset-top) + 6px); left: 50%; transform: translateX(-50%); margin: 0; }
+#roadModal .gclose { top: calc(env(safe-area-inset-top) + 8px); right: 12px; }
+#roadModal .road-sheet .road-full { flex: 1; max-height: none; margin: 0 -14px; border-radius: 0; padding-bottom: calc(env(safe-area-inset-bottom) + 30px); }
+/* every mode card the same size */
+#lobby .mode-pick { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; }
+#lobby .mode-pick .mode-card { height: 100%; min-height: 150px; align-content: start; }
+.party-pick { margin-top: 10px; }
+.party-pick .chip { text-transform: none; }
+.party-pick .chip:not(.on) { opacity: 0.6; text-decoration: line-through; }
+#lockBtn.waiting { filter: saturate(0.4); }
+/* the Trophy Road card on the Play page: a bit smaller */
+.hp-play .league-card.home-road { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; padding: 8px 12px; }
+.hp-play .league-card.home-road img { width: 52px; height: 52px; }
+.hp-play .league-card.home-road b { font-size: 19px; }
+.hp-play .league-card.home-road .qbar { height: 8px; }
+.hp-play .league-card.home-road .lc-next { font-size: 11px; }
+.hp-play .league-card.home-road .lc-go { font-size: 12px; padding: 6px 8px; }
+/* the sprint button takes taps (the HUD around it lets them through to the game) */
+.hud .sprint-btn { pointer-events: auto; }
+/* Quick Race (just you and bots): no prizes to set */
+#lobby.solo-room .prize-title, #lobby.solo-room #prizePick, #lobby.solo-room #prizeNote { display: none; }
+/* tournament prizes: coins or a pack */
+.prz-v { display: inline-flex; align-items: center; gap: 4px; }
+.prz-v.pack img { width: 22px; height: 28px; object-fit: contain; }
+/* each tap on a sealed pack: a hard, growing shake */
+.po-pack.shake.hit { animation: poHit 260ms ease-out, poShake 1.1s ease-in-out 260ms infinite; }
+@keyframes poHit { 0% { transform: scale(1); } 25% { transform: rotate(calc(-6deg * var(--shake, 1))) scale(calc(1 + 0.04 * var(--shake, 1))); } 55% { transform: rotate(calc(6deg * var(--shake, 1))) scale(calc(1 + 0.06 * var(--shake, 1))); } 100% { transform: rotate(0) scale(1); } }
+/* first visit: five runners in a row, tap one, then confirm */
+#starterModal { z-index: 72; }
+.pf-sheet { width: min(520px, 100%); text-align: center; align-items: stretch; }
+.pf-sheet h2 { margin: 0; }
+.pf-sub { margin: 0; opacity: 0.8; font-weight: 700; }
+.pf-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pf-zone { appearance: none; display: grid; justify-items: center; gap: 2px; padding: 4px 2px 6px; min-width: 0; border-radius: 14px; border: 3px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06); color: #fff; font: inherit; cursor: pointer; transition: transform 140ms, border-color 140ms, box-shadow 140ms, opacity 140ms; -webkit-tap-highlight-color: transparent; }
+.pf-zone img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: center top; border-radius: 10px; }
+.pf-zone b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 13px; text-transform: uppercase; white-space: nowrap; }
+.pf-row.chosen .pf-zone:not(.on) { opacity: 0.45; }
+.pf-zone.on { transform: scale(1.06); border-color: var(--team); box-shadow: 0 0 0 2px #fff, 0 0 20px 4px var(--team); }
+.pf-go:disabled { opacity: 0.5; }
+/* Trophy Road: runners for games played */
+.road-full .rv-games { position: relative; z-index: 2; display: grid; gap: 8px; margin: 0 0 12px; padding: 10px; border-radius: 16px; background: rgba(10, 14, 10, 0.88); border: 2px solid var(--lime); }
+.rv-games > b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 15px; text-transform: uppercase; color: var(--lime); text-align: center; }
+.rg-row { display: grid; grid-auto-flow: column; grid-auto-columns: 74px; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.rg-step { display: grid; justify-items: center; gap: 2px; padding: 6px 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(255, 255, 255, 0.2); }
+.rg-step img { width: 52px; height: 52px; object-fit: cover; object-position: top; border-radius: 10px; filter: grayscale(0.7) brightness(0.8); }
+.rg-step.got img, .rg-step.due img { filter: none; }
+.rg-step.got { border-color: var(--lime); }
+.rg-step small { font-weight: 900; font-size: 11px; }
+.rg-step em { font-style: normal; font-size: 10px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 66px; }
+.pick5-card { min-width: 0; overflow: hidden; }
+.pick5-card img { width: 100%; max-width: 110px; height: 96px; aspect-ratio: auto; object-fit: cover; object-position: center top; }
+/* Leave sits at the top of the room page, always on screen */
+#lobby #leaveBtn { position: fixed; z-index: 30; top: max(10px, calc(env(safe-area-inset-top) + 6px)); left: max(10px, env(safe-area-inset-left)); width: auto; min-height: 0; padding: 8px 14px; border-radius: 999px; font-size: 14px; background: rgba(8, 12, 30, 0.85); border: 2px solid rgba(255, 255, 255, 0.8); color: #fff; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4); }
+#lobby .lobby-head { padding-top: 34px; }
+
+/* glows that pulse during a race: opacity on a layer (cheap) rather than an animated box-shadow (a repaint every frame) */
+.power-slot.held { animation: none; }
+.power-slot.held::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 2px var(--lime), 0 0 24px rgba(182, 247, 42, 0.45); animation: glowPulse 1.2s ease-in-out infinite; will-change: opacity; }
+@keyframes glowPulse { 50% { opacity: 0.35; } }
+.rg-step { appearance: none; color: #fff; font: inherit; cursor: default; }
+.rg-step.due { cursor: pointer; border-color: #ffd23f; box-shadow: 0 0 14px rgba(255, 210, 63, 0.7); animation: btnPulse 1s ease-in-out infinite; }
+.rg-step .rg-claim { font-size: 11px; font-weight: 900; color: #3a2400; background: #ffd23f; padding: 1px 6px; border-radius: 8px; opacity: 1; max-width: none; }
+/* the Trophy Road card on Play: something to collect */
+.hp-play .league-card.home-road.ready { border-color: #ffd23f; box-shadow: 0 5px 0 var(--k0), 0 0 22px rgba(255, 210, 63, 0.75); }
+.hp-play .league-card.home-road.ready .lc-go { background: #ffd23f; color: #3a2400; animation: btnPulse 1s ease-in-out infinite; }

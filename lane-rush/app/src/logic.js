@@ -33,7 +33,7 @@ export const COUNTDOWN_MS = 5000; // room to load and warm up before the 3-2-1
 export const RACE_LIMIT_MS = 90000; // hard cap on a race
 export const AFTER_FIRST_MS = 15000; // stragglers get this long after the winner
 export const LOBBY_GRACE_MS = 10000; // a dropped lobby player keeps their spot this long
-export const CHARACTERS = 8; // 4 starters + 4 shop skins
+export const CHARACTERS = 13; // 8 runners + 5 collectible 3D runners
 
 /**
  * Ways to play (the lobby host picks one):
@@ -51,15 +51,16 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  *   sprint     — Classic Race: 700 m to a finish line, first one there wins
  * Empty spots are filled with bots.
  * `state.mode` is what the host picked; `state.kind` is the race being run.
- * The host can also pick "random" as the mode or the map: it's drawn when each race starts.
+ * The host can also pick "random" (Party) as the mode or the map: it's drawn when each race starts.
+ * Instead of one map the host can tick several (`state.maps`): each race draws one of those.
  */
-export const GAME_MODES = ["survival", "sprint", "chase", "coinrush", "potato", "grandtour", "random"];
+export const GAME_MODES = ["survival", "sprint", "chase", "coinrush", "grandtour", "random"];
 /** Modes played over several rounds with a points table. */
 export const CUP_MODES = ["grandtour"];
 /** How many rounds the host can pick for a match (the Grand Tour is always one of each mode). */
-export const ROUND_OPTIONS = [1, 3, 5];
+export const ROUND_OPTIONS = [1, 3, 5, 10];
 /** What the host can put up for 1st / 2nd / 3rd (paid with 2+ real players). */
-export const PRIZES = ["none", "coins", "bigcoins", "huge"];
+export const PRIZES = ["none", "coins", "bigcoins", "huge", "packs"];
 /**
  * How good the bots are (the host picks it when bots fill the room).
  *   skill — chance to clear an obstacle they run into · pace — share of full speed
@@ -70,7 +71,9 @@ export const BOT_LEVELS = {
   hard: { skill: [0.975, 0.99], pace: 1.0 },
 };
 /** The modes a single round can be (a Party Cup is three of these). All run on the endless course. */
-export const ROUND_KINDS = ["survival", "chase", "coinrush", "potato"];
+export const ROUND_KINDS = ["survival", "chase", "coinrush"]; // Hot Potato is retired (its code stays for old rooms)
+/** Party ("random"): every mode, the Classic Race too, a different one each round. */
+export const PARTY_KINDS = [...ROUND_KINDS, "sprint"];
 export const isEndless = (kind) => kind !== "sprint";
 /**
  * Brain Chase: a giant brain rolls after everyone, starting this far behind
@@ -108,9 +111,9 @@ export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
 /** The classic maps (3D models), then the themed ones built in code (public/themes.js: same ids). */
-export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space", "snowy", "canyon", "volcano", "candy", "crystal", "neon", "mars", "deepsea", "lava", "rainbow", "clouds", "egypt", "wildwest", "ghost", "alien", "synth", "icecream", "aurora", "fairy"];
+export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space", "snowy", "candy", "crystal", "neon", "mars", "deepsea", "lava", "rainbow", "clouds", "egypt", "synth", "icecream", "aurora"]; // Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet and Fairy Forest retired
 /** Themed maps borrow a classic map's moving obstacles (the rest use the meadow's logs and bees). */
-export const MAP_MOVERS = { neon: "city", mars: "space", deepsea: "beach", rainbow: "space", clouds: "space", egypt: "farm", wildwest: "farm", alien: "space", synth: "space" };
+export const MAP_MOVERS = { neon: "city", mars: "space", deepsea: "beach", rainbow: "space", clouds: "space", egypt: "farm", synth: "space" };
 /** A Party Cup is three rounds; each placing scores points, most points wins. */
 export const CUP_ROUND_BOOST_M = 350;
 export const CUP_POINTS = [10, 5, 3, 1];
@@ -846,10 +849,16 @@ function startRace(state, t) {
   state.seed = ((Math.floor(t) % 2147483647) ^ Math.imul(state.round, 2654435761)) >>> 0;
   // "random" mode or map: drawn now, from the race's seed
   const pick = rng((state.seed + 7919) >>> 0);
-  const baseMap = state.map === "random" ? Math.floor(pick() * MAPS.length) : Math.max(0, MAPS.indexOf(state.map ?? "meadow"));
-  state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode === "random" ? ROUND_KINDS[Math.floor(pick() * ROUND_KINDS.length)] : state.mode;
+  // several maps ticked: one of those, not the one just raced where there's a choice
+  const pool = state.maps?.length > 1 ? state.maps.filter((m) => m !== state.raceMap) : null;
+  const baseMap = pool
+    ? MAPS.indexOf(pool[Math.floor(pick() * pool.length)])
+    : state.map === "random"
+      ? Math.floor(pick() * MAPS.length)
+      : Math.max(0, MAPS.indexOf(state.map ?? "meadow"));
+  state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode === "random" ? partyOf(state)[Math.floor(pick() * partyOf(state).length)] : state.mode;
   // later Party Cup rounds open further into the difficulty curve
-  state.courseBoost = state.cup ? (state.cup.race - 1) * CUP_ROUND_BOOST_M : 0;
+  state.courseBoost = state.cup ? Math.min(state.cup.race - 1, 4) * CUP_ROUND_BOOST_M : 0; // 10-round matches stop getting harder after round 5
   state.raceMap = MAPS[baseMap]; // a random map is drawn again every round
   state.phase = "countdown";
   state.startAt = t + COUNTDOWN_MS;
@@ -871,6 +880,14 @@ function startRace(state, t) {
   state.blasts = [];
   state.nextBombAt = state.kind === "potato" ? state.startAt + POTATO_FIRST_MS : null;
   for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
+  // a random starting lane each race (not always by who joined first)
+  const order = ids(state);
+  const lanes = order.map((_, i) => i);
+  for (let i = lanes.length - 1; i > 0; i--) {
+    const j = Math.floor(roll(state.seed, i, 5) * (i + 1));
+    [lanes[i], lanes[j]] = [lanes[j], lanes[i]];
+  }
+  order.forEach((id, i) => (state.players[id].lane = lanes[i]));
 }
 
 // ── the modes: brain chase, coin rush, hot potato, party cup ───────────────
@@ -886,22 +903,27 @@ function knockOut(p, t) {
  * once; any other mode over several rounds repeats that mode (Random draws a
  * different kind each round where it can). A one-round match isn't a cup.
  */
-function newCup(mode, t, rounds = 1) {
+/** The modes a Party match draws from: all of them, minus any the host switched off. */
+export function partyOf(state) {
+  const k = (state.party ?? PARTY_KINDS).filter((x) => PARTY_KINDS.includes(x));
+  return k.length >= 2 ? k : PARTY_KINDS;
+}
+function newCup(mode, t, rounds = 1, party = PARTY_KINDS) {
   if (!CUP_MODES.includes(mode) && rounds <= 1) return null;
   const r = rng(Math.floor(t) % 2147483647);
-  const shuffled = () => {
-    const pool = [...ROUND_KINDS];
+  const shuffled = (kinds = ROUND_KINDS) => {
+    const pool = [...kinds];
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(r() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
     return pool;
   };
-  if (mode === "grandtour") return { race: 1, points: {}, races: shuffled() };
+  if (mode === "grandtour") return { race: 1, points: {}, races: shuffled(PARTY_KINDS) };
   if (mode === "random") {
     const races = [];
     while (races.length < rounds) {
-      const next = shuffled().filter((k, i) => i > 0 || k !== races[races.length - 1]);
+      const next = shuffled(party).filter((k, i) => i > 0 || k !== races[races.length - 1]);
       races.push(...next);
     }
     return { race: 1, points: {}, races: races.slice(0, rounds) };
@@ -1134,7 +1156,7 @@ function roll(seed, a, b) {
   return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
 }
 
-function fillBots(state) {
+function fillBots(state, t = state.now ?? 0) {
   const used = new Set(ids(state).map((id) => state.players[id].char));
   const real = humans(state).map((id) => state.players[id]);
   const avgRp = real.length ? real.reduce((a, p) => a + (p.rp ?? 0), 0) / real.length : 0;
@@ -1143,7 +1165,9 @@ function fillBots(state) {
     const id = `bot${n + 1}`;
     n += 1;
     if (state.players[id]) continue;
-    const char = [0, 1, 2, 3, 4, 5, 6, 7].find((c) => !used.has(c)) ?? 0;
+    // a random runner nobody has taken (from the 8 every phone has loaded, so the gun never waits on a download)
+    const free = Array.from({ length: 8 }, (_, c) => c).filter((c) => !used.has(c));
+    const char = free.length ? free[Math.floor(roll((Math.floor(t) ^ Math.imul(state.round + 1, 7919)) >>> 0, n, 11) * free.length)] : 0;
     used.add(char);
     const r = roll(state.seed + state.round, n, 3);
     const slot = ids(state).length;
@@ -1495,6 +1519,22 @@ export function validateAction(state, playerId, action) {
       if (!MAPS.includes(action.map) && action.map !== "random") return { ok: false, error: "bad map" };
       return { ok: true };
     }
+    case "maps": {
+      if (state.phase !== "lobby") return { ok: false, error: "can only change map in the lobby" };
+      if (state.host !== playerId) return { ok: false, error: "Only the host can pick the map" };
+      const m = action.maps;
+      if (!Array.isArray(m) || !m.length || m.length > MAPS.length || new Set(m).size !== m.length || !m.every((x) => MAPS.includes(x))) return { ok: false, error: "bad maps" };
+      if (m.length > Math.max(1, state.rounds ?? 1)) return { ok: false, error: "more maps than rounds" };
+      return { ok: true };
+    }
+    case "party": {
+      if (state.phase !== "lobby") return { ok: false, error: "only in the lobby" };
+      if (state.host !== playerId) return { ok: false, error: "Only the host can change that" };
+      const k = action.kinds;
+      if (!Array.isArray(k) || new Set(k).size !== k.length || !k.every((x) => PARTY_KINDS.includes(x))) return { ok: false, error: "bad modes" };
+      if (k.length < 2) return { ok: false, error: "Keep at least 2 modes" };
+      return { ok: true };
+    }
     case "rounds":
     case "prize":
     case "botlevel": {
@@ -1707,12 +1747,26 @@ export function applyAction(state0, playerId, action) {
       break;
     case "map":
       state.map = action.map;
+      state.maps = null;
+      break;
+    case "maps":
+      // one ticked = that map; more = a different one of them each race
+      state.maps = action.maps.length > 1 ? [...action.maps] : null;
+      state.map = action.maps.length > 1 ? "random" : action.maps[0];
       break;
     case "rounds":
       state.rounds = action.rounds;
+      // never more maps ticked than rounds to play them in
+      if (state.maps && state.maps.length > action.rounds) {
+        if (action.rounds > 1) state.maps = state.maps.slice(0, action.rounds);
+        else [state.map, state.maps] = [state.maps[0], null];
+      }
       break;
     case "prize":
       state.prize = action.prize;
+      break;
+    case "party":
+      state.party = [...action.kinds];
       break;
     case "botlevel":
       state.botLevel = action.level;
@@ -1724,16 +1778,16 @@ export function applyAction(state0, playerId, action) {
       break;
     case "start":
       state.lives = action.endless ? 1 : LIVES; // endless run: one hit and it's over
-      state.cup = newCup(state.mode, t, state.rounds ?? 1);
+      state.cup = newCup(state.mode, t, state.rounds ?? 1, partyOf(state));
       state.botFill = action.bots !== false;
-      if (state.botFill) fillBots(state);
+      if (state.botFill) fillBots(state, t);
       startRace(state, t);
       break;
     case "rematch": {
       state.rematch = [...new Set([...(state.rematch ?? []), playerId])];
       const voters = present(state).filter((id) => !state.players[id].bot);
       if (voters.every((id) => state.rematch.includes(id))) {
-        state.cup = newCup(state.mode, t, state.rounds ?? 1);
+        state.cup = newCup(state.mode, t, state.rounds ?? 1, partyOf(state));
         startRace(state, t);
       }
       break;
@@ -1959,8 +2013,10 @@ export function viewFor(state, playerId) {
     mode: state.mode ?? "survival",
     kind: state.kind ?? "survival",
     map: state.map ?? "meadow",
+    maps: state.maps ?? null,
     rounds: state.rounds ?? 1,
     botLevel: state.botLevel ?? "normal",
+    party: partyOf(state),
     prize: state.prize ?? "none",
     raceMap: state.raceMap ?? state.map ?? "meadow",
     courseBoost: state.courseBoost ?? 0,

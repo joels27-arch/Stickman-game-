@@ -126,7 +126,16 @@
         </div>
         <!-- PLAY -->
         <div class="hpage hp-play" id="hpPlay" aria-label="Play">
-          <h1 class="logo home-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
+          <button id="leagueCard" class="league-card home-road" type="button">
+            <img id="leagueImg" src="/assets/lg_bronze.webp" alt="" />
+            <span class="lc-info">
+              <small>🏆 Trophy Road</small>
+              <b id="leagueName">Bronze I</b>
+              <span class="qbar"><i id="leagueBar"></i></span>
+              <span id="leagueNext" class="lc-next">0 pts</span>
+            </span>
+            <span class="lc-go">Open ›</span>
+          </button>
           <div class="roster" id="homeRoster" hidden></div>
           <div class="home-dock">
             <div class="play-card">
@@ -150,16 +159,6 @@
         <div class="hpage hp-side hp-compete" id="hpCompete" aria-label="Tournaments">
           <div class="hp-scroll">
             <div class="ribbon teal hp-ribbon"><h2>Tournaments</h2></div>
-            <button id="leagueCard" class="league-card" type="button">
-              <img id="leagueImg" src="/assets/lg_bronze.webp" alt="" />
-              <span class="lc-info">
-                <small>Your league</small>
-                <b id="leagueName">Bronze I</b>
-                <span class="qbar"><i id="leagueBar"></i></span>
-                <span id="leagueNext" class="lc-next">0 pts</span>
-              </span>
-              <span class="lc-go">Rankings ›</span>
-            </button>
             <div id="tourneyList" class="tourney-list"></div>
           </div>
         </div>
@@ -177,6 +176,7 @@
               </span>
               <span class="sc-go">Open ›</span>
               <i class="dot" hidden></i>
+              <span id="passPeek" class="pass-peek"></span>
             </button>
             <div id="shopHome" class="shop-mount"></div>
           </div>
@@ -193,6 +193,7 @@
 
     <!-- LOBBY -->
     <section id="lobby" class="screen">
+      <button id="leaveBtn" class="btn small ghost" type="button">‹ Leave</button>
       <div class="frame">
         <header class="strip top"><span class="runner-ico">🏃</span><span>Lobby</span><i>/</i><span>Code <b id="lobbyCodeStrip">----</b></span><i>/</i><span id="lobbyCount">1/4 players</span></header>
         <div class="panel lobby-panel">
@@ -219,19 +220,20 @@
           <div id="hostPicks" class="host-picks">
             <h3 class="pick-title">Game mode</h3>
             <div id="modePick" class="mode-pick"></div>
+            <div id="partyPick" class="chip-pick party-pick" hidden></div>
             <label class="bot-toggle"><input type="checkbox" id="botToggle" checked /> <span>🤖 Fill empty spots with bots</span></label>
             <h3 class="pick-title">Map</h3>
             <div id="mapPick" class="map-pick"></div>
+            <p id="mapNote" class="pick-note"></p>
             <h3 class="pick-title">Rounds</h3>
             <div id="roundPick" class="chip-pick"></div>
-            <h3 class="pick-title">Prize for the top 3</h3>
+            <h3 class="pick-title prize-title">Prize for the top 3</h3>
             <div id="prizePick" class="chip-pick prize-pick"></div>
             <p id="prizeNote" class="pick-note"></p>
           <h3 class="pick-title" id="botLevelTitle">Bot opponents</h3>
           <div id="botLevelPick" class="chip-pick"></div>
           </div>
           <div class="lobby-actions">
-            <button id="leaveBtn" class="btn small ghost">Leave</button>
             <button id="lockBtn" class="btn big go"><span class="flagico">✓</span> Lock in <span class="arrow">→</span></button>
           </div>
           <div class="panel-foot"><span id="readyCount">👥 1/4 players ready</span><span class="motto">Same track. Different dreams.</span></div>
@@ -305,7 +307,7 @@
         <div class="lbl"><b>Shield</b><span class="bar"><i></i></span><span class="use"></span></div>
       </button>
       <div id="savedSlot" class="saved-slot" aria-label="Saved power-up"><img src="/assets/pw_shield.png" alt="" /><small>Next</small></div>
-      <div id="throwHint" class="throw-hint" aria-hidden="true"><i class="up"></i><span>↑ throw · ↓ drop<br />↗ ↖ other lane</span><i class="down"></i></div>
+      <div id="throwHint" class="throw-hint" aria-hidden="true"><i class="up"></i><span>↑ throw · ↓ drop</span><i class="down"></i></div>
       <div id="powerToast" class="power-toast"></div>
       <div id="controlsHint" class="controls-hint"></div>
       <!-- first endless run: the tutorial happens in the run (slow motion until you make the move) -->
@@ -365,9 +367,17 @@
       <div class="sheet ask-sheet" role="dialog" aria-modal="true" aria-labelledby="askTitle">
         <h2 id="askTitle">What's your name?</h2>
         <input id="askName" maxlength="14" autocomplete="nickname" placeholder="Your name" />
-        <button id="askCountry" class="country-chip ask-country" type="button"></button>
         <button id="askSave" class="btn big go" type="button">Save</button>
         <button id="askLater" class="ask-later" type="button">Later</button>
+      </div>
+    </div>
+    <!-- first visit: pick your first runner (tap one, then confirm) -->
+    <div id="starterModal" class="modal pick-first" hidden>
+      <div class="sheet pf-sheet" role="dialog" aria-modal="true" aria-labelledby="starterTitle">
+        <h2 id="starterTitle">Pick your runner</h2>
+        <p class="pf-sub">The others unlock as you play</p>
+        <div id="starterGrid" class="pf-row"></div>
+        <button id="starterGo" class="btn big go pf-go" type="button" disabled>Tap a runner</button>
       </div>
     </div>
     <div id="countryModal" class="modal" hidden>
@@ -392,9 +402,12 @@
           <label class="set-row"><span><b>🔊 Sound effects</b><small>Jumps, coins, hits, menus</small></span><input type="checkbox" id="setSound" /></label>
           <label class="set-row"><span><b>🎵 Music</b><small>Menu and race music</small></span><input type="checkbox" id="setMusic" /></label>
           <label class="set-row"><span><b>📳 Vibration</b><small>Buzz on hits and big moments</small></span><input type="checkbox" id="setBuzz" /></label>
-          <label class="set-row"><span><b>🔋 Battery saver</b><small>Sharper picture off, smoother on older phones</small></span><input type="checkbox" id="setLow" /></label>
+          <div class="set-row gfx-row"><span><b>✨ Graphics</b><small id="setGfxNow"></small></span>
+            <div id="setGfx" class="gfx-pick" role="group" aria-label="Graphics"><button type="button" data-gfx="auto">Auto</button><button type="button" data-gfx="high">High</button><button type="button" data-gfx="balanced">Balanced</button><button type="button" data-gfx="performance">Smooth</button></div>
+          </div>
           <button id="setCountry" class="set-row btnrow" type="button"><span><b>🌍 Country</b><small id="setCountryName">Not set</small></span><i>›</i></button>
           <button id="setTut" class="set-row btnrow" type="button"><span><b>👆 How to run</b><small>Play the tutorial again on your next endless run</small></span><i>›</i></button>
+          <button id="setRestart" class="set-row btnrow" type="button"><span><b>🔄 Start over</b><small>New account: deletes all progress on this device</small></span><i>›</i></button>
         </div>
       </div>
     </div>
@@ -549,7 +562,6 @@
         <h2 id="charName" class="char-name"></h2>
         <div id="charTags" class="char-tags"></div>
         <p id="charHow" class="char-how"></p>
-        <div id="charLvl" class="char-lvl" hidden></div>
         <button id="charAct" class="gbtn" type="button"></button>
       </div>
     </div>
@@ -581,6 +593,35 @@
 
     <div id="toast" class="toast"></div>
 
+    <script>
+      // never stuck on the loading screen: if the game fails to start (an old copy of this page
+      // with newer game code, a bad download), reload a fresh copy once; after that, offer a button
+      (function () {
+        var KEY = "lr:bootFix";
+        function fresh() {
+          try {
+            if (sessionStorage.getItem(KEY)) return false;
+            sessionStorage.setItem(KEY, "1");
+          } catch (e) {}
+          location.replace("/?r=" + Date.now());
+          return true;
+        }
+        function offer() {
+          var t = document.getElementById("bootText");
+          if (!t || !document.getElementById("boot")) return;
+          t.innerHTML = '<button type="button" style="font:inherit;font-weight:800;padding:8px 18px;border-radius:12px;border:2px solid #fff;background:#b6f72a;color:#1a2300">Tap to reload</button>';
+          t.firstChild.onclick = function () {
+            location.replace("/?r=" + Date.now());
+          };
+        }
+        window.addEventListener("error", function () {
+          if (document.getElementById("boot") && !window.__bootStarted) fresh() || offer();
+        });
+        setTimeout(function () {
+          if (!window.__bootStarted) fresh() || offer();
+        }, 45000);
+      })();
+    </script>
     <script type="module" src="/client.js"></script>
   </body>
 </html>
