@@ -4198,7 +4198,7 @@ const world = (() => {
     m.onBeforeCompile = (sh) => {
       sh.fragmentShader = sh.fragmentShader.replace(
         "#include <dithering_fragment>",
-        "#include <dithering_fragment>\n  float rimF = 1.0 - max(dot(normalize(vNormal), normalize(vViewPosition)), 0.0);\n  gl_FragColor.rgb += vec3(1.0, 0.95, 0.85) * pow(rimF, 3.0) * 0.42;",
+        "#include <dithering_fragment>\n  float rimF = 1.0 - max(dot(normalize(vNormal), normalize(vViewPosition)), 0.0);\n  gl_FragColor.rgb += vec3(1.0, 0.95, 0.85) * pow(rimF, 3.0) * 0.3;",
       );
     };
     m.customProgramCacheKey = () => "rim";
