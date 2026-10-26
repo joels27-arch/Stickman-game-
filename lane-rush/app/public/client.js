@@ -3205,6 +3205,15 @@ function gfxTier() {
   return GFX[learned] ? learned : "high";
 }
 let gfx = GFX[gfxTier()];
+// developer override for measuring each feature on its own: ?aa=0&env=1&sh=0 (local dev server only)
+if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+  const q = new URLSearchParams(location.search);
+  const o = { ...gfx };
+  if (q.has("aa")) o.aa = q.get("aa") === "1";
+  if (q.has("env")) o.env = q.get("env") === "1";
+  if (q.has("sh")) o.shadows = q.get("sh") === "1";
+  gfx = o;
+}
 const startGfx = gfx; // what the renderer was made with (edge smoothing, shadows)
 
 let renderer;
@@ -3243,8 +3252,9 @@ function applyQuality() {
 }
 let qualityIdx = 0;
 let slowFor = 0;
+const noAdapt = /[?&]noadapt\b/.test(location.search); // benchmarks: keep the settings fixed
 function adaptQuality(dt) {
-  if (!renderer || game.mode !== "race" || !Number.isFinite(dt) || dt <= 0) return;
+  if (noAdapt || !renderer || game.mode !== "race" || !Number.isFinite(dt) || dt <= 0) return;
   // only judge the frame rate once the race is really running: loading, warm-up and the
   // opening shot stutter on every phone, and must not cost the sharpness for the whole session
   if (game.warm || !curtain.hidden || !net.view || serverNow() < net.view.startAt + 2000) return;
@@ -4599,7 +4609,7 @@ const world = (() => {
     const light = new THREE.Color("#ffffff");
     const shade = new THREE.Color("#b9d6a6");
     for (const side of [-1, 1]) {
-      const geo = new THREE.PlaneGeometry(width, len, 26, Math.round(len / 5));
+      const geo = new THREE.PlaneGeometry(width, len, 18, Math.round(len / 7)); // smooth hills don't need more
       geo.rotateX(-Math.PI / 2);
       const pos = geo.attributes.position;
       const col = [];
