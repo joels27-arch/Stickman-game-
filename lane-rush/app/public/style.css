@@ -2865,13 +2865,13 @@ html, body { background: var(--k1); }
 /* first visit: pick one of five runners */
 #starterModal { z-index: 71; }
 .starter-sheet { width: min(460px, 100%); text-align: center; }
-.st-sub { margin: 2px 0 12px; opacity: 0.8; font-weight: 700; }
-.st-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.st-card { display: grid; justify-items: center; gap: 2px; padding: 8px 4px 10px; border-radius: 18px; border: 3px solid var(--team); background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.25)); color: #fff; font: inherit; cursor: pointer; }
-.st-card:active { transform: scale(0.96); }
-.st-card img { width: 100%; aspect-ratio: 1; object-fit: cover; object-position: top; border-radius: 12px; }
-.st-card b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 18px; text-transform: uppercase; }
-.st-card small { font-size: 11px; opacity: 0.8; }
+.pick5-sub { margin: 2px 0 12px; opacity: 0.8; font-weight: 700; }
+.pick5-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pick5-card { display: grid; justify-items: center; gap: 2px; padding: 8px 4px 10px; border-radius: 18px; border: 3px solid var(--team); background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.25)); color: #fff; font: inherit; cursor: pointer; }
+.pick5-card:active { transform: scale(0.96); }
+.pick5-card img { width: 100%; aspect-ratio: 1; object-fit: cover; object-position: top; border-radius: 12px; }
+.pick5-card b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 18px; text-transform: uppercase; }
+.pick5-card small { font-size: 11px; opacity: 0.8; }
 /* Trophy Road: runners for games played */
 .road-full .rv-games { position: relative; z-index: 2; display: grid; gap: 8px; margin: 0 0 12px; padding: 10px; border-radius: 16px; background: rgba(10, 14, 10, 0.88); border: 2px solid var(--lime); }
 .rv-games > b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 15px; text-transform: uppercase; color: var(--lime); text-align: center; }
@@ -2882,5 +2882,5 @@ html, body { background: var(--k1); }
 .rg-step.got { border-color: var(--lime); }
 .rg-step small { font-weight: 900; font-size: 11px; }
 .rg-step em { font-style: normal; font-size: 10px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 66px; }
-.st-card { min-width: 0; overflow: hidden; }
-.st-card img { width: 100%; max-width: 110px; height: 96px; aspect-ratio: auto; object-fit: cover; object-position: center top; }
+.pick5-card { min-width: 0; overflow: hidden; }
+.pick5-card img { width: 100%; max-width: 110px; height: 96px; aspect-ratio: auto; object-fit: cover; object-position: center top; }

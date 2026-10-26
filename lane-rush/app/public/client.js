@@ -943,7 +943,7 @@ function askStarter() {
   if (starterChoice() !== null) return;
   $("#starterGrid").replaceChildren(
     ...FIRST_FIVE.map((i) => {
-      const b = el("button", { class: "st-card", type: "button", style: `--team:${RUNNERS[i].color}` }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }), el("small", { text: RUNNERS[i].tag }));
+      const b = el("button", { class: "pick5-card", type: "button", style: `--team:${RUNNERS[i].color}` }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }), el("small", { text: RUNNERS[i].tag }));
       b.addEventListener("click", () => {
         sfx.finish();
         local.setItem("lr:starter", String(i));
