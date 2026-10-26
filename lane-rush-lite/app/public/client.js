@@ -5745,7 +5745,7 @@ const world = (() => {
   const coinFace = texLoader.load("/assets/coin_face.jpg");
   coinFace.colorSpace = THREE.SRGBColorSpace;
   // shiny gold: with the sky light it's real metal; without it, a warm glow does the job
-  const coinRim = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: gfx.env ? 0.9 : 0.2, roughness: gfx.env ? 0.25 : 0.35, emissive: 0xb07a00, emissiveIntensity: gfx.env ? 0.18 : 0.55, envMapIntensity: 1.4 });
+  const coinRim = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: gfx.env ? 0.6 : 0.2, roughness: gfx.env ? 0.3 : 0.35, emissive: 0xc88400, emissiveIntensity: gfx.env ? 0.38 : 0.55, envMapIntensity: 1.1 });
   const coinFaceMat = new THREE.MeshStandardMaterial({ map: coinFace, metalness: 0.1, roughness: 0.4, emissive: 0x6a4400, emissiveIntensity: 0.45 });
   const bigRim = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.2, roughness: 0.3, emissive: 0xc05000, emissiveIntensity: 0.6 });
   const bigFaceMat = new THREE.MeshStandardMaterial({ map: coinFace, color: 0xffb46a, metalness: 0.1, roughness: 0.35, emissive: 0x8a3a00, emissiveIntensity: 0.5 });
