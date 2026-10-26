@@ -942,26 +942,43 @@ function maybeAskName() {
     askModal.hidden = false;
   }, 1400);
 }
-/** First visit: pick your first runner out of five (the others come on the Trophy Road). */
+/** First visit: pick your first runner out of five (the others come on the Trophy Road). Tap one, it lights up, then confirm. */
+let starterPick = null;
 function askStarter() {
   if (starterChoice() !== null) return;
+  starterPick = null;
   $("#starterGrid").replaceChildren(
     ...FIRST_FIVE.map((i) => {
-      const b = el("button", { class: "pick5-card", type: "button", style: `--team:${RUNNERS[i].color}` }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }), el("small", { text: RUNNERS[i].tag }));
+      const b = el("button", { class: "pf-zone", type: "button", style: `--team:${RUNNERS[i].color}`, "aria-label": RUNNERS[i].name });
       b.addEventListener("click", () => {
-        sfx.finish();
-        local.setItem("lr:starter", String(i));
-        local.setItem("lr:char", String(i));
-        $("#starterModal").hidden = true;
-        world.setShowcase?.(i);
-        renderCollPill();
-        toast(`${RUNNERS[i].name} is yours! Play games to unlock the others`);
+        sfx.tap();
+        buzz(15);
+        starterPick = i;
+        for (const z of $("#starterGrid").children) z.classList.toggle("on", z === b);
+        $("#starterGrid").classList.add("chosen");
+        const go = $("#starterGo");
+        go.disabled = false;
+        go.textContent = `Confirm ${RUNNERS[i].name} ✓`;
       });
       return b;
     }),
   );
+  $("#starterGrid").classList.remove("chosen");
+  $("#starterGo").disabled = true;
+  $("#starterGo").textContent = "Tap a runner";
   $("#starterModal").hidden = false;
 }
+$("#starterGo").addEventListener("click", () => {
+  const i = starterPick;
+  if (i == null) return;
+  sfx.finish();
+  local.setItem("lr:starter", String(i));
+  local.setItem("lr:char", String(i));
+  $("#starterModal").hidden = true;
+  world.setShowcase?.(i);
+  renderCollPill();
+  showUnlock({ kind: "char", char: { name: RUNNERS[i].name, rarity: STARTER_RARITY[i], img: `/assets/lu_${RUNNERS[i].file}.webp` } }, () => toast("Play games to unlock the others on the Trophy Road"));
+});
 $("#askSave").addEventListener("click", () => {
   sfx.tap();
   if ($("#askName").value.trim()) saveName($("#askName").value);
@@ -2299,6 +2316,8 @@ function claimRoad(step, node) {
     showUnlock({ kind: "char", char: { name: info.label, rarity: info.rarity, img: info.img } });
   }
   renderTrophyRoad();
+  if (!roadModal.hidden) renderRoadFull();
+  renderRankPill();
 }
 function renderTrophyRoad() {
   const box = $("#trophyRoad");
@@ -2367,17 +2386,20 @@ function renderTrophyRoad() {
  * and you on the road where you are.
  */
 const roadModal = $("#roadModal");
-/** The games road: a new runner after 1, 3, 5, 10, 20, 50 and 100 games. One at a time, with a reveal. */
-function checkGamesRoad() {
-  let done = [];
+/** The games road: a new runner after 1, 3, 5, 10, 20, 50 and 100 games, collected on the Trophy Road. */
+function gamesClaimed() {
   try {
-    done = JSON.parse(local.getItem("lr:groad") || "[]");
+    const a = JSON.parse(local.getItem("lr:groad") || "[]");
+    return Array.isArray(a) ? a : [];
   } catch {
-    done = [];
+    return [];
   }
-  const step = gamesRoad().find((g) => g.games <= gamesPlayed() && !done.includes(g.games));
-  if (!step) return;
-  local.setItem("lr:groad", JSON.stringify([...done, step.games]));
+}
+/** Steps played for but not collected yet. */
+const gamesReady = () => gamesRoad().filter((g) => g.games <= gamesPlayed() && !gamesClaimed().includes(g.games));
+function claimGamesStep(step) {
+  if (step.games > gamesPlayed() || gamesClaimed().includes(step.games)) return;
+  local.setItem("lr:groad", JSON.stringify([...gamesClaimed(), step.games]));
   const c = step.char ? allChars().find((x) => x.id === step.char) : allChars().find((x) => x.idx === step.runner);
   if (ownsChar(c)) {
     wallet.addCoins(300);
@@ -2385,9 +2407,11 @@ function checkGamesRoad() {
   } else {
     giveItem(step.char ?? step.runner);
     renderCollPill();
-    showUnlock({ kind: "char", char: { name: c.name, rarity: c.rarity, img: c.hero } }, () => toast(`${step.games} game${step.games > 1 ? "s" : ""} played: ${c.name} unlocked!`));
+    showUnlock({ kind: "char", char: { name: c.name, rarity: c.rarity, img: c.hero } });
   }
-  setTimeout(checkGamesRoad, 3000); // the next one, if more are due
+  sfx.finish();
+  renderRoadFull();
+  renderRankPill();
 }
 function gamesRoadBox() {
   const n = gamesPlayed();
@@ -2400,8 +2424,17 @@ function gamesRoadBox() {
       { class: "rg-row" },
       ...gamesRoad().map((g) => {
         const c = g.char ? allChars().find((x) => x.id === g.char) : allChars().find((x) => x.idx === g.runner);
-        const got = ownsChar(c);
-        return el("span", { class: `rg-step${got ? " got" : n >= g.games ? " due" : ""}` }, el("img", { src: c.img, alt: "" }), el("small", { text: got ? "✓" : `${g.games} game${g.games > 1 ? "s" : ""}` }), el("em", { text: c.name }));
+        const done = gamesClaimed().includes(g.games);
+        const due = !done && n >= g.games;
+        const b = el(
+          "button",
+          { class: `rg-step${done ? " got" : due ? " due" : ""}`, type: "button" },
+          el("img", { src: c.img, alt: "" }),
+          due ? el("em", { class: "rg-claim", text: "Claim!" }) : el("small", { text: done ? "✓" : `${g.games} game${g.games > 1 ? "s" : ""}` }),
+          el("em", { text: c.name }),
+        );
+        b.addEventListener("click", () => due && claimGamesStep(g));
+        return b;
       }),
     ),
   );
@@ -7810,7 +7843,7 @@ function recordRace(v, place) {
   const mine = v.players.find((p) => p.id === playerId);
   const d = Math.round(mine?.d ?? 0);
   stats.add("races", 1);
-  setTimeout(checkGamesRoad, 2600); // a new runner for games played?
+  setTimeout(renderRankPill, 500); // a runner to collect on the Trophy Road?
   stats.add("dist", d);
   // "with friends" trophies only count races with at least two real people
   const real = v.players.filter((p) => !p.bot).length;
@@ -7883,6 +7916,10 @@ function renderRankPill() {
   $("#leagueName").textContent = r.name;
   $("#leagueBar").style.width = r.next == null ? "100%" : `${Math.round(((rp - r.from) / (r.next - r.from)) * 100)}%`;
   $("#leagueNext").textContent = r.next == null ? `${rp} pts · top league` : `${rp} pts · ${r.next - rp} more to ${rankOf(r.next).name}`;
+  // something to collect (a reward for trophies or a runner for games played): the card says so
+  const waiting = road.ready().length + gamesReady().length;
+  $("#leagueCard").classList.toggle("ready", waiting > 0);
+  $("#leagueCard .lc-go").textContent = waiting ? `🎁 Claim ${waiting}` : "Open ›";
 }
 
 // ── friends: everyone you've been in a room with, and their rank ──

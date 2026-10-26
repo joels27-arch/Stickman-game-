@@ -2862,16 +2862,19 @@ html, body { background: var(--k1); }
 /* each tap on a sealed pack: a hard, growing shake */
 .po-pack.shake.hit { animation: poHit 260ms ease-out, poShake 1.1s ease-in-out 260ms infinite; }
 @keyframes poHit { 0% { transform: scale(1); } 25% { transform: rotate(calc(-6deg * var(--shake, 1))) scale(calc(1 + 0.04 * var(--shake, 1))); } 55% { transform: rotate(calc(6deg * var(--shake, 1))) scale(calc(1 + 0.06 * var(--shake, 1))); } 100% { transform: rotate(0) scale(1); } }
-/* first visit: pick one of five runners */
-#starterModal { z-index: 71; }
-.starter-sheet { width: min(460px, 100%); text-align: center; }
-.pick5-sub { margin: 2px 0 12px; opacity: 0.8; font-weight: 700; }
-.pick5-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.pick5-card { display: grid; justify-items: center; gap: 2px; padding: 8px 4px 10px; border-radius: 18px; border: 3px solid var(--team); background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.25)); color: #fff; font: inherit; cursor: pointer; }
-.pick5-card:active { transform: scale(0.96); }
-.pick5-card img { width: 100%; aspect-ratio: 1; object-fit: cover; object-position: top; border-radius: 12px; }
-.pick5-card b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 18px; text-transform: uppercase; }
-.pick5-card small { font-size: 11px; opacity: 0.8; }
+/* first visit: the "Choose your first runner" picture, tap a runner, it lights up, then confirm */
+.pick-first { position: fixed; inset: 0; z-index: 72; display: grid; place-items: center; background: #120a2e; }
+.pick-first[hidden] { display: none; }
+.pf-art { position: relative; width: min(100vw, calc(100dvh * 645 / 1164)); aspect-ratio: 645 / 1164; }
+.pf-art > img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pf-zones { position: absolute; left: 0; right: 0; top: 35%; height: 38%; display: grid; grid-template-columns: 19.5% 18.5% 18.5% 20% 23.5%; }
+.pf-zone { appearance: none; border: 0; padding: 0; margin: 0 1px; background: transparent; border-radius: 18px; cursor: pointer; transition: background 160ms, box-shadow 160ms, transform 160ms; -webkit-tap-highlight-color: transparent; }
+.pf-zones.chosen .pf-zone:not(.on) { background: rgba(10, 6, 30, 0.45); }
+.pf-zone.on { box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--team), 0 0 34px 8px var(--team); background: radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--team) 45%, transparent), transparent 70%); animation: pfGlow 1.1s ease-in-out infinite; }
+@keyframes pfGlow { 50% { box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--team), 0 0 50px 14px var(--team); } }
+.pf-go { position: absolute; left: 10%; right: 10%; bottom: 7%; height: 64px; border: 4px solid #fff; border-radius: 20px; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 24px; text-transform: uppercase; color: #1a2300; background: linear-gradient(180deg, #d4ff5a, #8fd600); box-shadow: 0 6px 0 #3f7a00, 0 10px 24px rgba(0, 0, 0, 0.5); cursor: pointer; }
+.pf-go:disabled { color: #fff; background: rgba(20, 14, 50, 0.75); box-shadow: none; border-color: rgba(255, 255, 255, 0.5); font-size: 20px; }
+.pf-go:not(:disabled) { animation: btnPulse 1s ease-in-out infinite; }
 /* Trophy Road: runners for games played */
 .road-full .rv-games { position: relative; z-index: 2; display: grid; gap: 8px; margin: 0 0 12px; padding: 10px; border-radius: 16px; background: rgba(10, 14, 10, 0.88); border: 2px solid var(--lime); }
 .rv-games > b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 15px; text-transform: uppercase; color: var(--lime); text-align: center; }
@@ -2892,3 +2895,9 @@ html, body { background: var(--k1); }
 .power-slot.held { animation: none; }
 .power-slot.held::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 2px var(--lime), 0 0 24px rgba(182, 247, 42, 0.45); animation: glowPulse 1.2s ease-in-out infinite; will-change: opacity; }
 @keyframes glowPulse { 50% { opacity: 0.35; } }
+.rg-step { appearance: none; color: #fff; font: inherit; cursor: default; }
+.rg-step.due { cursor: pointer; border-color: #ffd23f; box-shadow: 0 0 14px rgba(255, 210, 63, 0.7); animation: btnPulse 1s ease-in-out infinite; }
+.rg-step .rg-claim { font-size: 11px; font-weight: 900; color: #3a2400; background: #ffd23f; padding: 1px 6px; border-radius: 8px; opacity: 1; max-width: none; }
+/* the Trophy Road card on Play: something to collect */
+.hp-play .league-card.home-road.ready { border-color: #ffd23f; box-shadow: 0 5px 0 var(--k0), 0 0 22px rgba(255, 210, 63, 0.75); }
+.hp-play .league-card.home-road.ready .lc-go { background: #ffd23f; color: #3a2400; animation: btnPulse 1s ease-in-out infinite; }
