@@ -398,7 +398,7 @@ describe("survival (3 hearts)", () => {
 describe("matches over several rounds", () => {
   const pos = (d: number, t: number, hits = 0) => ({ type: "pos", d, lane: 0, y: 0, act: "run", hits, t });
 
-  it("lets the host pick 1, 3 or 5 rounds and a prize", () => {
+  it("lets the host pick 1, 3, 5 or 10 rounds and a prize", () => {
     let s = act(lobbyOf(2), "p0", { type: "rounds", rounds: 5 });
     s = act(s, "p0", { type: "prize", prize: "huge" });
     expect((L.viewFor(s, "p1") as S).rounds).toBe(5);
@@ -422,8 +422,8 @@ describe("matches over several rounds", () => {
     s = act(s, "p0", { type: "rounds", rounds: 5 });
     s = act(s, "p0", { type: "start", bots: false, t: T0 });
     expect(s.cup.races).toHaveLength(5);
-    expect(s.cup.races.every((k: string) => L.ROUND_KINDS.includes(k))).toBe(true);
-    expect(new Set(s.cup.races.slice(0, 4)).size).toBe(4);
+    expect(s.cup.races.every((k: string) => L.PARTY_KINDS.includes(k))).toBe(true);
+    expect(new Set(s.cup.races).size).toBe(5);
     for (let i = 1; i < 5; i++) expect(s.cup.races[i]).not.toBe(s.cup.races[i - 1]);
     expect(s.kind).toBe(s.cup.races[0]);
   });
@@ -561,7 +561,7 @@ describe("random mode and map", () => {
       let s = act(lobbyOf(2), "p0", { type: "mode", mode: "random" });
       s = act(s, "p0", { type: "map", map: "random" });
       s = act(s, "p0", { type: "start", bots: true, t: T0 + i * 7919 });
-      expect(L.ROUND_KINDS).toContain(s.kind);
+      expect(L.PARTY_KINDS).toContain(s.kind);
       expect(L.MAPS).toContain(s.raceMap);
       expect(s.mode).toBe("random");
       expect(s.cup).toBeNull();
@@ -570,6 +570,36 @@ describe("random mode and map", () => {
     }
     expect(kinds.size).toBeGreaterThan(1);
     expect(maps.size).toBeGreaterThan(1);
+  });
+  it("Party over 10 rounds plays every mode, the Classic Race too", () => {
+    let s = act(lobbyOf(2), "p0", { type: "mode", mode: "random" });
+    s = act(s, "p0", { type: "rounds", rounds: 10 });
+    s = act(s, "p0", { type: "start", bots: true, t: T0 });
+    expect(s.cup.races).toHaveLength(10);
+    expect(new Set(s.cup.races)).toEqual(new Set(L.PARTY_KINDS));
+  });
+  it("the host can tick several maps: each race is one of those", () => {
+    const pick = ["farm", "space", "candy"];
+    let s = act(lobbyOf(2), "p0", { type: "maps", maps: pick });
+    expect((L.viewFor(s, "p1") as S).maps).toEqual(pick);
+    s = act(s, "p0", { type: "rounds", rounds: 10 });
+    s = act(s, "p0", { type: "start", bots: true, t: T0 });
+    const seen = [s.raceMap];
+    for (let r = 2; r <= 10; r++) {
+      s.cup.race = r - 1;
+      s.phase = "results";
+      s = act(s, "p0", { type: "next", t: T0 + r * 100000 });
+      expect(s.raceMap).not.toBe(seen[seen.length - 1]);
+      seen.push(s.raceMap);
+    }
+    expect(seen.every((m) => pick.includes(m))).toBe(true);
+    // one ticked map is just that map
+    s = act(lobbyOf(2), "p0", { type: "maps", maps: ["beach"] });
+    expect(s.map).toBe("beach");
+    expect(s.maps).toBeNull();
+    expect(reject(lobbyOf(2), "p0", { type: "maps", maps: ["beach", "moon"] })).toMatch(/bad/);
+    expect(reject(lobbyOf(2), "p0", { type: "maps", maps: [] })).toMatch(/bad/);
+    expect(reject(lobbyOf(2), "p1", { type: "maps", maps: ["beach"] })).toMatch(/host/);
   });
   it("only the host picks, and only real choices", () => {
     expect(reject(lobbyOf(2), "p1", { type: "map", map: "random" })).toMatch(/host/);

@@ -118,11 +118,11 @@ const countryName = (code) => (COUNTRIES.find(([c]) => c === code) || [])[1] || 
 const MODES = ["Solo", "Duo", "Trio", "Squad"];
 const GAME_MODE_INFO = {
   survival: { label: "Survival", icon: "❤️", tag: "Main mode", text: "3 hearts. Last one standing wins." },
+  random: { label: "Party", icon: "🎉", tag: "All modes", text: "A random mode every round." },
   sprint: { label: "Classic Race", icon: "🏁", tag: "700 m", text: "First to the finish line wins." },
   chase: { label: "Brain Chase", icon: "🧠", tag: "Run for it", text: "Outrun the giant brain!" },
   coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins." },
   potato: { label: "Hot Potato", icon: "💣", tag: "Don't be last", text: "Last place holds the bomb!" },
-  random: { label: "Random", icon: "🎲", tag: "Surprise", text: "A surprise mode each race." },
   grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "One round of every mode." },
 };
 /**
@@ -162,7 +162,7 @@ const MAP_INFO = {
   city: { label: "City", text: "Down the main street between skyscrapers" },
   stadium: { label: "Stadium", text: "Across the pitch in front of the fans" },
   space: { label: "Space", text: "A neon walkway over the moon" },
-  random: { label: "Random", text: "A different map every race" },
+  random: { label: "All maps", text: "A different map every race" },
 };
 // the themed maps, built in code (public/themes.js)
 const THEME = Object.fromEntries(THEMES.map((t) => [t.id, t]));
@@ -1120,22 +1120,11 @@ function charCard(c, n, onClick) {
     "button",
     { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${sel ? " sel" : ""}`, type: "button", style: `--i:${n}`, "aria-label": c.name },
     el("span", { class: "cpic" }, el("img", { src: c.img, alt: "" }), owned ? null : el("i", { class: "padlock", text: "🔒" })),
-    el("span", { class: "cfoot" }, name, tag, owned && (c.via === "pack" || c.via === "starter") ? levelBadge(c.id) : null),
+    el("span", { class: "cfoot" }, name, tag),
   );
   // the picture shows the character's card; the name (and the rest) does the main thing, e.g. select
   b.addEventListener("click", (e) => (e.target.closest(".cpic") ? inspectChar(c) : onClick(c)));
   return b;
-}
-/** Level and copies on a card; it glows when a level-up is ready. */
-function levelBadge(id) {
-  const n = nextLevel(id);
-  const have = cardCopies(id);
-  return el(
-    "span",
-    { class: `clvl${canLevel(id) ? " ready" : ""}` },
-    el("b", { text: `Lv ${cardLevel(id)}` }),
-    n ? el("span", { class: "cbar" }, el("i", { style: `width:${Math.min(100, Math.round((have / n.copies) * 100))}%` }), el("small", { text: `${have}/${n.copies}` })) : el("small", { text: "MAX" }),
-  );
 }
 const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
 const VIA_GROUP = { coins: "🪙 Buy with coins", pack: "🎁 From packs", pass: "⭐ Season Pass", road: "🏆 Trophy Road" };
@@ -1305,30 +1294,6 @@ function inspectChar(c) {
     };
   }
   btn.onclick = action;
-  // card level: copies from packs plus coins take it up a level
-  const lvBox = $("#charLvl");
-  if (owned && (c.via === "pack" || c.via === "starter")) {
-    const n = nextLevel(c.id);
-    const have = cardCopies(c.id);
-    lvBox.hidden = false;
-    const up = el("button", { class: "gbtn lvup", type: "button" }, n ? `Level up · ${n.coins.toLocaleString()} coins` : "Max level");
-    up.disabled = !canLevel(c.id);
-    up.addEventListener("click", () => {
-      if (!levelUp(c.id)) return;
-      sfx.finish();
-      buzz([30, 40, 80]);
-      toast(`${c.name} is now level ${cardLevel(c.id)}!`);
-      renderWallet();
-      inspectChar(c);
-      if (homePage === PAGE.skins) renderSkins();
-    });
-    lvBox.replaceChildren(
-      el("div", { class: "lv-row" }, el("b", { text: `Level ${cardLevel(c.id)}` }), n ? el("span", { text: `${have}/${n.copies} copies for level ${n.lv}` }) : el("span", { text: "Max level!" })),
-      n ? el("span", { class: "cbar big" }, el("i", { style: `width:${Math.min(100, Math.round((have / n.copies) * 100))}%` })) : null,
-      c.playable ? el("small", { text: `+${(cardLevel(c.id) - 1) * 5}% race coins with this runner` }) : null,
-      up,
-    );
-  } else lvBox.hidden = true;
   charModal.hidden = false;
 }
 $("#charClose").addEventListener("click", () => (charModal.hidden = true));
@@ -1345,61 +1310,17 @@ const PACK_CHARS = [
   { id: "dancer", name: "Disco Dash", rarity: "legendary", dupe: 1500 },
 ];
 /**
- * Four packs, each a set number of character cards. Every card is a character: a new one
- * unlocks it, one you have already is a copy that goes toward its next level.
- * odds: chance per card for each rarity · sure: the last card is at least this rarity.
+ * Three packs, one character each: a new one unlocks it, one you already have pays coins instead.
+ * odds: chance for each rarity.
  */
 const PACKS = [
-  { id: "starter", name: "Starter Pack", price: 250, cards: 2, img: "/assets/pack_starter.webp", odds: { rare: 0.88, epic: 0.11, legendary: 0.01 } },
-  { id: "brain", name: "Brain Pack", price: 750, cards: 4, img: "/assets/pack_brain.webp", odds: { rare: 0.78, epic: 0.19, legendary: 0.03 } },
-  { id: "mega", name: "Mega Pack", price: 2000, cards: 8, img: "/assets/pack_mega.webp", odds: { rare: 0.66, epic: 0.28, legendary: 0.06 }, sure: "epic" },
-  { id: "legend", name: "Legend Pack", price: 5000, cards: 12, img: "/assets/pack_legend.webp", odds: { rare: 0.5, epic: 0.38, legendary: 0.12 }, sure: "legendary" },
+  { id: "starter", name: "Starter Pack", price: 250, img: "/assets/pack_starter.webp", odds: { rare: 0.85, epic: 0.13, legendary: 0.02 } },
+  { id: "mega", name: "Mega Pack", price: 900, img: "/assets/pack_mega.webp", odds: { rare: 0.55, epic: 0.37, legendary: 0.08 } },
+  { id: "legend", name: "Legend Pack", price: 2500, img: "/assets/pack_legend.webp", odds: { rare: 0, epic: 0.65, legendary: 0.35 } },
 ];
+/** Coins for a character you already have. */
+const DUPE_COINS = { common: 60, rare: 100, epic: 300, legendary: 800 };
 const pct = (x) => `${Math.round(x * 1000) / 10}%`;
-
-// ── card levels: copies from packs level your characters up (a little coin bonus when you race with one) ──
-const LEVEL_COPIES = [2, 4, 10, 20, 50, 100]; // copies needed for level 2, 3, … 7
-const LEVEL_COINS = [50, 150, 400, 1000, 2000, 4000]; // and coins to do it
-const MAX_LEVEL = LEVEL_COPIES.length + 1;
-function cardStore(key) {
-  try {
-    const o = JSON.parse(local.getItem(key) || "{}");
-    return o && typeof o === "object" ? o : {};
-  } catch {
-    return {};
-  }
-}
-const cardCopies = (id) => cardStore("lr:cards")[id] ?? 0;
-const cardLevel = (id) => cardStore("lr:lv")[id] ?? 1;
-function addCopy(id) {
-  const c = cardStore("lr:cards");
-  c[id] = (c[id] ?? 0) + 1;
-  local.setItem("lr:cards", JSON.stringify(c));
-}
-/** What the next level needs, or null at max level. */
-function nextLevel(id) {
-  const lv = cardLevel(id);
-  if (lv >= MAX_LEVEL) return null;
-  return { lv: lv + 1, copies: LEVEL_COPIES[lv - 1], coins: LEVEL_COINS[lv - 1] };
-}
-const canLevel = (id) => {
-  const n = nextLevel(id);
-  return Boolean(n && cardCopies(id) >= n.copies && wallet.coins() >= n.coins);
-};
-function levelUp(id) {
-  const n = nextLevel(id);
-  if (!n || cardCopies(id) < n.copies || wallet.coins() < n.coins) return false;
-  wallet.addCoins(-n.coins);
-  const c = cardStore("lr:cards");
-  c[id] -= n.copies;
-  local.setItem("lr:cards", JSON.stringify(c));
-  const l = cardStore("lr:lv");
-  l[id] = n.lv;
-  local.setItem("lr:lv", JSON.stringify(l));
-  return true;
-}
-/** Race coins bonus for the runner you race with: +5% a level above 1. */
-const levelBonus = () => 1 + 0.05 * (cardLevel(`r${preferredChar()}`) - 1);
 
 /** Every character a pack can hold: the starters and the pack characters (not Trophy Road or Season Pass ones). */
 const packPool = () => allChars().filter((c) => c.via === "pack" || c.via === "starter");
@@ -1422,45 +1343,33 @@ function freePackLeft() {
 }
 /** Pay, roll and credit everything right away (so closing the animation can't lose items). */
 function buyPack(pack) {
-  const free = pack.id === "brain" && freePackLeft();
+  const free = pack.id === "mega" && freePackLeft();
   if (!free && wallet.coins() < pack.price) return null;
   if (free) local.setItem("lr:freePack", "1");
   else wallet.addCoins(-pack.price);
   return grantPack(pack);
 }
-/** Roll a pack's cards and credit them: new characters unlock, the rest are copies toward levels. */
+/** Roll a pack's one character and credit it: a new one unlocks, one you have pays coins. */
 function grantPack(pack) {
-  const opened = stats.get("packs");
-  const rarities = Array.from({ length: pack.cards }, () => rollRarity(pack.odds));
-  // the last card is at least the pack's sure rarity
-  if (pack.sure) {
-    const last = rarities.length - 1;
-    if (RARITY_ORDER.indexOf(rarities[last]) < RARITY_ORDER.indexOf(pack.sure)) rarities[last] = pack.sure;
-  }
-  const items = rarities.map(packCard);
+  const it = packCard(rollRarity(pack.odds));
   // your very first pack always has a character you don't have yet
-  if (opened === 0 && !items.some((it) => !ownsChar(it.char))) {
+  if (stats.get("packs") === 0 && ownsChar(it.char)) {
     const left = packPool().filter((c) => !ownsChar(c) && c.rarity !== "legendary");
-    if (left.length) items[items.length - 1] = { kind: "char", char: left[Math.floor(Math.random() * left.length)] };
+    if (left.length) it.char = left[Math.floor(Math.random() * left.length)];
   }
-  // rarest last: the best card is the big finish
-  items.sort((a, b) => RARITY_ORDER.indexOf(a.char.rarity) - RARITY_ORDER.indexOf(b.char.rarity));
-  for (const it of items) {
-    const c = it.char;
-    if (ownsChar(c)) {
-      it.dupe = true;
-      addCopy(c.id);
-    } else if (c.idx === undefined) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), c.id]));
-    it.copies = cardCopies(c.id);
-    it.next = nextLevel(c.id);
-  }
+  const c = it.char;
+  if (ownsChar(c)) {
+    it.dupe = true;
+    it.coins = DUPE_COINS[c.rarity] ?? 100;
+    wallet.addCoins(it.coins);
+  } else if (c.idx === undefined) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), c.id]));
   stats.add("packs", 1);
-  return items;
+  return [it];
 }
 function renderPacks() {
   $("#packRow").replaceChildren(
     ...PACKS.map((pk) => {
-      const free = pk.id === "brain" && freePackLeft();
+      const free = pk.id === "mega" && freePackLeft();
       const btn = el("button", { class: "sbuy", type: "button" }, ...(free ? [el("span", { text: "Free!" })] : [el("i", { class: "coin" }), el("span", { text: pk.price.toLocaleString() })]));
       btn.disabled = !free && wallet.coins() < pk.price;
       btn.addEventListener("click", () => {
@@ -1473,13 +1382,13 @@ function renderPacks() {
         free ? el("span", { class: "freetag", text: "1 free" }) : null,
         el("img", { class: "pack-img", src: pk.img, alt: "" }),
         el("b", { text: pk.name }),
-        el("small", { class: "pk-cards", text: `${pk.cards} cards${pk.sure ? ` · 1 ${pk.sure}+` : ""}` }),
+        el("small", { class: "pk-cards", text: "1 character" }),
         el("small", { class: "pk-odds", text: `Legendary ${pct(pk.odds.legendary)} · Epic ${pct(pk.odds.epic)}` }),
         btn,
       );
     }),
   );
-  $("#packOdds").textContent = "Copies of characters you have level them up";
+  $("#packOdds").textContent = "One you already have pays coins";
   renderWallet();
 }
 
@@ -1524,8 +1433,7 @@ function itemCard(it) {
       el("i", { class: "pglow" }),
       el("img", { src: it.char.img ?? `/assets/pk_${it.char.id}.webp`, alt: "" }),
       el("b", { text: it.char.name }),
-      it.dupe && it.next && it.copies >= it.next.copies ? el("em", { class: "plvl", text: "LEVEL UP READY" }) : null,
-      el("small", { text: it.dupe ? (it.next ? `+1 card · ${it.copies}/${it.next.copies} to Lv ${it.next.lv}` : "+1 card · max level") : it.unlocked ? "UNLOCKED!" : "NEW character!" }),
+      it.dupe ? el("small", { class: "pdupe" }, "Already yours · ", el("i", { class: "coin" }), `+${it.coins}`) : el("small", { text: it.unlocked ? "UNLOCKED!" : "NEW character!" }),
     );
   }
   if (it.kind === "medal") {
@@ -1745,6 +1653,8 @@ function onState(msg) {
     if (game.wantMode && v.host === playerId) {
       if (v.mode !== game.wantMode) act({ type: "mode", mode: game.wantMode });
       game.wantMode = null;
+      // your own tournament: its rounds too
+      if (game.custom && v.rounds !== game.custom.rounds) act({ type: "rounds", rounds: game.custom.rounds });
     }
     if (game.mode !== "lobby") enterLobby();
     renderLobby(v);
@@ -1825,6 +1735,7 @@ function renderSpotlight(box, cur, { takenBy = () => null, onPick }) {
 function openSoloRoom(mode = null) {
   game.solo = true;
   game.endless = false;
+  game.custom = null;
   game.wantMode = mode;
   connect(newCode(), true);
 }
@@ -1832,6 +1743,7 @@ function openSoloRoom(mode = null) {
 function startEndless() {
   game.solo = true;
   game.endless = true;
+  game.custom = null;
   game.endlessSent = false;
   game.wantMode = null;
   connect(newCode(), true);
@@ -1857,6 +1769,7 @@ $("#createBtn").addEventListener("click", () => {
   if (!requireName()) return;
   game.solo = false;
   game.endless = false;
+  game.custom = null;
   game.wantMode = null;
   connect(newCode(), true);
 });
@@ -1865,6 +1778,7 @@ $("#joinBtn").addEventListener("click", () => {
   if (!requireName()) return;
   game.solo = false;
   game.endless = false;
+  game.custom = null;
   const code = codeInput.value.trim().toUpperCase();
   if (code.length !== 4) {
     $("#homeMsg").textContent = "Room codes have 4 characters";
@@ -2183,10 +2097,10 @@ const ROAD = [
   { pts: 10, coins: 200 },
   { pts: 20, pack: "mega" },
   { pts: 30, coins: 300 },
-  { pts: 40, pack: "brain" },
+  { pts: 40, pack: "mega" },
   { pts: 60, coins: 400 },
   { pts: 80, pack: "mega" },
-  { pts: 110, pack: "brain" },
+  { pts: 110, pack: "mega" },
   { pts: 140, char: "rapstar" },
   { pts: 170, pack: "mega" },
   { pts: 220, char: "unitx" },
@@ -2503,6 +2417,23 @@ function tourneyCard(t) {
     ),
   );
 }
+/** Your own tournament: pick the mode and rounds, then a room opens to invite 3 friends; points over every round, most points wins. */
+const customT = { mode: "random", rounds: 5 };
+function customTCard() {
+  const chips = (list, cur, attr) =>
+    el("div", { class: "chip-pick ct-pick" }, ...list.map(([key, label]) => el("button", { class: `chip${cur === key ? " on" : ""}`, type: "button", [attr]: String(key), text: label })));
+  return el(
+    "div",
+    { class: "tcard t-custom" },
+    el("div", { class: "tc-head" }, el("img", { src: "/assets/tab_trophy.webp", alt: "" }), el("div", {}, el("em", { text: "You + 3 friends" }), el("b", { text: "Create a tournament" }))),
+    el("p", { class: "tc-desc", text: "Points every round. Most points wins." }),
+    el("h4", { class: "ct-title", text: "Mode" }),
+    chips(Object.entries(GAME_MODE_INFO).filter(([k]) => k !== "grandtour").map(([k, i]) => [k, `${i.icon} ${i.label}`]), customT.mode, "data-ctmode"),
+    el("h4", { class: "ct-title", text: "Rounds" }),
+    chips([3, 5, 10].map((r) => [r, `${r} rounds`]), customT.rounds, "data-ctrounds"),
+    el("div", { class: "tc-btns" }, el("button", { class: "btn big go", type: "button", "data-custom": "1", text: "🏆 Create & invite" })),
+  );
+}
 /** The Tournaments page: one simple row each; tap one for the rules, prizes and Play buttons. */
 function renderCompete() {
   const w = leagueWindow();
@@ -2514,10 +2445,11 @@ function renderCompete() {
       { class: `trow${opts.live ? " live" : ""}${opts.ready ? " ready" : ""}`, type: "button", "data-open": id },
       el("img", { src: img, alt: "" }),
       el("span", { class: "tr-txt" }, el("b", { text: name }), el("small", {}, opts.live ? el("i", { class: "live-dot" }) : "", status), opts.desc ? el("span", { class: "tr-desc", text: opts.desc }) : ""),
-      opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : el("span", { class: "tr-prize" }, el("i", { class: "coin" }), prize),
+      opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : prize ? el("span", { class: "tr-prize" }, el("i", { class: "coin" }), prize) : el("em", { class: "tr-claim new", text: "＋ New" }),
       el("i", { class: "tr-go", text: "›" }),
     );
   $("#tourneyList").replaceChildren(
+    row("custom", "/assets/tab_trophy.webp", "Create a tournament", "You + 3 friends", "", { desc: "Pick the mode and rounds, invite friends." }),
     row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0).toLocaleString(), { live: w.open, ready, desc: "10 matches vs bots. Win medals!" }),
     ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, t.prize[0].toLocaleString(), { desc: t.text })),
     row("endless", ENDLESS_T.img, "Endless Run", tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, ENDLESS_T.prize[0].toLocaleString(), { desc: ENDLESS_T.text }),
@@ -2528,10 +2460,10 @@ const tourneyModal = $("#tourneyModal");
 let tourneyOpen = null;
 function renderTourneySheet() {
   const t = TOURNEYS.find((x) => x.id === tourneyOpen);
-  const card = tourneyOpen === "weekend" ? weekendCard() : tourneyOpen === "endless" ? endlessTCard() : t ? tourneyCard(t) : null;
+  const card = tourneyOpen === "custom" ? customTCard() : tourneyOpen === "weekend" ? weekendCard() : tourneyOpen === "endless" ? endlessTCard() : t ? tourneyCard(t) : null;
   if (!card) return;
   card.classList.add("open"); // all the details show in the sheet
-  $("#tourneyTitle").textContent = tourneyOpen === "weekend" ? "Weekend League" : tourneyOpen === "endless" ? "Endless Run" : t.label;
+  $("#tourneyTitle").textContent = tourneyOpen === "custom" ? "Your tournament" : tourneyOpen === "weekend" ? "Weekend League" : tourneyOpen === "endless" ? "Endless Run" : t.label;
   $("#tourneyBody").replaceChildren(card);
 }
 function openTourney(id) {
@@ -2553,6 +2485,7 @@ function playMode(mode, withWho, fixed = null) {
   }
   game.solo = false;
   game.endless = false;
+  game.custom = null;
   game.wantMode = mode;
   connect(newCode(), true);
 }
@@ -2561,6 +2494,24 @@ $("#hpCompete").addEventListener("click", (e) => {
   if (open) openTourney(open.dataset.open);
 });
 $("#tourneyBody").addEventListener("click", (e) => {
+  const ct = e.target.closest("[data-ctmode], [data-ctrounds]");
+  if (ct) {
+    sfx.tap();
+    if (ct.dataset.ctmode) customT.mode = ct.dataset.ctmode;
+    else customT.rounds = Number(ct.dataset.ctrounds);
+    return renderTourneySheet();
+  }
+  if (e.target.closest("[data-custom]")) {
+    tourneyModal.hidden = true;
+    sfx.unlock();
+    if (soloBtn.disabled) return toast("Still loading the runners…");
+    if (!requireName()) return;
+    game.solo = false;
+    game.endless = false;
+    game.wantMode = customT.mode;
+    game.custom = { ...customT };
+    return connect(newCode(), true);
+  }
   if (e.target.closest("[data-endless]")) {
     tourneyModal.hidden = true;
     sfx.unlock();
@@ -2616,6 +2567,7 @@ function leaveToHome(message = "") {
   renderDaily();
   game.solo = false;
   game.endless = false;
+  game.custom = null;
   game.fixed = null;
   game.warm = null;
   game.prepped = null;
@@ -2664,6 +2616,16 @@ function enterLobby() {
 
 function renderLobby(v) {
   rememberFriends(v);
+  // your own tournament: a card to invite 3 friends, filling up as they join
+  const inv = $("#tInvite");
+  inv.hidden = !game.custom;
+  if (game.custom) {
+    const friends = v.players.filter((p) => p.id !== playerId && !p.bot && !p.gone);
+    $("#tInviteSlots").replaceChildren(
+      ...[0, 1, 2].map((i) => (friends[i] ? el("span", { class: "ti-slot in", text: friends[i].name }) : el("span", { class: "ti-slot", text: "Invite" }))),
+    );
+    $("#tInviteText").textContent = friends.length >= 3 ? "Everyone's in! Lock in and start." : `${3 - friends.length} more to invite · code ${net.code}`;
+  }
   $("#lobby").classList.toggle("solo-room", Boolean(game.solo));
   $("#lobbyCode").textContent = net.code;
   $("#lobbyCodeStrip").textContent = net.code;
@@ -2776,23 +2738,32 @@ function renderLobby(v) {
     }),
   );
   const mp = v.map || "meadow";
+  // tap maps to tick them: one = that map, several = a different one of them each round
+  const ticked = v.maps ?? (mp === "random" ? [] : [mp]);
   $("#mapPick").replaceChildren(
     ...["random", ...MAPS].map((key) => {
       const info = MAP_INFO[key];
       const style = key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)`;
+      const on = key === "random" ? mp === "random" && !v.maps : ticked.includes(key);
       const b = el(
         "button",
-        { class: `map-card${mp === key ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style },
+        { class: `map-card${on ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style },
         el("b", { text: info.label }),
         el("span", { text: info.text }),
       );
       b.disabled = !isHost;
-      b.addEventListener("click", () => mp !== key && act({ type: "map", map: key }));
+      b.addEventListener("click", () => {
+        if (key === "random") return !on && act({ type: "map", map: "random" });
+        if (!ticked.length) return act({ type: "map", map: key });
+        const next = on ? ticked.filter((m) => m !== key) : [...ticked, key];
+        if (next.length) act({ type: "maps", maps: next });
+      });
       return b;
     }),
   );
+  $("#mapNote").textContent = isHost ? (ticked.length > 1 ? `${ticked.length} maps · a different one each round` : "Tap more maps to mix them") : "";
   // start fetching the map's 3D props while everyone is still in the lobby
-  for (const key of mp === "random" ? MAPS : [mp]) {
+  for (const key of v.maps ?? (mp === "random" ? MAPS : [mp])) {
     world.ensureMap(key).catch(() => {});
     world.preloadMovers(key).catch(() => {});
   }
@@ -2893,14 +2864,14 @@ $("#luGo").addEventListener("click", () => {
  */
 /** What each runner shouts from the start blocks (picked per player, so it doesn't flicker). */
 const TAUNTS = ["Too slow!", "You're toast!", "My win!", "Catch me!", "Eat my dust!", "Bring it!", "Let's go!", "Easy win!"];
-const LU_KICKER = { survival: "Every runner for themself", chase: "Outrun the brain!", coinrush: "Grab the most coins", potato: "Don't be last!", grandtour: "One of every mode", random: "Surprise mode!" };
+const LU_KICKER = { survival: "Every runner for themself", chase: "Outrun the brain!", coinrush: "Grab the most coins", potato: "Don't be last!", grandtour: "One of every mode", random: "Party: every mode!" };
 function renderLineup(v, { isHost, gm, mp }) {
   $("#lineup").classList.toggle("solo-room", Boolean(game.solo));
   $("#luCode").textContent = net.code;
   $("#luKicker").textContent = LU_KICKER[gm] ?? "";
   $("#luMode").textContent = matchLabel(v, gm, gm === "survival" && v.players.length < 2 && !botsOn());
   const pz = PRIZE_INFO[v.prize ?? "none"];
-  $("#luMap").textContent = `${MAP_INFO[mp].label} map${pz.pays.length ? ` · ${pz.icon}` : ""}`;
+  $("#luMap").textContent = `${v.maps ? `${v.maps.length} maps` : mp === "random" ? "All maps" : `${MAP_INFO[mp].label} map`}${pz.pays.length ? ` · ${pz.icon}` : ""}`;
   const present = v.players.filter((p) => !p.gone);
   // you always stand on block 1
   const order = [...v.players].sort((a, b) => Number(b.id === playerId) - Number(a.id === playerId));
@@ -2961,9 +2932,10 @@ $("#botToggle").addEventListener("change", (e) => {
   if (net.view) renderLobby(net.view);
 });
 $("#nextBtn").addEventListener("click", () => act({ type: "next" }));
+$("#tInviteBtn").addEventListener("click", () => $("#copyBtn").click());
 $("#copyBtn").addEventListener("click", async () => {
   const url = `${location.origin}/?join=${net.code}`;
-  const text = `Race me in 4 Friends! Code ${net.code} → ${url}`;
+  const text = game.custom ? `Join my 4 Friends tournament! Code ${net.code} → ${url}` : `Race me in 4 Friends! Code ${net.code} → ${url}`;
   try {
     if (navigator.share && matchMedia("(pointer: coarse)").matches) {
       await navigator.share({ title: "4 Friends", text, url });
@@ -7676,8 +7648,7 @@ function recordRace(v, place) {
   if (v.cup && v.cup.race >= v.cup.races.length && v.cup.table?.[0] === playerId) stats.add("cupWins", 1);
   // rounds of a multi-round match pay double
   const picked = v.kind === "coinrush" ? 0 : game.runCoins ?? 0; // coins grabbed on the track
-  // your runner's card level adds a little on top (+5% a level)
-  const coins = Math.round(((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1) * levelBonus()) + picked;
+  const coins = Math.round(((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1)) + picked;
   wallet.addCoins(coins);
   const prize = tourneyPrize(v) + endlessTPrize(v);
   const league = leagueMatch(v, n, place);
@@ -8208,7 +8179,7 @@ renderCollPill();
 const CAREER = [
   {
     name: "Rookie",
-    chest: { pack: "brain" },
+    chest: { pack: "mega" },
     missions: [
       { stat: "races", goal: 3, text: "Play 3 races", coins: 50, icon: "/assets/ui_star.webp" },
       { stat: "dist", goal: 1000, text: "Run 1 km in total", coins: 50, icon: "/assets/ui_shoe.webp" },
@@ -8218,7 +8189,7 @@ const CAREER = [
   },
   {
     name: "Runner",
-    chest: { pack: "brain" },
+    chest: { pack: "mega" },
     missions: [
       { stat: "races", goal: 10, text: "Play 10 races", coins: 80, icon: "/assets/ui_star.webp" },
       { stat: "winsAny", goal: 1, text: "Win a race (bots count)", coins: 100, icon: "/assets/medal_gold.png" },

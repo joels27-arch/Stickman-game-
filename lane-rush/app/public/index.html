@@ -207,6 +207,12 @@
               <div id="copyMsg" class="small"></div>
             </div>
           </div>
+          <div id="tInvite" class="t-invite" hidden>
+            <b>🏆 Your tournament</b>
+            <div id="tInviteSlots" class="ti-slots"></div>
+            <small id="tInviteText"></small>
+            <button id="tInviteBtn" class="btn small blue" type="button">Invite friends</button>
+          </div>
           <div class="topbar">
             <div class="wallet" title="Your medals"></div>
             <button class="country-chip" type="button" aria-label="Country you cheer for"></button>
@@ -222,6 +228,7 @@
             <label class="bot-toggle"><input type="checkbox" id="botToggle" checked /> <span>🤖 Fill empty spots with bots</span></label>
             <h3 class="pick-title">Map</h3>
             <div id="mapPick" class="map-pick"></div>
+            <p id="mapNote" class="pick-note"></p>
             <h3 class="pick-title">Rounds</h3>
             <div id="roundPick" class="chip-pick"></div>
             <h3 class="pick-title">Prize for the top 3</h3>
@@ -551,7 +558,6 @@
         <h2 id="charName" class="char-name"></h2>
         <div id="charTags" class="char-tags"></div>
         <p id="charHow" class="char-how"></p>
-        <div id="charLvl" class="char-lvl" hidden></div>
         <button id="charAct" class="gbtn" type="button"></button>
       </div>
     </div>

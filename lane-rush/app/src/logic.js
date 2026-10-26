@@ -51,13 +51,14 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  *   sprint     — Classic Race: 700 m to a finish line, first one there wins
  * Empty spots are filled with bots.
  * `state.mode` is what the host picked; `state.kind` is the race being run.
- * The host can also pick "random" as the mode or the map: it's drawn when each race starts.
+ * The host can also pick "random" (Party) as the mode or the map: it's drawn when each race starts.
+ * Instead of one map the host can tick several (`state.maps`): each race draws one of those.
  */
 export const GAME_MODES = ["survival", "sprint", "chase", "coinrush", "potato", "grandtour", "random"];
 /** Modes played over several rounds with a points table. */
 export const CUP_MODES = ["grandtour"];
 /** How many rounds the host can pick for a match (the Grand Tour is always one of each mode). */
-export const ROUND_OPTIONS = [1, 3, 5];
+export const ROUND_OPTIONS = [1, 3, 5, 10];
 /** What the host can put up for 1st / 2nd / 3rd (paid with 2+ real players). */
 export const PRIZES = ["none", "coins", "bigcoins", "huge"];
 /**
@@ -71,6 +72,8 @@ export const BOT_LEVELS = {
 };
 /** The modes a single round can be (a Party Cup is three of these). All run on the endless course. */
 export const ROUND_KINDS = ["survival", "chase", "coinrush", "potato"];
+/** Party ("random"): every mode, the Classic Race too, a different one each round. */
+export const PARTY_KINDS = [...ROUND_KINDS, "sprint"];
 export const isEndless = (kind) => kind !== "sprint";
 /**
  * Brain Chase: a giant brain rolls after everyone, starting this far behind
@@ -846,10 +849,16 @@ function startRace(state, t) {
   state.seed = ((Math.floor(t) % 2147483647) ^ Math.imul(state.round, 2654435761)) >>> 0;
   // "random" mode or map: drawn now, from the race's seed
   const pick = rng((state.seed + 7919) >>> 0);
-  const baseMap = state.map === "random" ? Math.floor(pick() * MAPS.length) : Math.max(0, MAPS.indexOf(state.map ?? "meadow"));
-  state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode === "random" ? ROUND_KINDS[Math.floor(pick() * ROUND_KINDS.length)] : state.mode;
+  // several maps ticked: one of those, not the one just raced where there's a choice
+  const pool = state.maps?.length > 1 ? state.maps.filter((m) => m !== state.raceMap) : null;
+  const baseMap = pool
+    ? MAPS.indexOf(pool[Math.floor(pick() * pool.length)])
+    : state.map === "random"
+      ? Math.floor(pick() * MAPS.length)
+      : Math.max(0, MAPS.indexOf(state.map ?? "meadow"));
+  state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode === "random" ? PARTY_KINDS[Math.floor(pick() * PARTY_KINDS.length)] : state.mode;
   // later Party Cup rounds open further into the difficulty curve
-  state.courseBoost = state.cup ? (state.cup.race - 1) * CUP_ROUND_BOOST_M : 0;
+  state.courseBoost = state.cup ? Math.min(state.cup.race - 1, 4) * CUP_ROUND_BOOST_M : 0; // 10-round matches stop getting harder after round 5
   state.raceMap = MAPS[baseMap]; // a random map is drawn again every round
   state.phase = "countdown";
   state.startAt = t + COUNTDOWN_MS;
@@ -889,8 +898,8 @@ function knockOut(p, t) {
 function newCup(mode, t, rounds = 1) {
   if (!CUP_MODES.includes(mode) && rounds <= 1) return null;
   const r = rng(Math.floor(t) % 2147483647);
-  const shuffled = () => {
-    const pool = [...ROUND_KINDS];
+  const shuffled = (kinds = ROUND_KINDS) => {
+    const pool = [...kinds];
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(r() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -901,7 +910,7 @@ function newCup(mode, t, rounds = 1) {
   if (mode === "random") {
     const races = [];
     while (races.length < rounds) {
-      const next = shuffled().filter((k, i) => i > 0 || k !== races[races.length - 1]);
+      const next = shuffled(PARTY_KINDS).filter((k, i) => i > 0 || k !== races[races.length - 1]);
       races.push(...next);
     }
     return { race: 1, points: {}, races: races.slice(0, rounds) };
@@ -1495,6 +1504,13 @@ export function validateAction(state, playerId, action) {
       if (!MAPS.includes(action.map) && action.map !== "random") return { ok: false, error: "bad map" };
       return { ok: true };
     }
+    case "maps": {
+      if (state.phase !== "lobby") return { ok: false, error: "can only change map in the lobby" };
+      if (state.host !== playerId) return { ok: false, error: "Only the host can pick the map" };
+      const m = action.maps;
+      if (!Array.isArray(m) || !m.length || m.length > MAPS.length || new Set(m).size !== m.length || !m.every((x) => MAPS.includes(x))) return { ok: false, error: "bad maps" };
+      return { ok: true };
+    }
     case "rounds":
     case "prize":
     case "botlevel": {
@@ -1707,6 +1723,12 @@ export function applyAction(state0, playerId, action) {
       break;
     case "map":
       state.map = action.map;
+      state.maps = null;
+      break;
+    case "maps":
+      // one ticked = that map; more = a different one of them each race
+      state.maps = action.maps.length > 1 ? [...action.maps] : null;
+      state.map = action.maps.length > 1 ? "random" : action.maps[0];
       break;
     case "rounds":
       state.rounds = action.rounds;
@@ -1959,6 +1981,7 @@ export function viewFor(state, playerId) {
     mode: state.mode ?? "survival",
     kind: state.kind ?? "survival",
     map: state.map ?? "meadow",
+    maps: state.maps ?? null,
     rounds: state.rounds ?? 1,
     botLevel: state.botLevel ?? "normal",
     prize: state.prize ?? "none",

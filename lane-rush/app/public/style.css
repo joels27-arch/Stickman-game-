@@ -2802,3 +2802,15 @@ html, body { background: var(--k1); }
 .hp-compete .league-card small { font-size: 12px; }
 .hp-compete .league-card .lc-next { font-size: 13px; }
 .hp-compete .league-card .qbar { height: 12px; }
+/* your own tournament: the setup sheet and the invite card in the lobby */
+.t-custom { background: linear-gradient(160deg, #ffb02e, #e0561b); }
+.ct-title { position: relative; z-index: 1; margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; }
+.ct-pick { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+.ct-pick .chip { text-transform: none; }
+.ct-pick .chip.on { background: #fff; color: #b3400f; border-color: #fff; }
+.tr-claim.new { background: #ffb02e; color: #3a1600; }
+.t-invite { display: grid; gap: 8px; margin: 10px 0; padding: 12px; border-radius: 18px; border: 2px solid #ffd23f; background: linear-gradient(160deg, rgba(255, 176, 46, 0.25), rgba(224, 86, 27, 0.25)); color: #fff; text-align: center; }
+.t-invite b { font-size: 18px; }
+.ti-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ti-slot { padding: 10px 4px; border-radius: 12px; border: 2px dashed rgba(255, 255, 255, 0.5); font-weight: 800; font-size: 13px; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ti-slot.in { border-style: solid; border-color: #b6f72a; background: rgba(182, 247, 42, 0.18); opacity: 1; }
