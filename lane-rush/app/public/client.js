@@ -3308,6 +3308,12 @@ function gfxChoice() {
   if (p.gfx && (p.gfx === "auto" || GFX[p.gfx])) return p.gfx;
   return p.low ? "performance" : "auto"; // the old Battery saver switch
 }
+// the old Auto stepped down for good on any slow patch (or a Low Power Mode 30 fps cap):
+// everyone starts at High again once, and the new pace-aware check decides from here
+if (!local.getItem("lr:gfxV2")) {
+  local.setItem("lr:gfxV2", "1");
+  local.removeItem("lr:gfxAuto");
+}
 /** The preset in use: the chosen one, or Auto's current step. */
 function gfxTier() {
   const c = gfxChoice();
