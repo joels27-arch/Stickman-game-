@@ -77,8 +77,16 @@ const RUNNERS = [
   { name: "Kiko", color: "#7c4dff", file: "c5", tag: "Shadow Ninja" },
   { name: "Dino", color: "#14b8a6", file: "c6", tag: "Rawr Runner" },
   { name: "Nova", color: "#8fa3bf", file: "c7", tag: "Space Cadet" },
+  // collectible characters that are 3D runners too: owned through their collection id
+  { name: "Gloop", color: "#5b2a8a", file: "c8", tag: "Slime Monster", cid: "gloop" },
+  { name: "Sharky", color: "#3f8fe0", file: "c9", tag: "Beach Boss", cid: "sharky" },
+  { name: "Captain Brainstorm", color: "#7c3aed", file: "c10", tag: "Storm Hero", cid: "brainstorm" },
+  { name: "Pandu", color: "#d23a2a", file: "c11", tag: "Karate Panda", cid: "pandu" },
+  { name: "Siete", color: "#e02424", file: "c12", tag: "Football Star", cid: "striker" },
 ];
-const STARTERS = RUNNERS.length;
+const STARTERS = 8; // the first 8 runners; the rest are collectibles
+/** Collection id → runner index, for the collectibles that are 3D runners. */
+const CID_RUNNER = Object.fromEntries(RUNNERS.map((r, i) => [r.cid, i]).filter(([c]) => c));
 /** 3D runners you don't start with: Kiko is the Season Pass reward (free track, level 2). */
 const KIKO = 5;
 const PIP = 4;
@@ -274,6 +282,7 @@ const wallet = {
     }
   },
   owns(i) {
+    if (RUNNERS[i]?.cid) return this.has(RUNNERS[i].cid);
     return (i < STARTERS && !(i in PASS_RUNNERS) && !(i in ROAD_RUNNERS)) || this.owned().includes(i);
   },
   coins() {
@@ -1072,13 +1081,15 @@ function renderItems() {
 // ── the character catalog: every character, its rarity and how you get it ──
 
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
-const STARTER_RARITY = ["rare", "rare", "rare", "rare", "epic", "epic", "rare", "epic"]; // nothing below rare
+const STARTER_RARITY = ["rare", "rare", "rare", "rare", "epic", "epic", "rare", "epic", "epic", "epic", "legendary", "rare", "legendary"]; // nothing below rare
+/** A collectible that is also a 3D runner: its runner index (you can race with it). */
+const runnerOf = (id) => (id in CID_RUNNER ? { idx: CID_RUNNER[id], playable: true, tag: RUNNERS[CID_RUNNER[id]].tag } : {});
 function allChars() {
   return [
-    ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : i in ROAD_RUNNERS ? "road" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
-    ...COLLECTION.map((c) => ({ ...c, img: c.pic ?? `/assets/sc_${c.id}.webp`, hero: c.pic ?? `/assets/sc_${c.id}.webp` })),
+    ...RUNNERS.slice(0, STARTERS).map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : i in ROAD_RUNNERS ? "road" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
+    ...COLLECTION.map((c) => ({ ...c, img: c.pic ?? `/assets/sc_${c.id}.webp`, hero: c.pic ?? `/assets/sc_${c.id}.webp`, ...runnerOf(c.id) })),
     ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp` })),
-    { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp` },
+    { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp`, ...runnerOf(PASS_CHAR.id) },
     ...ROAD_CHARS.map((c) => ({ ...c, via: "road", img: `/assets/rd_${c.id}.webp`, hero: `/assets/rd_${c.id}.webp` })),
   ];
 }
@@ -1095,6 +1106,8 @@ function howToGet(c) {
 }
 /** The short lock label on a runner card you can't race with yet. */
 function lockLabel(i) {
+  const c = RUNNERS[i]?.cid && allChars().find((x) => x.id === RUNNERS[i].cid);
+  if (c) return `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}`;
   return i in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[i]}` : i in ROAD_RUNNERS ? `🏆 ${ROAD_RUNNERS[i]}` : "Locked";
 }
 function collectionCount() {
@@ -1674,7 +1687,7 @@ function requireName() {
  */
 function renderSpotlight(box, cur, { takenBy = () => null, onPick }) {
   const n = RUNNERS.length;
-  const free = (i) => !takenBy(i) || i === cur;
+  const free = (i) => i === cur || (!takenBy(i) && wallet.owns(i)); // only runners you have
   const step = (dir) => {
     for (let k = 1; k < n; k++) {
       const i = (cur + dir * k + n * k) % n;
@@ -2798,7 +2811,7 @@ function renderLobby(v) {
   // bots join at the gun with any runner: have every runner downloaded while people pick
   if (world.ready && !game.allChars) {
     game.allChars = true;
-    setTimeout(() => RUNNERS.forEach((_, i) => world.ensureChar(i).catch(() => (game.allChars = false))), 600);
+    setTimeout(() => RUNNERS.slice(0, STARTERS).forEach((_, i) => world.ensureChar(i).catch(() => (game.allChars = false))), 600); // bots only use the first 8
   }
   // a set map gets downloaded and built while people pick, so the race starts smooth
   if (world.ready && v.map && v.map !== "random" && game.prepped !== v.map) {
