@@ -6753,12 +6753,18 @@ function coachTick(dt) {
   }
   const course = race.course;
   if (!course) return coach.scale;
-  const reach = Math.max(7, me.speed * 0.75);
+  // stop the run exactly where the move works if made right then (a jump clears a hurdle
+  // between ~0.1 s and ~0.6 s after take-off), not when the obstacle first comes into view
+  const v = Math.max(6, me.speed);
+  const AT = { jump: 0.33, slide: 0.35, lane: 0.45 };
   for (const row of course.rows) {
-    if (row.z <= me.d + 1.5 || row.z > me.d + reach) continue;
+    if (row.z <= me.d + 1) continue;
+    if (row.z > me.d + v) break;
     const k = row.lanes[me.lane];
     const need = k === "hurdle" ? "jump" : k === "gate" ? "slide" : k === "crate" ? "lane" : null;
     if (!need || coach.done.has(need)) continue;
+    if (row.z - me.d > Math.max(2.2, v * AT[need])) break; // not yet: keep running up to it
+    coach.scale = 0; // freeze right here, no easing past the spot
     let dir;
     if (need === "lane") {
       const free = [me.lane - 1, me.lane + 1].filter((l) => l >= 0 && l < LANES && !row.lanes[l]);
@@ -9554,7 +9560,7 @@ world
 // test hooks for the local dev server only (headless browser checks)
 if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
   // test hooks (used by the automated play-tests)
-  window.__laneRush = { renderer, scene, me, hit, grabBox, useItem, game, net, remote, world, race, camera, renderPower, MOVER_KINDS, moverCovers, raceElapsed: () => (net.view ? (serverNow() - net.view.startAt) / 1000 : 0) };
+  window.__laneRush = { renderer, scene, me, hit, grabBox, useItem, game, net, coach, remote, world, race, camera, renderPower, MOVER_KINDS, moverCovers, raceElapsed: () => (net.view ? (serverNow() - net.view.startAt) / 1000 : 0) };
 }
 
 requestAnimationFrame(frame);
