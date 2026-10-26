@@ -1353,17 +1353,15 @@ function buyPack(pack) {
 /** Roll a pack's one character and credit it: a new one unlocks, one you have pays coins. */
 function grantPack(pack) {
   const it = packCard(rollRarity(pack.odds));
-  // your very first pack always has a character you don't have yet
-  if (stats.get("packs") === 0 && ownsChar(it.char)) {
-    const left = packPool().filter((c) => !ownsChar(c) && c.rarity !== "legendary");
-    if (left.length) it.char = left[Math.floor(Math.random() * left.length)];
-  }
+  // the 3D runners you can race with come first (not the Season Pass ones: those come from the pass)
+  const runners = allChars().filter((c) => c.playable && c.via !== "pass" && c.via !== "starter" && !ownsChar(c));
+  if (runners.length) it.char = runners[Math.floor(Math.random() * runners.length)];
   const c = it.char;
   if (ownsChar(c)) {
     it.dupe = true;
     it.coins = DUPE_COINS[c.rarity] ?? 100;
     wallet.addCoins(it.coins);
-  } else if (c.idx === undefined) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), c.id]));
+  } else giveItem(c.idx !== undefined && !RUNNERS[c.idx].cid ? c.idx : c.id);
   stats.add("packs", 1);
   return [it];
 }
@@ -1905,7 +1903,7 @@ for (const t of document.querySelectorAll(".htab")) {
 
 // Tournaments page: the Weekend League and two tournaments with daily prizes
 const TOURNEYS = [
-  { id: "grandtour", label: "Grand Tour", img: "/assets/medal_gold.png", tag: "Tournament · 4 rounds", text: "One round of every mode.", prize: [500, 250, 120] },
+  { id: "grandtour", label: "Grand Tour", img: "/assets/medal_gold.png", tag: "Tournament · 4 rounds", text: "One round of every mode.", prize: ["legend", 250, 120] },
 ];
 const PLACE_SHORT = ["1st", "2nd", "3rd", "4th"];
 /** Prize coins already paid today, per tournament: the best finish each day pays once (a better finish later pays the difference). */
@@ -1917,23 +1915,47 @@ function tourneyPaid() {
     return { day: dayKey() };
   }
 }
+/** A prize on a tournament card: coins, or a pack's picture and name. */
+function prizeEl(x) {
+  if (typeof x === "number") return el("span", { class: "prz-v" }, el("i", { class: "coin" }), x.toLocaleString());
+  return el("span", { class: "prz-v pack" }, el("img", { src: `/assets/pack_${x}.webp`, alt: "" }), prizeText(x));
+}
+/**
+ * Pay today's tournament prize for a place, once a day: 1st wins a Legend Pack (once),
+ * 2nd/3rd coins (a better place later pays the difference). Returns what was won, or "".
+ */
+function payDaily(key, place, prizes, extra = {}) {
+  const paid = tourneyPaid();
+  const was = paid[key] ?? { coins: 0 };
+  const prize = prizes[place - 1];
+  paid[key] = { ...was, ...extra };
+  let won = "";
+  if (typeof prize === "string") {
+    if (!was.pack) {
+      paid[key] = { ...paid[key], pack: true, place };
+      const pk = PACKS.find((x) => x.id === prize);
+      const items = grantPack(pk);
+      setTimeout(() => openPackAnim(pk, items), 1800);
+      won = prizeText(prize);
+    }
+  } else if ((prize ?? 0) > (was.coins ?? 0)) {
+    paid[key] = { ...paid[key], coins: prize, place: was.pack ? 1 : place };
+    wallet.addCoins(prize - (was.coins ?? 0));
+    won = `+${prize - (was.coins ?? 0)} coins`;
+  }
+  local.setItem("lr:tourney", JSON.stringify(paid));
+  return won;
+}
 function tourneyPrize(v) {
   const t = TOURNEYS.find((x) => x.id === v.mode);
-  if (!t || !v.cup || v.cup.race < v.cup.races.length) return 0;
+  if (!t || !v.cup || v.cup.race < v.cup.races.length) return "";
   const place = (v.cup.table ?? []).indexOf(playerId) + 1;
-  const prize = t.prize[place - 1] ?? 0;
-  const paid = tourneyPaid();
-  const before = paid[t.id]?.coins ?? 0;
-  if (prize <= before) return 0;
-  paid[t.id] = { coins: prize, place };
-  local.setItem("lr:tourney", JSON.stringify(paid));
-  wallet.addCoins(prize - before);
-  return prize - before;
+  return place ? payDaily(t.id, place, t.prize) : "";
 }
 
 // Endless Run Tournament: one run a go, as far as you can; today's board of rivals is the
 // same for everyone. Only runs started from the tournament count; the best place each day pays once.
-const ENDLESS_T = { id: "endless", label: "Endless Run Tournament", img: "/assets/ui_flame.webp", tag: "Daily · solo", text: "One life. Run further than the board!", prize: [600, 300, 150] };
+const ENDLESS_T = { id: "endless", label: "Endless Run Tournament", img: "/assets/ui_flame.webp", tag: "Daily · solo", text: "One life. Run further than the board!", prize: ["legend", 300, 150] };
 const ENDLESS_RIVALS = ["Turbo Tim", "Zippy", "Rocket Rita", "Dash", "Flash Fred", "Sprinty", "Max Speed", "Bolt Bot"];
 /** Today's board: three rivals with set distances. */
 function endlessBoard() {
@@ -1950,19 +1972,10 @@ function endlessTPlace(d) {
 }
 /** A finished endless run from the tournament: pay the place, once a day (a better place pays the difference). */
 function endlessTPrize(v) {
-  if (game.fixed?.kind !== "endlessT" || v.kind !== "survival" || v.players.length !== 1) return 0;
+  if (game.fixed?.kind !== "endlessT" || v.kind !== "survival" || v.players.length !== 1) return "";
   game.fixed = null;
   const d = Math.round(v.players[0]?.d ?? 0);
-  const place = endlessTPlace(d);
-  const paid = tourneyPaid();
-  const was = paid.endless ?? { coins: 0 };
-  const prize = ENDLESS_T.prize[place - 1] ?? 0;
-  paid.endless = { ...was, best: Math.max(was.best ?? 0, d) };
-  if (prize > was.coins) paid.endless = { ...paid.endless, coins: prize, place };
-  local.setItem("lr:tourney", JSON.stringify(paid));
-  if (prize <= was.coins) return 0;
-  wallet.addCoins(prize - was.coins);
-  return prize - was.coins;
+  return payDaily("endless", endlessTPlace(d), ENDLESS_T.prize, { best: Math.max(tourneyPaid().endless?.best ?? 0, d) });
 }
 function endlessTCard() {
   const t = ENDLESS_T;
@@ -1976,7 +1989,7 @@ function endlessTCard() {
       "div",
       { class: "tc-head" },
       el("img", { src: t.img, alt: "" }),
-      el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${t.prize[0].toLocaleString()}`)),
+      el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, "1st: ", prizeEl(t.prize[0]))),
     ),
     el("p", { class: "tc-desc", text: t.text }),
     el(
@@ -1988,7 +2001,7 @@ function endlessTCard() {
       "div",
       { class: "tc-prizes" },
       el("small", { text: "Daily prize" }),
-      ...t.prize.map((c, i) => el("span", { class: `prz${mine?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), el("i", { class: "coin" }), String(c))),
+      ...t.prize.map((c, i) => el("span", { class: `prz${mine?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), prizeEl(c))),
     ),
     el("div", { class: "tc-btns" }, el("button", { class: "btn big go", type: "button", "data-endless": "1", text: "▶ Run" })),
   );
@@ -2426,14 +2439,14 @@ function tourneyCard(t) {
       "div",
       { class: "tc-head" },
       el("img", { src: t.img, alt: "" }),
-      el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, el("i", { class: "coin" }), `Up to ${t.prize[0].toLocaleString()}`)),
+      el("div", {}, el("em", { text: t.tag }), el("b", { text: t.label }), el("span", { class: "tc-prize" }, "1st: ", prizeEl(t.prize[0]))),
     ),
     el("p", { class: "tc-desc", text: t.text }),
     el(
       "div",
       { class: "tc-prizes" },
       el("small", { text: "Daily prize" }),
-      ...t.prize.map((c, i) => el("span", { class: `prz${paid[t.id]?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), el("i", { class: "coin" }), String(c))),
+      ...t.prize.map((c, i) => el("span", { class: `prz${paid[t.id]?.place === i + 1 ? " won" : ""}` }, el("b", { text: PLACE_SHORT[i] }), prizeEl(c))),
     ),
     paid[t.id] ? el("p", { class: "tc-note", text: `Today: ${PLACE_SHORT[paid[t.id].place - 1]} ✓ · place higher for more` }) : "",
     el(
@@ -2454,13 +2467,13 @@ function renderCompete() {
       { class: `trow${opts.live ? " live" : ""}${opts.ready ? " ready" : ""}`, type: "button", "data-open": id },
       el("img", { src: img, alt: "" }),
       el("span", { class: "tr-txt" }, el("b", { text: name }), el("small", {}, opts.live ? el("i", { class: "live-dot" }) : "", status), opts.desc ? el("span", { class: "tr-desc", text: opts.desc }) : ""),
-      opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : prize ? el("span", { class: "tr-prize" }, el("i", { class: "coin" }), prize) : el("em", { class: "tr-claim new", text: "＋ New" }),
+      opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : el("span", { class: "tr-prize" }, ...(typeof prize === "string" ? [el("i", { class: "coin" }), prize] : [prizeEl(prize)])),
       el("i", { class: "tr-go", text: "›" }),
     );
   $("#tourneyList").replaceChildren(
     row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0).toLocaleString(), { live: w.open, ready, desc: "10 matches vs bots. Win medals!" }),
-    ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, t.prize[0].toLocaleString(), { desc: t.text })),
-    row("endless", ENDLESS_T.img, "Endless Run", tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, ENDLESS_T.prize[0].toLocaleString(), { desc: ENDLESS_T.text }),
+    ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, t.prize[0], { desc: t.text })),
+    row("endless", ENDLESS_T.img, "Endless Run", tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, ENDLESS_T.prize[0], { desc: ENDLESS_T.text }),
   );
   if (!tourneyModal.hidden) renderTourneySheet();
 }
@@ -2823,7 +2836,7 @@ function renderLobby(v) {
   // bots join at the gun with any runner: have every runner downloaded while people pick
   if (world.ready && !game.allChars) {
     game.allChars = true;
-    setTimeout(() => RUNNERS.slice(0, STARTERS).forEach((_, i) => world.ensureChar(i).catch(() => (game.allChars = false))), 600); // bots only use the first 8
+    setTimeout(() => RUNNERS.forEach((_, i) => world.ensureChar(i).catch(() => (game.allChars = false))), 600);
   }
   // a set map gets downloaded and built while people pick, so the race starts smooth
   if (world.ready && v.map && v.map !== "random" && game.prepped !== v.map) {
@@ -3065,7 +3078,7 @@ function renderResults(v) {
   if (rpChange) {
     reward.append(el("span", { class: "coinchip" }, el("img", { src: "/assets/ui_c2.webp", alt: "" }), el("b", { text: `+${rpChange.coins}` }), el("small", { text: game.runCoins && v.kind !== "coinrush" ? `incl. ${game.runCoins} picked up` : rpChange.kos ? `incl. ${rpChange.kos} hit${rpChange.kos > 1 ? "s" : ""} ×10` : "coins" })));
     if (rpChange.xp) reward.append(el("span", { class: "xpchip", text: `+${rpChange.xp} XP` }));
-    if (rpChange.prize) reward.append(el("span", { class: "xpchip prizechip", text: `🏆 Prize +${rpChange.prize}` }));
+    if (rpChange.prize) reward.append(el("span", { class: "xpchip prizechip", text: `🏆 Prize: ${rpChange.prize}` }));
     if (roomPrize) reward.append(el("span", { class: "xpchip prizechip", text: roomPrize }));
     if (potBack) reward.append(el("span", { class: "xpchip prizechip", text: potBack }));
     if (rpChange.league) reward.append(el("span", { class: "xpchip leaguechip", text: `Weekend League ${rpChange.league.medal ? MEDAL_ICON[rpChange.league.medal] : "—"} · match ${rpChange.league.matches}/${LEAGUE_MATCHES}` }));
@@ -7645,7 +7658,7 @@ function recordRace(v, place) {
   const picked = v.kind === "coinrush" ? 0 : game.runCoins ?? 0; // coins grabbed on the track
   const coins = Math.round(((n >= 2 ? RACE_COINS[place - 1] ?? 10 : Math.max(5, Math.min(60, Math.floor(d / 25)))) + 10 * kos) * (v.cup ? 2 : 1)) + picked;
   wallet.addCoins(coins);
-  const prize = tourneyPrize(v) + endlessTPrize(v);
+  const prize = [tourneyPrize(v), endlessTPrize(v)].filter(Boolean).join(" · ");
   const league = leagueMatch(v, n, place);
   const res = {};
   res.coins = coins;

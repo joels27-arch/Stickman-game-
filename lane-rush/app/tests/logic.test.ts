@@ -578,6 +578,17 @@ describe("random mode and map", () => {
     expect(s.cup.races).toHaveLength(10);
     expect(new Set(s.cup.races)).toEqual(new Set(L.PARTY_KINDS));
   });
+  it("bots get random runners, not the same ones every race", () => {
+    const sets = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      const s = act(lobbyOf(1), "p0", { type: "start", bots: true, t: T0 + i * 7777 });
+      const bots = Object.values(s.players).filter((p: any) => p.bot).map((p: any) => p.char);
+      expect(new Set(bots).size).toBe(bots.length); // never two the same
+      expect(bots.every((c: number) => c >= 0 && c < L.CHARACTERS)).toBe(true);
+      sets.add(bots.join(","));
+    }
+    expect(sets.size).toBeGreaterThan(5);
+  });
   it("Party: the host can switch modes off (at least 2 stay on)", () => {
     let s = act(lobbyOf(2), "p0", { type: "mode", mode: "random" });
     s = act(s, "p0", { type: "party", kinds: ["survival", "sprint"] });

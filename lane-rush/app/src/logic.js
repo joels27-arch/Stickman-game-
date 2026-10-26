@@ -33,7 +33,7 @@ export const COUNTDOWN_MS = 5000; // room to load and warm up before the 3-2-1
 export const RACE_LIMIT_MS = 90000; // hard cap on a race
 export const AFTER_FIRST_MS = 15000; // stragglers get this long after the winner
 export const LOBBY_GRACE_MS = 10000; // a dropped lobby player keeps their spot this long
-export const CHARACTERS = 13; // 8 runners + 5 collectible runners (bots only use the first 8)
+export const CHARACTERS = 13; // 8 runners + 5 collectible 3D runners
 
 /**
  * Ways to play (the lobby host picks one):
@@ -1157,7 +1157,9 @@ function fillBots(state) {
     const id = `bot${n + 1}`;
     n += 1;
     if (state.players[id]) continue;
-    const char = [0, 1, 2, 3, 4, 5, 6, 7].find((c) => !used.has(c)) ?? 0;
+    // a random runner nobody has taken (any of them, the collectible 3D ones too)
+    const free = Array.from({ length: CHARACTERS }, (_, c) => c).filter((c) => !used.has(c));
+    const char = free.length ? free[Math.floor(roll(state.seed + state.round * 7919, n, 11) * free.length)] : 0;
     used.add(char);
     const r = roll(state.seed + state.round, n, 3);
     const slot = ids(state).length;
