@@ -1394,6 +1394,7 @@ function renderPacks() {
 // the opening: shake → tap → flash → one card at a time
 const packOpen = $("#packOpen");
 let po = null;
+const PACK_TAPS = 4; // taps to burst a pack open
 function openPackAnim(pack, items) {
   po = { pack, items, i: -1, stage: "sealed" };
   // big packs: skip straight to all the cards
@@ -1419,7 +1420,8 @@ function openPackAnim(pack, items) {
   $("#poSummary").hidden = true;
   $("#poDone").hidden = true;
   $("#poHint").hidden = false;
-  $("#poHint").textContent = "Tap to open!";
+  $("#poHint").textContent = `Tap ${PACK_TAPS}× to open!`;
+  $("#poPack").style.setProperty("--shake", "1");
   packOpen.hidden = false;
   sfx.unlock();
 }
@@ -1443,6 +1445,19 @@ function itemCard(it) {
 function packStep() {
   if (!po) return;
   if (po.stage === "sealed") {
+    // tap, tap, tap: the pack shakes harder each time, then bursts open
+    po.taps = (po.taps ?? 0) + 1;
+    if (po.taps < PACK_TAPS) {
+      const pk = $("#poPack");
+      pk.style.setProperty("--shake", String(1 + po.taps * 0.8));
+      pk.className = "po-pack";
+      void pk.offsetWidth;
+      pk.className = "po-pack shake hit";
+      sfx.lane();
+      buzz(20 + po.taps * 10);
+      $("#poHint").textContent = `Tap! ${PACK_TAPS - po.taps} more`;
+      return;
+    }
     po.stage = "cards";
     $("#poPack").className = "po-pack burst";
     packOpen.classList.remove("flash");
