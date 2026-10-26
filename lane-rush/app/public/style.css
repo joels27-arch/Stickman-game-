@@ -2819,3 +2819,22 @@ html, body { background: var(--k1); }
 .hp-play .league-card.home-road img { width: 72px; height: 72px; }
 .hp-play .league-card.home-road b { font-size: 24px; }
 .hp-play .league-card.home-road .qbar { height: 10px; }
+/* the Season Pass card on the Shop page: bigger, with the next rewards on it */
+.store-card.pass-card { grid-template-columns: 84px minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 12px; padding: 16px 14px; min-height: 190px; }
+.store-card.pass-card > img { width: 84px; height: 84px; }
+.store-card.pass-card b { font-size: 26px; }
+.store-card.pass-card .qbar { height: 12px; }
+.pass-peek { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.pk-tile { position: relative; display: grid; justify-items: center; gap: 2px; padding: 8px 4px 6px; border-radius: 14px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.25); }
+.pk-tile.gold { background: linear-gradient(180deg, rgba(255, 210, 63, 0.35), rgba(224, 140, 0, 0.25)); border-color: #ffd23f; }
+.pk-tile img { width: 44px; height: 44px; object-fit: contain; }
+.pk-tile i { font-style: normal; font-size: 32px; line-height: 44px; }
+.pk-tile small { font-size: 11px; font-weight: 900; }
+.pk-tile.locked::after { content: "🔒"; position: absolute; top: 2px; right: 4px; font-size: 13px; }
+.pk-tile.done { opacity: 0.45; }
+/* the Trophy Road opens as a full page */
+#roadModal { padding: 0; }
+#roadModal .road-sheet { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border-radius: 0; border: 0; display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top) + 46px) 14px 0; }
+#roadModal .road-sheet > .ribbon { position: absolute; top: calc(env(safe-area-inset-top) + 6px); left: 50%; transform: translateX(-50%); margin: 0; }
+#roadModal .gclose { top: calc(env(safe-area-inset-top) + 8px); right: 12px; }
+#roadModal .road-sheet .road-full { flex: 1; max-height: none; margin: 0 -14px; border-radius: 0; padding-bottom: calc(env(safe-area-inset-bottom) + 30px); }

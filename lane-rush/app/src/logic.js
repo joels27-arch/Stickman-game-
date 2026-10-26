@@ -54,13 +54,13 @@ export const CHARACTERS = 8; // 4 starters + 4 shop skins
  * The host can also pick "random" (Party) as the mode or the map: it's drawn when each race starts.
  * Instead of one map the host can tick several (`state.maps`): each race draws one of those.
  */
-export const GAME_MODES = ["survival", "sprint", "chase", "coinrush", "potato", "grandtour", "random"];
+export const GAME_MODES = ["survival", "sprint", "chase", "coinrush", "grandtour", "random"];
 /** Modes played over several rounds with a points table. */
 export const CUP_MODES = ["grandtour"];
 /** How many rounds the host can pick for a match (the Grand Tour is always one of each mode). */
 export const ROUND_OPTIONS = [1, 3, 5, 10];
 /** What the host can put up for 1st / 2nd / 3rd (paid with 2+ real players). */
-export const PRIZES = ["none", "coins", "bigcoins", "huge"];
+export const PRIZES = ["none", "coins", "bigcoins", "huge", "packs"];
 /**
  * How good the bots are (the host picks it when bots fill the room).
  *   skill — chance to clear an obstacle they run into · pace — share of full speed
@@ -71,7 +71,7 @@ export const BOT_LEVELS = {
   hard: { skill: [0.975, 0.99], pace: 1.0 },
 };
 /** The modes a single round can be (a Party Cup is three of these). All run on the endless course. */
-export const ROUND_KINDS = ["survival", "chase", "coinrush", "potato"];
+export const ROUND_KINDS = ["survival", "chase", "coinrush"]; // Hot Potato is retired (its code stays for old rooms)
 /** Party ("random"): every mode, the Classic Race too, a different one each round. */
 export const PARTY_KINDS = [...ROUND_KINDS, "sprint"];
 export const isEndless = (kind) => kind !== "sprint";
@@ -906,7 +906,7 @@ function newCup(mode, t, rounds = 1) {
     }
     return pool;
   };
-  if (mode === "grandtour") return { race: 1, points: {}, races: shuffled() };
+  if (mode === "grandtour") return { race: 1, points: {}, races: shuffled(PARTY_KINDS) };
   if (mode === "random") {
     const races = [];
     while (races.length < rounds) {
@@ -1509,6 +1509,7 @@ export function validateAction(state, playerId, action) {
       if (state.host !== playerId) return { ok: false, error: "Only the host can pick the map" };
       const m = action.maps;
       if (!Array.isArray(m) || !m.length || m.length > MAPS.length || new Set(m).size !== m.length || !m.every((x) => MAPS.includes(x))) return { ok: false, error: "bad maps" };
+      if (m.length > Math.max(1, state.rounds ?? 1)) return { ok: false, error: "more maps than rounds" };
       return { ok: true };
     }
     case "rounds":
@@ -1732,6 +1733,11 @@ export function applyAction(state0, playerId, action) {
       break;
     case "rounds":
       state.rounds = action.rounds;
+      // never more maps ticked than rounds to play them in
+      if (state.maps && state.maps.length > action.rounds) {
+        if (action.rounds > 1) state.maps = state.maps.slice(0, action.rounds);
+        else [state.map, state.maps] = [state.maps[0], null];
+      }
       break;
     case "prize":
       state.prize = action.prize;

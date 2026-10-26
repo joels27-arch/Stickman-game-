@@ -37,6 +37,7 @@ import {
   SLOW_PAD_MS,
   ROUND_OPTIONS,
   ROUND_KINDS,
+  PARTY_KINDS,
   MAPS,
   MAP_MOVERS,
   EMOTES,
@@ -81,7 +82,9 @@ const STARTERS = RUNNERS.length;
 /** 3D runners you don't start with: Kiko is the Season Pass reward (free track, level 2). */
 const KIKO = 5;
 const PIP = 4;
-const PASS_RUNNERS = { [KIKO]: 2, [PIP]: 12 };
+const PASS_RUNNERS = { [PIP]: 12 };
+/** 3D runners won on the Trophy Road (runner index → trophies). */
+const ROAD_RUNNERS = { [KIKO]: 50 };
 
 /**
  * Collectible characters: bought in the shop with medals. They don't have 3D
@@ -105,7 +108,7 @@ const COLLECTION = [
   // heroes and stars (pictures only)
   { id: "captainstar", name: "Captain Star", color: "#2f5ae0", rarity: "rare", via: "pack" },
   { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "pack" },
-  { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "pack" },
+  { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "road" },
   { id: "boulder", name: "The Boulder", color: "#7a5a3a", rarity: "legendary", via: "road" },
   { id: "rapstar", name: "MC Gold", color: "#f0b400", rarity: "epic", via: "road", pic: "/assets/pk_rapstar.webp" },
 ];
@@ -122,24 +125,23 @@ const GAME_MODE_INFO = {
   sprint: { label: "Classic Race", icon: "🏁", tag: "700 m", text: "First to the finish line wins." },
   chase: { label: "Brain Chase", icon: "🧠", tag: "Run for it", text: "Outrun the giant brain!" },
   coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins." },
-  potato: { label: "Hot Potato", icon: "💣", tag: "Don't be last", text: "Last place holds the bomb!" },
   grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "One round of every mode." },
 };
 /**
- * What the host can put up for the top 3 of a match, paid out of the host's own
- * coins: the whole pot when the match starts, and the shares of places nobody
- * real took (bots, or fewer than 2 real players) come back after the last round.
+ * What the host can put up for the top 3 of a match: coins (numbers) or packs (ids).
+ * The host doesn't pay; real players in the top 3 get them (2+ real players).
  */
 const PRIZE_INFO = {
   none: { label: "Just glory", icon: "🤝", pays: [] },
   coins: { label: "Small pot", icon: "🪙", pays: [150, 75, 40] },
   bigcoins: { label: "Big pot", icon: "💰", pays: [300, 150, 75] },
   huge: { label: "Huge pot", icon: "👑", pays: [600, 300, 150] },
+  packs: { label: "Packs", icon: "🎁", pays: ["legend", "mega", "mega"] },
 };
-const potOf = (prize) => (PRIZE_INFO[prize ?? "none"]?.pays ?? []).reduce((a, b) => a + b, 0);
+const prizeText = (x) => (typeof x === "number" ? `${x}` : x === "legend" ? "Legend Pack" : "Mega Pack");
 /** "3 rounds", or the Grand Tour's fixed 4. */
 function roundsOf(v) {
-  return v.mode === "grandtour" ? ROUND_KINDS.length : v.rounds ?? 1;
+  return v.mode === "grandtour" ? PARTY_KINDS.length : v.rounds ?? 1;
 }
 function matchLabel(v, gm, endless) {
   const base = endless ? "Endless run" : GAME_MODE_INFO[gm].label;
@@ -272,7 +274,7 @@ const wallet = {
     }
   },
   owns(i) {
-    return (i < STARTERS && !(i in PASS_RUNNERS)) || this.owned().includes(i);
+    return (i < STARTERS && !(i in PASS_RUNNERS) && !(i in ROAD_RUNNERS)) || this.owned().includes(i);
   },
   coins() {
     const c = Number(local.getItem("lr:coins"));
@@ -1073,7 +1075,7 @@ const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
 const STARTER_RARITY = ["rare", "rare", "rare", "rare", "epic", "epic", "rare", "epic"]; // nothing below rare
 function allChars() {
   return [
-    ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
+    ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : i in ROAD_RUNNERS ? "road" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
     ...COLLECTION.map((c) => ({ ...c, img: c.pic ?? `/assets/sc_${c.id}.webp`, hero: c.pic ?? `/assets/sc_${c.id}.webp` })),
     ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp` })),
     { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp` },
@@ -1088,12 +1090,12 @@ function howToGet(c) {
   if (c.via === "coins") return `${c.coins.toLocaleString()} coins in the Shop.`;
   if (c.via === "pack") return "Found in packs.";
   if (c.idx in PASS_RUNNERS) return `Season Pass, level ${PASS_RUNNERS[c.idx]}.`;
-  if (c.via === "road") return `Trophy Road, at ${ROAD.find((r) => r.char === c.id).pts.toLocaleString()} 🏆.`;
+  if (c.via === "road") return `Trophy Road, at ${ROAD.find((r) => (c.idx !== undefined ? r.runner === c.idx : r.char === c.id)).pts.toLocaleString()} 🏆.`;
   return `Gold Pass, level ${c.passLv ?? 30}.`;
 }
 /** The short lock label on a runner card you can't race with yet. */
 function lockLabel(i) {
-  return i in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[i]}` : "Locked";
+  return i in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[i]}` : i in ROAD_RUNNERS ? `🏆 ${ROAD_RUNNERS[i]}` : "Locked";
 }
 function collectionCount() {
   const all = allChars();
@@ -1109,7 +1111,7 @@ function renderCollPill() {
 const RARITY_ICON = { common: "●", rare: "◆", epic: "✦", legendary: "★" };
 function charCard(c, n, onClick) {
   const owned = ownsChar(c);
-  const sel = c.playable && c.idx === preferredChar();
+  const sel = false; // runners are picked when you play, not here
   const forCoins = !owned && c.via === "coins";
   const can = forCoins && wallet.coins() >= c.coins;
   const name = forCoins ? el("b", { class: `cname price${can ? "" : " short"}` }, el("i", { class: "coin" }), el("span", { text: c.coins.toLocaleString() })) : el("b", { class: "cname", text: c.name });
@@ -1157,7 +1159,7 @@ function renderSkins() {
     ...mine.map((c) => {
       // a tap on one of your runners picks it straight away; the ⓘ shows its card
       // tap the name to race with them, the picture for their card
-      const card = charCard(c, n++, c.playable ? selectRunner : inspectChar);
+      const card = charCard(c, n++, inspectChar);
       const on = fav.includes(c.id);
       const star = el("button", { class: `fav${on ? " on" : ""}`, type: "button", "aria-label": on ? "Remove from favourites" : "Add to favourites", text: on ? "★" : "☆" });
       star.addEventListener("click", (e) => {
@@ -1250,20 +1252,7 @@ function inspectChar(c) {
   btn.className = "gbtn";
   btn.disabled = false;
   let action = null;
-  if (owned && c.playable) {
-    const sel = preferredChar() === c.idx;
-    btn.textContent = sel ? "Selected ✓" : "Select runner";
-    btn.disabled = sel;
-    action = () => {
-      local.setItem("lr:char", String(c.idx));
-      world.setShowcase?.(c.idx);
-      if (net.view?.phase === "lobby" && net.view.joined) act({ type: "pick", char: c.idx });
-      toast(`${c.name} selected`);
-      charModal.hidden = true;
-      if (shopShown()) renderShop();
-      if (homePage === PAGE.skins) renderSkins();
-    };
-  } else if (owned) {
+  if (owned) {
     btn.textContent = "In your collection ✓";
     btn.disabled = true;
   } else if (c.via === "road") {
@@ -1310,11 +1299,10 @@ const PACK_CHARS = [
   { id: "dancer", name: "Disco Dash", rarity: "legendary", dupe: 1500 },
 ];
 /**
- * Three packs, one character each: a new one unlocks it, one you already have pays coins instead.
+ * Two packs, one character each: a new one unlocks it, one you already have pays coins instead.
  * odds: chance for each rarity.
  */
 const PACKS = [
-  { id: "starter", name: "Starter Pack", price: 250, img: "/assets/pack_starter.webp", odds: { rare: 0.85, epic: 0.13, legendary: 0.02 } },
   { id: "mega", name: "Mega Pack", price: 900, img: "/assets/pack_mega.webp", odds: { rare: 0.55, epic: 0.37, legendary: 0.08 } },
   { id: "legend", name: "Legend Pack", price: 2500, img: "/assets/pack_legend.webp", odds: { rare: 0, epic: 0.65, legendary: 0.35 } },
 ];
@@ -1653,8 +1641,6 @@ function onState(msg) {
     if (game.wantMode && v.host === playerId) {
       if (v.mode !== game.wantMode) act({ type: "mode", mode: game.wantMode });
       game.wantMode = null;
-      // your own tournament: its rounds too
-      if (game.custom && v.rounds !== game.custom.rounds) act({ type: "rounds", rounds: game.custom.rounds });
     }
     if (game.mode !== "lobby") enterLobby();
     renderLobby(v);
@@ -1735,7 +1721,6 @@ function renderSpotlight(box, cur, { takenBy = () => null, onPick }) {
 function openSoloRoom(mode = null) {
   game.solo = true;
   game.endless = false;
-  game.custom = null;
   game.wantMode = mode;
   connect(newCode(), true);
 }
@@ -1743,7 +1728,6 @@ function openSoloRoom(mode = null) {
 function startEndless() {
   game.solo = true;
   game.endless = true;
-  game.custom = null;
   game.endlessSent = false;
   game.wantMode = null;
   connect(newCode(), true);
@@ -1769,7 +1753,6 @@ $("#createBtn").addEventListener("click", () => {
   if (!requireName()) return;
   game.solo = false;
   game.endless = false;
-  game.custom = null;
   game.wantMode = null;
   connect(newCode(), true);
 });
@@ -1778,7 +1761,6 @@ $("#joinBtn").addEventListener("click", () => {
   if (!requireName()) return;
   game.solo = false;
   game.endless = false;
-  game.custom = null;
   const code = codeInput.value.trim().toUpperCase();
   if (code.length !== 4) {
     $("#homeMsg").textContent = "Room codes have 4 characters";
@@ -2002,7 +1984,7 @@ function endlessTCard() {
 // Weekend League: Friday 18:00 to Sunday midnight, 10 matches vs bots, each one a set mode
 // (the modes take turns). Only matches started from the league count. Rewards go by medals won.
 const LEAGUE_MATCHES = 10;
-const LEAGUE_PLAN = ["survival", "chase", "coinrush", "potato", "survival", "chase", "coinrush", "potato", "chase", "survival"];
+const LEAGUE_PLAN = ["survival", "chase", "coinrush", "sprint", "survival", "chase", "coinrush", "sprint", "chase", "survival"];
 const LEAGUE_TIERS = [
   { medals: 2, coins: 300 },
   { medals: 4, coins: 800 },
@@ -2098,28 +2080,48 @@ const ROAD = [
   { pts: 20, pack: "mega" },
   { pts: 30, coins: 300 },
   { pts: 40, pack: "mega" },
-  { pts: 60, coins: 400 },
+  { pts: 50, runner: KIKO },
+  { pts: 65, coins: 400 },
   { pts: 80, pack: "mega" },
+  { pts: 95, coins: 500 },
   { pts: 110, pack: "mega" },
+  { pts: 125, coins: 600 },
   { pts: 140, char: "rapstar" },
   { pts: 170, pack: "mega" },
+  { pts: 195, coins: 800 },
   { pts: 220, char: "unitx" },
+  { pts: 240, pack: "mega" },
   { pts: 260, coins: 1000 },
   { pts: 300, pack: "mega" },
+  { pts: 330, char: "gloop" },
   { pts: 360, pack: "legend" },
+  { pts: 390, coins: 1200 },
   { pts: 420, coins: 1500 },
+  { pts: 450, pack: "mega" },
   { pts: 480, pack: "mega" },
+  { pts: 520, coins: 1800 },
   { pts: 560, pack: "legend" },
+  { pts: 630, coins: 2000 },
   { pts: 700, char: "boulder" },
+  { pts: 780, pack: "mega" },
   { pts: 850, pack: "mega" },
-  { pts: 1000, pack: "mega" },
-  { pts: 1300, coins: 3000 },
-  { pts: 1600, coins: 4000 },
+  { pts: 920, coins: 2500 },
+  { pts: 1000, pack: "legend" },
+  { pts: 1150, coins: 3000 },
+  { pts: 1300, pack: "mega" },
+  { pts: 1450, coins: 3500 },
+  { pts: 1600, pack: "legend" },
+  { pts: 1800, coins: 4000 },
   { pts: 2000, char: "striker" },
+  { pts: 2250, pack: "mega" },
   { pts: 2500, char: "titan" },
+  { pts: 3000, pack: "legend" },
   { pts: 3500, coins: 6000 },
+  { pts: 4200, pack: "legend" },
   { pts: 5000, pack: "mega" },
+  { pts: 6000, coins: 8000 },
   { pts: 7500, coins: 10000 },
+  { pts: 8500, pack: "legend" },
   { pts: 10000, char: "aurum" },
 ];
 /** Coins instead, for a road character you already own (from the old medal shop). */
@@ -2128,6 +2130,7 @@ const roadChar = (id) => ROAD_CHARS.find((c) => c.id === id) ?? COLLECTION.find(
 function roadInfo(step) {
   if (step.coins) return { label: `${step.coins.toLocaleString()} coins`, img: step.coins >= 2500 ? "/assets/ui_c3.webp" : step.coins >= 1000 ? "/assets/ui_c2.webp" : "/assets/ui_c1.webp" };
   if (step.pack) return { label: PACKS.find((x) => x.id === step.pack)?.name ?? "Pack", img: `/assets/pack_${step.pack}.webp` };
+  if (step.runner !== undefined) return { label: RUNNERS[step.runner].name, img: portrait(step.runner), rarity: STARTER_RARITY[step.runner] };
   const c = roadChar(step.char);
   return { label: c.name, img: ROAD_CHARS.includes(c) ? `/assets/rd_${c.id}.webp` : c.pic ?? `/assets/sc_${c.id}.webp`, rarity: c.rarity };
 }
@@ -2167,6 +2170,16 @@ function claimRoad(step, node) {
   } else if (step.pack) {
     const pk = PACKS.find((x) => x.id === step.pack);
     openPackAnim(pk, grantPack(pk));
+  } else if (step.runner !== undefined) {
+    if (wallet.owns(step.runner)) {
+      wallet.addCoins(500);
+      coinRain(node, 14);
+      toast(`You already have ${info.label}: +500 coins`);
+    } else {
+      giveItem(step.runner);
+      renderCollPill();
+      showUnlock({ kind: "char", char: { name: info.label, rarity: info.rarity, img: `/assets/lu_${RUNNERS[step.runner].file}.webp` } });
+    }
   } else if (wallet.has(step.char)) {
     const n = ROAD_DUPE[info.rarity] ?? 800;
     wallet.addCoins(n);
@@ -2417,23 +2430,6 @@ function tourneyCard(t) {
     ),
   );
 }
-/** Your own tournament: pick the mode and rounds, then a room opens to invite 3 friends; points over every round, most points wins. */
-const customT = { mode: "random", rounds: 5 };
-function customTCard() {
-  const chips = (list, cur, attr) =>
-    el("div", { class: "chip-pick ct-pick" }, ...list.map(([key, label]) => el("button", { class: `chip${cur === key ? " on" : ""}`, type: "button", [attr]: String(key), text: label })));
-  return el(
-    "div",
-    { class: "tcard t-custom" },
-    el("div", { class: "tc-head" }, el("img", { src: "/assets/tab_trophy.webp", alt: "" }), el("div", {}, el("em", { text: "You + 3 friends" }), el("b", { text: "Create a tournament" }))),
-    el("p", { class: "tc-desc", text: "Points every round. Most points wins." }),
-    el("h4", { class: "ct-title", text: "Mode" }),
-    chips(Object.entries(GAME_MODE_INFO).filter(([k]) => k !== "grandtour").map(([k, i]) => [k, `${i.icon} ${i.label}`]), customT.mode, "data-ctmode"),
-    el("h4", { class: "ct-title", text: "Rounds" }),
-    chips([3, 5, 10].map((r) => [r, `${r} rounds`]), customT.rounds, "data-ctrounds"),
-    el("div", { class: "tc-btns" }, el("button", { class: "btn big go", type: "button", "data-custom": "1", text: "🏆 Create & invite" })),
-  );
-}
 /** The Tournaments page: one simple row each; tap one for the rules, prizes and Play buttons. */
 function renderCompete() {
   const w = leagueWindow();
@@ -2449,7 +2445,6 @@ function renderCompete() {
       el("i", { class: "tr-go", text: "›" }),
     );
   $("#tourneyList").replaceChildren(
-    row("custom", "/assets/tab_trophy.webp", "Create a tournament", "You + 3 friends", "", { desc: "Pick the mode and rounds, invite friends." }),
     row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0).toLocaleString(), { live: w.open, ready, desc: "10 matches vs bots. Win medals!" }),
     ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, t.prize[0].toLocaleString(), { desc: t.text })),
     row("endless", ENDLESS_T.img, "Endless Run", tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, ENDLESS_T.prize[0].toLocaleString(), { desc: ENDLESS_T.text }),
@@ -2460,10 +2455,10 @@ const tourneyModal = $("#tourneyModal");
 let tourneyOpen = null;
 function renderTourneySheet() {
   const t = TOURNEYS.find((x) => x.id === tourneyOpen);
-  const card = tourneyOpen === "custom" ? customTCard() : tourneyOpen === "weekend" ? weekendCard() : tourneyOpen === "endless" ? endlessTCard() : t ? tourneyCard(t) : null;
+  const card = tourneyOpen === "weekend" ? weekendCard() : tourneyOpen === "endless" ? endlessTCard() : t ? tourneyCard(t) : null;
   if (!card) return;
   card.classList.add("open"); // all the details show in the sheet
-  $("#tourneyTitle").textContent = tourneyOpen === "custom" ? "Your tournament" : tourneyOpen === "weekend" ? "Weekend League" : tourneyOpen === "endless" ? "Endless Run" : t.label;
+  $("#tourneyTitle").textContent = tourneyOpen === "weekend" ? "Weekend League" : tourneyOpen === "endless" ? "Endless Run" : t.label;
   $("#tourneyBody").replaceChildren(card);
 }
 function openTourney(id) {
@@ -2485,7 +2480,6 @@ function playMode(mode, withWho, fixed = null) {
   }
   game.solo = false;
   game.endless = false;
-  game.custom = null;
   game.wantMode = mode;
   connect(newCode(), true);
 }
@@ -2494,24 +2488,6 @@ $("#hpCompete").addEventListener("click", (e) => {
   if (open) openTourney(open.dataset.open);
 });
 $("#tourneyBody").addEventListener("click", (e) => {
-  const ct = e.target.closest("[data-ctmode], [data-ctrounds]");
-  if (ct) {
-    sfx.tap();
-    if (ct.dataset.ctmode) customT.mode = ct.dataset.ctmode;
-    else customT.rounds = Number(ct.dataset.ctrounds);
-    return renderTourneySheet();
-  }
-  if (e.target.closest("[data-custom]")) {
-    tourneyModal.hidden = true;
-    sfx.unlock();
-    if (soloBtn.disabled) return toast("Still loading the runners…");
-    if (!requireName()) return;
-    game.solo = false;
-    game.endless = false;
-    game.wantMode = customT.mode;
-    game.custom = { ...customT };
-    return connect(newCode(), true);
-  }
   if (e.target.closest("[data-endless]")) {
     tourneyModal.hidden = true;
     sfx.unlock();
@@ -2567,7 +2543,6 @@ function leaveToHome(message = "") {
   renderDaily();
   game.solo = false;
   game.endless = false;
-  game.custom = null;
   game.fixed = null;
   game.warm = null;
   game.prepped = null;
@@ -2627,16 +2602,6 @@ function changed(node, ...key) {
 const lobbySig = (v) => v.players.map((p) => [p.id, p.name, p.char, p.country, p.gone, p.ready, p.rp, p.bot]);
 function renderLobby(v) {
   rememberFriends(v);
-  // your own tournament: a card to invite 3 friends, filling up as they join
-  const inv = $("#tInvite");
-  inv.hidden = !game.custom;
-  if (game.custom && changed(inv, lobbySig(v), net.code)) {
-    const friends = v.players.filter((p) => p.id !== playerId && !p.bot && !p.gone);
-    $("#tInviteSlots").replaceChildren(
-      ...[0, 1, 2].map((i) => (friends[i] ? el("span", { class: "ti-slot in", text: friends[i].name }) : el("span", { class: "ti-slot", text: "Invite" }))),
-    );
-    $("#tInviteText").textContent = friends.length >= 3 ? "Everyone's in! Lock in and start." : `${3 - friends.length} more to invite · code ${net.code}`;
-  }
   $("#lobby").classList.toggle("solo-room", Boolean(game.solo));
   $("#lobbyCode").textContent = net.code;
   $("#lobbyCodeStrip").textContent = net.code;
@@ -2752,7 +2717,8 @@ function renderLobby(v) {
   const mp = v.map || "meadow";
   // tap maps to tick them: one = that map, several = a different one of them each round
   const ticked = v.maps ?? (mp === "random" ? [] : [mp]);
-  if (changed($("#mapPick"), mp, ticked, isHost)) $("#mapPick").replaceChildren(
+  const rounds = roundsOf(v);
+  if (changed($("#mapPick"), mp, ticked, isHost, rounds)) $("#mapPick").replaceChildren(
     ...["random", ...MAPS].map((key) => {
       const info = MAP_INFO[key];
       const style = key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)`;
@@ -2766,14 +2732,16 @@ function renderLobby(v) {
       b.disabled = !isHost;
       b.addEventListener("click", () => {
         if (key === "random") return !on && act({ type: "map", map: "random" });
-        if (!ticked.length) return act({ type: "map", map: key });
+        // one round: one map; more rounds: up to one map a round
+        if (!ticked.length || rounds <= 1) return !on && act({ type: "map", map: key });
+        if (!on && ticked.length >= rounds) return toast(`${rounds} rounds: up to ${rounds} maps`);
         const next = on ? ticked.filter((m) => m !== key) : [...ticked, key];
         if (next.length) act({ type: "maps", maps: next });
       });
       return b;
     }),
   );
-  $("#mapNote").textContent = isHost ? (ticked.length > 1 ? `${ticked.length} maps · a different one each round` : "Tap more maps to mix them") : "";
+  $("#mapNote").textContent = !isHost ? "" : ticked.length > 1 ? `${ticked.length}/${rounds} maps · a different one each round` : rounds > 1 ? `Pick up to ${rounds} maps` : "";
   // start fetching the map's 3D props while everyone is still in the lobby
   for (const key of v.maps ?? (mp === "random" ? MAPS : [mp])) {
     world.ensureMap(key).catch(() => {});
@@ -2781,7 +2749,7 @@ function renderLobby(v) {
   }
   for (const p of v.players) world.ensureChar(p.char).catch(() => {});
   // rounds (the Grand Tour is always one of each mode) and the prize for the top 3
-  const rounds = roundsOf(v);
+  // (rounds: worked out above, with the maps)
   if (changed($("#roundPick"), rounds, isHost, gm)) $("#roundPick").replaceChildren(
     ...ROUND_OPTIONS.map((r) => {
       const b = el("button", { class: `chip${rounds === r ? " on" : ""}`, type: "button", text: r === 1 ? "1 round" : `${r} rounds` });
@@ -2806,17 +2774,17 @@ function renderLobby(v) {
     );
   }
   const prize = v.prize ?? "none";
-  if (changed($("#prizePick"), prize, isHost, wallet.coins())) $("#prizePick").replaceChildren(
+  if (changed($("#prizePick"), prize, isHost)) $("#prizePick").replaceChildren(
     ...Object.entries(PRIZE_INFO).map(([key, info]) => {
-      const b = el("button", { class: `chip prize${prize === key ? " on" : ""}`, type: "button" }, el("b", { text: `${info.icon} ${info.label}` }), info.pays.length ? el("small", { text: info.pays.map((x, i) => `${["1st", "2nd", "3rd"][i]} ${x}`).join(" · ") }) : el("small", { text: "No prize" }));
+      const b = el("button", { class: `chip prize${prize === key ? " on" : ""}`, type: "button" }, el("b", { text: `${info.icon} ${info.label}` }), info.pays.length ? el("small", { text: info.pays.map((x, i) => `${["1st", "2nd", "3rd"][i]} ${prizeText(x)}`).join(" · ") }) : el("small", { text: "No prize" }));
       // the host pays the pot, so they can only pick one they can afford
-      b.disabled = !isHost || (prize !== key && potOf(key) > wallet.coins());
+      b.disabled = !isHost;
       b.addEventListener("click", () => prize !== key && act({ type: "prize", prize: key }));
       return b;
     }),
   );
   $("#prizeNote").textContent =
-    prize === "none" ? "" : isHost ? `You pay ${potOf(prize).toLocaleString()} coins. Bot places come back to you.` : `The host pays ${potOf(prize).toLocaleString()} coins for the top 3`;
+    prize === "none" ? "" : "For real players in the top 3 (2+ players)";
   $("#lockBtn").replaceChildren(el("span", { class: "flagico", text: "✓" }), el("span", { text: `Lock in ${RUNNERS[me?.char ?? 0].name}` }), el("span", { class: "arrow", text: "→" }));
   renderLineup(v, { isHost, gm, mp });
   // once you've locked in your runner, the lobby is the line-up
@@ -2863,8 +2831,6 @@ $("#luGo").addEventListener("click", () => {
   if (!v) return;
   const me = v.players.find((p) => p.id === playerId);
   if (v.host === playerId) {
-    const pot = potOf(v.prize);
-    if (pot > wallet.coins()) return toast(`You need ${pot.toLocaleString()} coins for this prize pot`);
     act({ type: "start", bots: botsOn() });
   } else act({ type: "ready", ready: !me?.ready });
 });
@@ -2944,10 +2910,9 @@ $("#botToggle").addEventListener("change", (e) => {
   if (net.view) renderLobby(net.view);
 });
 $("#nextBtn").addEventListener("click", () => act({ type: "next" }));
-$("#tInviteBtn").addEventListener("click", () => $("#copyBtn").click());
 $("#copyBtn").addEventListener("click", async () => {
   const url = `${location.origin}/?join=${net.code}`;
-  const text = game.custom ? `Join my 4 Friends tournament! Code ${net.code} → ${url}` : `Race me in 4 Friends! Code ${net.code} → ${url}`;
+  const text = `Race me in 4 Friends! Code ${net.code} → ${url}`;
   try {
     if (navigator.share && matchMedia("(pointer: coarse)").matches) {
       await navigator.share({ title: "4 Friends", text, url });
@@ -3057,7 +3022,6 @@ function renderResults(v) {
   const rpChange = recordRace(v, v.standings.indexOf(playerId) + 1);
   // the host's prize for the top 3, once the whole match is over
   const roomPrize = rpChange && (!cup || cupDone) ? payRoomPrize(v, myPlace) : null;
-  const potBack = rpChange && (!cup || cupDone) ? refundPot(v, order) : null;
   if (rpChange && v.standings.length >= 2 && (cupDone ? cup.table[0] === playerId : !cup && myPlace === 1)) setTimeout(() => sfx.cheer(), 300);
   const ptsBefore = rank.points();
   if (mine?.medal) {
@@ -3109,29 +3073,17 @@ function renderResults(v) {
   }
 }
 
-/** Your share of the host's prize pot for your final place (top 3, with 2+ real players). Returns a label, or null. */
+/** Your prize for your final place in the top 3 (2+ real players): coins, or a pack that opens right away. Returns a label, or null. */
 function payRoomPrize(v, place) {
   const x = (PRIZE_INFO[v.prize ?? "none"]?.pays ?? [])[place - 1];
   if (x === undefined || v.players.filter((p) => !p.bot).length < 2) return null;
-  wallet.addCoins(x);
-  return v.host === playerId ? `🏆 Your own prize back +${x}` : `🏆 Prize from ${nameOf(v.host)} +${x}`;
-}
-/** The host paid the whole pot when the match started: whatever nobody real won goes back to them. */
-function chargePot(v) {
-  const key = `${net.code}:${v.startAt}`;
-  if (v.host !== playerId || !potOf(v.prize) || local.getItem("lr:potKey") === key) return;
-  local.setItem("lr:potKey", key);
-  wallet.addCoins(-potOf(v.prize));
-  toast(`Prize pot: -${potOf(v.prize).toLocaleString()} coins`);
-}
-function refundPot(v, order) {
-  if (v.host !== playerId || !potOf(v.prize)) return null;
-  const pays = PRIZE_INFO[v.prize].pays;
-  const real = v.players.filter((p) => !p.bot);
-  const paid = real.length < 2 ? 0 : order.reduce((a, id, i) => a + (real.some((p) => p.id === id) ? pays[i] ?? 0 : 0), 0);
-  const back = potOf(v.prize) - paid;
-  if (back > 0) wallet.addCoins(back);
-  return back > 0 ? `↩ ${back.toLocaleString()} coins of your pot back` : null;
+  if (typeof x === "number") wallet.addCoins(x);
+  else {
+    const pk = PACKS.find((p) => p.id === x);
+    const items = grantPack(pk);
+    setTimeout(() => openPackAnim(pk, items), 1800);
+  }
+  return `🏆 ${PLACE_SHORT[place - 1]} place prize: ${typeof x === "number" ? `+${x} coins` : prizeText(x)}`;
 }
 function renderCup(v) {
   const box = $("#cupBox");
@@ -6417,7 +6369,6 @@ function liftCurtain() {
   setTimeout(() => curtain.classList.contains("gone") && (curtain.hidden = true), 500);
 }
 function enterRace(v) {
-  if (!v.cup || v.cup.race === 1) chargePot(v); // the host pays the prize pot as the match starts
   const needed = v.players.map((p) => p.char);
   const map = v.raceMap || "meadow";
   if (world.ready && !world.hasChars(needed)) for (const c of needed) world.ensureChar(c).catch(() => {});
@@ -7792,7 +7743,7 @@ for (const chip of document.querySelectorAll(".medal-chip")) chip.addEventListen
 $("#profileCard").addEventListener("click", openStats);
 // ── Stats page: places, records, modes, and how you stand among your friends ──
 const statsModal = $("#statsModal");
-const MODE_STAT = [["survival", "❤️ Survival"], ["chase", "🧠 Brain Chase"], ["coinrush", "🪙 Coin Rush"], ["potato", "💣 Hot Potato"]];
+const MODE_STAT = [["survival", "❤️ Survival"], ["sprint", "🏁 Classic Race"], ["chase", "🧠 Brain Chase"], ["coinrush", "🪙 Coin Rush"]];
 function openStats() {
   sfx.tap();
   renderStats();
@@ -8016,7 +7967,7 @@ function savePass(p) {
 // Kiko moved to the Season Pass: anyone who already claimed that level this season gets him now
 if (!local.getItem("lr:kikoMove")) {
   local.setItem("lr:kikoMove", "1");
-  if (passState().free.includes(PASS_RUNNERS[KIKO])) giveItem(KIKO);
+  if (passState().free.includes(2)) giveItem(KIKO);
 }
 // Pip moved to the Season Pass: anyone who has already played keeps him
 if (!local.getItem("lr:pipMove")) {
@@ -8119,6 +8070,24 @@ function renderPassPill() {
   const n = passClaimable(p);
   $("#passPillSub").textContent = n ? `${n} reward${n > 1 ? "s" : ""} ready to claim!` : lv >= PASS_LEVELS ? "Max level reached" : `${into} / ${PASS_XP} XP to level ${lv + 1}`;
   $("#passPill .dot").hidden = n === 0;
+  // the next rewards, right on the card (gold ones locked until the Gold Pass)
+  const peek = [];
+  for (let l = Math.min(lv, PASS_LEVELS - 3); peek.length < 4 && l <= PASS_LEVELS; l++) {
+    for (const track of ["free", "gold"]) {
+      if (peek.length >= 4) break;
+      const r = passReward(l, track);
+      const done = p[track].includes(l) && l <= lv;
+      peek.push(
+        el(
+          "span",
+          { class: `pk-tile ${track}${done ? " done" : ""}${track === "gold" && !p.hasGold ? " locked" : ""}` },
+          r.img ? el("img", { src: r.img, alt: "" }) : el("i", { text: r.icon ?? "🎁" }),
+          el("small", { text: `Lv ${l}` }),
+        ),
+      );
+    }
+  }
+  $("#passPeek").replaceChildren(...peek);
   renderStoreDot();
 }
 function renderPass() {
@@ -8219,7 +8188,7 @@ const CAREER = [
     name: "Contender",
     chest: { pack: "mega" },
     missions: [
-      { stat: "modes", goal: 4, text: "Play all 4 modes (Survival, Chase, Coin Rush, Potato)", coins: 150, icon: "/assets/ui_chest.webp" },
+      { stat: "modes", goal: 4, text: "Play all 4 modes (Survival, Race, Chase, Coin Rush)", coins: 150, icon: "/assets/ui_chest.webp" },
       { stat: "winsAny", goal: 3, text: "Win 3 races", coins: 150, icon: "/assets/medal_gold.png" },
       { stat: "kos", goal: 10, text: "Hit opponents 10 times", coins: 150, icon: "/assets/pw_boxing.png" },
       { stat: "rushCoins", goal: 100, text: "Collect 100 coins in Coin Rush", coins: 150, icon: "/assets/ui_c2.webp" },
@@ -8733,7 +8702,7 @@ function checkZaps() {
 
 /** Random / Grand Tour matches: a slot-machine reel lands on this round's mode during the countdown. */
 function spinReveal(round, kind, total) {
-  const kinds = ["survival", "chase", "coinrush", "potato"];
+  const kinds = ["survival", "sprint", "chase", "coinrush"];
   const reel = $("#spinReel");
   const cards = [];
   const loops = 5;
