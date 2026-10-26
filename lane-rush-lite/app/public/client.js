@@ -906,6 +906,11 @@ $("#askSave").addEventListener("click", () => {
   toast("Saved!");
 });
 $("#askLater").addEventListener("click", () => (askModal.hidden = true));
+// picking a country closes the name card (keeping any typed name) so the flag sheet is usable
+$("#askCountry").addEventListener("click", () => {
+  if ($("#askName").value.trim()) saveName($("#askName").value);
+  askModal.hidden = true;
+});
 $("#askName").addEventListener("keydown", (e) => e.key === "Enter" && $("#askSave").click());
 // settings sheet
 const setModal = $("#setModal");
