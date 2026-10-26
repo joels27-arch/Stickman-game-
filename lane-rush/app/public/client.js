@@ -2614,12 +2614,23 @@ function enterLobby() {
   history.replaceState(null, "", `?join=${net.code}`);
 }
 
+/**
+ * Rebuild a lobby section only when what it shows changed: room updates come for every
+ * pick and emote, and rebuilding everything each time made all screens blink and jump.
+ */
+function changed(node, ...key) {
+  const sig = JSON.stringify(key);
+  if (node.dataset.sig === sig) return false;
+  node.dataset.sig = sig;
+  return true;
+}
+const lobbySig = (v) => v.players.map((p) => [p.id, p.name, p.char, p.country, p.gone, p.ready, p.rp, p.bot]);
 function renderLobby(v) {
   rememberFriends(v);
   // your own tournament: a card to invite 3 friends, filling up as they join
   const inv = $("#tInvite");
   inv.hidden = !game.custom;
-  if (game.custom) {
+  if (game.custom && changed(inv, lobbySig(v), net.code)) {
     const friends = v.players.filter((p) => p.id !== playerId && !p.bot && !p.gone);
     $("#tInviteSlots").replaceChildren(
       ...[0, 1, 2].map((i) => (friends[i] ? el("span", { class: "ti-slot in", text: friends[i].name }) : el("span", { class: "ti-slot", text: "Invite" }))),
@@ -2630,8 +2641,9 @@ function renderLobby(v) {
   $("#lobbyCode").textContent = net.code;
   $("#lobbyCodeStrip").textContent = net.code;
   const slots = $("#slots");
-  slots.replaceChildren();
-  for (let i = 0; i < 4; i++) {
+  const newSlots = changed(slots, lobbySig(v), v.host, playerId);
+  if (newSlots) slots.replaceChildren();
+  for (let i = 0; i < 4 && newSlots; i++) {
     const p = v.players[i];
     if (!p) {
       slots.append(el("div", { class: "rcard empty" }, el("span", { class: "num", text: String(i + 1) }), el("span", { class: "nm", text: "Waiting for player…" })));
@@ -2660,8 +2672,8 @@ function renderLobby(v) {
 
   const me = v.players.find((p) => p.id === playerId);
   const picker = $("#picker");
-  picker.replaceChildren();
-  RUNNERS.forEach((r, i) => {
+  if (changed(picker, lobbySig(v), RUNNERS.map((_, i) => wallet.owns(i)))) picker.replaceChildren();
+  if (!picker.children.length) RUNNERS.forEach((r, i) => {
     const owner = v.players.find((p) => p.char === i);
     const mine = owner?.id === playerId;
     const locked = !wallet.owns(i);
@@ -2693,9 +2705,9 @@ function renderLobby(v) {
     act({ type: "pick", char: i });
     toast(`🎲 ${RUNNERS[i].name}!`);
   });
-  picker.append(dice);
+  if (!picker.querySelector(".random-card")) picker.append(dice);
   if (me) {
-    renderSpotlight($("#lobbySpot"), me.char, {
+    if (changed($("#lobbySpot"), me.char, lobbySig(v))) renderSpotlight($("#lobbySpot"), me.char, {
       takenBy: (i) => v.players.find((p) => p.char === i && p.id !== playerId)?.name ?? null,
       onPick: (i) => {
         if (i === me.char) return;
@@ -2722,7 +2734,7 @@ function renderLobby(v) {
   // league and tournament matches have a set mode
   $("#modePick").hidden = $("#modePick").previousElementSibling.hidden = Boolean(game.fixed);
   const modePick = $("#modePick");
-  modePick.replaceChildren(
+  if (changed(modePick, gm, isHost, n < 2 && !botsOn())) modePick.replaceChildren(
     ...Object.entries(GAME_MODE_INFO).filter(([key]) => key !== "grandtour").map(([key, info]) => {
       const b = el(
         "button",
@@ -2740,7 +2752,7 @@ function renderLobby(v) {
   const mp = v.map || "meadow";
   // tap maps to tick them: one = that map, several = a different one of them each round
   const ticked = v.maps ?? (mp === "random" ? [] : [mp]);
-  $("#mapPick").replaceChildren(
+  if (changed($("#mapPick"), mp, ticked, isHost)) $("#mapPick").replaceChildren(
     ...["random", ...MAPS].map((key) => {
       const info = MAP_INFO[key];
       const style = key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)`;
@@ -2770,7 +2782,7 @@ function renderLobby(v) {
   for (const p of v.players) world.ensureChar(p.char).catch(() => {});
   // rounds (the Grand Tour is always one of each mode) and the prize for the top 3
   const rounds = roundsOf(v);
-  $("#roundPick").replaceChildren(
+  if (changed($("#roundPick"), rounds, isHost, gm)) $("#roundPick").replaceChildren(
     ...ROUND_OPTIONS.map((r) => {
       const b = el("button", { class: `chip${rounds === r ? " on" : ""}`, type: "button", text: r === 1 ? "1 round" : `${r} rounds` });
       b.disabled = !isHost || gm === "grandtour";
@@ -2784,7 +2796,7 @@ function renderLobby(v) {
   $("#botLevelTitle").hidden = $("#botLevelPick").hidden = !withBots;
   if (withBots) {
     const lv = v.botLevel ?? "normal";
-    $("#botLevelPick").replaceChildren(
+    if (changed($("#botLevelPick"), lv, isHost)) $("#botLevelPick").replaceChildren(
       ...[["easy", "😊 Easy"], ["normal", "🙂 Normal"], ["hard", "😈 Hard"]].map(([key, label]) => {
         const b = el("button", { class: `chip${lv === key ? " on" : ""}`, type: "button", text: label });
         b.disabled = !isHost;
@@ -2794,7 +2806,7 @@ function renderLobby(v) {
     );
   }
   const prize = v.prize ?? "none";
-  $("#prizePick").replaceChildren(
+  if (changed($("#prizePick"), prize, isHost, wallet.coins())) $("#prizePick").replaceChildren(
     ...Object.entries(PRIZE_INFO).map(([key, info]) => {
       const b = el("button", { class: `chip prize${prize === key ? " on" : ""}`, type: "button" }, el("b", { text: `${info.icon} ${info.label}` }), info.pays.length ? el("small", { text: info.pays.map((x, i) => `${["1st", "2nd", "3rd"][i]} ${x}`).join(" · ") }) : el("small", { text: "No prize" }));
       // the host pays the pot, so they can only pick one they can afford
@@ -2898,7 +2910,7 @@ function renderLineup(v, { isHost, gm, mp }) {
   for (let i = order.length; i < 4; i++) {
     peds.push(el("div", { class: `lx-ped p${i + 1} empty` }, el("span", { class: "lx-ghost", text: botsOn() ? "🤖" : "?" }), el("div", { class: "lx-block" }, el("b", { text: String(i + 1) }), el("small", { text: botsOn() ? "Bot" : "Waiting…" }))));
   }
-  $("#luStage").replaceChildren(...peds);
+  if (changed($("#luStage"), lobbySig(v), v.host, playerId, botsOn())) $("#luStage").replaceChildren(...peds);
   paintEmotes();
 
   const waiting = present.filter((p) => p.id !== v.host && !p.ready);
