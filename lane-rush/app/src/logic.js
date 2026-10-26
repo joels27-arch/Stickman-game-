@@ -1148,7 +1148,7 @@ function roll(seed, a, b) {
   return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
 }
 
-function fillBots(state) {
+function fillBots(state, t = state.now ?? 0) {
   const used = new Set(ids(state).map((id) => state.players[id].char));
   const real = humans(state).map((id) => state.players[id]);
   const avgRp = real.length ? real.reduce((a, p) => a + (p.rp ?? 0), 0) / real.length : 0;
@@ -1159,7 +1159,7 @@ function fillBots(state) {
     if (state.players[id]) continue;
     // a random runner nobody has taken (any of them, the collectible 3D ones too)
     const free = Array.from({ length: CHARACTERS }, (_, c) => c).filter((c) => !used.has(c));
-    const char = free.length ? free[Math.floor(roll(state.seed + state.round * 7919, n, 11) * free.length)] : 0;
+    const char = free.length ? free[Math.floor(roll((Math.floor(t) ^ Math.imul(state.round + 1, 7919)) >>> 0, n, 11) * free.length)] : 0;
     used.add(char);
     const r = roll(state.seed + state.round, n, 3);
     const slot = ids(state).length;
@@ -1772,7 +1772,7 @@ export function applyAction(state0, playerId, action) {
       state.lives = action.endless ? 1 : LIVES; // endless run: one hit and it's over
       state.cup = newCup(state.mode, t, state.rounds ?? 1, partyOf(state));
       state.botFill = action.bots !== false;
-      if (state.botFill) fillBots(state);
+      if (state.botFill) fillBots(state, t);
       startRace(state, t);
       break;
     case "rematch": {
