@@ -2884,3 +2884,6 @@ html, body { background: var(--k1); }
 .rg-step em { font-style: normal; font-size: 10px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 66px; }
 .pick5-card { min-width: 0; overflow: hidden; }
 .pick5-card img { width: 100%; max-width: 110px; height: 96px; aspect-ratio: auto; object-fit: cover; object-position: center top; }
+/* Leave sits at the top of the room page, always on screen */
+#lobby #leaveBtn { position: fixed; z-index: 30; top: max(10px, calc(env(safe-area-inset-top) + 6px)); left: max(10px, env(safe-area-inset-left)); width: auto; min-height: 0; padding: 8px 14px; border-radius: 999px; font-size: 14px; background: rgba(8, 12, 30, 0.85); border: 2px solid rgba(255, 255, 255, 0.8); color: #fff; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4); }
+#lobby .lobby-head { padding-top: 34px; }
