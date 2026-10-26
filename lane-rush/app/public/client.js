@@ -5699,7 +5699,8 @@ const world = (() => {
   // the Higgsfield "4" coin on both faces, a gold rim round the edge
   const coinFace = texLoader.load("/assets/coin_face.jpg");
   coinFace.colorSpace = THREE.SRGBColorSpace;
-  const coinRim = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.2, roughness: 0.35, emissive: 0xb07a00, emissiveIntensity: 0.55 });
+  // shiny gold: with the sky light it's real metal; without it, a warm glow does the job
+  const coinRim = new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: gfx.env ? 0.9 : 0.2, roughness: gfx.env ? 0.25 : 0.35, emissive: 0xb07a00, emissiveIntensity: gfx.env ? 0.18 : 0.55, envMapIntensity: 1.4 });
   const coinFaceMat = new THREE.MeshStandardMaterial({ map: coinFace, metalness: 0.1, roughness: 0.4, emissive: 0x6a4400, emissiveIntensity: 0.45 });
   const bigRim = new THREE.MeshStandardMaterial({ color: 0xff9f1c, metalness: 0.2, roughness: 0.3, emissive: 0xc05000, emissiveIntensity: 0.6 });
   const bigFaceMat = new THREE.MeshStandardMaterial({ map: coinFace, color: 0xffb46a, metalness: 0.1, roughness: 0.35, emissive: 0x8a3a00, emissiveIntensity: 0.5 });
@@ -8756,6 +8757,11 @@ function modeTick(prevD, v) {
   if (me.finished || me.out) return;
   // coin lines on the track
   const got = me.power === "rocket" ? { coins: 0, bolts: 0 } : world.grabRunCoins(prevD, me.d, me.x, me.y);
+  // a little sparkle where you grabbed it
+  if ((got.coins || got.bolts) && me.runner) {
+    const g = me.runner.group.position;
+    world.spray(g.x, 1.0, g.z - 0.6, got.bolts ? ["#8ff3ff", "#3fe0ff", "#ffffff"] : ["#ffe36e", "#ffc928", "#ffffff"], 8, { speed: 3, life: 0.35, gravity: 2, size: 0.22, drag: 2.5, up: 1 });
+  }
   if (got.coins) {
     game.runCoins = (game.runCoins ?? 0) + got.coins;
     setText(hudEl.coins ?? (hudEl.coins = $("#runCoins")), String(game.runCoins));
