@@ -4998,21 +4998,23 @@ const world = (() => {
   }
   /** How far out a kind keeps its full model, as a share of LOD_NEAR (big busy fields switch sooner). */
   const NEAR_SCALE = { wheat: 0.45, sunflowers: 0.7, farmTile: 0.7, boardTile: 0.8 };
-  /** The single mesh inside a prop holder, and where it sits in the holder. */
-  function propMesh(holder) {
-    let mesh = null;
-    let n = 0;
-    holder.traverse((x) => {
-      if (x.isMesh) {
-        mesh = x;
-        n++;
-      }
-    });
-    if (n !== 1 || mesh.isSkinnedMesh || Array.isArray(mesh.material)) return null;
+  /** The meshes inside a prop holder, and where each sits in the holder (null if any can't be batched). */
+  function propMeshes(holder) {
+    const out = [];
+    let ok = true;
     holder.updateWorldMatrix(true, true);
-    const local = new THREE.Matrix4().copy(holder.matrixWorld).invert().multiply(mesh.matrixWorld);
-    return { mesh, local };
+    const inv = new THREE.Matrix4().copy(holder.matrixWorld).invert();
+    holder.traverse((x) => {
+      if (!x.isMesh && !x.isSprite) return;
+      if (x.isSprite || x.isSkinnedMesh || x.isInstancedMesh || Array.isArray(x.material)) ok = false;
+      else out.push({ mesh: x, local: new THREE.Matrix4().multiplyMatrices(inv, x.matrixWorld) });
+    });
+    return ok && out.length ? out : null;
   }
+  const propMesh = (holder) => {
+    const l = propMeshes(holder);
+    return l && l.length === 1 ? l[0] : null;
+  };
   const lowerZ = (zs, z) => {
     let lo = 0;
     let hi = zs.length;
@@ -5070,25 +5072,27 @@ const world = (() => {
     for (const c of cull) {
       if (!c.proto || c.obj.parent !== group) continue;
       let k = kinds.get(c.proto);
-      if (!k) kinds.set(c.proto, (k = { info: propMesh(c.proto), items: [] }));
-      if (!k.info) continue;
+      if (!k) kinds.set(c.proto, (k = { parts: propMeshes(c.proto), items: [] }));
+      if (!k.parts) continue;
       c.obj.updateWorldMatrix(false, false);
       k.items.push({ z: c.z, c, world: c.obj.matrixWorld.clone() });
     }
     const done = new Set();
     for (const [proto, k] of kinds) {
-      if (!k.info || k.items.length < 3) continue;
+      if (!k.parts || k.items.length < 3) continue;
       const key = lodFile.get(proto);
       const lodHolder = lodProps.get(key);
       const lod = lodHolder ? propMesh(lodHolder) : null;
       const nearTo = () => LOD_NEAR * (NEAR_SCALE[key] ?? 1);
-      // full model near the camera (all the way out if there's no far version)
-      const near = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().multiplyMatrices(inv, it.world).multiply(k.info.local) }));
-      const nb = windowBatch(k.info.mesh.geometry, k.info.mesh.material, near, NEAR_FROM, lod ? nearTo : FAR_TO);
-      nb.inst.receiveShadow = Boolean(proto.userData.ground); // the running surface
-      group.add(nb.inst);
-      batches.push(nb);
-      if (lod) {
+      // full model near the camera (all the way out if there's no far version): one batch per part
+      for (const part of k.parts) {
+        const near = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().multiplyMatrices(inv, it.world).multiply(part.local) }));
+        const nb = windowBatch(part.mesh.geometry, part.mesh.material, near, NEAR_FROM, lod && k.parts.length === 1 ? nearTo : FAR_TO);
+        nb.inst.receiveShadow = Boolean(proto.userData.ground); // the running surface
+        group.add(nb.inst);
+        batches.push(nb);
+      }
+      if (lod && k.parts.length === 1) {
         const far = k.items.map((it) => ({ z: it.z, m: new THREE.Matrix4().multiplyMatrices(inv, it.world).multiply(lod.local) }));
         const fb = windowBatch(lod.mesh.geometry, lod.mesh.material, far, nearTo, FAR_TO);
         fb.inst.receiveShadow = Boolean(proto.userData.ground);
