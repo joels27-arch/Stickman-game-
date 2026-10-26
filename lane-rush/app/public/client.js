@@ -3378,7 +3378,7 @@ if (renderer) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gfx.ratio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
+  renderer.toneMappingExposure = 1.14;
   renderer.debug.checkShaderErrors = false; // no driver round trip per shader (errors still show in the console as warnings)
   if (startGfx.shadows) {
     renderer.shadowMap.enabled = true;
@@ -4188,6 +4188,21 @@ const world = (() => {
     return clip;
   }
 
+  /**
+   * A soft warm rim round the runners' edges, so they pop off the track. Done in the
+   * material's own shader (a few instructions): no extra light, no extra pass.
+   */
+  function addRim(m) {
+    if (m.userData.rim) return;
+    m.userData.rim = true;
+    m.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace(
+        "#include <dithering_fragment>",
+        "#include <dithering_fragment>\n  float rimF = 1.0 - max(dot(normalize(vNormal), normalize(vViewPosition)), 0.0);\n  gl_FragColor.rgb += vec3(1.0, 0.95, 0.85) * pow(rimF, 3.0) * 0.42;",
+      );
+    };
+    m.customProgramCacheKey = () => "rim";
+  }
   async function loadChar(i) {
     const gltf = await loadGLB(`/assets/${RUNNERS[i].file}.glb`);
     const clips = {};
@@ -4223,6 +4238,7 @@ const world = (() => {
           // a glossy, toy-like finish: the sky light gives them soft highlights
           o.material.roughness = 0.5;
           o.material.envMapIntensity = 0.75;
+          addRim(o.material);
         }
       }
     });
@@ -9525,13 +9541,13 @@ function frame(now) {
       introPath.points[0].set(0, 2.4, fz - 11.5);
       introPath.points[1].set(side * 3.2, 4.2, fz - 5.5);
       introPath.points[2].set(side * 2.4, 4.6, fz + 1.5);
-      introPath.points[3].set(tx, 3.0, fz + 5.6);
+      introPath.points[3].set(tx, 2.65, fz + 4.7);
       introPath.getPoint(e, camPos);
       // look at the middle of the line-up, then turn to look down the track
       const k = THREE.MathUtils.smoothstep(p, 0.6, 1);
-      introLook = new THREE.Vector3(0, 1.0, fz).lerp(new THREE.Vector3(tx * 0.8, 1.0, fz - 9), k);
+      introLook = new THREE.Vector3(0, 1.0, fz).lerp(new THREE.Vector3(tx * 0.8, 1.15, fz - 10), k);
     } else {
-      camGoal.set(tx, back ? 2.5 + fy * 0.6 : 3.0 + fy * 0.75, back ? fz - 4.2 : fz + 5.6); // reused: no garbage per frame
+      camGoal.set(tx, back ? 2.5 + fy * 0.6 : 2.65 + fy * 0.75, back ? fz - 4.2 : fz + 4.7); // reused: no garbage per frame (closer and lower: your runner big, the track fast)
       camPos.lerp(camGoal, Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     }
     camera.position.copy(camPos);
@@ -9542,7 +9558,7 @@ function frame(now) {
     }
     if (intro) camLook.copy(introLook);
     else if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
-    else camLook.set(tx * 0.8, 1.0 + fy * 0.6, fz - 9);
+    else camLook.set(tx * 0.8, 1.15 + fy * 0.6, fz - 10);
     camera.lookAt(camLook);
     world.cull(back ? fd - 30 : fd);
     world.syncBananas(net.view?.bananas || [], slipped);
