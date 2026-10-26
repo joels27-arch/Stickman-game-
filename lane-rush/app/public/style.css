@@ -2882,3 +2882,5 @@ html, body { background: var(--k1); }
 .rg-step.got { border-color: var(--lime); }
 .rg-step small { font-weight: 900; font-size: 11px; }
 .rg-step em { font-style: normal; font-size: 10px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 66px; }
+.st-card { min-width: 0; overflow: hidden; }
+.st-card img { width: 100%; max-width: 110px; height: 96px; aspect-ratio: auto; object-fit: cover; object-position: center top; }
