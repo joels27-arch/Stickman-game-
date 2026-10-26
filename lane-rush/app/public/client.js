@@ -9771,6 +9771,9 @@ world
     $("#boot").setAttribute("aria-valuenow", String(pct));
   })
   .then(() => {
+    try {
+      sessionStorage.removeItem("lr:bootFix"); // started fine: a later failure may reload again
+    } catch {}
     $("#loadHint").textContent = "";
     // the loading screen fills up, then fades away
     $("#bootFill").style.width = "100%";

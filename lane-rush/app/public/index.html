@@ -593,6 +593,35 @@
 
     <div id="toast" class="toast"></div>
 
+    <script>
+      // never stuck on the loading screen: if the game fails to start (an old copy of this page
+      // with newer game code, a bad download), reload a fresh copy once; after that, offer a button
+      (function () {
+        var KEY = "lr:bootFix";
+        function fresh() {
+          try {
+            if (sessionStorage.getItem(KEY)) return false;
+            sessionStorage.setItem(KEY, "1");
+          } catch (e) {}
+          location.replace("/?r=" + Date.now());
+          return true;
+        }
+        function offer() {
+          var t = document.getElementById("bootText");
+          if (!t || !document.getElementById("boot")) return;
+          t.innerHTML = '<button type="button" style="font:inherit;font-weight:800;padding:8px 18px;border-radius:12px;border:2px solid #fff;background:#b6f72a;color:#1a2300">Tap to reload</button>';
+          t.firstChild.onclick = function () {
+            location.replace("/?r=" + Date.now());
+          };
+        }
+        window.addEventListener("error", function () {
+          if (document.getElementById("boot") && !window.__bootStarted) fresh() || offer();
+        });
+        setTimeout(function () {
+          if (!window.__bootStarted) fresh() || offer();
+        }, 45000);
+      })();
+    </script>
     <script type="module" src="/client.js"></script>
   </body>
 </html>
