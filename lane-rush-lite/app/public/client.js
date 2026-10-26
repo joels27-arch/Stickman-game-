@@ -3545,9 +3545,10 @@ const world = (() => {
     hemi.groundColor.set(look.light.hemi[1]);
     hemi.intensity = look.light.hemi[2];
     sun.color.set(look.light.sun[0]);
-    sun.intensity = look.light.sun[1];
+    // a sunnier, higher-contrast look: a stronger sun (so shadows read) and a softer fill
+    sun.intensity = look.light.sun[1] * (startGfx.shadows ? 1.3 : 1);
     // with the sky light on, the flat fill lamp is turned down (the sky light does it better)
-    if (gfx.env) hemi.intensity = look.light.hemi[2] * 0.55;
+    if (gfx.env) hemi.intensity = look.light.hemi[2] * 0.42;
     skyLight(look.sky.top, look.sky.horizon, look.light.hemi[1]);
     sunGlow.visible = Boolean(look.sun);
     if (look.sun) sunGlow.material.color.set(look.sun);
@@ -3910,6 +3911,7 @@ const world = (() => {
     holder.traverse((o) => {
       if (o.isMesh) {
         o.material.side = THREE.FrontSide;
+        o.material.envMapIntensity = 0.6; // the sky light: a soft fill, not a glow
         o.frustumCulled = true;
       }
     });
@@ -4027,7 +4029,7 @@ const world = (() => {
           o.material.side = THREE.FrontSide;
           // a glossy, toy-like finish: the sky light gives them soft highlights
           o.material.roughness = 0.5;
-          o.material.envMapIntensity = 0.9;
+          o.material.envMapIntensity = 0.75;
         }
       }
     });
@@ -6845,7 +6847,7 @@ window.addEventListener("keyup", (e) => {
   let sy = 0;
   let used = false;
   let tracking = false;
-  const SWIPE = 28;
+  const SWIPE = 22; // px: a short flick is enough (lower = quicker to react)
   canvas.addEventListener(
     "touchstart",
     (e) => {
