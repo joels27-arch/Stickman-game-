@@ -111,9 +111,9 @@ export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
 /** The classic maps (3D models), then the themed ones built in code (public/themes.js: same ids). */
-export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space", "snowy", "canyon", "volcano", "candy", "crystal", "neon", "mars", "deepsea", "lava", "rainbow", "clouds", "egypt", "wildwest", "ghost", "alien", "synth", "icecream", "aurora", "fairy"];
+export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space", "snowy", "candy", "crystal", "neon", "mars", "deepsea", "lava", "rainbow", "clouds", "egypt", "synth", "icecream", "aurora"]; // Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet and Fairy Forest retired
 /** Themed maps borrow a classic map's moving obstacles (the rest use the meadow's logs and bees). */
-export const MAP_MOVERS = { neon: "city", mars: "space", deepsea: "beach", rainbow: "space", clouds: "space", egypt: "farm", wildwest: "farm", alien: "space", synth: "space" };
+export const MAP_MOVERS = { neon: "city", mars: "space", deepsea: "beach", rainbow: "space", clouds: "space", egypt: "farm", synth: "space" };
 /** A Party Cup is three rounds; each placing scores points, most points wins. */
 export const CUP_ROUND_BOOST_M = 350;
 export const CUP_POINTS = [10, 5, 3, 1];

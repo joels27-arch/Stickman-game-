@@ -24,20 +24,6 @@ export const THEMES = [
     props: [["pine", 5, { leaf: ["#2f5a46", "#3a6b54"] }], ["snowman", 1, { c: ["#ffffff"] }], ["rock", 1, { c: ["#c8d0dc"] }]],
     fx: "snow", hills: 2.5,
   }),
-  T("canyon", "Red Canyon", "🏜️", {
-    sky: { top: "#2a6fc0", mid: "#86c0e8", horizon: "#ffe1c4" }, fog: ["#ffd9b8", 70, 260],
-    light: { hemi: ["#ffe6cc", "#9a4a2a", 1.0], sun: ["#ffd2a0", 2.2] }, far: "#b8583a", near: "#c86a42",
-    ground: { style: "speckle", colors: ["#c4643e", "#d67a4e", "#a85232"] }, track: { style: "speckle", colors: ["#e3b27a", "#eec290", "#d09c64"], kerb: "#fff0dc" },
-    props: [["spire", 3, { c: ["#b8583a", "#c86a42", "#a04a30"] }, [0.8, 2.2]], ["rock", 2, { c: ["#b8583a"] }], ["cactus", 1, { c: ["#4f9a4a"] }]],
-    hills: 2.8, fx: "dust",
-  }),
-  T("volcano", "Volcano", "🌋", {
-    sky: { top: "#2a1a2a", mid: "#7a2a1a", horizon: "#e8642a" }, sun: null, fog: ["#6a2a1a", 50, 220], clouds: false,
-    light: { hemi: ["#ff9a6a", "#2a1a1a", 0.9], sun: ["#ff8a4a", 1.6] }, far: "#3a2020", near: "#2a1a1a",
-    ground: { style: "lava", colors: ["#2a2020", "#ff5a1a", "#3a2a2a"] }, track: { style: "speckle", colors: ["#3a3434", "#4a4444", "#2a2626"], kerb: "#ff7a2a", lines: "#ffb070" },
-    props: [["rock", 4, { c: ["#3a3030", "#2a2424"] }, [1, 2.4]], ["crystal", 2, { c: ["#ff4a1a", "#ff8a2a"] }, null, true], ["spire", 1, { c: ["#2a2020"] }]],
-    fx: "embers", hills: 2,
-  }),
   T("candy", "Candy Land", "🍭", {
     sky: { top: "#7ac8ff", mid: "#ffc2e4", horizon: "#fff0f8" }, fog: ["#ffe4f2", 80, 280],
     light: { hemi: ["#fff0fa", "#ff9ad0", 1.2], sun: ["#ffffff", 1.6] }, far: "#ff9ad0", near: "#ffb8e0",
@@ -101,27 +87,6 @@ export const THEMES = [
     props: [["pyramid", 2, { c: ["#e0c080", "#d4b070"] }, [1.5, 4]], ["column", 2, { c: ["#e8d8b0"] }], ["palm", 2, { leaf: ["#3a9a4a"], trunk: ["#8a6a42"] }]],
     hills: 1.2, fx: "dust", movers: "farm",
   }),
-  T("wildwest", "Wild West", "🤠", {
-    sky: { top: "#3a7ac8", mid: "#a8c8e0", horizon: "#ffe0b0" }, sun: "#fff0c8", fog: ["#ffe0b8", 80, 300],
-    light: { hemi: ["#fff0d8", "#b07a4a", 1.05], sun: ["#ffe0b0", 2.3] }, far: "#c87a4a", near: "#d89a5a",
-    ground: { style: "speckle", colors: ["#d89a5a", "#e8aa6a", "#c08448"] }, track: { style: "speckle", colors: ["#b07a4a", "#c08a58", "#966838"], kerb: "#f4dcb8" },
-    props: [["cactus", 3, { c: ["#4a9a4a"] }], ["house", 2, { c: ["#a87a4a", "#8a5a32"], accent: ["#6a4a2a"] }], ["spire", 1, { c: ["#c87a4a"] }, [1, 2]], ["barrel", 1, { c: ["#8a5a32"], accent: ["#3a3a3a"] }]],
-    fx: "dust", hills: 1.2, movers: "farm",
-  }),
-  T("ghost", "Ghost Town", "👻", {
-    sky: { top: "#1a1e2a", mid: "#3a4458", horizon: "#7a8698" }, sun: null, night: true, fog: ["#4a5262", 30, 170], clouds: false,
-    light: { hemi: ["#b8c8e0", "#1a1e24", 1.0], sun: ["#c8d8f0", 0.8] }, far: "#2a3040", near: "#30384a",
-    ground: { style: "speckle", colors: ["#3a3e38", "#4a4e46", "#2a2e28"] }, track: { style: "planks", colors: ["#4a4440", "#5a5450", "#2a2624"], kerb: "#8a90a0" },
-    props: [["house", 3, { c: ["#4a4448", "#3a3438"], accent: ["#2a2428"] }], ["deadtree", 3, { c: ["#1e1a1e"] }], ["grave", 2, { c: ["#7a7e86"] }], ["lamp", 1, { c: ["#2a2a2a"], accent: ["#a8f0c8"] }, null, true]],
-    fx: "fireflies",
-  }),
-  T("alien", "Alien Planet", "👽", {
-    sky: { top: "#1a0a3a", mid: "#6a2a8a", horizon: "#3ad0a0" }, sun: "#c0ffe8", night: true, fog: ["#3a2a6a", 50, 230], clouds: false,
-    light: { hemi: ["#b0ffe0", "#3a1a5a", 1.05], sun: ["#d0ffe0", 1.2] }, far: "#4a1a6a", near: "#5a2a7a",
-    ground: { style: "speckle", colors: ["#5a2a8a", "#6a3a9a", "#3ad0a0"] }, track: { style: "tiles", colors: ["#2a3a5a", "#3a4a6a", "#3af0b0"], kerb: "#3af0b0", lines: "#3af0b0" },
-    props: [["mushroom", 3, { c: ["#3af0b0", "#ff5ad0", "#f0f03a"], accent: ["#c8a0ff"] }, [1, 3], true], ["crystal", 2, { c: ["#3af0b0", "#ff5ad0"] }, null, true], ["rock", 2, { c: ["#4a2a6a"] }]],
-    fx: "fireflies", hills: 2, movers: "space",
-  }),
   T("synth", "Synthwave", "🕹️", {
     sky: { top: "#0a0220", mid: "#5a0a6a", horizon: "#ff5a8a" }, sun: "#ffd05a", fog: ["#4a0a4a", 60, 260], clouds: false,
     light: { hemi: ["#ff8ad0", "#1a0a2a", 0.95], sun: ["#ffb07a", 1.0] }, far: "#ff3a9a", near: "#1a0a2a",
@@ -142,13 +107,6 @@ export const THEMES = [
     ground: { style: "speckle", colors: ["#d8e8f4", "#ffffff", "#b8d0e4"] }, track: { style: "ice", colors: ["#6aa8d0", "#8ac0e0", "#4a88b8"], kerb: "#ffffff", lines: "#2af0b0" },
     props: [["iceberg", 3, { c: ["#d0e8f8", "#ffffff"] }, [1, 2.2]], ["pine", 2, { leaf: ["#1a3a3a"] }]],
     fx: "snow", hills: 1.6,
-  }),
-  T("fairy", "Fairy Forest", "🧚", {
-    sky: { top: "#06142a", mid: "#0e3a5a", horizon: "#3a8aa8" }, sun: null, night: true, fog: ["#0e3048", 35, 190], clouds: false,
-    light: { hemi: ["#a0e8ff", "#0a1a1a", 1.05], sun: ["#c8f0ff", 0.8] }, far: "#0a2a3a", near: "#1a3a3a",
-    ground: { style: "speckle", colors: ["#1a3a2a", "#244a34", "#3af0c0"] }, track: { style: "speckle", colors: ["#3a4a5a", "#4a5a6a", "#2a3a4a"], kerb: "#7af0d0", lines: "#c8fff0" },
-    props: [["mushroom", 4, { c: ["#3af0d0", "#ff7af0", "#7ab0ff"], accent: ["#e8fff8"] }, [0.8, 2.4], true], ["giantflower", 3, { c: ["#ff7ad0", "#7af0ff", "#ffe07a"], accent: ["#2a8a5a"] }, null, true], ["tree", 2, { leaf: ["#1a4a3a"], trunk: ["#2a2a24"] }]],
-    fx: "fireflies",
   }),
 ];
 
