@@ -98,15 +98,16 @@ const PASS_RUNNERS = { [KIKO]: 2, [PIP]: 12 };
 const COLLECTION = [
   { id: "zara", name: "Zara", color: "#ff6fb5", rarity: "rare", via: "pack" },
   { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "pack" },
-  { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pack" },
-  { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pack" },
+  { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pass", passLv: 15 },
+  { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pass", passLv: 1 }, // yours the moment you buy the Gold Pass
   { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "road", legacy: { medal: "silver", count: 5 } },
   { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 6 } },
   // heroes and stars (pictures only)
   { id: "captainstar", name: "Captain Star", color: "#2f5ae0", rarity: "rare", via: "pack" },
   { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "pack" },
   { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "pack" },
-  { id: "boulder", name: "The Boulder", color: "#7a5a3a", rarity: "legendary", via: "pack" },
+  { id: "boulder", name: "The Boulder", color: "#7a5a3a", rarity: "legendary", via: "road" },
+  { id: "rapstar", name: "MC Gold", color: "#f0b400", rarity: "epic", via: "road", pic: "/assets/pk_rapstar.webp" },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
 const MEDAL_ICON = { gold: "🥇", silver: "🥈", bronze: "🥉" };
@@ -1073,7 +1074,7 @@ const STARTER_RARITY = ["rare", "rare", "rare", "rare", "epic", "epic", "rare", 
 function allChars() {
   return [
     ...RUNNERS.map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
-    ...COLLECTION.map((c) => ({ ...c, img: `/assets/sc_${c.id}.webp`, hero: `/assets/sc_${c.id}.webp` })),
+    ...COLLECTION.map((c) => ({ ...c, img: c.pic ?? `/assets/sc_${c.id}.webp`, hero: c.pic ?? `/assets/sc_${c.id}.webp` })),
     ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp` })),
     { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp` },
     ...ROAD_CHARS.map((c) => ({ ...c, via: "road", img: `/assets/rd_${c.id}.webp`, hero: `/assets/rd_${c.id}.webp` })),
@@ -1088,7 +1089,7 @@ function howToGet(c) {
   if (c.via === "pack") return "Found in packs.";
   if (c.idx in PASS_RUNNERS) return `Season Pass, level ${PASS_RUNNERS[c.idx]}.`;
   if (c.via === "road") return `Trophy Road, at ${ROAD.find((r) => r.char === c.id).pts.toLocaleString()} 🏆.`;
-  return "Gold Pass, level 30.";
+  return `Gold Pass, level ${c.passLv ?? 30}.`;
 }
 /** The short lock label on a runner card you can't race with yet. */
 function lockLabel(i) {
@@ -1340,7 +1341,6 @@ const PACK_CHARS = [
   { id: "ra", name: "Pharaoh Ra", rarity: "epic", dupe: 600 },
   { id: "zorp", name: "Zorp", rarity: "rare", dupe: 300 },
   { id: "glorb", name: "Glorb", rarity: "epic", dupe: 600 },
-  { id: "rapstar", name: "MC Gold", rarity: "epic", dupe: 600 },
   { id: "magic", name: "Diez", rarity: "legendary", dupe: 1500 },
   { id: "dancer", name: "Disco Dash", rarity: "legendary", dupe: 1500 },
 ];
@@ -2187,7 +2187,7 @@ const ROAD = [
   { pts: 60, coins: 400 },
   { pts: 80, pack: "mega" },
   { pts: 110, pack: "brain" },
-  { pts: 140, coins: 600 },
+  { pts: 140, char: "rapstar" },
   { pts: 170, pack: "mega" },
   { pts: 220, char: "unitx" },
   { pts: 260, coins: 1000 },
@@ -2196,7 +2196,7 @@ const ROAD = [
   { pts: 420, coins: 1500 },
   { pts: 480, pack: "mega" },
   { pts: 560, pack: "legend" },
-  { pts: 700, coins: 2500 },
+  { pts: 700, char: "boulder" },
   { pts: 850, pack: "mega" },
   { pts: 1000, pack: "mega" },
   { pts: 1300, coins: 3000 },
@@ -2215,7 +2215,7 @@ function roadInfo(step) {
   if (step.coins) return { label: `${step.coins.toLocaleString()} coins`, img: step.coins >= 2500 ? "/assets/ui_c3.webp" : step.coins >= 1000 ? "/assets/ui_c2.webp" : "/assets/ui_c1.webp" };
   if (step.pack) return { label: PACKS.find((x) => x.id === step.pack)?.name ?? "Pack", img: `/assets/pack_${step.pack}.webp` };
   const c = roadChar(step.char);
-  return { label: c.name, img: ROAD_CHARS.includes(c) ? `/assets/rd_${c.id}.webp` : `/assets/sc_${c.id}.webp`, rarity: c.rarity };
+  return { label: c.name, img: ROAD_CHARS.includes(c) ? `/assets/rd_${c.id}.webp` : c.pic ?? `/assets/sc_${c.id}.webp`, rarity: c.rarity };
 }
 /** Gold medals won, ever (a stat: spending them never counted back). */
 function goldEver() {
@@ -8062,6 +8062,8 @@ function passReward(level, track) {
     return { coins: 50 + level * 10, label: `${50 + level * 10} coins`, img: "/assets/ui_c1.webp" };
   }
   if (level === 30) return { char: PASS_CHAR.id, label: PASS_CHAR.name, img: `/assets/pk_${PASS_CHAR.id}.webp` };
+  if (level === 1) return { char: "sharky", label: "Sharky", img: "/assets/sc_sharky.webp" };
+  if (level === 15) return { char: "pandu", label: "Pandu", img: "/assets/sc_pandu.webp" };
   if (level === 10) return { item: "trail:neon", label: "Neon trail", icon: "🌈" };
   if (level === 20) return { coins: 1000, label: "1,000 coins", img: "/assets/ui_c3.webp" };
   if (level === 15 || level === 25) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
@@ -8179,11 +8181,18 @@ $("#passBuy").addEventListener("click", () => {
   const p = passState();
   if (p.hasGold) return;
   p.hasGold = true;
+  p.gold = [...new Set([...(p.gold ?? []), 1])]; // level 1 is claimed on the spot: Sharky
   savePass(p);
   sfx.finish();
   coinRain($("#passBuy"), 20);
-  toast("Gold Pass unlocked! Claim your gold rewards");
   renderPass();
+  const fresh = !wallet.has("sharky");
+  giveItem("sharky");
+  renderCollPill();
+  if (fresh) {
+    passModal.hidden = true;
+    showUnlock({ kind: "char", char: { name: "Sharky", rarity: "epic", img: "/assets/sc_sharky.webp" } }, () => toast("Gold Pass unlocked! Claim your gold rewards"));
+  } else toast("Gold Pass unlocked! Claim your gold rewards");
 });
 $("#passPill").addEventListener("click", () => {
   renderPass();
