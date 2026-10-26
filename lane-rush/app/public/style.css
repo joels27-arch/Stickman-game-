@@ -2854,3 +2854,5 @@ html, body { background: var(--k1); }
 .hp-play .league-card.home-road .lc-go { font-size: 12px; padding: 6px 8px; }
 /* the sprint button takes taps (the HUD around it lets them through to the game) */
 .hud .sprint-btn { pointer-events: auto; }
+/* Quick Race (just you and bots): no prizes to set */
+#lobby.solo-room .prize-title, #lobby.solo-room #prizePick, #lobby.solo-room #prizeNote { display: none; }
