@@ -3232,7 +3232,7 @@ if (renderer) {
   renderer.debug.checkShaderErrors = false; // no driver round trip per shader (errors still show in the console as warnings)
   if (startGfx.shadows) {
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap; // filtered edges at a fraction of the soft filter's cost
     renderer.shadowMap.autoUpdate = true;
   }
 }
