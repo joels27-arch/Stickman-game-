@@ -880,6 +880,14 @@ function startRace(state, t) {
   state.blasts = [];
   state.nextBombAt = state.kind === "potato" ? state.startAt + POTATO_FIRST_MS : null;
   for (const id of ids(state)) state.players[id] = freshRunner(state.players[id]);
+  // a random starting lane each race (not always by who joined first)
+  const order = ids(state);
+  const lanes = order.map((_, i) => i);
+  for (let i = lanes.length - 1; i > 0; i--) {
+    const j = Math.floor(roll(state.seed, i, 5) * (i + 1));
+    [lanes[i], lanes[j]] = [lanes[j], lanes[i]];
+  }
+  order.forEach((id, i) => (state.players[id].lane = lanes[i]));
 }
 
 // ── the modes: brain chase, coin rush, hot potato, party cup ───────────────

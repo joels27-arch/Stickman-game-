@@ -578,6 +578,16 @@ describe("random mode and map", () => {
     expect(s.cup.races).toHaveLength(10);
     expect(new Set(s.cup.races)).toEqual(new Set(L.PARTY_KINDS));
   });
+  it("starting lanes are dealt at random each race", () => {
+    const seen = new Set<number>();
+    for (let i = 0; i < 20; i++) {
+      const s = act(lobbyOf(1), "p0", { type: "start", bots: true, t: T0 + i * 7777 });
+      const lanes = Object.values(s.players).map((p: any) => p.lane);
+      expect([...lanes].sort()).toEqual([0, 1, 2, 3]);
+      seen.add(s.players.p0.lane);
+    }
+    expect(seen.size).toBeGreaterThan(2);
+  });
   it("bots get random runners, not the same ones every race", () => {
     const sets = new Set<string>();
     for (let i = 0; i < 20; i++) {

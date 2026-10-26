@@ -949,7 +949,7 @@ function askStarter() {
   starterPick = null;
   $("#starterGrid").replaceChildren(
     ...FIRST_FIVE.map((i) => {
-      const b = el("button", { class: "pf-zone", type: "button", style: `--team:${RUNNERS[i].color}`, "aria-label": RUNNERS[i].name });
+      const b = el("button", { class: "pf-zone", type: "button", style: `--team:${RUNNERS[i].color}`, "aria-label": RUNNERS[i].name }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }));
       b.addEventListener("click", () => {
         sfx.tap();
         buzz(15);
@@ -6687,7 +6687,7 @@ function enterRace(v) {
   const mine = v.players.find((p) => p.id === playerId);
   Object.assign(me, {
     d: mine?.d ?? 0,
-    lane: mine?.slot ?? 0,
+    lane: mine?.lane ?? mine?.slot ?? 0, // the server deals out random starting lanes
     y: 0,
     vy: 0,
     slideT: 0,
@@ -9517,20 +9517,19 @@ function frame(now) {
     let introLook = null;
     if (intro) {
       const p = forced ?? 1 - Math.max(0, toGo) / introLen;
-      const e = p * p * (3 - 2 * p);
-      // round your runner: from in front of your face, past your side, to behind you
-      // (kept between the start gate's posts)
-      const px = laneX(fx);
-      const side = px > 0 ? -1 : 1; // swing round on the open side
-      const cx = (x) => clamp(x, -3.4, 3.4);
-      introPath.points[0].set(cx(px + side * 1.6), 1.6, fz - 4.6);
-      introPath.points[1].set(cx(px + side * 3.0), 2.2, fz - 2.2);
-      introPath.points[2].set(cx(px + side * 3.0), 3.4, fz + 2.6);
+      // the whole line-up first (all four runners, cheering), held for a while,
+      // then one sweep over their heads to behind your runner for the gun
+      const q = THREE.MathUtils.smoothstep(p, 0.45, 1);
+      const e = p < 0.45 ? (0.06 * p) / 0.45 : 0.06 + 0.94 * q;
+      const side = laneX(fx) > 0 ? -1 : 1; // sweep round on the open side
+      introPath.points[0].set(0, 2.4, fz - 11.5);
+      introPath.points[1].set(side * 3.2, 4.2, fz - 5.5);
+      introPath.points[2].set(side * 2.4, 4.6, fz + 1.5);
       introPath.points[3].set(tx, 3.0, fz + 5.6);
       introPath.getPoint(e, camPos);
-      // look at your runner, then turn to look down the track
-      const k = THREE.MathUtils.smoothstep(p, 0.68, 1);
-      introLook = new THREE.Vector3(px, 1.05, fz).lerp(new THREE.Vector3(tx * 0.8, 1.0, fz - 9), k);
+      // look at the middle of the line-up, then turn to look down the track
+      const k = THREE.MathUtils.smoothstep(p, 0.6, 1);
+      introLook = new THREE.Vector3(0, 1.0, fz).lerp(new THREE.Vector3(tx * 0.8, 1.0, fz - 9), k);
     } else {
       camGoal.set(tx, back ? 2.5 + fy * 0.6 : 3.0 + fy * 0.75, back ? fz - 4.2 : fz + 5.6); // reused: no garbage per frame
       camPos.lerp(camGoal, Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
@@ -9561,7 +9560,7 @@ function frame(now) {
     world.syncBowls(net.view?.bowls || [], serverNow());
     // feel the speed: wider view and speed lines on a rocket or boost
     // the view opens up a little as you speed up (and a lot on a rocket or boost)
-    const zoom = me.power === "rocket" ? 80 : me.boostT > 0 || me.sprintT > 0 ? 70 : 62 + clamp((me.speed - BASE_SPEED) * 0.45, 0, 5);
+    const zoom = intro ? 66 + 10 * (1 - THREE.MathUtils.smoothstep(forced ?? 1 - Math.max(0, toGo) / Math.max(introLen, 0.01), 0.55, 1)) : me.power === "rocket" ? 80 : me.boostT > 0 || me.sprintT > 0 ? 70 : 62 + clamp((me.speed - BASE_SPEED) * 0.45, 0, 5);
     if (Math.abs(camera.fov - zoom) > 0.1) {
       camera.fov += (zoom - camera.fov) * Math.min(1, dt * 5);
       camera.updateProjectionMatrix();

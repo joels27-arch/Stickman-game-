@@ -371,12 +371,13 @@
         <button id="askLater" class="ask-later" type="button">Later</button>
       </div>
     </div>
-    <!-- first visit: pick your first runner (tap one, it lights up, then confirm) -->
-    <div id="starterModal" class="pick-first" hidden>
-      <div class="pf-art">
-        <img src="/assets/pick_first.webp" alt="Choose your first runner" />
-        <div id="starterGrid" class="pf-zones"></div>
-        <button id="starterGo" class="pf-go" type="button" disabled>Pick a runner</button>
+    <!-- first visit: pick your first runner (tap one, then confirm) -->
+    <div id="starterModal" class="modal pick-first" hidden>
+      <div class="sheet pf-sheet" role="dialog" aria-modal="true" aria-labelledby="starterTitle">
+        <h2 id="starterTitle">Pick your runner</h2>
+        <p class="pf-sub">The others unlock as you play</p>
+        <div id="starterGrid" class="pf-row"></div>
+        <button id="starterGo" class="btn big go pf-go" type="button" disabled>Tap a runner</button>
       </div>
     </div>
     <div id="countryModal" class="modal" hidden>

@@ -2862,19 +2862,18 @@ html, body { background: var(--k1); }
 /* each tap on a sealed pack: a hard, growing shake */
 .po-pack.shake.hit { animation: poHit 260ms ease-out, poShake 1.1s ease-in-out 260ms infinite; }
 @keyframes poHit { 0% { transform: scale(1); } 25% { transform: rotate(calc(-6deg * var(--shake, 1))) scale(calc(1 + 0.04 * var(--shake, 1))); } 55% { transform: rotate(calc(6deg * var(--shake, 1))) scale(calc(1 + 0.06 * var(--shake, 1))); } 100% { transform: rotate(0) scale(1); } }
-/* first visit: the "Choose your first runner" picture, tap a runner, it lights up, then confirm */
-.pick-first { position: fixed; inset: 0; z-index: 72; display: grid; place-items: center; background: #120a2e; }
-.pick-first[hidden] { display: none; }
-.pf-art { position: relative; width: min(100vw, calc(100dvh * 645 / 1164)); aspect-ratio: 645 / 1164; }
-.pf-art > img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.pf-zones { position: absolute; left: 0; right: 0; top: 35%; height: 38%; display: grid; grid-template-columns: 19.5% 18.5% 18.5% 20% 23.5%; }
-.pf-zone { appearance: none; border: 0; padding: 0; margin: 0 1px; background: transparent; border-radius: 18px; cursor: pointer; transition: background 160ms, box-shadow 160ms, transform 160ms; -webkit-tap-highlight-color: transparent; }
-.pf-zones.chosen .pf-zone:not(.on) { background: rgba(10, 6, 30, 0.45); }
-.pf-zone.on { box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--team), 0 0 34px 8px var(--team); background: radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--team) 45%, transparent), transparent 70%); animation: pfGlow 1.1s ease-in-out infinite; }
-@keyframes pfGlow { 50% { box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--team), 0 0 50px 14px var(--team); } }
-.pf-go { position: absolute; left: 10%; right: 10%; bottom: 7%; height: 64px; border: 4px solid #fff; border-radius: 20px; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 24px; text-transform: uppercase; color: #1a2300; background: linear-gradient(180deg, #d4ff5a, #8fd600); box-shadow: 0 6px 0 #3f7a00, 0 10px 24px rgba(0, 0, 0, 0.5); cursor: pointer; }
-.pf-go:disabled { color: #fff; background: rgba(20, 14, 50, 0.75); box-shadow: none; border-color: rgba(255, 255, 255, 0.5); font-size: 20px; }
-.pf-go:not(:disabled) { animation: btnPulse 1s ease-in-out infinite; }
+/* first visit: five runners in a row, tap one, then confirm */
+#starterModal { z-index: 72; }
+.pf-sheet { width: min(520px, 100%); text-align: center; align-items: stretch; }
+.pf-sheet h2 { margin: 0; }
+.pf-sub { margin: 0; opacity: 0.8; font-weight: 700; }
+.pf-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pf-zone { appearance: none; display: grid; justify-items: center; gap: 2px; padding: 4px 2px 6px; min-width: 0; border-radius: 14px; border: 3px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06); color: #fff; font: inherit; cursor: pointer; transition: transform 140ms, border-color 140ms, box-shadow 140ms, opacity 140ms; -webkit-tap-highlight-color: transparent; }
+.pf-zone img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: center top; border-radius: 10px; }
+.pf-zone b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 13px; text-transform: uppercase; white-space: nowrap; }
+.pf-row.chosen .pf-zone:not(.on) { opacity: 0.45; }
+.pf-zone.on { transform: scale(1.06); border-color: var(--team); box-shadow: 0 0 0 2px #fff, 0 0 20px 4px var(--team); }
+.pf-go:disabled { opacity: 0.5; }
 /* Trophy Road: runners for games played */
 .road-full .rv-games { position: relative; z-index: 2; display: grid; gap: 8px; margin: 0 0 12px; padding: 10px; border-radius: 16px; background: rgba(10, 14, 10, 0.88); border: 2px solid var(--lime); }
 .rv-games > b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 15px; text-transform: uppercase; color: var(--lime); text-align: center; }
