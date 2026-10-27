@@ -5348,17 +5348,19 @@ const world = (() => {
     let k = 0;
     for (let z = -40; z < TRACK_LEN + 140; z += 8) for (const side of [-1, 1]) add(ads[k++ % ads.length], side * (edge - 0.1), 0, z, 1, 0);
     // grandstands all the way along both sides, facing the pitch
-    const len = P.stadiumStand.userData.len;
-    for (let z = -60; z < TRACK_LEN + 180; z += len * 0.98) {
-      add(P.stadiumStand, edge + 9, MEADOW_Y, z, 1, -Math.PI / 2);
-      add(P.stadiumStand, -(edge + 9), MEADOW_Y, z, 1, Math.PI / 2);
+    // one long stand per side (8 draw calls in all, however long the track)
+    const standLen = TRACK_LEN + 240;
+    for (const side of [-1, 1]) {
+      const st = codeStand(standLen);
+      st.position.set(side * (edge + 9), MEADOW_Y, (-60 + TRACK_LEN + 180) / 2);
+      st.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      group.add(st);
     }
     for (let z = 30; z < TRACK_LEN + 160; z += 110) for (const side of [-1, 1]) add(P.stadiumLight, side * (edge + 26), MEADOW_Y, z, 1, side > 0 ? -Math.PI / 2 : Math.PI / 2);
   }
 
-  /** A grandstand, 34 m long (along x), facing +z: the crowd bank rises away from the pitch. */
-  function codeStand() {
-    const L = 34;
+  /** A grandstand L m long (along x), facing +z: the crowd bank rises away from the pitch. The pictures repeat every 34 m. */
+  function codeStand(L = 34) {
     const D = 13; // depth of the seating bank
     const H = 9; // height at the back
     // the crowd: rows of seats, a fan in most of them, in team colours
@@ -5394,6 +5396,8 @@ const world = (() => {
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = renderer?.capabilities.getMaxAnisotropy?.() ?? 4;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.set(L / 34, 1);
     const root = new THREE.Group();
     // the raked bank (a slope from the front wall up to the back)
     const slope = Math.hypot(D, H - 2);
@@ -5417,6 +5421,8 @@ const world = (() => {
       });
       const t = new THREE.CanvasTexture(w);
       t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = THREE.RepeatWrapping;
+      t.repeat.set(L / 34, 1);
       return t;
     })();
     const shell = new THREE.MeshLambertMaterial({ color: "#3a4256" });
