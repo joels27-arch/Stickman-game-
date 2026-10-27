@@ -4263,21 +4263,27 @@ const world = (() => {
   const fileProgress = new Map();
   /** The Artlist remake of a model (md_*), or the original if that file is missing. */
   function loadGLBOr(file, fallback) {
-    return loadGLB(`/assets/${file}.glb`).catch(() => loadGLB(`/assets/${fallback}.glb`));
+    return loadGLB(`/assets/${file}.glb`, 2).catch(() => loadGLB(`/assets/${fallback}.glb`));
   }
-  function loadGLB(url) {
+  // a dropped download (flaky mobile data, a deploy swapping files) retries twice, fresh from the server
+  function loadGLB(url, tries = 3) {
     fileProgress.set(url, fileProgress.get(url) ?? 0);
-    return new Promise((resolve, reject) =>
-      loader.load(
-        url,
-        (g) => {
-          fileProgress.set(url, 1);
-          resolve(g);
-        },
-        (e) => e.total && fileProgress.set(url, Math.max(fileProgress.get(url) ?? 0, Math.min(0.99, e.loaded / e.total))),
-        reject,
-      ),
-    );
+    const attempt = (n) =>
+      new Promise((resolve, reject) =>
+        loader.load(
+          n ? `${url}?r=${Date.now()}` : url,
+          (g) => {
+            fileProgress.set(url, 1);
+            resolve(g);
+          },
+          (e) => e.total && fileProgress.set(url, Math.max(fileProgress.get(url) ?? 0, Math.min(0.99, e.loaded / e.total))),
+          reject,
+        ),
+      ).catch((err) => {
+        if (n + 1 >= tries) throw new Error(`${url}: ${err?.message || err}`);
+        return new Promise((r) => setTimeout(r, 800 * (n + 1))).then(() => attempt(n + 1));
+      });
+    return attempt(0);
   }
 
   /** Normalise a static prop: long side across the lane, centred, base on the ground. */
@@ -10357,7 +10363,15 @@ world
   .catch((err) => {
     console.error(err);
     $("#loadHint").textContent = "Couldn't load the 3D models — check your connection and reload.";
-    $("#bootText").textContent = "Couldn't load the game. Check your connection and reload.";
+    // reload a fresh copy once by itself; after that, a button
+    let tried = true;
+    try {
+      tried = !!sessionStorage.getItem("lr:bootFix");
+      if (!tried) sessionStorage.setItem("lr:bootFix", "1");
+    } catch {}
+    if (!tried) return location.replace(`/?r=${Date.now()}`);
+    $("#bootText").innerHTML = '<button type="button" class="boot-retry">Tap to reload</button>';
+    $("#bootText .boot-retry").onclick = () => location.replace(`/?r=${Date.now()}`);
   });
 
 // test hooks for the local dev server only (headless browser checks)
