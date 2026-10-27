@@ -104,6 +104,12 @@
         <div class="hpage hp-side hp-missions" id="hpMissions" aria-label="Missions">
           <div class="hp-scroll">
             <div class="ribbon pink hp-ribbon"><h2>Missions</h2></div>
+            <div class="m-tabs" role="tablist">
+              <button class="m-tab on" type="button" role="tab" data-mt="road">🏆 Trophy Road<i class="dot" hidden></i></button>
+              <button class="m-tab" type="button" role="tab" data-mt="missions">📋 Missions<i class="dot" hidden></i></button>
+            </div>
+            <div id="mtRoad" class="road-sheet road-page"><div id="roadFull" class="road-full"></div></div>
+            <div id="mtMissions" hidden>
             <section class="m-head">
               <h3>Daily missions <i class="dot" id="dailyDot" hidden></i></h3>
               <p>New in <b id="questReset">--:--:--</b> · <span id="questSub"></span></p>
@@ -114,6 +120,7 @@
               <p id="careerSub"></p>
             </section>
             <div id="careerList" class="career-road"></div>
+            </div>
           </div>
         </div>
         <!-- SKINS: your runners first, then every one still to get -->
@@ -126,16 +133,6 @@
         </div>
         <!-- PLAY -->
         <div class="hpage hp-play" id="hpPlay" aria-label="Play">
-          <button id="leagueCard" class="league-card home-road" type="button">
-            <img id="leagueImg" src="/assets/lg_bronze.webp" alt="" />
-            <span class="lc-info">
-              <small>🏆 Trophy Road</small>
-              <b id="leagueName">Bronze I</b>
-              <span class="qbar"><i id="leagueBar"></i></span>
-              <span id="leagueNext" class="lc-next">0 pts</span>
-            </span>
-            <span class="lc-go">Open ›</span>
-          </button>
           <div class="roster" id="homeRoster" hidden></div>
           <div class="home-dock">
             <div class="play-card">
@@ -483,14 +480,6 @@
         <div class="ribbon teal"><h2 id="tourneyTitle">Tournament</h2></div>
         <button id="tourneyClose" class="gclose" type="button" aria-label="Close">✕</button>
         <div id="tourneyBody" class="tourney-body"></div>
-      </div>
-    </div>
-    <div id="roadModal" class="modal gmodal" hidden>
-      <div class="grays" aria-hidden="true"></div>
-      <div class="gsheet road-sheet" role="dialog" aria-modal="true" aria-labelledby="roadTitle">
-        <div class="ribbon gold"><h2 id="roadTitle">Trophy Road</h2></div>
-        <button id="roadClose" class="gclose" type="button" aria-label="Close">✕</button>
-        <div id="roadFull" class="road-full"></div>
       </div>
     </div>
     <div id="avatarModal" class="modal gmodal" hidden>

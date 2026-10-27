@@ -2916,3 +2916,11 @@ html, body { background: var(--k1); }
 /* the Trophy Road card on Play: something to collect */
 .hp-play .league-card.home-road.ready { border-color: #ffd23f; box-shadow: 0 5px 0 var(--k0), 0 0 22px rgba(255, 210, 63, 0.75); }
 .hp-play .league-card.home-road.ready .lc-go { background: #ffd23f; color: #3a2400; animation: btnPulse 1s ease-in-out infinite; }
+
+/* Missions page: Trophy Road | Missions tabs; the Trophy Road sits right on the page */
+.m-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0 12px; padding: 5px; border-radius: 16px; background: rgba(0, 0, 0, 0.28); }
+.m-tab { position: relative; appearance: none; border: 0; border-radius: 12px; padding: 11px 6px; background: transparent; color: rgba(255, 255, 255, 0.75); font-family: var(--display); font-style: italic; font-weight: 900; font-size: 16px; text-transform: uppercase; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.m-tab.on { background: #ffd23f; color: #3a2400; box-shadow: 0 3px 0 #b8860b; }
+.m-tab .dot { position: absolute; top: 6px; right: 8px; }
+.road-page { width: auto; padding: 0; }
+.road-page .road-full { max-height: none; overflow: visible; margin: 0; border-radius: 22px; }
