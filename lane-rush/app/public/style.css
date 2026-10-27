@@ -2924,3 +2924,50 @@ html, body { background: var(--k1); }
 .m-tab .dot { position: absolute; top: 6px; right: 8px; }
 .road-page { width: auto; padding: 0; }
 .road-page .road-full { max-height: none; overflow: visible; margin: 0; border-radius: 22px; }
+
+/* ── Medal Road: a ladder of reward rows (badge · reward · claim), league banners between ── */
+.road-page .road-full.road-full { background: none; display: grid; gap: 12px; padding: 0 2px 24px; }
+.road-page .road-full::before, .road-page .road-full::after { display: none; }
+.mr-head { display: grid; gap: 8px; justify-items: center; padding: 6px 0 4px; }
+.mr-title { position: relative; padding: 6px 34px; background: linear-gradient(180deg, #c6f55a, #8fd61f 60%, #6fb310); border-radius: 6px; box-shadow: 0 4px 0 #3f6b06, 0 8px 14px rgba(0, 0, 0, 0.35); transform: perspective(300px) rotateX(6deg); }
+.mr-title b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 32px; text-transform: uppercase; color: #13200a; letter-spacing: 0.01em; }
+.mr-pts { display: grid; grid-template-columns: 54px minmax(0, 1fr) 54px; align-items: center; gap: 8px; width: 100%; }
+.mr-pts img { width: 54px; height: 54px; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.4)); }
+.mr-mid { display: grid; gap: 6px; justify-items: center; }
+.mr-mid p { margin: 0; display: flex; align-items: center; gap: 6px; color: #fff; }
+.mr-mid p b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 40px; line-height: 1; }
+.mr-mid p small { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 14px; line-height: 1; text-transform: uppercase; max-width: 70px; }
+.mr-bar { position: relative; display: block; width: 100%; height: 14px; border-radius: 99px; background: #0b1224; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6); overflow: hidden; }
+.mr-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(180deg, #8cf04a, #34b81e); }
+.mr-how { margin: 0; color: rgba(255, 255, 255, 0.75); font-weight: 700; font-size: 12px; text-align: center; }
+.mr-row { --t: #c87533; appearance: none; display: grid; grid-template-columns: 76px minmax(0, 1fr) 96px; align-items: stretch; min-height: 84px; padding: 0; border: 3px solid var(--t); border-radius: 16px; background: #121b33; color: #fff; font: inherit; cursor: default; overflow: hidden; box-shadow: 0 4px 0 rgba(0, 0, 0, 0.45); -webkit-tap-highlight-color: transparent; }
+.mr-row.ready { cursor: pointer; border-color: #e9ff8a; background: linear-gradient(180deg, #c9f45c, #92d822); box-shadow: 0 0 18px rgba(190, 255, 80, 0.6), 0 4px 0 #4d7d0a; }
+.mr-row.got { opacity: 0.6; }
+.mr-badge { position: relative; display: grid; place-content: center; justify-items: center; margin: 10px 0 14px 10px; width: 58px; height: 58px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8, transparent 40%), var(--t); border: 3px solid #fff6; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); color: #fff; }
+.mr-badge::before, .mr-badge::after { content: ""; position: absolute; bottom: -12px; width: 16px; height: 18px; background: #d93a2a; z-index: -1; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%); }
+.mr-badge::before { left: 8px; transform: rotate(14deg); }
+.mr-badge::after { right: 8px; transform: rotate(-14deg); }
+.mr-badge b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 22px; line-height: 0.9; -webkit-text-stroke: 1.5px #0006; paint-order: stroke fill; }
+.mr-badge small { font-family: var(--display); font-weight: 900; font-size: 10px; line-height: 1; }
+.mr-row.ready .mr-badge { box-shadow: 0 3px 0 #4d7d0a; }
+.mr-reward { display: grid; grid-auto-flow: column; justify-content: center; align-items: center; gap: 8px; padding: 6px; }
+.mr-row.ready .mr-reward { background: rgba(255, 255, 255, 0.18); }
+.mr-reward img { width: 58px; height: 58px; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35)); }
+.mr-row.char .mr-reward img { width: 64px; height: 64px; border-radius: 12px; }
+.mr-reward small { font-weight: 800; font-size: 12px; text-align: left; max-width: 90px; }
+.mr-row.ready .mr-reward small { color: #1f3407; }
+.mr-act { display: grid; place-items: center; background: #0b1224; }
+.mr-row.ready .mr-act { background: none; }
+.mr-act em { padding: 9px 14px; border-radius: 10px; background: linear-gradient(180deg, #6ce04a, #22a332); border: 2px solid #b8ff9a; box-shadow: 0 3px 0 #146b1f; color: #fff; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 18px; text-transform: uppercase; animation: btnPulse 1s ease-in-out infinite; }
+.mr-lock { font-size: 28px; font-style: normal; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)); }
+.mr-tick { font-style: normal; font-size: 30px; font-weight: 900; color: #6ce04a; }
+.mr-league { --t: #c87533; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 0 0; }
+.mr-league img { width: 40px; height: 40px; object-fit: contain; }
+.mr-league b { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 24px; text-transform: uppercase; color: var(--t); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5); }
+.tier-bronze { --t: #c87533; }
+.tier-silver { --t: #b9c3d2; }
+.tier-gold { --t: #f5bf2a; }
+.tier-platinum { --t: #6fe0d8; }
+.tier-diamond { --t: #6fb3ff; }
+.tier-master { --t: #c27bff; }
+.mr-you { justify-self: center; }
