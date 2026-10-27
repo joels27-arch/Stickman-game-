@@ -2887,8 +2887,8 @@ function renderLobby(v) {
   const me = v.players.find((p) => p.id === playerId);
   const picker = $("#picker");
   if (changed(picker, lobbySig(v), RUNNERS.map((_, i) => wallet.owns(i)))) picker.replaceChildren();
-  // your runners first, the locked ones below
-  const order = RUNNERS.map((_, i) => i).sort((a, b) => wallet.owns(b) - wallet.owns(a));
+  // only the runners you have (the rest are on the Skins page)
+  const order = RUNNERS.map((_, i) => i).filter((i) => wallet.owns(i));
   if (!picker.children.length) order.forEach((i) => {
     const r = RUNNERS[i];
     const owner = v.players.find((p) => p.char === i);
@@ -2922,7 +2922,7 @@ function renderLobby(v) {
     act({ type: "pick", char: i });
     toast(`🎲 ${RUNNERS[i].name}!`);
   });
-  if (!picker.querySelector(".random-card")) picker.append(dice);
+  if (order.length > 1 && !picker.querySelector(".random-card")) picker.append(dice); // random needs a choice
   if (me) {
     if (changed($("#lobbySpot"), me.char, lobbySig(v))) renderSpotlight($("#lobbySpot"), me.char, {
       takenBy: (i) => v.players.find((p) => p.char === i && p.id !== playerId)?.name ?? null,
