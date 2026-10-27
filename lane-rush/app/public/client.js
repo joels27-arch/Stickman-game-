@@ -1762,7 +1762,7 @@ function onState(msg) {
       if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
       // the tutorial run is on the meadow; after that any map. Load it all, then start
       const picked = game.endlessMap && game.endlessMap !== "random" && RANDOM_MAPS.includes(game.endlessMap) ? game.endlessMap : null;
-      const map = !local.getItem("lr:endlessTut") ? "meadow" : picked ?? RANDOM_MAPS[Math.floor(Math.random() * RANDOM_MAPS.length)];
+      const map = !local.getItem("lr:endlessTut") ? "candy" : picked ?? RANDOM_MAPS[Math.floor(Math.random() * RANDOM_MAPS.length)];
       if (v.map !== map) act({ type: "map", map });
       showScreen("race");
       showCurtain(map);
@@ -2992,7 +2992,7 @@ function renderLobby(v) {
         return b;
       }),
     );
-  const mp = v.map || "meadow";
+  const mp = v.map || "candy";
   const rounds = roundsOf(v);
   if (changed($("#mapPick"), mp, isHost)) $("#mapPick").replaceChildren(
     ...["random", ...MAPS].map((key) => {

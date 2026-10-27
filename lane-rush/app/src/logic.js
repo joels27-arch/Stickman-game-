@@ -111,8 +111,10 @@ export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
 /** The classic maps (3D models), then the themed ones built in code (public/themes.js: same ids). */
-export const MAPS = ["meadow", "beach", "stadium", "space", "snowy", "candy", "crystal", "mars", "deepsea", "lava", "egypt", "icecream", "aurora", "artlist", "uranus"]; // retired: Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet, Fairy Forest, Farm, City, Neon Night, Rainbow Road, Cloud Kingdom, Synthwave
+export const MAPS = ["space", "snowy", "candy", "crystal", "mars", "deepsea", "lava", "egypt", "icecream", "aurora", "artlist", "uranus"]; // retired: Meadow, Beach, Stadium, Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet, Fairy Forest, Farm, City, Neon Night, Rainbow Road, Cloud Kingdom, Synthwave
 /** The maps a "random" pick draws from: Artlist is only raced when picked by name. */
+/** A new room starts on this map. */
+export const DEFAULT_MAP = "candy";
 export const RANDOM_MAPS = MAPS.filter((m) => m !== "artlist");
 /** Themed maps borrow a classic map's moving obstacles (the rest use the meadow's logs and bees). */
 export const MAP_MOVERS = { mars: "space", deepsea: "beach", egypt: "farm" };
@@ -908,7 +910,7 @@ function startRace(state, t) {
     ? MAPS.indexOf(pool[Math.floor(pick() * pool.length)])
     : state.map === "random"
       ? MAPS.indexOf(RANDOM_MAPS[Math.floor(pick() * RANDOM_MAPS.length)])
-      : Math.max(0, MAPS.indexOf(state.map ?? "meadow"));
+      : Math.max(0, MAPS.indexOf(state.map ?? DEFAULT_MAP));
   state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode === "random" ? partyOf(state)[Math.floor(pick() * partyOf(state).length)] : state.mode;
   // later Party Cup rounds open further into the difficulty curve
   state.courseBoost = state.cup ? Math.min(state.cup.race - 1, 4) * CUP_ROUND_BOOST_M : 0; // 10-round matches stop getting harder after round 5
@@ -1525,8 +1527,8 @@ export function setup() {
     firstFinishAt: null,
     mode: "survival",
     kind: "survival",
-    map: "meadow",
-    raceMap: "meadow",
+    map: DEFAULT_MAP,
+    raceMap: DEFAULT_MAP,
     cup: null,
     zaps: [],
     zapSeq: 0,
@@ -2074,13 +2076,13 @@ export function viewFor(state, playerId) {
     firstFinishAt: state.firstFinishAt,
     mode: state.mode ?? "survival",
     kind: state.kind ?? "survival",
-    map: state.map ?? "meadow",
+    map: state.map ?? DEFAULT_MAP,
     maps: state.maps ?? null,
     rounds: state.rounds ?? 1,
     botLevel: state.botLevel ?? "normal",
     party: partyOf(state),
     prize: state.prize ?? "none",
-    raceMap: state.raceMap ?? state.map ?? "meadow",
+    raceMap: state.raceMap ?? state.map ?? DEFAULT_MAP,
     courseBoost: state.courseBoost ?? 0,
     cup: state.cup
       ? {
