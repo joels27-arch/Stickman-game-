@@ -2874,6 +2874,7 @@ html, body { background: var(--k1); }
 .pf-row.chosen .pf-zone:not(.on) { opacity: 0.45; }
 .pf-zone.on { transform: scale(1.06); border-color: var(--team); box-shadow: 0 0 0 2px #fff, 0 0 20px 4px var(--team); }
 .pf-go:disabled { opacity: 0.5; }
+.pf-row[hidden], .pf-go[hidden], .pf-pack[hidden] { display: none; }
 /* the Starter Pack: sealed, tap it, it bursts and the five fly out */
 .pf-pack { appearance: none; border: 0; background: none; color: #fff; font: inherit; cursor: pointer; display: grid; justify-items: center; gap: 8px; padding: 6px; -webkit-tap-highlight-color: transparent; }
 .pf-pack img { width: min(190px, 46vw); filter: drop-shadow(0 10px 24px rgba(255, 200, 40, 0.55)); animation: pfFloat 1.6s ease-in-out infinite; }
