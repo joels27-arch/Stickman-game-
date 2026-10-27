@@ -2972,3 +2972,20 @@ html, body { background: var(--k1); }
 .tier-master { --t: #c27bff; }
 .mr-you { justify-self: center; }
 .boot-retry{font:inherit;font-weight:800;padding:8px 18px;border-radius:12px;border:2px solid #fff;background:#b6f72a;color:#1a2300;pointer-events:auto}
+/* the higher leagues */
+.tier-ruby { --t: #ff4d6d; }
+.tier-emerald { --t: #3ddc84; }
+.tier-champion { --t: #ffb020; }
+.tier-grandchamp { --t: #ff6a3d; }
+.tier-mythic { --t: #9b6bff; }
+.tier-legend { --t: #ffd23f; }
+.tier-immortal { --t: #ff8a1f; }
+.tier-galaxy { --t: #7ad7ff; }
+.rv-league.lg-ruby { --lg-a: #ffd0d8; --lg-b: #d61f45; --lg-ink: #5e0018; }
+.rv-league.lg-emerald { --lg-a: #c9ffe0; --lg-b: #1fae5e; --lg-ink: #054a24; }
+.rv-league.lg-champion { --lg-a: #fff0b0; --lg-b: #e88a00; --lg-ink: #6a3400; }
+.rv-league.lg-grandchamp { --lg-a: #ffd9c0; --lg-b: #d43c12; --lg-ink: #5a1300; }
+.rv-league.lg-mythic { --lg-a: #e4d6ff; --lg-b: #6a3cf0; --lg-ink: #230a6a; }
+.rv-league.lg-legend { --lg-a: #fff1a0; --lg-b: #3a3a3a; --lg-ink: #111; }
+.rv-league.lg-immortal { --lg-a: #ffe6b0; --lg-b: #f06a00; --lg-ink: #5a2100; }
+.rv-league.lg-galaxy { --lg-a: #cfe8ff; --lg-b: #3a2a9a; --lg-ink: #0c0640; }
