@@ -430,7 +430,7 @@ const sfx = (() => {
   let loading = false;
   const buffers = new Map();
   const SAMPLES = ["tap", "coin", "unlock", "boom", "whoosh", "cheer", "slip", "thunder", "pack", "bonk", "dizzy"];
-  const MUSIC = { menu: 0.3, race1: 0.24, race2: 0.24, race3: 0.24 }; // loop volumes
+  const MUSIC = { menu: 0.16, race1: 0.13, race2: 0.13, race3: 0.13 }; // loop volumes: soft, under the game sounds
   const RACE_TRACKS = ["race1", "race2", "race3"]; // a different one each race
   const ensure = () => {
     if (!ctx) {
@@ -508,8 +508,13 @@ const sfx = (() => {
     src.loop = true;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(MUSIC[target], t + 0.9);
-    src.connect(gain).connect(ctx.destination);
+    gain.gain.linearRampToValueAtTime(MUSIC[target], t + 1.6);
+    // a gentle low-pass takes the edge off the highs: warmer, softer music
+    const soft = ctx.createBiquadFilter();
+    soft.type = "lowpass";
+    soft.frequency.value = 2600;
+    soft.Q.value = 0.5;
+    src.connect(soft).connect(gain).connect(ctx.destination);
     src.start(t);
     playing = { name: target, src, gain };
   }
