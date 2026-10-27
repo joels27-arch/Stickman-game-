@@ -2417,6 +2417,7 @@ function claimRoad(step, node) {
   }
   renderTrophyRoad();
   if (roadOpen()) renderRoadFull();
+  renderRankPill(); // the tab dots follow
   renderRankPill();
 }
 function renderTrophyRoad() {
@@ -8708,6 +8709,7 @@ function renderRankPill() {
   const waiting = road.ready().length + gamesReady().length;
   const rd = $('.m-tab[data-mt="road"] .dot');
   if (rd) rd.hidden = !waiting;
+  renderMissionDots(); // and the badge on the bottom tab
 }
 
 // ── friends: everyone you've been in a room with, and their rank ──
@@ -10583,6 +10585,7 @@ world
     setTimeout(() => $("#boot").classList.add("done"), 250);
     setTimeout(() => $("#boot").remove(), 900);
     createBtn.disabled = joinBtn.disabled = soloBtn.disabled = endlessBtn.disabled = false;
+    renderMissionDots(); // everything is defined now: show what's waiting
     world.buildScenery();
     world.setShowcase(preferredChar());
     if (net.view?.phase === "lobby") renderLobby(net.view);
