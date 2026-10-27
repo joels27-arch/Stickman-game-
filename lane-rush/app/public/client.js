@@ -1072,7 +1072,7 @@ $("#setRestart").addEventListener("click", () => {
 });
 // every runner and character, for trying them all out
 $("#setUnlock").addEventListener("click", () => {
-  const ids = allChars().filter((c) => !c.id.startsWith("r")).map((c) => c.id);
+  const ids = allChars().filter((c) => !/^r\d+$/.test(c.id)).map((c) => c.id);
   const starters = RUNNERS.slice(0, STARTERS).map((_, i) => i);
   local.setItem("lr:owned", JSON.stringify([...new Set([...wallet.owned(), ...ids, ...starters])]));
   local.setItem("lr:starter", "all");
