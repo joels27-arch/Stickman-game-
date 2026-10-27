@@ -3230,7 +3230,6 @@ function renderResults(v) {
     if (rpChange.xp) reward.append(el("span", { class: "xpchip", text: `+${rpChange.xp} XP` }));
     if (rpChange.prize) reward.append(el("span", { class: "xpchip prizechip", text: `🏆 Prize: ${rpChange.prize}` }));
     if (roomPrize) reward.append(el("span", { class: "xpchip prizechip", text: roomPrize }));
-    if (potBack) reward.append(el("span", { class: "xpchip prizechip", text: potBack }));
     if (rpChange.league) reward.append(el("span", { class: "xpchip leaguechip", text: `Weekend League ${rpChange.league.medal ? MEDAL_ICON[rpChange.league.medal] : "—"} · match ${rpChange.league.matches}/${LEAGUE_MATCHES}` }));
     if (rpChange.botsOnly) reward.append(el("span", { class: "nomedal", text: "Medals (and league progress) need 2 real players" }));
     else reward.append(rankChip(rank.points() - ptsBefore));
