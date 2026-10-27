@@ -64,6 +64,12 @@ import {
   moversFor,
   SHOP_EMOTES,
   TRAILS,
+  BUS_H,
+  BUS_LEN,
+  RAMP_LEN,
+  floorAt,
+  busAt,
+  busFront,
 } from "/logic.js";
 
 // ── constants ───────────────────────────────────────────────────────────────
@@ -218,6 +224,7 @@ const GETUP_CLIP = [1.9, 6.1];
 const POWER_S = { shield: 9, rocket: 3.2, ghost: 4.5 };
 const FREEZE_S = 3; // how long a freeze slows you
 const ROCKET_Y = 2.1;
+const BUS_TURN = false; // the bus model's front faces the runners as loaded (true: turn it round)
 const POWER_INFO = {
   shield: { label: "Shield", hint: "Blocks the next hit" },
   rocket: { label: "Rocket", hint: "Fly over everything" },
@@ -3942,6 +3949,85 @@ const world = (() => {
     return g;
   }
 
+  /** The bus: stretched to fill one lane (BUS_LEN long, roof at BUS_H), its front facing the runners. */
+  function fitBus(root) {
+    const holder = new THREE.Group();
+    const inner = new THREE.Group();
+    inner.add(root);
+    holder.add(inner);
+    let b = new THREE.Box3().setFromObject(inner);
+    let s = b.getSize(new THREE.Vector3());
+    if (s.x > s.z) inner.rotation.y = Math.PI / 2; // lengthwise down the lane
+    if (BUS_TURN) inner.rotation.y += Math.PI;
+    holder.updateMatrixWorld(true);
+    b = new THREE.Box3().setFromObject(inner);
+    s = b.getSize(new THREE.Vector3());
+    const c = b.getCenter(new THREE.Vector3());
+    inner.position.set(-c.x, -b.min.y, -c.z);
+    holder.scale.set(1.8 / s.x, BUS_H / s.y, BUS_LEN / s.z);
+    holder.traverse((o) => {
+      if (o.isMesh) {
+        o.material.side = THREE.FrontSide;
+        o.material.envMapIntensity = 0.6;
+      }
+    });
+    return holder;
+  }
+  /** Stand-in bus (if the model didn't load): yellow body, red skirt, dark windows. */
+  function busStandIn() {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, BUS_H - 0.35, BUS_LEN), new THREE.MeshStandardMaterial({ color: "#ffc61a", roughness: 0.5 }));
+    body.position.y = 0.35 + (BUS_H - 0.35) / 2;
+    const skirt = new THREE.Mesh(new THREE.BoxGeometry(1.84, 0.7, BUS_LEN + 0.04), new THREE.MeshStandardMaterial({ color: "#e0301e", roughness: 0.5 }));
+    skirt.position.y = 0.55;
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.75, BUS_LEN - 1.2), new THREE.MeshStandardMaterial({ color: "#3c8fd8", roughness: 0.15 }));
+    glass.position.y = 1.55;
+    g.add(body, skirt, glass);
+    return g;
+  }
+  let rampGeo = null;
+  let rampMat = null;
+  /** A ramp up to a bus roof: a wedge RAMP_LEN long, from the road (z = 0) up to BUS_H (z = -RAMP_LEN). */
+  function makeRamp() {
+    if (!rampGeo) {
+      const w = 0.85;
+      const L = RAMP_LEN;
+      const H = BUS_H;
+      // top slope, two sides, back
+      const v = [
+        [-w, 0, 0], [w, 0, 0], [w, H, -L], [-w, H, -L], // slope
+        [-w, 0, 0], [-w, H, -L], [-w, 0, -L], // left side
+        [w, 0, 0], [w, 0, -L], [w, H, -L], // right side
+      ];
+      const pos = new Float32Array(v.flat());
+      const uv = new Float32Array([0, 0, 1, 0, 1, 3, 0, 3, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1]);
+      rampGeo = new THREE.BufferGeometry();
+      rampGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      rampGeo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      rampGeo.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 7, 8, 9]);
+      rampGeo.computeVertexNormals();
+      // yellow and dark stripes across a metal deck
+      const c = document.createElement("canvas");
+      c.width = 64;
+      c.height = 128;
+      const x = c.getContext("2d");
+      x.fillStyle = "#8a9099";
+      x.fillRect(0, 0, 64, 128);
+      for (let i = 0; i < 4; i++) {
+        x.fillStyle = i % 2 ? "#2a2d33" : "#ffc61a";
+        x.fillRect(0, i * 32 + 4, 64, 24);
+      }
+      x.fillStyle = "#ffc61a";
+      x.fillRect(0, 0, 5, 128);
+      x.fillRect(59, 0, 5, 128);
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapT = THREE.RepeatWrapping;
+      rampMat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.6, metalness: 0.2, side: THREE.DoubleSide });
+    }
+    return new THREE.Mesh(rampGeo, rampMat);
+  }
+
   function ballStandIn() {
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.375, 20, 14), new THREE.MeshPhongMaterial({ color: "#6b2fd6", shininess: 90 }));
     m.position.y = 0.375;
@@ -4282,6 +4368,7 @@ const world = (() => {
       loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
       // gates are wide enough that their pillars stand outside the fences
       loadGLB("/assets/boost_pad.glb").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
+      loadGLB("/assets/bus.glb").then((g) => (assets.props.bus = fitBus(g.scene))).catch(() => {}),
       loadGLB("/assets/bowling_ball.glb").then((g) => (assets.props.bowlingBall = fitProp(g.scene, { width: 0.75 }))).catch(() => (assets.props.bowlingBall = ballStandIn())),
       loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8.5 }))).catch(() => {}),
       loadGLB("/assets/gate_start.glb").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8 }))).catch(() => {}),
@@ -5594,7 +5681,7 @@ const world = (() => {
       if (row.z < z + 40 || row.lanes.includes("roller") || row.z - rows[rows.length - 1].z < 38) continue;
       rows.push(row);
     }
-    return { ...course, rows, slows: [], boosts: (course.boosts || []).filter((b) => b.z > z) };
+    return { ...course, rows, slows: [], buses: [], boosts: (course.boosts || []).filter((b) => b.z > z) };
   }
   function buildCourseObjects(seed, len, boost = 0) {
     const out = buildCourseObjectsInner(seed, len, boost);
@@ -5641,6 +5728,18 @@ const world = (() => {
         raceGroup.add(o);
         cullables.push({ obj: o, z: row.z });
       });
+    }
+    // buses (a second level to run on) and the ramps up to their roofs
+    for (const b of course.buses ?? []) {
+      const bus = (assets.props.bus ?? (assets.props.bus = busStandIn())).clone();
+      bus.position.set(laneX(b.lane), 0, -(b.z0 + b.z1) / 2);
+      raceGroup.add(bus);
+      cullables.push({ obj: bus, z: b.z0, z1: b.z1 });
+      if (b.ramp === false) continue;
+      const ramp = makeRamp();
+      ramp.position.set(laneX(b.lane), 0, -(b.z0 - RAMP_LEN));
+      raceGroup.add(ramp);
+      cullables.push({ obj: ramp, z: b.z0 - RAMP_LEN, z1: b.z0 });
     }
     for (const b of course.boxes || []) {
       const o = assets.props.box.clone();
@@ -6060,7 +6159,7 @@ const world = (() => {
   const rcP = new THREE.Vector3();
   const rcS = new THREE.Vector3();
   function setupRunCoins(course, on, bolts = false) {
-    runCoins = on ? coinLines(course).map((c) => ({ z: c.z, lane: c.lane, v: c.v, got: false })).sort((a, b) => a.z - b.z) : [];
+    runCoins = on ? coinLines(course).map((c) => ({ z: c.z, lane: c.lane, v: c.v, y: c.y ?? 0, got: false })).sort((a, b) => a.z - b.z) : [];
     if (bolts) {
       // every other gap between obstacle rows holds bolts instead of coins
       const zs = course.rows.map((r) => r.z);
@@ -6087,14 +6186,14 @@ const world = (() => {
       if (c.bolt) {
         if (nb >= 60) continue;
         rcQ.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, k * 2.5 + c.z);
-        rcP.set(laneX(c.lane), 0.95 + Math.sin(k * 5 + c.z) * 0.1, -c.z);
+        rcP.set(laneX(c.lane), c.y + 0.95 + Math.sin(k * 5 + c.z) * 0.1, -c.z);
         rcS.setScalar(0.8);
         boltMesh.setMatrixAt(nb++, rcM.compose(rcP, rcQ, rcS));
         continue;
       }
       rcE.y = k * 3 + c.z;
       rcQ.setFromEuler(rcE);
-      rcP.set(laneX(c.lane), 0.85 + Math.sin(k * 4 + c.z) * 0.08, -c.z);
+      rcP.set(laneX(c.lane), c.y + 0.85 + Math.sin(k * 4 + c.z) * 0.08, -c.z);
       rcS.setScalar(c.v > 1 ? 0.95 : 0.62);
       runCoinMesh.setMatrixAt(n++, rcM.compose(rcP, rcQ, rcS));
     }
@@ -6106,11 +6205,10 @@ const world = (() => {
   /** Coins and bolts you ran through between two distances. */
   function grabRunCoins(d0, d1, x, y) {
     const got = { coins: 0, bolts: 0 };
-    if (y > 2.2) return got;
     for (let i = runLo; i < runCoins.length; i++) {
       const c = runCoins[i];
       if (c.z > d1 + 0.8) break;
-      if (c.got || c.z < d0 - 0.8 || Math.abs(x - c.lane) > 0.6) continue;
+      if (c.got || c.z < d0 - 0.8 || Math.abs(x - c.lane) > 0.6 || Math.abs(y - c.y) > 2.2) continue;
       c.got = true;
       if (c.bolt) got.bolts++;
       else got.coins += c.v;
@@ -6130,9 +6228,9 @@ const world = (() => {
     if (kind === "coinrush") {
       coinLines(course).forEach((c, i) => {
         const obj = makeCoin(c.v > 1);
-        obj.position.set(laneX(c.lane), 1.3, -c.z);
+        obj.position.set(laneX(c.lane), 1.3 + (c.y ?? 0), -c.z);
         raceGroup.add(obj);
-        const entry = { obj, z: c.z, lane: c.lane, v: c.v, i, got: false };
+        const entry = { obj, z: c.z, lane: c.lane, v: c.v, y: c.y ?? 0, i, got: false };
         coinList.push(entry);
         cullables.push({ obj, z: c.z, coin: entry });
       });
@@ -6209,7 +6307,7 @@ const world = (() => {
       for (const c of coinList) {
         if (c.got || !c.obj.visible) continue;
         c.obj.rotation.y = k * 3 + c.z;
-        c.obj.position.y = 1.3 + Math.sin(k * 4 + c.z) * 0.12;
+        c.obj.position.y = c.y + 1.3 + Math.sin(k * 4 + c.z) * 0.12;
       }
       const live = new Set();
       for (const l of v.loose || []) {
@@ -6381,7 +6479,7 @@ const world = (() => {
     if (endless) moveScenery(d);
     for (const c of cullables) {
       const z = c.keep ? c.z + shift : c.z;
-      c.obj.visible = z > d - VIEW_BEHIND && z < d + VIEW_AHEAD + (c.wide ? 60 : 0) && !c.box?.taken && !c.coin?.got;
+      c.obj.visible = (c.z1 ?? z) > d - VIEW_BEHIND && z < d + VIEW_AHEAD + (c.wide ? 60 : 0) && !c.box?.taken && !c.coin?.got;
     }
     for (const c of sceneryCull) {
       const z = c.z + shift;
@@ -6547,7 +6645,8 @@ const me = {
   d: 0,
   x: 0,
   lane: 0,
-  y: 0,
+  y: 0, // height above the floor under you (see base)
+  base: 0, // the floor under you: the road, a ramp or a bus roof
   vy: 0,
   slideT: 0,
   stumbleT: 0,
@@ -6693,6 +6792,7 @@ function enterRace(v) {
     lane: mine?.lane ?? mine?.slot ?? 0, // the server deals out random starting lanes
     y: 0,
     vy: 0,
+    base: 0,
     slideT: 0,
     stumbleT: 0,
     invulnT: 0,
@@ -7015,6 +7115,13 @@ function input(kind) {
     // a brain wave flips your controls
     const dirIn = kind === "left" ? -1 : 1;
     const next = clamp(me.lane + (me.waveT > 0 ? -dirIn : dirIn), 0, LANES - 1);
+    // a bus's side is a wall from the road (from a roof you can step across or off)
+    if (next !== me.lane && me.base + me.y < BUS_H - 0.4 && busAt(race.course, next, me.d)) {
+      shake = Math.max(shake, 0.18);
+      sfx.hit();
+      buzz(30);
+      return;
+    }
     if (next !== me.lane) {
       me.lane = next;
       me.laneAt = performance.now();
@@ -7131,6 +7238,24 @@ function stepMe(dt) {
   const stepX = Math.max(LANE_SWITCH_SPEED * 0.65, Math.abs(dx) * 22) * dt;
   me.x = Math.abs(dx) <= stepX ? me.lane : me.x + Math.sign(dx) * stepX;
 
+  // the floor under you: up a ramp, along a bus roof, and off the end (you drop)
+  if (race.course?.buses?.length) {
+    const abs = me.base + me.y;
+    let floor = floorAt(race.course, Math.round(me.x), me.d);
+    if (floor - abs > 0.8 && dx !== 0) {
+      // swerving into a bus's side mid-change: bounce back to the lane you came from
+      me.lane = clamp(Math.round(me.x) - Math.sign(dx), 0, LANES - 1);
+      me.x = me.lane;
+      floor = floorAt(race.course, me.lane, me.d);
+      shake = Math.max(shake, 0.18);
+    }
+    if (floor !== me.base) {
+      me.base = floor;
+      me.y = Math.max(0, abs - floor);
+      if (me.y === 0 && me.vy < 0) me.vy = 0; // (stepped off the end: y > 0, so you fall)
+    }
+  } else me.base = 0;
+
   // vertical (the rocket holds you up in the air)
   if (me.power === "rocket") {
     me.y += (ROCKET_Y - me.y) * Math.min(1, dt * 6);
@@ -7192,6 +7317,15 @@ function stepMe(dt) {
   me.speed += clamp(target - me.speed, -accel * dt, accel * dt);
   const prevD = me.d;
   me.d += me.speed * dt;
+  if (!me.finished && !me.out && me.power !== "rocket" && me.power !== "ghost" && me.base + me.y < BUS_H - 0.35) {
+    // a bus with no ramp: you run into its front (dodge, or jump on from a roof next to it)
+    const wall = busFront(race.course, Math.round(me.x), prevD, me.d + 0.45);
+    if (wall) {
+      me.d = Math.max(prevD, wall.z0 - 0.45);
+      me.speed = 0;
+      hit("bus");
+    }
+  }
 
   modeTick(prevD, v);
   if (!isSurvival() && !me.finished && me.d >= TRACK_LEN) {
@@ -7371,6 +7505,7 @@ function hit(kind) {
     hurdle: "Jump! ↑",
     gate: "Slide! ↓",
     crate: "Dodge! ← →",
+    bus: "Dodge! ← →",
     roller: "Jump the barrel! ↑",
     zap: "ZAPPED! ⚡",
     banana: "Slipped on a banana! 🍌",
@@ -9040,7 +9175,7 @@ $("#sprintBtn").addEventListener("pointerdown", (e) => {
 function modeTick(prevD, v) {
   if (me.finished || me.out) return;
   // coin lines on the track
-  const got = me.power === "rocket" ? { coins: 0, bolts: 0 } : world.grabRunCoins(prevD, me.d, me.x, me.y);
+  const got = me.power === "rocket" ? { coins: 0, bolts: 0 } : world.grabRunCoins(prevD, me.d, me.x, me.base + me.y);
   // a little sparkle where you grabbed it
   if ((got.coins || got.bolts) && me.runner && performance.now() - (game.sparkleAt ?? 0) > 200) {
     game.sparkleAt = performance.now(); // at most 5 a second, however fast the coins come
@@ -9092,7 +9227,7 @@ function modeTick(prevD, v) {
   }
   if (game.kind === "coinrush") {
     for (const c of world.coins) {
-      if (c.got || c.z < prevD - 0.8 || c.z > me.d + 0.8 || Math.abs(me.x - c.lane) > 0.6 || me.y > 2.2) continue;
+      if (c.got || c.z < prevD - 0.8 || c.z > me.d + 0.8 || Math.abs(me.x - c.lane) > 0.6 || Math.abs(me.base + me.y - c.y) > 2.2) continue;
       c.got = true;
       c.gotAt = performance.now();
       c.obj.visible = false;
@@ -9350,7 +9485,7 @@ function sendPos(force = false) {
     type: "pos",
     d: Math.round(Math.min(me.d, game.len) * 100) / 100,
     lane: me.lane,
-    y: Math.round(me.y * 100) / 100,
+    y: Math.round((me.base + me.y) * 100) / 100,
     act: a,
     hits: me.hits,
     pw: me.power,
@@ -9449,8 +9584,8 @@ function frame(now) {
 
     const zMe = -me.d;
     if (me.runner) {
-      me.runner.group.position.set(laneX(me.x), me.y, zMe);
-      if (equipped().trail && me.speed > 2 && !me.out) world.trail(equipped().trail, laneX(me.x), me.y, zMe);
+      me.runner.group.position.set(laneX(me.x), me.base + me.y, zMe);
+      if (equipped().trail && me.speed > 2 && !me.out) world.trail(equipped().trail, laneX(me.x), me.base + me.y, zMe);
       me.runner.group.visible = !(me.invulnT > 0 && me.stumbleT <= 0 && !me.power && Math.floor(now / 90) % 2 === 0);
       animateRunner(me.runner, currentAct(), me.speed, dt * ts, me.power);
       if (me.power) {
@@ -9494,7 +9629,7 @@ function frame(now) {
     // camera: behind and above the player, looking down the track (once
     // you're out of a survival race, it follows the leader instead)
     let fx = me.x;
-    let fy = me.y;
+    let fy = me.base + me.y;
     let fz = zMe;
     let fd = me.d;
     if (me.out) {
