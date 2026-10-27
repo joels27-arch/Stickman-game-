@@ -95,6 +95,8 @@ const RUNNERS = [
   { name: "Webster", color: "#1a6a78", file: "c15", tag: "Web Slinger", cid: "webster" },
   { name: "MC Gold", color: "#f0b400", file: "c16", tag: "Rap Star", cid: "rapstar" },
   { name: "Momo", color: "#e9ecef", file: "c17", tag: "Snow Buddy", cid: "momo" },
+  { name: "Glorb", color: "#8a4fd8", file: "c18", tag: "Space Octopus", cid: "glorb" },
+  { name: "Prof. Brainz", color: "#ff7ab8", file: "c19", tag: "Mad Genius", cid: "brainz" },
 ];
 const STARTERS = 8; // the first 8 runners; the rest are collectibles
 /** Collection id → runner index, for the collectibles that are 3D runners. */
@@ -143,14 +145,12 @@ const gamesStepOf = (c) => gamesRoad().find((g) => (c.cid ?? c.id) === g.char ||
  * (Anything bought under the old prices stays owned.)
  */
 const COLLECTION = [
-  { id: "zara", name: "Zara", color: "#ff6fb5", rarity: "rare", via: "pack" },
   { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "pack" },
   { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pass", passLv: 15 },
   { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pass", passLv: 1 }, // yours the moment you buy the Gold Pass
   { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "road", legacy: { medal: "silver", count: 5 } },
   { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 6 } },
   // heroes and stars
-  { id: "captainstar", name: "Captain Star", color: "#2f5ae0", rarity: "rare", via: "pack" },
   { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "pack" },
   { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "road" },
   { id: "dunk", name: "Big Dunk", color: "#14b8b0", rarity: "legendary", via: "road" },
@@ -1199,7 +1199,7 @@ function allChars() {
   return [
     ...RUNNERS.slice(0, STARTERS).map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : i in ROAD_RUNNERS || gamesRoad().some((g) => g.runner === i) ? "road" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
     ...COLLECTION.map((c) => ({ ...c, img: c.pic ?? `/assets/sc_${c.id}.webp`, hero: c.pic ?? `/assets/sc_${c.id}.webp`, ...runnerOf(c.id) })),
-    ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp` })),
+    ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp`, ...runnerOf(c.id) })),
     { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp`, ...runnerOf(PASS_CHAR.id) },
     ...ROAD_CHARS.map((c) => ({ ...c, via: "road", img: `/assets/rd_${c.id}.webp`, hero: `/assets/rd_${c.id}.webp` })),
   ];
@@ -1422,7 +1422,6 @@ const PACK_CHARS = [
   { id: "ra", name: "Pharaoh Ra", rarity: "epic", dupe: 600 },
   { id: "zorp", name: "Zorp", rarity: "rare", dupe: 300 },
   { id: "glorb", name: "Glorb", rarity: "epic", dupe: 600 },
-  { id: "magic", name: "Diez", rarity: "legendary", dupe: 1500 },
   { id: "dancer", name: "Disco Dash", rarity: "legendary", dupe: 1500 },
 ];
 /**
@@ -10294,7 +10293,7 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 
 // characters taken out of the game: whoever owned one gets coins for it, once
 {
-  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000, mo: 300, porky: 900, frosty: 600, thunderjack: 1500, kai: 800, leo: 800, zed: 1500, hoops: 1500 };
+  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000, mo: 300, porky: 900, frosty: 600, thunderjack: 1500, kai: 800, leo: 800, zed: 1500, hoops: 1500, zara: 300, captainstar: 300, magic: 1500 };
   const owned = wallet.owned();
   const had = owned.filter((id) => id in GONE && !local.getItem(`lr:refund:${id}`));
   if (had.length) {
