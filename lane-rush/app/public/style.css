@@ -3098,3 +3098,6 @@ html, body { background: var(--k1); }
 #tourneyList .tr-desc { -webkit-line-clamp: 1; }
 #tourneyList .tr-prize { flex-direction: column; gap: 2px; padding: 6px 8px; font-size: 11px; text-align: center; max-width: 84px; }
 #tourneyList .tr-prize img { width: 26px; height: 26px; }
+/* the Missions tab's badge names what is waiting: 🏅 Medal Road, 📋 Missions */
+.htab .dot.lbl { width: auto; height: 22px; min-width: 22px; padding: 0 4px; top: 0; right: calc(50% - 36px); display: grid; grid-auto-flow: column; place-items: center; border-radius: 12px; font-size: 12px; font-style: normal; line-height: 1; }
+.htab .dot.lbl[hidden] { display: none; }
