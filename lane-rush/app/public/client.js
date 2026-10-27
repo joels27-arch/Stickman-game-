@@ -6198,8 +6198,8 @@ const world = (() => {
     }
     mesh.frustumCulled = false;
     // a backing wall far behind, in the map's colour, so nothing shows through the gaps
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(460, 220), new THREE.MeshBasicMaterial({ color: spec.back, side: THREE.DoubleSide, fog: false }));
-    wall.position.set(0, 90, 112);
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(460, 76), new THREE.MeshBasicMaterial({ color: spec.back, side: THREE.DoubleSide }));
+    wall.position.set(0, 30, 112); // up to the shapes' tops: the sky still shows above
     wall.rotation.y = Math.PI;
     g.add(wall, mesh);
     return g;
