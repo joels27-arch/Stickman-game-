@@ -659,19 +659,19 @@ describe("random mode and map", () => {
     }
     expect(seen.every((m) => pick.includes(m))).toBe(true);
     // one ticked map is just that map
-    s = act(lobbyOf(2), "p0", { type: "maps", maps: ["beach"] });
-    expect(s.map).toBe("beach");
+    s = act(lobbyOf(2), "p0", { type: "maps", maps: ["lava"] });
+    expect(s.map).toBe("lava");
     expect(s.maps).toBeNull();
-    expect(reject(act(lobbyOf(2), "p0", { type: "rounds", rounds: 3 }), "p0", { type: "maps", maps: ["beach", "moon"] })).toMatch(/bad/);
+    expect(reject(act(lobbyOf(2), "p0", { type: "rounds", rounds: 3 }), "p0", { type: "maps", maps: ["lava", "moon"] })).toMatch(/bad/);
     // fewer rounds: the extra maps drop off
     let t = act(lobbyOf(2), "p0", { type: "rounds", rounds: 5 });
-    t = act(t, "p0", { type: "maps", maps: ["beach", "snowy", "mars", "space", "candy"] });
+    t = act(t, "p0", { type: "maps", maps: ["lava", "snowy", "mars", "space", "candy"] });
     t = act(t, "p0", { type: "rounds", rounds: 3 });
-    expect(t.maps).toEqual(["beach", "snowy", "mars"]);
+    expect(t.maps).toEqual(["lava", "snowy", "mars"]);
     t = act(t, "p0", { type: "rounds", rounds: 1 });
-    expect([t.map, t.maps]).toEqual(["beach", null]);
+    expect([t.map, t.maps]).toEqual(["lava", null]);
     expect(reject(lobbyOf(2), "p0", { type: "maps", maps: [] })).toMatch(/bad/);
-    expect(reject(lobbyOf(2), "p1", { type: "maps", maps: ["beach"] })).toMatch(/host/);
+    expect(reject(lobbyOf(2), "p1", { type: "maps", maps: ["lava"] })).toMatch(/host/);
   });
   it("only the host picks, and only real choices", () => {
     expect(reject(lobbyOf(2), "p1", { type: "map", map: "random" })).toMatch(/host/);
@@ -855,7 +855,7 @@ describe("rounds get faster, boxes are first come first served", () => {
 describe("maps", () => {
   it("lets the host pick the map, and a match stays on it", () => {
     let s = act(lobbyOf(2), "p0", { type: "map", map: "snowy" });
-    expect(reject(s, "p1", { type: "map", map: "beach" })).toMatch(/host/);
+    expect(reject(s, "p1", { type: "map", map: "lava" })).toMatch(/host/);
     expect(reject(s, "p0", { type: "map", map: "moon" })).toBeTruthy();
     let r = act(s, "p0", { type: "start", bots: false, t: T0 });
     expect((L.viewFor(r, "p1") as any).raceMap).toBe("snowy");
@@ -1166,8 +1166,8 @@ describe("moving obstacles", () => {
 
   it("has a recipe for every themed map, with the same movers", async () => {
     const { THEMES } = await import("../public/themes.js");
-    expect(L.MAPS.slice(4)).toEqual(THEMES.map((t: { id: string }) => t.id));
-    expect(L.MAPS.length).toBe(15);
+    expect(L.MAPS.slice(1)).toEqual(THEMES.map((t: { id: string }) => t.id));
+    expect(L.MAPS.length).toBe(12);
     for (const t of THEMES as { id: string; movers?: string }[]) expect(L.MAP_MOVERS[t.id]).toBe(t.movers);
   });
 
