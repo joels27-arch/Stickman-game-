@@ -429,14 +429,14 @@ function slalom(r, n) {
  *   Master        2.4 km zigzags, everything, tightest (but always fair) timing
  */
 export const STAGES = [
-  { name: "Warm-up", from: 0, react: 1.3, mix: { hurdleOne: 4, gateOne: 3, hurdleWall: 1.5, gateWall: 1.5, crateOne: 2 } },
-  { name: "Getting going", from: 250, react: 1.15, mix: { hurdleOne: 1, gateOne: 1, crateOne: 1, hurdleWall: 1, gateWall: 1, split: 2.5, barrels: 1.2, bus: 1.1, breather: 0.7 } },
-  { name: "In the zone", from: 700, react: 1.02, mix: { split: 2, mixedWall: 1.6, barrels: 1, tunnel: 1.2, slalom2: 1.5, hurdleWall: 0.5, gateWall: 0.5, bus: 1.2, breather: 0.55 } },
-  { name: "Pro", from: 1400, react: 1.05, mix: { split: 1.2, mixedWall: 1.5, tunnel: 1, slalom2: 1, slalom3: 1.3, combo: 1.2, barrels2: 1, bus: 1.2, breather: 0.45 } },
-  { name: "Master", from: 2400, react: 0.92, mix: { mixedWall: 1.3, tunnel: 1, slalom3: 1.5, combo: 1.3, zigzag: 1.2, barrels2: 1, split: 1, bus: 1.2, breather: 0.35 } },
+  { name: "Warm-up", from: 0, react: 1.3, mix: { hurdleOne: 4, gateOne: 3, hurdleWall: 1.5, gateWall: 1.5, crateOne: 2, bus: 1.5 } },
+  { name: "Getting going", from: 250, react: 1.15, mix: { hurdleOne: 1, gateOne: 1, crateOne: 1, hurdleWall: 1, gateWall: 1, split: 2.5, barrels: 1.2, bus: 2.4, breather: 0.7 } },
+  { name: "In the zone", from: 700, react: 1.02, mix: { split: 2, mixedWall: 1.6, barrels: 1, tunnel: 1.2, slalom2: 1.5, hurdleWall: 0.5, gateWall: 0.5, bus: 2.2, breather: 0.55 } },
+  { name: "Pro", from: 1400, react: 1.05, mix: { split: 1.2, mixedWall: 1.5, tunnel: 1, slalom2: 1, slalom3: 1.3, combo: 1.2, barrels2: 1, bus: 2, breather: 0.45 } },
+  { name: "Master", from: 2400, react: 0.92, mix: { mixedWall: 1.3, tunnel: 1, slalom3: 1.5, combo: 1.3, zigzag: 1.2, barrels2: 1, split: 1, bus: 2, breather: 0.35 } },
 ];
 /** In the warm-up, each first-time pattern waits until here (so they come one at a time). */
-const FIRST_AT = { hurdleOne: 0, gateOne: 90, hurdleWall: 150, gateWall: 190, crateOne: 220 };
+const FIRST_AT = { hurdleOne: 0, gateOne: 90, bus: 120, hurdleWall: 150, gateWall: 190, crateOne: 220 };
 export function stageAt(z) {
   let st = STAGES[0];
   for (const x of STAGES) if (z >= x.from) st = x;
