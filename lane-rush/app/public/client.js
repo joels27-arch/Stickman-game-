@@ -235,6 +235,7 @@ const POWER_S = { shield: 9, rocket: 3.2, ghost: 4.5 };
 const FREEZE_S = 3; // how long a freeze slows you
 const ROCKET_Y = 2.1;
 const BUS_TURN = false; // the bus model's front faces the runners as loaded (true: turn it round)
+const BUS2_TURN = false; // the same for the Artlist bus
 const POWER_INFO = {
   shield: { label: "Shield", hint: "Blocks the next hit" },
   rocket: { label: "Rocket", hint: "Fly over everything" },
@@ -4001,7 +4002,7 @@ const world = (() => {
   }
 
   /** The bus: stretched to fill one lane (BUS_LEN long, roof at BUS_H), its front facing the runners. */
-  function fitBus(root) {
+  function fitBus(root, turn = BUS_TURN) {
     const holder = new THREE.Group();
     const inner = new THREE.Group();
     inner.add(root);
@@ -4009,7 +4010,7 @@ const world = (() => {
     let b = new THREE.Box3().setFromObject(inner);
     let s = b.getSize(new THREE.Vector3());
     if (s.x > s.z) inner.rotation.y = Math.PI / 2; // lengthwise down the lane
-    if (BUS_TURN) inner.rotation.y += Math.PI;
+    if (turn) inner.rotation.y += Math.PI;
     holder.updateMatrixWorld(true);
     b = new THREE.Box3().setFromObject(inner);
     s = b.getSize(new THREE.Vector3());
@@ -4039,6 +4040,44 @@ const world = (() => {
   let rampGeo = null;
   let rampMat = null;
   /** A ramp up to a bus roof: a wedge RAMP_LEN long, from the road (z = 0) up to BUS_H (z = -RAMP_LEN). */
+  /**
+   * The Artlist ramp model fitted to a ramp's spot: lengthwise down the lane, as wide as a lane,
+   * low end at z = 0 and the top (bus-roof height) at z = -RAMP_LEN.
+   */
+  function fitRamp(root) {
+    const holder = new THREE.Group();
+    const inner = new THREE.Group();
+    inner.add(root);
+    holder.add(inner);
+    let b = new THREE.Box3().setFromObject(inner);
+    let s = b.getSize(new THREE.Vector3());
+    if (s.x > s.z) inner.rotation.y = Math.PI / 2;
+    holder.updateMatrixWorld(true);
+    // which end is high? average height of the points near each end
+    const v = new THREE.Vector3();
+    b = new THREE.Box3().setFromObject(inner);
+    let front = [0, 0];
+    let back = [0, 0];
+    inner.traverse((o) => {
+      if (!o.isMesh) return;
+      const p = o.geometry.attributes.position;
+      for (let i = 0; i < p.count; i += 7) {
+        v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
+        const t = (v.z - b.min.z) / Math.max(1e-6, b.max.z - b.min.z);
+        if (t < 0.25) (back[0] += v.y), back[1]++;
+        else if (t > 0.75) (front[0] += v.y), front[1]++;
+      }
+    });
+    // the high end must point away from the runners (towards -z)
+    if (front[0] / Math.max(1, front[1]) > back[0] / Math.max(1, back[1])) inner.rotation.y += Math.PI;
+    holder.updateMatrixWorld(true);
+    b = new THREE.Box3().setFromObject(inner);
+    s = b.getSize(new THREE.Vector3());
+    const c = b.getCenter(new THREE.Vector3());
+    inner.position.set(-c.x, -b.min.y, -b.max.z); // low end at z = 0
+    holder.scale.set(1.7 / s.x, BUS_H / s.y, RAMP_LEN / s.z);
+    return holder;
+  }
   function makeRamp() {
     if (!rampGeo) {
       const w = 0.85;
@@ -4473,6 +4512,9 @@ const world = (() => {
       // gates are wide enough that their pillars stand outside the fences
       loadGLB("/assets/boost_pad.glb").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
       loadGLB("/assets/bus.glb").then((g) => (assets.props.bus = fitBus(g.scene))).catch(() => {}),
+      // the Artlist bus and ramp: every other bus uses them (to compare with the first pair)
+      loadGLB("/assets/bus2.glb").then((g) => (assets.props.bus2 = fitBus(g.scene, BUS2_TURN))).catch(() => {}),
+      loadGLB("/assets/ramp2.glb").then((g) => (assets.props.ramp2 = fitRamp(g.scene))).catch(() => {}),
       loadGLB("/assets/bowling_ball.glb").then((g) => (assets.props.bowlingBall = fitProp(g.scene, { width: 0.75 }))).catch(() => (assets.props.bowlingBall = ballStandIn())),
       loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8.5 }))).catch(() => {}),
       loadGLBOr("start_line", "gate_start").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8 }))).catch(() => {}),
@@ -6124,12 +6166,13 @@ const world = (() => {
     }
     // buses (a second level to run on) and the ramps up to their roofs
     for (const b of course.buses ?? []) {
-      const bus = (assets.props.bus ?? (assets.props.bus = busStandIn())).clone();
+      const artlist = b.look % 2 === 0 && assets.props.bus2;
+      const bus = (artlist ? assets.props.bus2 : assets.props.bus ?? (assets.props.bus = busStandIn())).clone();
       bus.position.set(laneX(b.lane), 0, -(b.z0 + b.z1) / 2);
       raceGroup.add(bus);
       cullables.push({ obj: bus, z: b.z0, z1: b.z1 });
       if (b.ramp === false) continue;
-      const ramp = makeRamp();
+      const ramp = artlist && assets.props.ramp2 ? assets.props.ramp2.clone() : makeRamp();
       ramp.position.set(laneX(b.lane), 0, -(b.z0 - RAMP_LEN));
       raceGroup.add(ramp);
       cullables.push({ obj: ramp, z: b.z0 - RAMP_LEN, z1: b.z0 });
