@@ -90,13 +90,12 @@ const RUNNERS = [
   { name: "Captain Brainstorm", color: "#7c3aed", file: "c10", tag: "Storm Hero", cid: "brainstorm" },
   { name: "Pandu", color: "#d23a2a", file: "c11", tag: "Karate Panda", cid: "pandu" },
   { name: "Siete", color: "#e02424", file: "c12", tag: "Football Star", cid: "striker" },
-  { name: "Unit-X", color: "#9aa8bd", file: "c13", tag: "Chrome Robot", cid: "unitx" },
+  { name: "Prof. Brainz", color: "#ff7ab8", file: "c19", pp: 19, tag: "Mad Genius", cid: "brainz" }, // in Unit-X's old slot
   { name: "Big Dunk", color: "#14b8b0", file: "c14", tag: "Court King", cid: "dunk" },
   { name: "Webster", color: "#1a6a78", file: "c15", tag: "Web Slinger", cid: "webster" },
   { name: "MC Gold", color: "#f0b400", file: "c16", tag: "Rap Star", cid: "rapstar" },
   { name: "Momo", color: "#e9ecef", file: "c17", tag: "Snow Buddy", cid: "momo" },
   { name: "Glorb", color: "#8a4fd8", file: "c18", tag: "Space Octopus", cid: "glorb" },
-  { name: "Prof. Brainz", color: "#ff7ab8", file: "c19", tag: "Mad Genius", cid: "brainz" },
 ];
 const STARTERS = 8; // the first 8 runners; the rest are collectibles
 /** Collection id → runner index, for the collectibles that are 3D runners. */
@@ -151,7 +150,6 @@ const COLLECTION = [
   { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "pack" },
   { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pass", passLv: 15 },
   { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pass", passLv: 1 }, // yours the moment you buy the Gold Pass
-  { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "road", legacy: { medal: "silver", count: 5 } },
   { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 6 } },
   // heroes and stars
   { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "pack" },
@@ -216,7 +214,7 @@ const MAP_INFO = {
 // the themed maps, built in code (public/themes.js)
 const THEME = Object.fromEntries(THEMES.map((t) => [t.id, t]));
 for (const t of THEMES) MAP_INFO[t.id] = { label: t.label, text: "", icon: t.icon };
-MAP_INFO.artlist.text = "Film set · Unit-X only";
+MAP_INFO.artlist.text = "Film set";
 const LANE_W = 2.0; // metres between lane centres
 const CHAR_H = 1.55; // runner height in metres
 const JUMP_V = 8.6;
@@ -605,7 +603,7 @@ function toast(text) {
 
 /** Higgsfield character-select portrait (upper body, posed) for runner i. */
 function portrait(i) {
-  return `/assets/pp${i}.webp`;
+  return `/assets/pp${RUNNERS[i]?.pp ?? i}.webp`;
 }
 
 function el(tag, attrs = {}, ...kids) {
@@ -1072,6 +1070,16 @@ $("#setRestart").addEventListener("click", () => {
   }
   location.reload();
 });
+// every runner and character, for trying them all out
+$("#setUnlock").addEventListener("click", () => {
+  const ids = allChars().filter((c) => !c.id.startsWith("r")).map((c) => c.id);
+  const starters = RUNNERS.slice(0, STARTERS).map((_, i) => i);
+  local.setItem("lr:owned", JSON.stringify([...new Set([...wallet.owned(), ...ids, ...starters])]));
+  local.setItem("lr:starter", "all");
+  equipCache = null;
+  toast("All runners unlocked!");
+  setTimeout(() => location.reload(), 900);
+});
 $("#setTut").addEventListener("click", () => {
   local.setItem("lr:tutDone", "");
   local.removeItem("lr:endlessTut");
@@ -1111,28 +1119,14 @@ function giveItem(id) {
   equipCache = null;
   if (!wallet.has(id)) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), id]));
 }
-// Unit-X, once for everyone (to try the Artlist map)
-// The Boulder left the game: whoever had him gets Big Dunk in his place
-if (wallet.has("boulder")) giveItem("dunk");
-// (players from before: new players earn him on the Medal Road)
-if (!local.getItem("lr:gift:unitx")) {
-  if (local.getItem("lr:asked")) giveItem("unitx");
-  local.setItem("lr:gift:unitx", "1");
+// Unit-X left the game; Prof. Brainz took his runner slot (13): a saved pick of Brainz moves with him
+if (!local.getItem("lr:fix:slot13")) {
+  local.setItem("lr:fix:slot13", "1");
+  const c = local.getItem("lr:char");
+  if (c === "19") local.setItem("lr:char", "13");
+  else if (c === "13") local.removeItem("lr:char");
 }
-// undo that gift for new players who got it anyway (with 25 medal points it counted as)
-if (!local.getItem("lr:fix:unitx") && starterChoice() !== "all") {
-  local.setItem("lr:fix:unitx", "1");
-  let roadDone = [];
-  try { roadDone = JSON.parse(local.getItem("lr:troad") || "[]"); } catch { /* none */ }
-  if (wallet.has("unitx") && !(Array.isArray(roadDone) && roadDone.includes(220))) {
-    local.setItem("lr:owned", JSON.stringify(wallet.owned().filter((id) => id !== "unitx")));
-    const lp = Number(local.getItem("lr:lp"));
-    if (lp >= 25) local.setItem("lr:lp", String(lp - 25));
-  }
-}
-/** The Artlist map is Unit-X only: everyone on it runs as Unit-X. */
-const UNITX = CID_RUNNER.unitx;
-const charOn = (c, map) => (map === "artlist" ? UNITX : c);
+const charOn = (c) => c;
 
 // ── shop ───────────────────────────────────────────────────────────────────
 let shopReturn = "home";
@@ -2255,7 +2249,7 @@ const ROAD = [
   { pts: 140, char: "rapstar" },
   { pts: 170, pack: "mega" },
   { pts: 195, coins: 800 },
-  { pts: 220, char: "unitx" },
+  { pts: 220, pack: "legend" },
   { pts: 240, pack: "mega" },
   { pts: 260, coins: 1000 },
   { pts: 300, pack: "mega" },
@@ -4183,7 +4177,6 @@ const world = (() => {
         glb("al_gate", "al_gate", (o) => fitProp(o, { width: 1.95, maxHeight: 2.2 })),
         glb("al_crate", "al_crate", (o) => fitProp(o, { width: 1.45, maxHeight: 2.6 })),
         glb("al_roller", "al_roller", (o) => fitReel(o)),
-        ensureChar(UNITX).catch(() => {}),
       ]).then(() => (artlistDone = true));
     }
     return artlistLoad;
@@ -10331,7 +10324,7 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 
 // characters taken out of the game: whoever owned one gets coins for it, once
 {
-  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000, mo: 300, porky: 900, frosty: 600, thunderjack: 1500, kai: 800, leo: 800, zed: 1500, hoops: 1500, zara: 300, captainstar: 300, magic: 1500 };
+  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000, mo: 300, porky: 900, frosty: 600, thunderjack: 1500, kai: 800, leo: 800, zed: 1500, hoops: 1500, zara: 300, captainstar: 300, magic: 1500, unitx: 800 };
   const owned = wallet.owned();
   const had = owned.filter((id) => id in GONE && !local.getItem(`lr:refund:${id}`));
   if (had.length) {
