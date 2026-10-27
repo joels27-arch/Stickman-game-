@@ -428,10 +428,10 @@ function slalom(r, n) {
  */
 export const STAGES = [
   { name: "Warm-up", from: 0, react: 1.3, mix: { hurdleOne: 4, gateOne: 3, hurdleWall: 1.5, gateWall: 1.5, crateOne: 2 } },
-  { name: "Getting going", from: 250, react: 1.15, mix: { hurdleOne: 1, gateOne: 1, crateOne: 1, hurdleWall: 1, gateWall: 1, split: 2.5, barrels: 1.2, breather: 0.7 } },
-  { name: "In the zone", from: 700, react: 1.02, mix: { split: 2, mixedWall: 1.6, barrels: 1, tunnel: 1.2, slalom2: 1.5, hurdleWall: 0.5, gateWall: 0.5, breather: 0.55 } },
-  { name: "Pro", from: 1400, react: 1.05, mix: { split: 1.2, mixedWall: 1.5, tunnel: 1, slalom2: 1, slalom3: 1.3, combo: 1.2, barrels2: 1, breather: 0.45 } },
-  { name: "Master", from: 2400, react: 0.92, mix: { mixedWall: 1.3, tunnel: 1, slalom3: 1.5, combo: 1.3, zigzag: 1.2, barrels2: 1, split: 1, breather: 0.35 } },
+  { name: "Getting going", from: 250, react: 1.15, mix: { hurdleOne: 1, gateOne: 1, crateOne: 1, hurdleWall: 1, gateWall: 1, split: 2.5, barrels: 1.2, bus: 1.1, breather: 0.7 } },
+  { name: "In the zone", from: 700, react: 1.02, mix: { split: 2, mixedWall: 1.6, barrels: 1, tunnel: 1.2, slalom2: 1.5, hurdleWall: 0.5, gateWall: 0.5, bus: 1.2, breather: 0.55 } },
+  { name: "Pro", from: 1400, react: 1.05, mix: { split: 1.2, mixedWall: 1.5, tunnel: 1, slalom2: 1, slalom3: 1.3, combo: 1.2, barrels2: 1, bus: 1.2, breather: 0.45 } },
+  { name: "Master", from: 2400, react: 0.92, mix: { mixedWall: 1.3, tunnel: 1, slalom3: 1.5, combo: 1.3, zigzag: 1.2, barrels2: 1, split: 1, bus: 1.2, breather: 0.35 } },
 ];
 /** In the warm-up, each first-time pattern waits until here (so they come one at a time). */
 const FIRST_AT = { hurdleOne: 0, gateOne: 90, hurdleWall: 150, gateWall: 190, crateOne: 220 };
@@ -528,6 +528,33 @@ function placeOne(r, kind) {
  * The same pattern never comes twice in a row. `looks[lane]` picks the
  * visual variant of each obstacle; it never changes how it's cleared.
  */
+/**
+ * Buses: a second level to run on, like a train roof. Each bus stands in one lane, in a stretch
+ * of its own (no obstacle rows beside it). Most have a ramp up to the roof in front; the rest
+ * (`ramp: false`) are a wall: dodge into another lane (or jump on from a neighbouring roof).
+ * There's always a free road lane. From the road you can't step into a bus's side; from the
+ * roof you can step off (and drop).
+ */
+export const BUS_H = 2.3; // roof height (m)
+export const BUS_LEN = 11;
+export const RAMP_LEN = 6;
+/** The floor under you in `lane` at distance `d`: the road (0), a ramp, or a bus roof. */
+export function floorAt(course, lane, d) {
+  for (const b of course?.buses ?? []) {
+    if (b.lane !== lane) continue;
+    if (d >= b.z0 && d <= b.z1) return BUS_H;
+    if (b.ramp !== false && d >= b.z0 - RAMP_LEN && d < b.z0) return (BUS_H * (d - (b.z0 - RAMP_LEN))) / RAMP_LEN;
+  }
+  return 0;
+}
+/** The bus without a ramp whose front is in `lane` just after `d0` and by `d1`, if any. */
+export function busFront(course, lane, d0, d1) {
+  return (course?.buses ?? []).find((b) => b.lane === lane && b.ramp === false && b.z0 > d0 && b.z0 <= d1) ?? null;
+}
+/** Is a bus's side (not its ramp) in `lane` at `d`? */
+export function busAt(course, lane, d) {
+  return (course?.buses ?? []).some((b) => b.lane === lane && d >= b.z0 - 0.5 && d <= b.z1 + 0.5);
+}
 /** Running over a red slow pad slows you down this long (ms). */
 export const SLOW_PAD_MS = 1300;
 /** The longest run without an obstacle row (metres): about 3 s even at the start. */
@@ -546,6 +573,7 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
   const boosts = [];
   const boxes = [];
   const hearts = [];
+  const buses = [];
   const seen = new Set();
   const taught = new Set();
   let lastHeart = 0;
@@ -592,6 +620,21 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
     }
     last = name;
 
+    if (name === "bus") {
+      // one bus (sometimes two side by side) in a stretch of their own; most with a ramp
+      const a = Math.floor(r() * 4);
+      const lanes = [a];
+      if (r() < 0.45) lanes.push(a === 0 ? 1 : a === 3 ? 2 : r() < 0.5 ? a - 1 : a + 1);
+      if (rows.length && z - prevZ > MAX_EMPTY_M - 6) z = prevZ + MAX_EMPTY_M - 6; // no long empty run-up to it
+      const z0 = Math.ceil((z + RAMP_LEN) * 10) / 10;
+      for (const lane of lanes) buses.push({ lane, z0, z1: Math.round((z0 + BUS_LEN) * 10) / 10, look: Math.floor(r2() * 3), ramp: r2() < 0.65 });
+      // the next row comes after you've had time to drop off the end and line up
+      z = z0 + BUS_LEN + Math.max(10, step * 0.7);
+      prevZ = z0; // (so the "no long empty stretch" rule measures from the bus)
+      reach = new Map([[0, "run"], [1, "run"], [2, "run"], [3, "run"]]);
+      sinceRest += 1;
+      continue;
+    }
     if (name === "breather") {
       addBox(z + step * 0.3);
       boosts.push({ z: Math.round((z + step * 0.8) * 10) / 10, lane: Math.floor(r() * 4) });
@@ -644,7 +687,7 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
     else if (z > 60 && (sinceBox >= 4 || r2() < 0.22)) addBox(z + gap * 0.55);
     z += gap;
   }
-  return { rows, boosts, slows, boxes, hearts, len };
+  return { rows, boosts, slows, boxes, hearts, buses, len };
 }
 
 // ── moving obstacles: each map has two, sweeping across the lanes ──────────
@@ -695,6 +738,8 @@ export function moversFor(course, seed, map) {
     const a = rows[i];
     const b = rows[i + 1];
     if (a.z < next || b.z - a.z < 12) continue;
+    const mz = (a.z + b.z) / 2;
+    if ((course.buses ?? []).some((bus) => mz > bus.z0 - RAMP_LEN - 4 && mz < bus.z1 + 4)) continue;
     out.push({ z: Math.round(((a.z + b.z) / 2) * 10) / 10, kind: kinds[Math.floor(r() * kinds.length)], phase: Math.round(r() * 100) / 100 });
     next = a.z + 120 + r() * 90;
   }
@@ -953,7 +998,8 @@ export function coinLines(course) {
     picks.forEach((lane, li) => {
       for (let k = 0; k < n; k++) {
         const big = li === 0 && k === Math.floor(n / 2) && i % 4 === 1; // a 5-coin bonus every few rows
-        out.push({ z: Math.round((start + k * 1.8) * 10) / 10, lane, v: big ? 5 : 1 });
+        const cz = Math.round((start + k * 1.8) * 10) / 10;
+        out.push({ z: cz, lane, v: big ? 5 : 1, y: Math.round(floorAt(course, lane, cz) * 100) / 100 });
       }
     });
   }
@@ -1251,7 +1297,8 @@ function stepBots(state, t) {
         // a confused bot wobbles into a random lane and slows down
         if (p.d > z.d) {
           p.slowUntil = t + 1500;
-          p.lane = Math.max(0, Math.min(LANES - 1, p.lane + (roll(state.seed, bi, z.id) < 0.5 ? -1 : 1)));
+          const to = Math.max(0, Math.min(LANES - 1, p.lane + (roll(state.seed, bi, z.id) < 0.5 ? -1 : 1)));
+          if (!busAt(courseFor(state), to, p.d)) p.lane = to;
         }
       } else if (z.kind === "mud") {
         // a bot can't see through mud either: it eases off for a moment
@@ -1280,6 +1327,12 @@ function stepBots(state, t) {
     const rocketing = (p.rocketUntil ?? 0) > t;
     let act = (p.stunUntil ?? 0) > t ? "stumble" : "run";
     let y = 0;
+    // a bus without a ramp ahead in our lane: move over to a lane with no bus
+    const wall = !rocketing && floorAt(course, p.lane, d0) < BUS_H ? busFront(course, p.lane, d0, d0 + v * 0.8 + 6) : null;
+    if (wall) {
+      const free = [0, 1, 2, 3].filter((l) => !busAt(course, l, wall.z0)).sort((a, b) => Math.abs(a - p.lane) - Math.abs(b - p.lane));
+      if (free.length) p.lane = free[0];
+    }
     // look ahead: line up for what's coming
     for (const row of course.rows) {
       if (row.z <= d0) continue;
@@ -1289,7 +1342,7 @@ function stepBots(state, t) {
       const dodge = roll(state.seed, bi, row.z) < sharp;
       if (!dodge) continue;
       if (kind === "crate" || kind === "roller") {
-        const free = [0, 1, 2, 3].filter((l) => !row.lanes[l]).sort((a, b) => Math.abs(a - p.lane) - Math.abs(b - p.lane));
+        const free = [0, 1, 2, 3].filter((l) => !row.lanes[l] && !busAt(course, l, d0)).sort((a, b) => Math.abs(a - p.lane) - Math.abs(b - p.lane));
         if (free.length) p.lane = free[0];
       } else if (row.z - d0 < v * 0.35 + 1.5) {
         if (kind === "hurdle") {
@@ -1318,7 +1371,7 @@ function stepBots(state, t) {
       const next = coinsFor(state).find((c, i) => c.z > d1 + 2 && c.z < d1 + 30 && !taken.has(i));
       if (next && next.lane !== p.lane && roll(state.seed, bi, t / 400) < 0.6) {
         const to = p.lane + Math.sign(next.lane - p.lane);
-        const blocked = course.rows.some((row) => row.z > d1 && row.z < d1 + 8 && row.lanes[to]);
+        const blocked = course.rows.some((row) => row.z > d1 && row.z < d1 + 8 && row.lanes[to]) || ((busAt(course, to, d1) || busFront(course, to, d1, d1 + 10)) && floorAt(course, p.lane, d1) < BUS_H);
         if (!blocked) p.lane = to;
       }
     }
@@ -1436,7 +1489,8 @@ function stepBots(state, t) {
     p.at = t;
     if (p.outAt === null) {
       p.act = (p.stunUntil ?? 0) > t ? "stumble" : act;
-      p.y = p.act === "jump" ? y : 0;
+      // up the ramp and along the roof when its lane has a bus (bots ride them too)
+      p.y = Math.round((floorAt(course, p.lane, p.d) + (p.act === "jump" ? y : 0)) * 100) / 100;
     }
     if (!survival && p.d >= TRACK_LEN && p.finish === null) {
       p.finish = Math.max(1, Math.round(t - state.startAt));

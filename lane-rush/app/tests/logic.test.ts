@@ -181,11 +181,42 @@ describe("course", () => {
 describe("difficulty manager", () => {
   it("never leaves a long empty stretch, not even at the start", () => {
     for (let seed = 0; seed < 200; seed++) {
-      const z = L.buildCourse(seed * 7919, L.SURVIVAL_LEN).rows.map((r) => r.z).filter((x) => x < 2000);
+      const c = L.buildCourse(seed * 7919, L.SURVIVAL_LEN);
+      // a bus (its ramp, front and end) is something to deal with too, not empty track
+      const z = [...c.rows.map((r) => r.z), ...c.buses.flatMap((b) => [b.z0 - L.RAMP_LEN, b.z0, b.z1])].sort((a, b) => a - b).filter((x) => x < 2000);
       expect(z[0]).toBeLessThanOrEqual(L.MAX_EMPTY_M);
       for (let i = 1; i < z.length; i++) expect(z[i]! - z[i - 1]!).toBeLessThanOrEqual(L.MAX_EMPTY_M + 12); // + a fairness widening at most
       expect(z.filter((x) => x < 800).length).toBeGreaterThanOrEqual(28);
     }
+  });
+
+  it("buses: most with a ramp up to the roof, never beside an obstacle row, the floor follows them", () => {
+    let n = 0;
+    let ramps0 = 0;
+    for (let seed = 0; seed < 60; seed++) {
+      const c = L.buildCourse(seed * 104729, L.SURVIVAL_LEN);
+      for (const b of c.buses) {
+        n++;
+        expect(b.z1 - b.z0).toBeCloseTo(L.BUS_LEN);
+        expect(c.rows.some((r) => r.z > b.z0 - L.RAMP_LEN - 1 && r.z < b.z1 + 1)).toBe(false);
+        expect(L.floorAt(c, b.lane, b.z0 - L.RAMP_LEN)).toBe(0);
+        if (b.ramp) expect(L.floorAt(c, b.lane, b.z0 - L.RAMP_LEN / 2)).toBeCloseTo(L.BUS_H / 2);
+        else {
+          ramps0++;
+          expect(L.floorAt(c, b.lane, b.z0 - 0.1)).toBe(0);
+          expect(L.busFront(c, b.lane, b.z0 - 3, b.z0 + 1)).toBe(b);
+        }
+        expect(L.floorAt(c, b.lane, (b.z0 + b.z1) / 2)).toBe(L.BUS_H);
+        expect(L.floorAt(c, b.lane, b.z1 + 0.5)).toBe(0);
+        expect(L.busAt(c, b.lane, b.z0 + 2)).toBe(true);
+      }
+      expect(c.buses.every((b) => b.z0 > 250)).toBe(true);
+      // never every lane: there's always a road lane to stay on
+      for (const b of c.buses) expect(c.buses.filter((o) => o.z0 === b.z0).length).toBeLessThan(L.LANES);
+    }
+    expect(n).toBeGreaterThan(30);
+    expect(ramps0).toBeGreaterThan(5);
+    expect(ramps0).toBeLessThan(n / 2);
   });
 
   it("every course is fair: from any lane you could be in, the next way through is reachable in time", () => {
