@@ -120,7 +120,7 @@ export const THEMES = [
   T("uranus", "Uranus", "🪐", {
     sky: { top: "#12062e", mid: "#3a1260", horizon: "#5a1c78" }, sun: null, fog: ["#3a1464", 70, 300], clouds: false,
     light: { hemi: ["#c8a8ff", "#1a0c38", 0.9], sun: ["#e0d0ff", 0.9] }, far: "#3a1464", near: "#3a1464",
-    ground: { style: "speckle", colors: ["#140a2a", "#1a0e34", "#0e0820"] }, track: { style: "tiles", colors: ["#1e2a4a", "#24325a", "#141c36"], kerb: "#1a2240", lines: "#d8d0ff" },
+    ground: { style: "speckle", colors: ["#140a2a", "#1a0e34", "#0e0820"] }, track: { style: "tiles", colors: ["#1e2a4a", "#24325a", "#141c36"], kerb: "#1a2240", lines: "#a89ee0" },
     props: [], hills: 0,
   }),
 ];

@@ -3393,7 +3393,7 @@ function loadBloom() {
         const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: startGfx.aa ? 4 : 0 });
         const composer = new EffectComposer(renderer, rt);
         composer.addPass(new RenderPass(scene, camera));
-        composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.75, 0.45, 0.78));
+        composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.6, 0.4, 0.86));
         composer.addPass(new OutputPass());
         bloom = { composer, ratio: 0, w: 0, h: 0 };
       })
@@ -5067,7 +5067,7 @@ const world = (() => {
     g.add(stars);
     const planet = new THREE.Sprite(new THREE.SpriteMaterial({ map: planetTex(), fog: false, depthWrite: false, transparent: true }));
     planet.scale.set(210, 131, 1);
-    planet.position.set(-150, 70, -290);
+    planet.position.set(-80, 75, -290);
     planet.renderOrder = -1;
     g.add(planet);
     uranusStars = mat;
