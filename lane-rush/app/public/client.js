@@ -151,11 +151,11 @@ const COLLECTION = [
   { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "pack" },
   { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pass", passLv: 15 },
   { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pass", passLv: 1 }, // yours the moment you buy the Gold Pass
-  { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 6 } },
+  { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "pack", legacy: { medal: "gold", count: 6 } },
   // heroes and stars
   { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "pack" },
   { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "road" },
-  { id: "dunk", name: "Big Dunk", color: "#14b8b0", rarity: "legendary", via: "road" },
+  { id: "dunk", name: "Big Dunk", color: "#14b8b0", rarity: "legendary", via: "pack" },
   { id: "rapstar", name: "MC Gold", color: "#f0b400", rarity: "epic", via: "road", pic: "/assets/pk_rapstar.webp" },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
@@ -1196,7 +1196,7 @@ function allChars() {
     ...COLLECTION.map((c) => ({ ...c, img: c.pic ?? `/assets/sc_${c.id}.webp`, hero: c.pic ?? `/assets/sc_${c.id}.webp`, ...runnerOf(c.id) })),
     ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp`, ...runnerOf(c.id) })),
     { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp`, ...runnerOf(PASS_CHAR.id) },
-    ...ROAD_CHARS.map((c) => ({ ...c, via: "road", img: `/assets/rd_${c.id}.webp`, hero: `/assets/rd_${c.id}.webp` })),
+    ...ROAD_CHARS.map((c) => ({ ...c, via: c.via ?? "road", img: `/assets/rd_${c.id}.webp`, hero: `/assets/rd_${c.id}.webp` })),
   ];
 }
 const ownsChar = (c) => (c.idx !== undefined ? wallet.owns(c.idx) : wallet.has(c.id));
@@ -2282,7 +2282,7 @@ function untilText(ms) {
 /** Characters only found on the Trophy Road (the others on it are in COLLECTION, via "road"). */
 const ROAD_CHARS = [
   { id: "titan", name: "Titan", rarity: "legendary" },
-  { id: "aurum", name: "Aurum", rarity: "legendary" },
+  { id: "aurum", name: "Aurum", rarity: "legendary", via: "pack" }, // found in packs now (kept here for its picture)
 ];
 /** Each step: the league points it needs and what it gives. Every league starts with a character. */
 const ROAD = [
@@ -2312,7 +2312,7 @@ const ROAD = [
   { pts: 520, coins: 1800 },
   { pts: 560, pack: "legend" },
   { pts: 640, coins: 2000 },
-  { pts: 700, char: "dunk" },
+  { pts: 700, pack: "legend" },
   { pts: 720, pack: "mega" },
   { pts: 800, pack: "legend" },
   { pts: 900, coins: 2500 },
@@ -2323,7 +2323,7 @@ const ROAD = [
   { pts: 1550, pack: "legend" },
   { pts: 1750, coins: 3500 },
   { pts: 1950, pack: "mega" },
-  { pts: 2150, char: "striker" },
+  { pts: 2150, pack: "legend" },
   { pts: 2400, pack: "legend" },
   { pts: 2650, coins: 5000 },
   { pts: 2900, char: "titan" },
@@ -2337,7 +2337,7 @@ const ROAD = [
   { pts: 7000, pack: "legend" },
   { pts: 8000, pack: "legend" },
   { pts: 9000, coins: 10000 },
-  { pts: 10000, char: "aurum" },
+  { pts: 10000, coins: 25000 },
 ];
 /** Coins instead, for a road character you already own (from the old medal shop). */
 const ROAD_DUPE = { epic: 800, legendary: 1500 };
@@ -2479,16 +2479,21 @@ function renderTrophyRoad() {
 let missionTab = "road";
 function showMissionTab(tab) {
   missionTab = tab;
-  for (const b of document.querySelectorAll(".m-tab")) b.classList.toggle("on", b.dataset.mt === tab);
+  for (const b of document.querySelectorAll(".m-tab[data-mt]")) b.classList.toggle("on", b.dataset.mt === tab);
   $("#mtRoad").hidden = tab !== "road";
   $("#mtMissions").hidden = tab !== "missions";
+  // the page title and its tab in the bottom bar follow the tab you're on
+  const title = tab === "road" ? "Medal Road" : "Missions";
+  $("#missionsTitle").textContent = title;
+  const tabLabel = document.querySelector('.htab[data-page="0"] span');
+  if (tabLabel) tabLabel.textContent = title;
   if (tab === "road") renderRoadFull();
   else {
     renderDaily();
     renderCareer();
   }
 }
-for (const b of document.querySelectorAll(".m-tab"))
+for (const b of document.querySelectorAll(".m-tab[data-mt]"))
   b.addEventListener("click", () => {
     if (b.dataset.mt === missionTab) return;
     sfx.tap();
@@ -2518,8 +2523,8 @@ function renderRoadFull() {
   const rows = [
     el(
       "div",
-      { class: "mr-head" },
-      el("div", { class: "mr-title" }, el("b", { text: "Medal Road" })),
+      { class: "mr-head m-hero" },
+      el("div", { class: "m-hero-top mr-top" }, el("div", {}, el("em", { text: "Your league" }), el("h3", { text: r.name })), nextLg ? el("span", { class: "m-timer" }, el("img", { src: `/assets/lg_${nextLg.id}.webp`, alt: "" }), el("span", {}, el("small", { text: "Next" }), el("b", { text: `${(nextLg.min - p).toLocaleString()} pts` }))) : null),
       el(
         "div",
         { class: "mr-pts" },

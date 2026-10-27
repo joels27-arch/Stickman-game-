@@ -3068,3 +3068,24 @@ html, body { background: var(--k1); }
   100% { transform: scale(1.8); opacity: 0; filter: brightness(3) drop-shadow(0 0 60px #fff); }
 }
 .pf-row.pf-odds { margin-top: 22px; }
+
+/* ── Medal Road v3: the Missions look (hero banner, deep-blue cards with a coloured edge) ── */
+.mr-head.m-hero { display: grid; gap: 10px; justify-items: stretch; padding: 14px 16px 12px; border-radius: 22px; border: 2px solid rgba(255, 255, 255, 0.75); background: linear-gradient(135deg, #ff4fa3 0%, #a23cff 55%, #5a22d6 100%); }
+.mr-head.m-hero > * { position: relative; z-index: 1; }
+.mr-top h3 { font-size: 26px; }
+.mr-head .mr-pts { grid-template-columns: 48px minmax(0, 1fr) 48px; }
+.mr-head .mr-pts > img:last-child { opacity: 1; }
+.mr-head .mr-mid p small { color: #ffe066; }
+.mr-head .mr-bar { background: rgba(10, 6, 40, 0.45); }
+.mr-head .mr-bar i { background: linear-gradient(90deg, #6fe000, #b6f72a); box-shadow: 0 0 10px rgba(182, 247, 42, 0.7); }
+.mr-head .mr-how { color: rgba(255, 255, 255, 0.92); font-size: 12px; }
+.mr-row { border: 2px solid rgba(255, 255, 255, 0.12); border-left: 6px solid var(--t); background: linear-gradient(180deg, #252e6b 0%, #181f4d 100%); box-shadow: 0 6px 0 #0b0f2c, 0 10px 22px rgba(0, 0, 0, 0.35); }
+.mr-row:not(.ready):not(.got) { opacity: 1; }
+.mr-badge { background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.55), transparent 45%), var(--t); box-shadow: 0 0 14px color-mix(in srgb, var(--t) 60%, transparent), 0 3px 0 rgba(0, 0, 0, 0.35); }
+.mr-reward small { color: #fff; }
+.mr-row.got { opacity: 0.55; }
+.mr-row.ready { border: 2px solid #f4ffb0; border-left: 6px solid #6fe000; }
+.mr-lock { background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.15); }
+.mr-league { margin-top: 6px; padding: 8px 14px; border-radius: 16px; border: 2px solid rgba(255, 255, 255, 0.6); background: linear-gradient(135deg, color-mix(in srgb, var(--t) 85%, #fff) 0%, var(--t) 50%, color-mix(in srgb, var(--t) 60%, #000) 100%); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35); }
+.mr-league b { color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
+.mr-league img { width: 40px; height: 40px; }
