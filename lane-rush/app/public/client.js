@@ -39,6 +39,7 @@ import {
   ROUND_KINDS,
   PARTY_KINDS,
   MAPS,
+  RANDOM_MAPS,
   MAP_MOVERS,
   EMOTES,
   BANANA_AHEAD_M,
@@ -208,6 +209,7 @@ const MAP_INFO = {
 // the themed maps, built in code (public/themes.js)
 const THEME = Object.fromEntries(THEMES.map((t) => [t.id, t]));
 for (const t of THEMES) MAP_INFO[t.id] = { label: t.label, text: "", icon: t.icon };
+MAP_INFO.artlist.text = "Film set · Unit-X only";
 const LANE_W = 2.0; // metres between lane centres
 const CHAR_H = 1.55; // runner height in metres
 const JUMP_V = 8.6;
@@ -1081,6 +1083,14 @@ function giveItem(id) {
   equipCache = null;
   if (!wallet.has(id)) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), id]));
 }
+// Unit-X, once for everyone (to try the Artlist map)
+if (!local.getItem("lr:gift:unitx")) {
+  giveItem("unitx");
+  local.setItem("lr:gift:unitx", "1");
+}
+/** The Artlist map is Unit-X only: everyone on it runs as Unit-X. */
+const UNITX = CID_RUNNER.unitx;
+const charOn = (c, map) => (map === "artlist" ? UNITX : c);
 
 // ── shop ───────────────────────────────────────────────────────────────────
 let shopReturn = "home";
@@ -1731,7 +1741,7 @@ function onState(msg) {
       game.endlessSent = true;
       if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
       // the tutorial run is on the meadow; after that any map. Load it all, then start
-      const map = local.getItem("lr:endlessTut") ? MAPS[Math.floor(Math.random() * MAPS.length)] : "meadow";
+      const map = local.getItem("lr:endlessTut") ? RANDOM_MAPS[Math.floor(Math.random() * RANDOM_MAPS.length)] : "meadow";
       if (v.map !== map) act({ type: "map", map });
       showScreen("race");
       showCurtain(map);
@@ -2926,7 +2936,7 @@ function renderLobby(v) {
   );
   $("#mapNote").textContent = mp === "random" ? "A different map every round" : "";
   // start fetching the map's 3D props while everyone is still in the lobby
-  for (const key of mp === "random" ? MAPS : [mp]) {
+  for (const key of mp === "random" ? RANDOM_MAPS : [mp]) {
     world.ensureMap(key).catch(() => {});
     world.preloadMovers(key).catch(() => {});
   }
@@ -4077,7 +4087,50 @@ const world = (() => {
 
   /** Farm and beach props load the first time someone picks that map. */
   const mapLoads = new Map();
+  let artlistLoad = null;
+  let artlistDone = false;
+  /** The Artlist map's own obstacles (Artlist 3D models) and Unit-X; the usual ones stand in if a file fails. */
+  function ensureArtlist() {
+    if (!artlistLoad) {
+      const P = assets.props;
+      const glb = (file, key, fit) => loadGLB(`/assets/${file}.glb`).then((g) => (P[key] = fit(g.scene))).catch(() => {});
+      artlistLoad = Promise.all([
+        glb("al_hurdle", "al_hurdle", (o) => fitProp(o, { width: 1.75, maxHeight: 0.72 })),
+        glb("al_gate", "al_gate", (o) => fitProp(o, { width: 1.95, maxHeight: 2.2 })),
+        glb("al_crate", "al_crate", (o) => fitProp(o, { width: 1.45, maxHeight: 2.6 })),
+        glb("al_roller", "al_roller", (o) => fitReel(o)),
+        ensureChar(UNITX).catch(() => {}),
+      ]).then(() => (artlistDone = true));
+    }
+    return artlistLoad;
+  }
+  /** The film reel rolls like the barrel: stood on its edge, turning about the x axis, 1 m across. */
+  function fitReel(root) {
+    const holder = new THREE.Group();
+    const inner = new THREE.Group();
+    inner.add(root);
+    holder.add(inner);
+    let b = new THREE.Box3().setFromObject(inner);
+    let s = b.getSize(new THREE.Vector3());
+    // the reel's thin side faces across the lane
+    if (s.z < s.x && s.z < s.y) inner.rotation.y = Math.PI / 2;
+    else if (s.y < s.x && s.y < s.z) inner.rotation.z = Math.PI / 2;
+    holder.updateMatrixWorld(true);
+    b = new THREE.Box3().setFromObject(inner);
+    s = b.getSize(new THREE.Vector3());
+    const c = b.getCenter(new THREE.Vector3());
+    inner.position.set(-c.x, -b.min.y, -c.z);
+    holder.scale.setScalar(1.0 / Math.max(s.y, s.z));
+    holder.traverse((o) => {
+      if (o.isMesh) {
+        o.material.side = THREE.FrontSide;
+        o.material.envMapIntensity = 0.6;
+      }
+    });
+    return holder;
+  }
   function ensureMap(map) {
+    if (map === "artlist") return ensureArtlist();
     if (map === "meadow" || THEME[map] || mapReady(map)) return Promise.resolve();
     if (!mapLoads.has(map)) {
       const P = assets.props;
@@ -4715,6 +4768,7 @@ const world = (() => {
     space: { color: "#ffffff", tex: "moon" },
   };
   function mapReady(map) {
+    if (map === "artlist") return artlistDone && Boolean(assets.props.ground);
     if (THEME[map]) return Boolean(assets.props.ground); // themed maps need nothing more to load
     if (BUILT_MAPS.has(map)) return Boolean(assets.props[`${map}Tile`]);
     if (map === "farm") return Boolean(assets.props.farmTile);
@@ -5710,7 +5764,7 @@ const world = (() => {
         let look = row.looks?.[lane] ?? 0;
         // no cows or hay bales in the city, the stadium or space
         if (BUILT_MAPS.has(activeMap) && look === 1 && (kind === "crate" || kind === "hurdle")) look = 0;
-        const proto = assets.props[`${kind}${look}`] || assets.props[`${kind}0`];
+        const proto = (activeMap === "artlist" && assets.props[`al_${kind}`]) || assets.props[`${kind}${look}`] || assets.props[`${kind}0`];
         const o = proto.clone();
         o.position.set(laneX(lane), 0, -row.z);
         if (kind === "crate") o.rotation.y = ((row.z * 7 + lane) % 3 - 1) * 0.12 + (look === 1 ? (lane < 2 ? 0.5 : -0.5) : 0);
@@ -6721,8 +6775,8 @@ function liftCurtain() {
   setTimeout(() => curtain.classList.contains("gone") && (curtain.hidden = true), 500);
 }
 function enterRace(v) {
-  const needed = v.players.map((p) => p.char);
   const map = v.raceMap || "meadow";
+  const needed = v.players.map((p) => charOn(p.char, map));
   if (world.ready && !world.hasChars(needed)) for (const c of needed) world.ensureChar(c).catch(() => {});
   if (world.ready && !world.mapReady(map)) {
     world.ensureMap(map).catch(() => {
@@ -6828,14 +6882,16 @@ function enterRace(v) {
   renderSprint();
   me.x = me.lane;
   if (me.runner) scene.remove(me.runner.group);
-  me.runner = world.makeRunner(mine?.char ?? 0, mine?.name ?? "", RUNNERS[mine?.char ?? 0].color, true);
+  const myChar = charOn(mine?.char ?? 0, v.raceMap);
+  me.runner = world.makeRunner(myChar, mine?.name ?? "", RUNNERS[myChar].color, true);
   scene.add(me.runner.group);
 
   for (const p of v.players) {
     if (p.id === playerId) continue;
     remote.ingest(p, v);
     const r = remote.map.get(p.id);
-    r.runner = world.makeRunner(p.char, withFlag(p.name, p.country), RUNNERS[p.char].color, false);
+    const pc = charOn(p.char, v.raceMap);
+    r.runner = world.makeRunner(pc, withFlag(p.name, p.country), RUNNERS[pc].color, false);
     r.dispD = p.d;
     r.dispX = laneX(p.lane);
     scene.add(r.runner.group);
@@ -9565,7 +9621,7 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
 
-  if (game.pendingRace && world.ready && net.view && (net.view.phase === "countdown" || net.view.phase === "race") && world.hasChars(net.view.players.map((p) => p.char)) && world.mapReady(net.view.raceMap || "meadow")) {
+  if (game.pendingRace && world.ready && net.view && (net.view.phase === "countdown" || net.view.phase === "race") && world.hasChars(net.view.players.map((p) => charOn(p.char, net.view.raceMap))) && world.mapReady(net.view.raceMap || "meadow")) {
     enterRace(net.view);
   }
 

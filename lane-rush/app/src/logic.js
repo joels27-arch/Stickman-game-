@@ -111,7 +111,9 @@ export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
 /** The classic maps (3D models), then the themed ones built in code (public/themes.js: same ids). */
-export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space", "snowy", "candy", "crystal", "neon", "mars", "deepsea", "lava", "rainbow", "clouds", "egypt", "synth", "icecream", "aurora"]; // Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet and Fairy Forest retired
+export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space", "snowy", "candy", "crystal", "neon", "mars", "deepsea", "lava", "rainbow", "clouds", "egypt", "synth", "icecream", "aurora", "artlist"]; // Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet and Fairy Forest retired
+/** The maps a "random" pick draws from: Artlist is only raced when picked by name. */
+export const RANDOM_MAPS = MAPS.filter((m) => m !== "artlist");
 /** Themed maps borrow a classic map's moving obstacles (the rest use the meadow's logs and bees). */
 export const MAP_MOVERS = { neon: "city", mars: "space", deepsea: "beach", rainbow: "space", clouds: "space", egypt: "farm", synth: "space" };
 /** A Party Cup is three rounds; each placing scores points, most points wins. */
@@ -899,7 +901,7 @@ function startRace(state, t) {
   const baseMap = pool
     ? MAPS.indexOf(pool[Math.floor(pick() * pool.length)])
     : state.map === "random"
-      ? Math.floor(pick() * MAPS.length)
+      ? MAPS.indexOf(RANDOM_MAPS[Math.floor(pick() * RANDOM_MAPS.length)])
       : Math.max(0, MAPS.indexOf(state.map ?? "meadow"));
   state.kind = state.cup ? state.cup.races[state.cup.race - 1] : state.mode === "random" ? partyOf(state)[Math.floor(pick() * partyOf(state).length)] : state.mode;
   // later Party Cup rounds open further into the difficulty curve
