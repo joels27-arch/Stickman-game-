@@ -36,6 +36,7 @@ export function buildCourse(seed: number, len?: number, boost?: number): {
   slows: { z: number; lane: number }[];
   boxes: { z: number; lane: number }[];
   hearts: { z: number; lane: number }[];
+  buses: { lane: number; z0: number; z1: number; look: number; ramp: boolean }[];
   len: number;
 };
 
