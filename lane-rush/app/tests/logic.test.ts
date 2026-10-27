@@ -210,7 +210,7 @@ describe("difficulty manager", () => {
         expect(L.floorAt(c, b.lane, b.z1 + 0.5)).toBe(0);
         expect(L.busAt(c, b.lane, b.z0 + 2)).toBe(true);
       }
-      expect(c.buses.every((b) => b.z0 > 60)).toBe(true);
+      expect(c.buses.every((b) => b.z0 > 30)).toBe(true);
       // never every lane: there's always a road lane to stay on
       for (const b of c.buses) expect(c.buses.filter((o) => o.z0 === b.z0).length).toBeLessThan(L.LANES);
     }
@@ -228,11 +228,12 @@ describe("difficulty manager", () => {
     }
   });
 
-  it("teaches one mechanic at a time: hurdles, then gates, then crates, then barrels, each flagged once", () => {
+  it("teaches one mechanic at a time: hurdles, then crates, then barrels (no gates), each flagged once", () => {
     for (let seed = 0; seed < 50; seed++) {
       const c = L.buildCourse(seed * 13, L.SURVIVAL_LEN);
       const intros = c.rows.filter((r) => r.intro).map((r) => r.intro);
-      expect(intros.slice(0, 3)).toEqual(["hurdle", "gate", "crate"]);
+      expect(intros.slice(0, 2)).toEqual(["hurdle", "crate"]);
+      expect(intros).not.toContain("gate");
       expect(new Set(intros).size).toBe(intros.length);
       // the first 120 m only ask one thing per row
       for (const r of c.rows.filter((x) => x.z < 120)) expect(r.lanes.filter(Boolean).length).toBe(1);

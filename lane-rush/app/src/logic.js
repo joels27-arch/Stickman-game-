@@ -355,7 +355,7 @@ const PATTERNS = {
   // two crates; the other lanes are open or hold something to jump or duck
   split: {
     rows: (r) => {
-      const lanes = [0, 1, 2, 3].map(() => pickFrom(r, [null, "hurdle", "gate"]));
+      const lanes = [0, 1, 2, 3].map(() => pickFrom(r, [null, "hurdle"]));
       for (const i of shuffled(r).slice(0, 2)) lanes[i] = "crate";
       return [lanes];
     },
@@ -385,7 +385,7 @@ const PATTERNS = {
   tunnel: {
     rows: (r) => {
       const lanes = ["crate", "crate", "crate", "crate"];
-      lanes[Math.floor(r() * 4)] = "gate";
+      lanes[Math.floor(r() * 4)] = r() < 0.5 ? "hurdle" : null;
       return [lanes];
     },
   },
@@ -394,11 +394,11 @@ const PATTERNS = {
   slalom3: { rows: (r) => slalom(r, 3) },
   // jump, then slide straight away (or the other way round)
   combo: {
-    rows: (r) => (r() < 0.5 ? [["hurdle", "hurdle", "hurdle", "hurdle"], ["gate", "gate", "gate", "gate"]] : [["gate", "gate", "gate", "gate"], ["hurdle", "hurdle", "hurdle", "hurdle"]]),
+    rows: () => [["hurdle", "hurdle", "hurdle", "hurdle"], ["hurdle", "hurdle", "hurdle", "hurdle"]],
   },
   // a slalom where every gap also needs a jump or a slide
   zigzag: {
-    rows: (r) => slalom(r, 3).map((lanes, i) => lanes.map((k) => (k === null ? (i % 2 ? "gate" : "hurdle") : k))),
+    rows: (r) => slalom(r, 3).map((lanes, i) => lanes.map((k) => (k === null && i % 2 ? "hurdle" : k))),
   },
 };
 function slalom(r, n) {
@@ -429,14 +429,14 @@ function slalom(r, n) {
  *   Master        2.4 km zigzags, everything, tightest (but always fair) timing
  */
 export const STAGES = [
-  { name: "Warm-up", from: 0, react: 1.3, mix: { hurdleOne: 4, gateOne: 3, hurdleWall: 1.5, gateWall: 1.5, crateOne: 2, bus: 5 } },
-  { name: "Getting going", from: 250, react: 1.15, mix: { hurdleOne: 1, gateOne: 1, crateOne: 1, hurdleWall: 1, gateWall: 1, split: 2.5, barrels: 1.2, bus: 7, breather: 0.7 } },
-  { name: "In the zone", from: 700, react: 1.02, mix: { split: 2, mixedWall: 1.6, barrels: 1, tunnel: 1.2, slalom2: 1.5, hurdleWall: 0.5, gateWall: 0.5, bus: 6, breather: 0.55 } },
-  { name: "Pro", from: 1400, react: 1.05, mix: { split: 1.2, mixedWall: 1.5, tunnel: 1, slalom2: 1, slalom3: 1.3, combo: 1.2, barrels2: 1, bus: 5.5, breather: 0.45 } },
-  { name: "Master", from: 2400, react: 0.92, mix: { mixedWall: 1.3, tunnel: 1, slalom3: 1.5, combo: 1.3, zigzag: 1.2, barrels2: 1, split: 1, bus: 5.5, breather: 0.35 } },
+  { name: "Warm-up", from: 0, react: 1.3, mix: { hurdleOne: 4, hurdleWall: 2, crateOne: 2, bus: 12 } },
+  { name: "Getting going", from: 250, react: 1.15, mix: { hurdleOne: 1, crateOne: 1, hurdleWall: 1, split: 2.5, barrels: 1.2, bus: 16, breather: 0.7 } },
+  { name: "In the zone", from: 700, react: 1.02, mix: { split: 2, barrels: 1, tunnel: 1.2, slalom2: 1.5, hurdleWall: 1, bus: 16, breather: 0.55 } },
+  { name: "Pro", from: 1400, react: 1.05, mix: { split: 1.2, tunnel: 1, slalom2: 1, slalom3: 1.3, combo: 1.2, barrels2: 1, bus: 15, breather: 0.45 } },
+  { name: "Master", from: 2400, react: 0.92, mix: { tunnel: 1, slalom3: 1.5, combo: 1.3, zigzag: 1.2, barrels2: 1, split: 1, bus: 15, breather: 0.35 } },
 ];
 /** In the warm-up, each first-time pattern waits until here (so they come one at a time). */
-const FIRST_AT = { hurdleOne: 0, gateOne: 90, bus: 70, hurdleWall: 150, gateWall: 190, crateOne: 220 };
+const FIRST_AT = { hurdleOne: 0, bus: 40, hurdleWall: 125, crateOne: 150 };
 export function stageAt(z) {
   let st = STAGES[0];
   for (const x of STAGES) if (z >= x.from) st = x;
@@ -626,7 +626,11 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
       // one bus (sometimes two side by side) in a stretch of their own; most with a ramp
       const a = Math.floor(r() * 4);
       const lanes = [a];
-      if (r() < 0.45) lanes.push(a === 0 ? 1 : a === 3 ? 2 : r() < 0.5 ? a - 1 : a + 1);
+      if (r() < 0.6) lanes.push(a === 0 ? 1 : a === 3 ? 2 : r() < 0.5 ? a - 1 : a + 1);
+      if (lanes.length === 2 && r() < 0.35) {
+        const free = [0, 1, 2, 3].filter((l) => !lanes.includes(l));
+        lanes.push(free[Math.floor(r() * free.length)]); // three buses: one lane stays open
+      }
       if (rows.length && z - prevZ > MAX_EMPTY_M - 6) z = prevZ + MAX_EMPTY_M - 6; // no long empty run-up to it
       const z0 = Math.ceil((z + RAMP_LEN) * 10) / 10;
       for (const lane of lanes) buses.push({ lane, z0, z1: Math.round((z0 + BUS_LEN) * 10) / 10, look: Math.floor(r2() * 3), ramp: r2() < 0.65 });
