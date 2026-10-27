@@ -2971,3 +2971,4 @@ html, body { background: var(--k1); }
 .tier-diamond { --t: #6fb3ff; }
 .tier-master { --t: #c27bff; }
 .mr-you { justify-self: center; }
+.boot-retry{font:inherit;font-weight:800;padding:8px 18px;border-radius:12px;border:2px solid #fff;background:#b6f72a;color:#1a2300;pointer-events:auto}
