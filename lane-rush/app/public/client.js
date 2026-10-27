@@ -4194,6 +4194,10 @@ const world = (() => {
 
   // download progress per file (0 … 1), for the loading bar
   const fileProgress = new Map();
+  /** The Artlist remake of a model (md_*), or the original if that file is missing. */
+  function loadGLBOr(file, fallback) {
+    return loadGLB(`/assets/${file}.glb`).catch(() => loadGLB(`/assets/${fallback}.glb`));
+  }
   function loadGLB(url) {
     fileProgress.set(url, fileProgress.get(url) ?? 0);
     return new Promise((resolve, reject) =>
@@ -4407,15 +4411,15 @@ const world = (() => {
     const jobs = [
       ...[0, 1, 2, 3].map((i) => ensureChar(i)),
       // obstacles: `${kind}${look}` (see LOOKS in logic.js)
-      loadGLB("/assets/hurdle2.glb").then((g) => (assets.props.hurdle0 = fitProp(g.scene, { width: 1.75, maxHeight: 0.72 }))),
-      loadGLB("/assets/hay.glb").then((g) => (assets.props.hurdle1 = fitProp(g.scene, { width: 1.7, maxHeight: 0.7 }))),
-      loadGLB("/assets/gate2.glb").then((g) => (assets.props.gate0 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
-      loadGLB("/assets/arch.glb").then((g) => (assets.props.gate1 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
-      loadGLB("/assets/crates.glb").then((g) => (assets.props.crate0 = fitProp(g.scene, { width: 1.45, maxHeight: 2.6 }))),
+      loadGLBOr("md_hurdle", "hurdle2").then((g) => (assets.props.hurdle0 = fitProp(g.scene, { width: 1.75, maxHeight: 0.72 }))),
+      loadGLBOr("md_hay", "hay").then((g) => (assets.props.hurdle1 = fitProp(g.scene, { width: 1.7, maxHeight: 0.7 }))),
+      loadGLBOr("md_gate", "gate2").then((g) => (assets.props.gate0 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
+      loadGLBOr("md_arch", "arch").then((g) => (assets.props.gate1 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
+      loadGLBOr("md_crates", "crates").then((g) => (assets.props.crate0 = fitProp(g.scene, { width: 1.45, maxHeight: 2.6 }))),
       // the cow faces you and stands tall: far too big to jump, so you dodge it like the crates
-      loadGLB("/assets/cow.glb").then((g) => (assets.props.crate1 = fitProp(g.scene, { height: 2.5, maxWidth: 1.8, lengthwise: true }))),
-      loadGLB("/assets/tires.glb").then((g) => (assets.props.crate2 = fitProp(g.scene, { width: 1.4, maxHeight: 2.5 }))),
-      loadGLB("/assets/barrel.glb").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
+      loadGLBOr("md_cow", "cow").then((g) => (assets.props.crate1 = fitProp(g.scene, { height: 2.5, maxWidth: 1.8, lengthwise: true }))),
+      loadGLBOr("md_tires", "tires").then((g) => (assets.props.crate2 = fitProp(g.scene, { width: 1.4, maxHeight: 2.5 }))),
+      loadGLBOr("md_barrel", "barrel").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
       loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
       // nice-to-haves: the game still runs with stand-ins if one of these fails
       // power-up models (made with Higgsfield): the rocket backpack, the storm cloud, the glue puddle, the boxing glove
@@ -4432,15 +4436,15 @@ const world = (() => {
       loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8.5 }))).catch(() => {}),
       loadGLB("/assets/gate_start.glb").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8 }))).catch(() => {}),
       loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
-      loadGLB("/assets/tree_oak.glb").then((g) => (assets.props.oak = fitProp(g.scene, { height: 6.5 }))),
-      loadGLB("/assets/tree_pine.glb").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
-      loadGLB("/assets/tree_blossom.glb").then((g) => (assets.props.blossom = fitProp(g.scene, { height: 5.4 }))),
-      loadGLB("/assets/bush.glb").then((g) => (assets.props.bush = fitProp(g.scene, { width: 2.4 }))),
+      loadGLBOr("md_oak", "tree_oak").then((g) => (assets.props.oak = fitProp(g.scene, { height: 6.5 }))),
+      loadGLBOr("md_pine", "tree_pine").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
+      loadGLBOr("md_blossom", "tree_blossom").then((g) => (assets.props.blossom = fitProp(g.scene, { height: 5.4 }))),
+      loadGLBOr("md_bush", "bush").then((g) => (assets.props.bush = fitProp(g.scene, { width: 2.4 }))),
       // light far versions (colour baked in, a few hundred triangles) for scenery past LOD_NEAR
-      ...[["oak", "tree_oak", { height: 6.5 }], ["pine", "tree_pine", { height: 6.2 }], ["blossom", "tree_blossom", { height: 5.4 }], ["bush", "bush", { width: 2.4 }], ["rocks", "rocks", { width: 2.2 }], ["cloud", "cloud", { width: 1 }]].map(([k, f, size]) => loadLod(k, f, size)),
-      loadGLB("/assets/rocks.glb").then((g) => (assets.props.rocks = fitProp(g.scene, { width: 2.2 }))),
+      ...[["oak", "md_oak", { height: 6.5 }], ["pine", "md_pine", { height: 6.2 }], ["blossom", "md_blossom", { height: 5.4 }], ["bush", "md_bush", { width: 2.4 }], ["rocks", "md_rocks", { width: 2.2 }], ["cloud", "md_cloud", { width: 1 }]].map(([k, f, size]) => loadLod(k, f, size)),
+      loadGLBOr("md_rocks", "rocks").then((g) => (assets.props.rocks = fitProp(g.scene, { width: 2.2 }))),
       Promise.resolve().then(() => (assets.props.fence = pickerFence())), // built in code: crisp and ~150 triangles
-      loadGLB("/assets/cloud.glb").then((g) => (assets.props.cloud = fitProp(g.scene, { width: 1 }))),
+      loadGLBOr("md_cloud", "cloud").then((g) => (assets.props.cloud = fitProp(g.scene, { width: 1 }))),
     ];
     // the bar moves with the bytes downloaded (and finished files), never backwards
     let shown = 0;
