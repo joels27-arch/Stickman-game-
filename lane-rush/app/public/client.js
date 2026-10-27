@@ -6185,11 +6185,11 @@ const world = (() => {
       // two rows across the whole width, the back row taller
       const back = i >= N / 2;
       const x = -150 + ((i % (N / 2)) + rnd() * 0.6) * (300 / (N / 2));
-      const h = (back ? 22 : 10) + rnd() * (back ? 26 : 14);
-      const w = 9 + rnd() * 10;
-      const z = (back ? 98 : 78) + rnd() * 10; // world z: behind the start (the track starts near z = 60)
-      const tall = spec.shape === "crystal" ? 1.8 : spec.shape === "pyramid" ? 1 : spec.shape === "ice" ? 1.2 : 0.8;
-      const scale = new THREE.Vector3(w, spec.shape === "pyramid" ? h * 1.3 : h * tall * 0.6, w * 0.8);
+      const h = (back ? 40 : 20) + rnd() * (back ? 34 : 18);
+      const w = 13 + rnd() * 12;
+      const z = (back ? 92 : 74) + rnd() * 8; // world z: behind the start (the track starts near z = 60)
+      const tall = spec.shape === "crystal" ? 1.8 : spec.shape === "ice" ? 1.2 : 0.9;
+      const scale = spec.shape === "pyramid" ? new THREE.Vector3(h * 0.9, h * 0.75, h * 0.9) : new THREE.Vector3(w, h * tall * 0.6, w * 0.8);
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * Math.PI);
       const y = spec.shape === "pyramid" ? MEADOW_Y + scale.y / 2 : MEADOW_Y + scale.y * 0.35;
       m.compose(new THREE.Vector3(x, y, z), q, scale);
@@ -6198,8 +6198,8 @@ const world = (() => {
     }
     mesh.frustumCulled = false;
     // a backing wall far behind, in the map's colour, so nothing shows through the gaps
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(420, 140), new THREE.MeshBasicMaterial({ color: spec.back, side: THREE.DoubleSide }));
-    wall.position.set(0, 50, 118);
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(460, 220), new THREE.MeshBasicMaterial({ color: spec.back, side: THREE.DoubleSide, fog: false }));
+    wall.position.set(0, 90, 112);
     wall.rotation.y = Math.PI;
     g.add(wall, mesh);
     return g;
