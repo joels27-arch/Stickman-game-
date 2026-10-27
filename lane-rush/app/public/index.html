@@ -205,10 +205,6 @@
               <div id="copyMsg" class="small"></div>
             </div>
           </div>
-          <div class="topbar">
-            <div class="wallet" title="Your medals"></div>
-            <button class="country-chip" type="button" aria-label="Country you cheer for"></button>
-          </div>
           <div id="lobbyTabs" class="m-tabs lobby-tabs" role="tablist" hidden>
             <button class="m-tab on" type="button" data-lt="runners">🏃 Runners</button>
             <button class="m-tab" type="button" data-lt="room">⚙️ Room settings</button>
@@ -371,6 +367,7 @@
       <div class="sheet ask-sheet" role="dialog" aria-modal="true" aria-labelledby="askTitle">
         <h2 id="askTitle">What's your name?</h2>
         <input id="askName" maxlength="14" autocomplete="nickname" placeholder="Your name" />
+        <button class="country-chip ask-country" type="button" aria-label="Country you cheer for"></button>
         <button id="askSave" class="btn big go" type="button">Save</button>
         <button id="askLater" class="ask-later" type="button">Later</button>
       </div>

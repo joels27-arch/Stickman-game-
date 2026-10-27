@@ -58,6 +58,7 @@ export const BANANA_AHEAD_M: number;
 export const BANANA_BEHIND_M: number;
 export const ZAP_KINDS: string[];
 export const START_POWERS: string[];
+export const SOLO_START_POWERS: string[];
 export const DROP_KINDS: string[];
 export const GLUE_MS: number;
 export const CLOUD_MS: number;

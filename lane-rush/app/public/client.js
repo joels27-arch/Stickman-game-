@@ -51,6 +51,7 @@ import {
   powerOdds,
   pickPower,
   START_POWERS,
+  SOLO_START_POWERS,
   ROLLER_SPEED,
   ROLLER_TRIGGER_M,
   glueLane2,
@@ -1465,10 +1466,8 @@ function buyPack(pack) {
 }
 /** Roll a pack's one character and credit it: a new one unlocks, one you have pays coins. */
 function grantPack(pack) {
+  // a fair roll over everything packs hold: a runner you already have pays coins instead
   const it = packCard(rollRarity(pack.odds));
-  // the 3D runners you can race with come first (not the Season Pass ones: those come from the pass)
-  const runners = allChars().filter((c) => c.playable && c.via !== "pass" && c.via !== "starter" && !gamesStepOf(c) && !ownsChar(c));
-  if (runners.length) it.char = runners[Math.floor(Math.random() * runners.length)];
   const c = it.char;
   if (ownsChar(c)) {
     it.dupe = true;
@@ -6141,8 +6140,69 @@ const world = (() => {
     }
     cull = batchScenery(group, cull, batches);
     batchSink = null;
+    group.add(startBackdrop(map));
     scene.add(group);
     return { group, cull, batches };
+  }
+
+  /**
+   * Behind the start line: a wall that fits the map (icebergs, ice-cream scoops, a candy
+   * wall, red cliffs, black space…), so a camera looking back never sees an empty world.
+   * One instanced mesh of shapes and one backing plane: 2 draw calls.
+   */
+  const BACKDROPS = {
+    snowy: { shape: "ice", colors: ["#f4f9ff", "#d8e9fb", "#b4d2f0", "#9cc4ec"], back: "#cfe3f7" },
+    aurora: { shape: "ice", colors: ["#e8f4ff", "#c4dcf4", "#9cc0e8", "#6f9ad0"], back: "#2a3a6a" },
+    candy: { shape: "drop", colors: ["#ff5aa0", "#ffd02a", "#5ad0a0", "#7a5aff", "#ff8a3a", "#ffffff"], back: "#ffc2e4" },
+    icecream: { shape: "scoop", colors: ["#ffd0e0", "#c8f0ff", "#fff0b0", "#d0ffd8", "#8a5a3a", "#ffffff"], back: "#ffe8f2" },
+    crystal: { shape: "crystal", colors: ["#5af0ff", "#ff5af0", "#a05aff", "#3a3058"], back: "#120e24" },
+    mars: { shape: "rock", colors: ["#9a4626", "#b85a32", "#7a3620", "#c86a3e"], back: "#8a3a1e" },
+    deepsea: { shape: "rock", colors: ["#2a5a6a", "#ff6a6a", "#ff9a3a", "#3a7a7a", "#c05aff"], back: "#062a4a" },
+    lava: { shape: "rock", colors: ["#2a1a1a", "#3a2220", "#ff5a1a", "#1e1414"], back: "#1a0c0a" },
+    egypt: { shape: "pyramid", colors: ["#e0b878", "#d0a060", "#c89050", "#f0c888"], back: "#e8c890" },
+    space: { shape: "rock", colors: ["#3a3a4a", "#2a2a36", "#4a4a5a"], back: "#05040c" },
+    uranus: { shape: "rock", colors: ["#2a2440", "#3a3058", "#1e1a30"], back: "#05030c" },
+    artlist: { shape: "rock", colors: ["#1a1a1a", "#2a2a2a"], back: "#0a0a0a" },
+  };
+  function startBackdrop(map) {
+    const spec = BACKDROPS[map] ?? { shape: "rock", colors: ["#6a7a5a", "#5a6a4a", "#7a8a6a"], back: "#9ab4c8" };
+    const g = new THREE.Group();
+    const geo =
+      spec.shape === "ice" ? new THREE.IcosahedronGeometry(1, 0)
+      : spec.shape === "crystal" ? new THREE.OctahedronGeometry(1, 0)
+      : spec.shape === "pyramid" ? new THREE.ConeGeometry(1, 1, 4)
+      : spec.shape === "scoop" || spec.shape === "drop" ? new THREE.SphereGeometry(1, 14, 10)
+      : new THREE.DodecahedronGeometry(1, 0);
+    const mat = new THREE.MeshLambertMaterial({ flatShading: spec.shape !== "scoop" && spec.shape !== "drop" });
+    const N = 44;
+    const mesh = new THREE.InstancedMesh(geo, mat, N);
+    let seed = 99 + map.length * 31;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const col = new THREE.Color();
+    for (let i = 0; i < N; i++) {
+      // two rows across the whole width, the back row taller
+      const back = i >= N / 2;
+      const x = -150 + ((i % (N / 2)) + rnd() * 0.6) * (300 / (N / 2));
+      const h = (back ? 22 : 10) + rnd() * (back ? 26 : 14);
+      const w = 9 + rnd() * 10;
+      const z = (back ? 98 : 78) + rnd() * 10; // world z: behind the start (the track starts near z = 60)
+      const tall = spec.shape === "crystal" ? 1.8 : spec.shape === "pyramid" ? 1 : spec.shape === "ice" ? 1.2 : 0.8;
+      const scale = new THREE.Vector3(w, spec.shape === "pyramid" ? h * 1.3 : h * tall * 0.6, w * 0.8);
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * Math.PI);
+      const y = spec.shape === "pyramid" ? MEADOW_Y + scale.y / 2 : MEADOW_Y + scale.y * 0.35;
+      m.compose(new THREE.Vector3(x, y, z), q, scale);
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, col.set(spec.colors[Math.floor(rnd() * spec.colors.length)]));
+    }
+    mesh.frustumCulled = false;
+    // a backing wall far behind, in the map's colour, so nothing shows through the gaps
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(420, 140), new THREE.MeshBasicMaterial({ color: spec.back, side: THREE.DoubleSide }));
+    wall.position.set(0, 50, 118);
+    wall.rotation.y = Math.PI;
+    g.add(wall, mesh);
+    return g;
   }
   let batchSink = null; // the batch list of the map being built (themed props and flowers go in it)
 
@@ -10047,7 +10107,8 @@ function frost() {
 
 /** The power-up everyone starts with: one of the neutral ones, same odds for everybody. */
 function startingItem() {
-  const kind = START_POWERS[Math.floor(Math.random() * START_POWERS.length)];
+  const list = game.endless ? SOLO_START_POWERS : START_POWERS;
+  const kind = list[Math.floor(Math.random() * list.length)];
   me.lastItem = kind;
   return kind;
 }
