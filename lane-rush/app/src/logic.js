@@ -111,11 +111,13 @@ export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
 /** The classic maps (3D models), then the themed ones built in code (public/themes.js: same ids). */
-export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space", "snowy", "candy", "crystal", "neon", "mars", "deepsea", "lava", "rainbow", "clouds", "egypt", "synth", "icecream", "aurora", "artlist", "uranus"]; // Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet and Fairy Forest retired
+export const MAPS = ["meadow", "beach", "stadium", "space", "snowy", "candy", "crystal", "mars", "deepsea", "lava", "egypt", "icecream", "aurora", "artlist", "uranus"]; // retired: Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet, Fairy Forest, Farm, City, Neon Night, Rainbow Road, Cloud Kingdom, Synthwave
 /** The maps a "random" pick draws from: Artlist is only raced when picked by name. */
 export const RANDOM_MAPS = MAPS.filter((m) => m !== "artlist");
 /** Themed maps borrow a classic map's moving obstacles (the rest use the meadow's logs and bees). */
-export const MAP_MOVERS = { neon: "city", mars: "space", deepsea: "beach", rainbow: "space", clouds: "space", egypt: "farm", synth: "space" };
+export const MAP_MOVERS = { mars: "space", deepsea: "beach", egypt: "farm" };
+/** The maps with their own moving obstacles; every other map uses the meadow's (or MAP_MOVERS). */
+export const MOVER_BASES = ["meadow", "farm", "beach", "city", "stadium", "space"];
 /** A Party Cup is three rounds; each placing scores points, most points wins. */
 export const CUP_ROUND_BOOST_M = 350;
 export const CUP_POINTS = [10, 5, 3, 1];
@@ -733,7 +735,7 @@ export function moverCovers(m, lane, t) {
 }
 /** The course's moving obstacles for a map: one every ~150 m (from 150 m on), in a wide gap between rows. */
 export function moversFor(course, seed, map) {
-  const base = MAP_MOVERS[map] ?? (MAPS.indexOf(map) > 5 ? "meadow" : map ?? "meadow");
+  const base = MAP_MOVERS[map] ?? (MOVER_BASES.includes(map) ? map : "meadow");
   const kinds = Object.keys(MOVER_KINDS).filter((k) => MOVER_KINDS[k].map === base);
   if (!kinds.length) return [];
   const r = rng((seed ^ 0x5bd1e995) >>> 0);

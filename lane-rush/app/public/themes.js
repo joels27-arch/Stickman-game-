@@ -38,13 +38,6 @@ export const THEMES = [
     props: [["crystal", 6, { c: ["#5af0ff", "#ff5af0", "#a05aff", "#5aff9a"] }, [1, 2.6], true], ["rock", 2, { c: ["#3a3058"] }]],
     fx: "fireflies", hills: 2,
   }),
-  T("neon", "Neon Night", "🌃", {
-    sky: { top: "#05031a", mid: "#2a0a4a", horizon: "#8a1a8a" }, sun: null, night: true, fog: ["#3a0a4a", 50, 230], clouds: false,
-    light: { hemi: ["#8a6aff", "#1a0a2a", 0.9], sun: ["#d0a0ff", 0.7] }, far: "#1a0a3a", near: "#2a0a4a",
-    ground: { style: "grid", colors: ["#120a24", "#ff3ad0"] }, track: { style: "grid", colors: ["#1a1030", "#3af0ff"], kerb: "#ff3ad0", lines: "#3af0ff" },
-    props: [["building", 6, { c: ["#2a2a5a", "#3a1a5a", "#1a2a4a"] }, [1, 3], true], ["lamp", 1, { c: ["#3a3a5a"], accent: ["#ff3ad0", "#3af0ff"] }, null, true]],
-    arches: ["#ff3ad0", "#3af0ff", "#ffe23a"], hills: 0, movers: "city",
-  }),
   T("mars", "Mars", "🔴", {
     sky: { top: "#5a2a2a", mid: "#c8784a", horizon: "#f0b88a" }, sun: "#fff0d0", fog: ["#e8a070", 60, 260], clouds: false,
     light: { hemi: ["#ffd0b0", "#8a3a1a", 1.0], sun: ["#ffe0c0", 2.0] }, far: "#a0482a", near: "#b85a32",
@@ -66,33 +59,12 @@ export const THEMES = [
     props: [["rock", 4, { c: ["#2a2020", "#1a1414"] }, [1.2, 2.6]], ["crystal", 2, { c: ["#ff5a1a", "#ffb03a"] }, null, true]],
     fx: "embers", hills: 1.4,
   }),
-  T("rainbow", "Rainbow Road", "🌈", {
-    sky: { top: "#05021a", mid: "#1a0a4a", horizon: "#4a2a8a" }, sun: null, night: true, fog: ["#1a0a3a", 60, 260], clouds: false,
-    light: { hemi: ["#ffffff", "#4a2a8a", 1.2], sun: ["#ffffff", 1.0] }, far: "#2a1a5a", near: "#1a0a3a",
-    ground: { style: "speckle", colors: ["#0e0828", "#1a1040", "#ffffff"] }, track: { style: "rainbow", colors: ["#ff3a3a", "#ff9a2a", "#ffe23a", "#3ad06a", "#3a9aff", "#a04aff"], kerb: "#ffffff", lines: "#ffffff" },
-    props: [["star", 3, { c: ["#ffe23a", "#ffffff", "#7af0ff"] }, [0.8, 1.6], true], ["crystal", 1, { c: ["#ff5af0", "#5af0ff"] }, null, true]],
-    arches: ["#ff3a3a", "#ffe23a", "#3ad06a", "#3a9aff", "#a04aff"], hills: 0, movers: "space",
-  }),
-  T("clouds", "Cloud Kingdom", "☁️", {
-    sky: { top: "#4aa0f0", mid: "#b8e0ff", horizon: "#ffffff" }, sun: "#fff8e0", fog: ["#ffffff", 70, 260],
-    light: { hemi: ["#ffffff", "#c8d8f0", 1.35], sun: ["#fffbe8", 1.5] }, far: "#e0eefc", near: "#f4f8ff",
-    ground: { style: "speckle", colors: ["#f4f8ff", "#ffffff", "#e0eaf8"] }, track: { style: "speckle", colors: ["#ffd24a", "#ffe07a", "#f0b82a"], kerb: "#ffffff", lines: "#ffffff" },
-    props: [["puff", 5, { c: ["#ffffff", "#f0f6ff"] }, [1, 2.6]], ["balloon", 2, { c: ["#ff5a7a", "#ffd02a", "#5ab0ff", "#7ae07a"], accent: ["#ffffff"] }], ["island", 1, { c: ["#8a6a4a"], accent: ["#6ac05a"] }]],
-    hills: 1, movers: "space",
-  }),
   T("egypt", "Pyramids", "🐫", {
     sky: { top: "#2f86d6", mid: "#98d0f0", horizon: "#fff0cc" }, sun: "#fff8d8", fog: ["#ffeec8", 90, 320],
     light: { hemi: ["#fff4dc", "#c8a060", 1.1], sun: ["#fff0c8", 2.3] }, far: "#d8b07a", near: "#e8c890",
     ground: { style: "waves", colors: ["#e8cc8a", "#f4dca0", "#d4b470"] }, track: { style: "tiles", colors: ["#d8b880", "#e8c890", "#b89860"], kerb: "#fff4dc" },
     props: [["pyramid", 2, { c: ["#e0c080", "#d4b070"] }, [1.5, 4]], ["column", 2, { c: ["#e8d8b0"] }], ["palm", 2, { leaf: ["#3a9a4a"], trunk: ["#8a6a42"] }]],
     hills: 1.2, fx: "dust", movers: "farm",
-  }),
-  T("synth", "Synthwave", "🕹️", {
-    sky: { top: "#0a0220", mid: "#5a0a6a", horizon: "#ff5a8a" }, sun: "#ffd05a", fog: ["#4a0a4a", 60, 260], clouds: false,
-    light: { hemi: ["#ff8ad0", "#1a0a2a", 0.95], sun: ["#ffb07a", 1.0] }, far: "#ff3a9a", near: "#1a0a2a",
-    ground: { style: "grid", colors: ["#140420", "#ff3ad0"] }, track: { style: "grid", colors: ["#1a0830", "#ffd05a"], kerb: "#3af0ff", lines: "#ff3ad0" },
-    props: [["pillar", 3, { c: ["#3af0ff", "#ff3ad0"] }, [1, 2], true], ["palm", 2, { leaf: ["#1a0a2a"], trunk: ["#1a0a2a"] }]],
-    arches: ["#ff3ad0", "#3af0ff"], hills: 0, movers: "space",
   }),
   T("icecream", "Ice Cream Hills", "🍦", {
     sky: { top: "#8ad0ff", mid: "#ffd8ec", horizon: "#fff8e8" }, fog: ["#fff4ec", 80, 280],

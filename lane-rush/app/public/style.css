@@ -3049,3 +3049,22 @@ html, body { background: var(--k1); }
 .es-maps .map-card { min-height: 64px; }
 .es-maps .map-card b { font-size: 15px; }
 .es-foot { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+/* starter pack: "1 of these 5" (no spin: the pack bursts, the runner comes out) */
+.pf-odds { position: relative; padding: 30px 8px 8px; border-radius: 18px; border: 2px dashed rgba(255, 210, 63, 0.7); background: rgba(255, 210, 63, 0.08); }
+.pf-odds-head { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); margin: 0; padding: 4px 14px; border-radius: 99px; background: #ffd23f; color: #3a2400; white-space: nowrap; font-family: var(--display); font-style: italic; font-weight: 900; font-size: 15px; text-transform: uppercase; box-shadow: 0 3px 0 #b8860b; }
+.pf-odds-head b { font-size: 18px; }
+.pf-odds-head span { font-weight: 800; }
+.pf-odds .pf-zone { opacity: 1; }
+.pf-odds .pf-zone img { filter: brightness(0.95); }
+.pf-odds.gone { transition: opacity 300ms, transform 300ms; opacity: 0; transform: scale(0.9); }
+.pf-pack.burst img { animation: pfShakeBurst 900ms ease-in forwards; }
+@keyframes pfShakeBurst {
+  0% { transform: rotate(0) scale(1); }
+  10% { transform: rotate(-8deg) scale(1.05); }
+  20% { transform: rotate(8deg) scale(1.08); }
+  30% { transform: rotate(-8deg) scale(1.1); }
+  40% { transform: rotate(8deg) scale(1.12); }
+  55% { transform: rotate(0) scale(1.2); filter: brightness(1.4) drop-shadow(0 0 30px #fff7b0); }
+  100% { transform: scale(1.8); opacity: 0; filter: brightness(3) drop-shadow(0 0 60px #fff); }
+}
+.pf-row.pf-odds { margin-top: 22px; }
