@@ -211,7 +211,7 @@ const ODDS = {
   rocket: [1, 6, 16, 30],
   mud: [0, 6, 9, 8],
 };
-const SOLO_ODDS = { shield: 35, rocket: 35, banana: 30 };
+const SOLO_ODDS = { shield: 50, rocket: 50 }; // alone (endless run): only gadgets, nothing to throw at anyone
 /** How far behind the leader (metres) counts as "as far back as it gets". */
 const GAP_FULL_M = 80;
 
@@ -268,6 +268,8 @@ export function pickPower(odds, roll) {
 
 /** The power-up everyone starts a race with: defensive or neutral, same odds for all. */
 export const START_POWERS = ["shield", "banana", "fake"];
+/** The endless run starts you with a gadget instead (no one to throw at). */
+export const SOLO_START_POWERS = ["shield", "rocket"];
 /** Powers relayed to everyone through the server as a "zap" (an area effect). */
 export const ZAP_KINDS = ["lightning", "freeze", "brainwave", "mud"];
 /** Things dropped on the track: a banana trips you, glue slows you (2 lanes, stays a while), a fake box trips you. */
