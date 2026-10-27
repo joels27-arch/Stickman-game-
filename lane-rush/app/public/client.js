@@ -4500,7 +4500,7 @@ const world = (() => {
       loadGLB("/assets/bus.glb").then((g) => (assets.props.bus = fitBus(g.scene))).catch(() => {}),
       loadGLB("/assets/bowling_ball.glb").then((g) => (assets.props.bowlingBall = fitProp(g.scene, { width: 0.75 }))).catch(() => (assets.props.bowlingBall = ballStandIn())),
       loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8.5 }))).catch(() => {}),
-      loadGLB("/assets/gate_start.glb").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8 }))).catch(() => {}),
+      loadGLBOr("start_line", "gate_start").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8 }))).catch(() => {}),
       loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
       loadGLBOr("md_oak", "tree_oak").then((g) => (assets.props.oak = fitProp(g.scene, { height: 6.5 }))),
       loadGLBOr("md_pine", "tree_pine").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
