@@ -1980,6 +1980,7 @@ const homePages = $("#homePages");
 const PAGE = { missions: 0, skins: 1, play: 2, compete: 3, shop: 4 };
 const PAGE_NAMES = Object.keys(PAGE);
 let homePage = PAGE.play;
+let missionsWaiting = { road: false, missions: false }; // what the Missions tab has to collect
 // ── the home picture on phones: the runners always stand in the free space between
 // the logo and the play card, whatever widgets get added above or below them ──
 const ART_RUNNERS = { top: 0.25, bottom: 0.63 }; // where the runners are in home_tall.jpg, as parts of its height
@@ -2032,7 +2033,11 @@ function setHomePage(i, animate = true) {
     t.setAttribute("aria-selected", String(on));
   }
   if (homePage === PAGE.compete) renderCompete();
-  if (homePage === PAGE.missions) showMissionTab(missionTab);
+  if (homePage === PAGE.missions) {
+    // open on the tab that has something to collect
+    if (!missionsWaiting[missionTab]) missionTab = missionsWaiting.road ? "road" : missionsWaiting.missions ? "missions" : missionTab;
+    showMissionTab(missionTab);
+  }
   if (homePage === PAGE.skins) renderSkins();
   if (homePage === PAGE.shop) {
     mountShop($("#shopHome"));
@@ -8985,8 +8990,14 @@ function renderMissionDots() {
   const md = $('.m-tab[data-mt="missions"] .dot');
   if (md) md.hidden = !(daily || career);
   $("#careerDot").hidden = !career;
+  // the bottom tab says WHICH has something to collect: 🏅 Medal Road, 📋 Missions
   const dot = document.querySelector(`.htab[data-page="${PAGE.missions}"] .dot`);
-  if (dot) dot.hidden = !(daily || career || gold);
+  if (dot) {
+    dot.hidden = !(daily || career || gold);
+    dot.textContent = `${gold ? "🏅" : ""}${daily || career ? "📋" : ""}`;
+    dot.classList.add("lbl");
+  }
+  missionsWaiting = { road: gold, missions: daily || career };
   $("#dailyDot").hidden = !daily;
   renderStoreDot();
 }
