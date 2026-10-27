@@ -33,7 +33,7 @@ export const COUNTDOWN_MS = 5000; // room to load and warm up before the 3-2-1
 export const RACE_LIMIT_MS = 90000; // hard cap on a race
 export const AFTER_FIRST_MS = 15000; // stragglers get this long after the winner
 export const LOBBY_GRACE_MS = 10000; // a dropped lobby player keeps their spot this long
-export const CHARACTERS = 14; // 8 runners + 6 collectible 3D runners
+export const CHARACTERS = 18; // 8 runners + 10 collectible 3D runners
 
 /**
  * Ways to play (the lobby host picks one):
@@ -111,7 +111,7 @@ export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
 /** The classic maps (3D models), then the themed ones built in code (public/themes.js: same ids). */
-export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space", "snowy", "candy", "crystal", "neon", "mars", "deepsea", "lava", "rainbow", "clouds", "egypt", "synth", "icecream", "aurora", "artlist"]; // Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet and Fairy Forest retired
+export const MAPS = ["meadow", "farm", "beach", "city", "stadium", "space", "snowy", "candy", "crystal", "neon", "mars", "deepsea", "lava", "rainbow", "clouds", "egypt", "synth", "icecream", "aurora", "artlist", "uranus"]; // Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet and Fairy Forest retired
 /** The maps a "random" pick draws from: Artlist is only raced when picked by name. */
 export const RANDOM_MAPS = MAPS.filter((m) => m !== "artlist");
 /** Themed maps borrow a classic map's moving obstacles (the rest use the meadow's logs and bees). */

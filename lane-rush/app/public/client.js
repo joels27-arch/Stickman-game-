@@ -91,6 +91,10 @@ const RUNNERS = [
   { name: "Pandu", color: "#d23a2a", file: "c11", tag: "Karate Panda", cid: "pandu" },
   { name: "Siete", color: "#e02424", file: "c12", tag: "Football Star", cid: "striker" },
   { name: "Unit-X", color: "#9aa8bd", file: "c13", tag: "Chrome Robot", cid: "unitx" },
+  { name: "Big Dunk", color: "#14b8b0", file: "c14", tag: "Court King", cid: "dunk" },
+  { name: "Webster", color: "#1a6a78", file: "c15", tag: "Web Slinger", cid: "webster" },
+  { name: "MC Gold", color: "#f0b400", file: "c16", tag: "Rap Star", cid: "rapstar" },
+  { name: "Momo", color: "#e9ecef", file: "c17", tag: "Snow Buddy", cid: "momo" },
 ];
 const STARTERS = 8; // the first 8 runners; the rest are collectibles
 /** Collection id → runner index, for the collectibles that are 3D runners. */
@@ -145,11 +149,11 @@ const COLLECTION = [
   { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pass", passLv: 1 }, // yours the moment you buy the Gold Pass
   { id: "unitx", name: "Unit-X", color: "#9aa8bd", rarity: "epic", via: "road", legacy: { medal: "silver", count: 5 } },
   { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "road", legacy: { medal: "gold", count: 6 } },
-  // heroes and stars (pictures only)
+  // heroes and stars
   { id: "captainstar", name: "Captain Star", color: "#2f5ae0", rarity: "rare", via: "pack" },
   { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "pack" },
   { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "road" },
-  { id: "boulder", name: "The Boulder", color: "#7a5a3a", rarity: "legendary", via: "road" },
+  { id: "dunk", name: "Big Dunk", color: "#14b8b0", rarity: "legendary", via: "road" },
   { id: "rapstar", name: "MC Gold", color: "#f0b400", rarity: "epic", via: "road", pic: "/assets/pk_rapstar.webp" },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
@@ -1084,6 +1088,8 @@ function giveItem(id) {
   if (!wallet.has(id)) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), id]));
 }
 // Unit-X, once for everyone (to try the Artlist map)
+// The Boulder left the game: whoever had him gets Big Dunk in his place
+if (wallet.has("boulder")) giveItem("dunk");
 if (!local.getItem("lr:gift:unitx")) {
   giveItem("unitx");
   local.setItem("lr:gift:unitx", "1");
@@ -2231,7 +2237,7 @@ const ROAD = [
   { pts: 520, coins: 1800 },
   { pts: 560, pack: "legend" },
   { pts: 630, coins: 2000 },
-  { pts: 700, char: "boulder" },
+  { pts: 700, char: "dunk" },
   { pts: 780, pack: "mega" },
   { pts: 850, pack: "mega" },
   { pts: 920, coins: 2500 },
@@ -3367,6 +3373,44 @@ if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
   gfx = o;
 }
 const startGfx = gfx; // what the renderer was made with (edge smoothing, shadows)
+
+/**
+ * Bloom (glow on the bright parts), only on the Uranus map: the post-processing
+ * code loads the first time it's needed; until then frames render plainly.
+ */
+let bloom = null; // { composer, ratio, w, h } once loaded, "loading" while it loads
+function loadBloom() {
+  if (bloom && bloom !== "loading") return true;
+  if (!bloom && renderer) {
+    bloom = "loading";
+    Promise.all([
+      import("/vendor/jsm/postprocessing/EffectComposer.js"),
+      import("/vendor/jsm/postprocessing/RenderPass.js"),
+      import("/vendor/jsm/postprocessing/UnrealBloomPass.js"),
+      import("/vendor/jsm/postprocessing/OutputPass.js"),
+    ])
+      .then(([{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }]) => {
+        const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: startGfx.aa ? 4 : 0 });
+        const composer = new EffectComposer(renderer, rt);
+        composer.addPass(new RenderPass(scene, camera));
+        composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.75, 0.45, 0.78));
+        composer.addPass(new OutputPass());
+        bloom = { composer, ratio: 0, w: 0, h: 0 };
+      })
+      .catch(() => (bloom = "loading")); // no bloom files: stay plain
+  }
+  return false;
+}
+function renderBloom(dt) {
+  const ratio = renderer.getPixelRatio();
+  const size = renderer.getSize(new THREE.Vector2());
+  if (bloom.ratio !== ratio || bloom.w !== size.x || bloom.h !== size.y) {
+    Object.assign(bloom, { ratio, w: size.x, h: size.y });
+    bloom.composer.setPixelRatio(ratio);
+    bloom.composer.setSize(size.x, size.y);
+  }
+  bloom.composer.render(dt);
+}
 
 let renderer;
 try {
@@ -4814,6 +4858,7 @@ const world = (() => {
     ground.material.color.set(look.color);
     ground.material.map = theme ? patternTex(theme.ground, 6, 700, GROUND_LEN) : typeof look.tex === "string" ? groundTex(look.tex) : look.tex ? grassTex : null;
     ground.material.needsUpdate = true;
+    ground.visible = map !== "uranus"; // nothing under the road out in space
     chalk.color.set(theme?.track.lines ?? "#ffffff");
     if (!sharedBuilt) buildShared();
   }
@@ -4828,6 +4873,7 @@ const world = (() => {
   const MAP_SKY = {
     space: { file: "space_pano.jpg", turn: 0.62, drop: 60, bg: "#0b0722", fog: "#1b1240", clouds: false },
     city: { file: "city_pano.jpg", turn: 0, drop: 46, bg: "#3f9ae6", fog: "#cfe6f5", clouds: true },
+    uranus: { paint: buildUranusSky, bg: "#12062e", fog: "#3a1464", clouds: false },
   };
   const mapSkies = {}; // map -> group
   function mapSkyGroup(map) {
@@ -4836,6 +4882,10 @@ const world = (() => {
     scene.add(g);
     mapSkies[map] = g;
     const sky = MAP_SKY[map];
+    if (sky.paint) {
+      sky.paint(g);
+      return g;
+    }
     texLoader.load(`/assets/${sky.file}`, (t) => {
       t.colorSpace = THREE.SRGBColorSpace;
       t.wrapS = THREE.RepeatWrapping;
@@ -4868,6 +4918,286 @@ const world = (() => {
       scene.fog.color.set(own.fog);
     }
     setWeather(theme?.fx ?? null);
+  }
+
+  // ── Uranus: deep space. A painted nebula with twinkling stars and a ringed planet
+  // (all far away, fixed to the view), 3D asteroids tumbling past both sides, a dark
+  // metal road with glowing rails, speed streaks and pink / cyan light (bloom in frame()). ──
+  function nebulaTex() {
+    const W = 2048;
+    const H = 1024;
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const g = c.getContext("2d");
+    let s = 777;
+    const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    const base = g.createLinearGradient(0, 0, 0, H);
+    base.addColorStop(0, "#08031a");
+    base.addColorStop(0.5, "#1e0a3e");
+    base.addColorStop(1, "#0a0420");
+    g.fillStyle = base;
+    g.fillRect(0, 0, W, H);
+    // soft clouds of purple, blue and pink, drawn twice across the seam so it wraps
+    g.globalCompositeOperation = "lighter";
+    const tints = ["122,42,168", "58,60,190", "200,58,154", "150,40,190", "90,30,150", "230,90,190"];
+    for (let i = 0; i < 70; i++) {
+      const x = r() * W;
+      const y = H * (0.2 + r() * 0.65);
+      const rad = 80 + r() * 320;
+      const col = tints[Math.floor(r() * tints.length)];
+      const a = 0.05 + r() * 0.12;
+      for (const dx of [-W, 0, W]) {
+        const gr = g.createRadialGradient(x + dx, y, 0, x + dx, y, rad);
+        gr.addColorStop(0, `rgba(${col},${a})`);
+        gr.addColorStop(1, `rgba(${col},0)`);
+        g.fillStyle = gr;
+        g.fillRect(x + dx - rad, y - rad, rad * 2, rad * 2);
+      }
+    }
+    // faint dust of tiny stars
+    for (let i = 0; i < 3500; i++) {
+      const a = 0.25 + r() * 0.6;
+      g.fillStyle = `rgba(255,255,255,${a})`;
+      const sz = r() < 0.9 ? 1 : 2;
+      g.fillRect(r() * W, r() * H, sz, sz);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = THREE.RepeatWrapping;
+    return t;
+  }
+  function planetTex() {
+    const c = document.createElement("canvas");
+    c.width = 1024;
+    c.height = 640;
+    const g = c.getContext("2d");
+    const cx = 512;
+    const cy = 320;
+    const R = 190;
+    const ring = (front) => {
+      g.save();
+      g.translate(cx, cy);
+      g.rotate(-0.2);
+      g.beginPath();
+      // the ring's far half goes behind the planet, the near half in front
+      g.rect(-520, front ? 0 : -400, 1040, 400);
+      g.clip();
+      for (let k = 0; k < 26; k++) {
+        const rr = 270 + k * 7.5;
+        g.beginPath();
+        g.ellipse(0, 0, rr, rr * 0.26, 0, 0, Math.PI * 2);
+        g.strokeStyle = `rgba(${k % 3 ? "236,200,255" : "255,170,230"},${0.18 + 0.5 * Math.abs(Math.sin(k * 1.7))})`;
+        g.lineWidth = 3.5;
+        g.stroke();
+      }
+      g.restore();
+    };
+    ring(false);
+    g.save();
+    g.beginPath();
+    g.arc(cx, cy, R, 0, Math.PI * 2);
+    g.clip();
+    g.fillStyle = "#c98ad8";
+    g.fillRect(cx - R, cy - R, R * 2, R * 2);
+    // wavy bands
+    const bands = ["#f2c4ec", "#a868c8", "#e8a0d8", "#8a4aa8", "#f8dcf4", "#b47ad0"];
+    for (let y = -R; y < R; y += 9) {
+      g.beginPath();
+      for (let x = -R; x <= R; x += 8) g.lineTo(cx + x, cy + y + 7 * Math.sin(x * 0.03 + y * 0.11));
+      g.strokeStyle = bands[Math.abs(Math.round(y / 9)) % bands.length];
+      g.globalAlpha = 0.55;
+      g.lineWidth = 8;
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+    // lit from the upper right, dark on the far side
+    const sh = g.createRadialGradient(cx + R * 0.45, cy - R * 0.4, R * 0.2, cx, cy, R * 1.05);
+    sh.addColorStop(0, "rgba(255,240,255,0.35)");
+    sh.addColorStop(0.55, "rgba(40,10,60,0)");
+    sh.addColorStop(1, "rgba(20,4,40,0.85)");
+    g.fillStyle = sh;
+    g.fillRect(cx - R, cy - R, R * 2, R * 2);
+    g.restore();
+    ring(true);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+  /** The far-away part: nebula dome, ~1,400 twinkling stars and the ringed planet. Follows the camera. */
+  function buildUranusSky(g) {
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(380, 48, 24), new THREE.MeshBasicMaterial({ map: nebulaTex(), side: THREE.BackSide, fog: false, depthWrite: false }));
+    dome.renderOrder = -2;
+    g.add(dome);
+    let s = 99;
+    const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    const n = 1400;
+    const pos = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    const ph = new Float32Array(n);
+    const size = new Float32Array(n);
+    const tint = [new THREE.Color("#ffffff"), new THREE.Color("#cfe0ff"), new THREE.Color("#ffd0f0"), new THREE.Color("#e0d0ff")];
+    for (let i = 0; i < n; i++) {
+      const a = r() * Math.PI * 2;
+      const y = -0.35 + r() * 1.35;
+      const rr = Math.sqrt(Math.max(0, 1 - Math.min(1, y * y)));
+      pos.set([Math.cos(a) * rr * 350, Math.min(1, y) * 350, Math.sin(a) * rr * 350], i * 3);
+      tint[Math.floor(r() * tint.length)].toArray(col, i * 3);
+      ph[i] = r() * 10;
+      size[i] = 1.2 + Math.pow(r(), 3) * 3.2;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    geo.setAttribute("phase", new THREE.BufferAttribute(ph, 1));
+    geo.setAttribute("size", new THREE.BufferAttribute(size, 1));
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { time: { value: 0 }, ratio: { value: 1 } },
+      vertexShader: `attribute float phase; attribute float size; attribute vec3 color; uniform float time; uniform float ratio; varying vec3 vC;
+        void main() { float tw = 0.6 + 0.4 * sin(time * (1.3 + phase * 0.25) + phase * 6.28); vC = color * tw * 1.5;
+          gl_PointSize = size * ratio * (0.8 + 0.3 * tw); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `varying vec3 vC; void main() { vec2 d = gl_PointCoord - 0.5; float a = smoothstep(0.5, 0.0, length(d)); gl_FragColor = vec4(vC * a, a); }`,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const stars = new THREE.Points(geo, mat);
+    stars.renderOrder = -1;
+    stars.frustumCulled = false;
+    g.add(stars);
+    const planet = new THREE.Sprite(new THREE.SpriteMaterial({ map: planetTex(), fog: false, depthWrite: false, transparent: true }));
+    planet.scale.set(210, 131, 1);
+    planet.position.set(-150, 70, -290);
+    planet.renderOrder = -1;
+    g.add(planet);
+    uranusStars = mat;
+  }
+  let uranusStars = null;
+  /** The near part (built once, shown only on Uranus): asteroids, speed streaks, pink and cyan lights. */
+  let uranusFx = null;
+  const ROCK_RANGE = 330;
+  function makeUranusFx() {
+    const root = new THREE.Group();
+    let s = 2024;
+    const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    const hash = (x, y, z) => {
+      const h = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
+      return h - Math.floor(h);
+    };
+    const rockMat = new THREE.MeshStandardMaterial({ color: "#3a2c5c", roughness: 0.82, metalness: 0.15, flatShading: true });
+    const rocks = [];
+    const meshes = [];
+    const per = [27, 27, 26];
+    for (let v = 0; v < 3; v++) {
+      const geo = new THREE.IcosahedronGeometry(1, 1);
+      const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i);
+        const y = p.getY(i);
+        const z = p.getZ(i);
+        const k = 0.72 + 0.5 * hash(Math.round(x * 100) + v * 7, Math.round(y * 100), Math.round(z * 100));
+        p.setXYZ(i, x * k, y * k * (0.8 + v * 0.1), z * k);
+      }
+      geo.computeVertexNormals();
+      const m = new THREE.InstancedMesh(geo, rockMat, per[v]);
+      m.frustumCulled = false;
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      root.add(m);
+      meshes.push(m);
+      for (let i = 0; i < per[v]; i++) {
+        const side = rocks.length % 2 ? 1 : -1;
+        rocks.push({
+          mesh: m,
+          i,
+          side,
+          x: side * (TRACK_W / 2 + 5 + Math.pow(r(), 1.4) * 60),
+          y: -14 + r() * 38,
+          z: null,
+          off: r() * ROCK_RANGE,
+          drift: 1.5 + r() * 4,
+          s: 0.5 + Math.pow(r(), 2.2) * 5,
+          rot: new THREE.Euler(r() * 6, r() * 6, r() * 6),
+          spin: new THREE.Vector3((r() - 0.5) * 0.8, (r() - 0.5) * 0.8, (r() - 0.5) * 0.8),
+        });
+      }
+    }
+    // speed streaks: thin lines around the camera, rushing past when you're fast
+    const nS = 60;
+    const sp = new Float32Array(nS * 6);
+    const streaks = [];
+    for (let i = 0; i < nS; i++) {
+      const a = -0.4 + r() * (Math.PI + 0.8); // above and beside, never through the road
+      const rad = 3 + r() * 7;
+      streaks.push({ x: Math.cos(a) * rad, y: Math.sin(a) * rad * 0.8 + 0.5, z: -r() * 70, len: 3 + r() * 5 });
+    }
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute("position", new THREE.BufferAttribute(sp, 3).setUsage(THREE.DynamicDrawUsage));
+    const sMat = new THREE.LineBasicMaterial({ color: "#d8ecff", transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    const lines = new THREE.LineSegments(sg, sMat);
+    lines.frustumCulled = false;
+    const near = new THREE.Group(); // follows the camera
+    near.add(lines);
+    // coloured light from the front: pink from the left, cyan from the right
+    for (const [color, x] of [["#ff5ad0", -10], ["#4af0ff", 10]]) {
+      const l = new THREE.DirectionalLight(color, 1.6);
+      l.position.set(x, 6, -14);
+      l.target.position.set(0, 0, 2);
+      near.add(l, l.target);
+    }
+    root.add(near);
+    root.visible = false;
+    scene.add(root);
+    return { root, rocks, meshes, streaks, lines, sMat, near, m4: new THREE.Matrix4(), q: new THREE.Quaternion(), v: new THREE.Vector3(), sc: new THREE.Vector3() };
+  }
+  /** Glowing rails along both edges of the Uranus road (cyan left, pink right). */
+  function buildUranus(group, edge) {
+    const theme = THEME.uranus;
+    const len = TRACK_LEN + 220;
+    group.add(runningTrack(patternTex(theme.track, 3, TRACK_W, len), "#0c1226", theme.track.kerb));
+    for (const [side, color] of [[-1, "#5ff6ff"], [1, "#ff5ad8"]]) {
+      const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.8) });
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, len), mat);
+      rail.position.set(side * (edge + 0.44), 0.08, -(len / 2 - 60));
+      group.add(rail);
+    }
+    if (!uranusFx) uranusFx = makeUranusFx();
+  }
+  function stepUranus(camZ, dt, speed) {
+    const u = uranusFx;
+    if (!u) return;
+    u.root.visible = activeMap === "uranus";
+    if (!u.root.visible) return;
+    if (uranusStars) {
+      uranusStars.uniforms.time.value = performance.now() / 1000;
+      uranusStars.uniforms.ratio.value = renderer?.getPixelRatio() ?? 1;
+    }
+    for (const k of u.rocks) {
+      if (k.z === null) k.z = camZ - 20 - k.off;
+      k.z += k.drift * dt;
+      // passed behind you: back to the far end; far off after a restart: pull it into range
+      while (k.z > camZ + 12) k.z -= ROCK_RANGE;
+      while (k.z < camZ + 12 - ROCK_RANGE) k.z += ROCK_RANGE;
+      k.rot.x += k.spin.x * dt;
+      k.rot.y += k.spin.y * dt;
+      k.rot.z += k.spin.z * dt;
+      u.q.setFromEuler(k.rot);
+      u.m4.compose(u.v.set(k.x, k.y, k.z), u.q, u.sc.setScalar(k.s));
+      k.mesh.setMatrixAt(k.i, u.m4);
+    }
+    for (const m of u.meshes) m.instanceMatrix.needsUpdate = true;
+    u.near.position.set(camera.position.x, camera.position.y, camZ);
+    const fast = THREE.MathUtils.clamp((speed - BASE_SPEED * 0.92) / (BASE_SPEED * 0.6), 0, 1);
+    u.sMat.opacity = fast * 0.75;
+    u.lines.visible = fast > 0.01;
+    if (u.lines.visible) {
+      const a = u.lines.geometry.attributes.position.array;
+      u.streaks.forEach((st, i) => {
+        st.z += speed * 2.4 * dt;
+        if (st.z > 4) st.z -= 74;
+        a.set([st.x, st.y, st.z, st.x, st.y, st.z - st.len * (0.5 + fast)], i * 6);
+      });
+      u.lines.geometry.attributes.position.needsUpdate = true;
+    }
   }
 
   // city, stadium and space: Higgsfield 3D props along the track, plus simple edges
@@ -5526,6 +5856,7 @@ const world = (() => {
     if (map === "city") buildCity(add, group, r, edge);
     else if (map === "stadium") buildStadium(add, group, r, edge);
     else if (map === "space") buildSpace(add, group, r, edge);
+    else if (map === "uranus") buildUranus(group, edge);
     else if (theme) buildThemed(theme, group, r, edge);
 
     if (map === "meadow") {
@@ -5713,8 +6044,9 @@ const world = (() => {
     }
   }
 
-  function tick(camZ, dt) {
+  function tick(camZ, dt, speed = 0) {
     stepParticles(dt);
+    stepUranus(camZ, dt, speed);
     stepWeather(dt, camZ);
     skyGroup.position.z = camZ;
     clouds.position.z = camZ;
@@ -9786,8 +10118,9 @@ function frame(now) {
 
   if (game.mode === "race" || game.mode === "results-pending") world.stepRunCoins(me.d);
   if (startGfx.shadows) world.followSun(camera.position.x * 0.5, camera.position.z - 9);
-  world.tick(camera.position.z, dt);
-  renderer?.render(scene, camera);
+  world.tick(camera.position.z, dt, game.mode === "race" ? me.speed : 0);
+  if (world.activeMap === "uranus" && loadBloom()) renderBloom(dt);
+  else renderer?.render(scene, camera);
   perfHud?.frame(dt * 1000);
   renderMirror();
   adaptQuality(dt);
