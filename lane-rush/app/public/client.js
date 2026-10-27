@@ -4364,6 +4364,12 @@ const world = (() => {
           // a glossy, toy-like finish: the sky light gives them soft highlights
           o.material.roughness = 0.5;
           o.material.envMapIntensity = 0.75;
+          // full metal (Unit-X's chrome) reflects only the sky and goes near black at night: keep it bright
+          if (o.material.metalness > 0.4) {
+            o.material.metalness = 0.3;
+            o.material.roughness = 0.35;
+            o.material.envMapIntensity = 1.3;
+          }
           addRim(o.material);
         }
       }
