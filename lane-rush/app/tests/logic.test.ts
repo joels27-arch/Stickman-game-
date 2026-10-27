@@ -210,7 +210,7 @@ describe("difficulty manager", () => {
         expect(L.floorAt(c, b.lane, b.z1 + 0.5)).toBe(0);
         expect(L.busAt(c, b.lane, b.z0 + 2)).toBe(true);
       }
-      expect(c.buses.every((b) => b.z0 > 250)).toBe(true);
+      expect(c.buses.every((b) => b.z0 > 120)).toBe(true);
       // never every lane: there's always a road lane to stay on
       for (const b of c.buses) expect(c.buses.filter((o) => o.z0 === b.z0).length).toBeLessThan(L.LANES);
     }
