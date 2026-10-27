@@ -958,62 +958,68 @@ function maybeAskName() {
     askModal.hidden = false;
   }, 1400);
 }
-/** First visit: pick your first runner out of five (the others come on the Trophy Road). Tap one, it lights up, then confirm. */
-let starterPick = null;
+/** First visit: a Starter Pack with one of five runners inside. Tap it open: a spin through the five lands on yours. */
 function askStarter() {
   if (starterChoice() !== null) return;
-  starterPick = null;
   $("#starterGrid").replaceChildren(
-    ...FIRST_FIVE.map((i) => {
-      const b = el("button", { class: "pf-zone", type: "button", style: `--team:${RUNNERS[i].color}`, "aria-label": RUNNERS[i].name }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }));
-      b.addEventListener("click", () => {
-        sfx.tap();
-        buzz(15);
-        starterPick = i;
-        for (const z of $("#starterGrid").children) z.classList.toggle("on", z === b);
-        $("#starterGrid").classList.add("chosen");
-        const go = $("#starterGo");
-        go.disabled = false;
-        go.textContent = `Confirm ${RUNNERS[i].name} ✓`;
-      });
-      return b;
-    }),
+    ...FIRST_FIVE.map((i) => el("span", { class: "pf-zone", style: `--team:${RUNNERS[i].color}`, "data-i": String(i) }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }))),
   );
-  $("#starterGrid").classList.remove("chosen");
-  $("#starterGo").disabled = true;
-  $("#starterGo").textContent = "Tap a runner";
-  // sealed first: a Starter Pack to tap open, then the five fly out
+  $("#starterGrid").className = "pf-row pf-odds";
+  $("#starterGrid").hidden = false;
+  $("#starterGo").hidden = true;
   $("#starterPack").hidden = false;
   $("#starterPack").classList.remove("burst");
-  $("#starterGrid").hidden = $("#starterGo").hidden = true;
   $("#starterTitle").textContent = "Your Starter Pack";
-  $("#starterSub").textContent = "5 runners inside. You keep 1";
+  $("#starterSub").textContent = "One of these 5 is inside";
   $("#starterModal").hidden = false;
+}
+function giveStarter(i) {
+  local.setItem("lr:starter", String(i));
+  local.setItem("lr:char", String(i));
+  if (!wallet.owned().includes(i)) local.setItem("lr:owned", JSON.stringify([...wallet.owned(), i]));
+  world.setShowcase?.(i);
+  renderCollPill();
+  if (homePage === PAGE.skins) renderSkins();
 }
 $("#starterPack").addEventListener("click", () => {
   const pack = $("#starterPack");
   if (pack.classList.contains("burst")) return;
+  const win = FIRST_FIVE[Math.floor(Math.random() * FIRST_FIVE.length)];
+  giveStarter(win); // saved right away: closing the app mid-spin can't lose it
   sfx.pack?.();
   buzz(30);
   pack.classList.add("burst");
+  $("#starterTitle").textContent = "Opening…";
+  $("#starterSub").textContent = "";
+  const zones = [...$("#starterGrid").children];
+  const end = zones.findIndex((z) => Number(z.dataset.i) === win);
+  // spin: about three laps, slowing down, stopping on the winner
+  const steps = zones.length * 3 + end;
+  let k = 0;
+  const spin = () => {
+    zones.forEach((z, j) => z.classList.toggle("on", j === k % zones.length));
+    sfx.tap?.();
+    if (k >= steps) {
+      setTimeout(() => {
+        zones.forEach((z, j) => z.classList.toggle("lose", j !== end));
+        zones[end].classList.add("win");
+        sfx.finish();
+        buzz(60);
+        $("#starterTitle").textContent = `You got ${RUNNERS[win].name}!`;
+        setTimeout(() => {
+          $("#starterModal").hidden = true;
+          showUnlock({ kind: "char", char: { name: RUNNERS[win].name, rarity: STARTER_RARITY[win], img: `/assets/lu_${RUNNERS[win].file}.webp` } }, () => toast("Win medals to unlock the others on the Medal Road"));
+        }, 1300);
+      }, 250);
+      return;
+    }
+    k++;
+    setTimeout(spin, 70 + Math.pow(k / steps, 3) * 380);
+  };
   setTimeout(() => {
     pack.hidden = true;
-    $("#starterTitle").textContent = "Pick 1 of 5";
-    $("#starterSub").textContent = "The others unlock as you play";
-    $("#starterGrid").hidden = $("#starterGo").hidden = false;
-    $("#starterGrid").classList.add("reveal");
+    spin();
   }, 650);
-});
-$("#starterGo").addEventListener("click", () => {
-  const i = starterPick;
-  if (i == null) return;
-  sfx.finish();
-  local.setItem("lr:starter", String(i));
-  local.setItem("lr:char", String(i));
-  $("#starterModal").hidden = true;
-  world.setShowcase?.(i);
-  renderCollPill();
-  showUnlock({ kind: "char", char: { name: RUNNERS[i].name, rarity: STARTER_RARITY[i], img: `/assets/lu_${RUNNERS[i].file}.webp` } }, () => toast("Win medals to unlock the others on the Medal Road"));
 });
 $("#askSave").addEventListener("click", () => {
   sfx.tap();
@@ -2293,7 +2299,7 @@ const ROAD = [
 const ROAD_DUPE = { epic: 800, legendary: 1500 };
 const roadChar = (id) => ROAD_CHARS.find((c) => c.id === id) ?? COLLECTION.find((c) => c.id === id);
 function roadInfo(step) {
-  if (step.coins) return { label: `${step.coins.toLocaleString()} coins`, img: step.coins >= 2500 ? "/assets/ui_c3.webp" : step.coins >= 1000 ? "/assets/ui_c2.webp" : "/assets/ui_c1.webp" };
+  if (step.coins) return { label: `${step.coins.toLocaleString()} coins`, img: step.coins >= 2500 ? "/assets/ui_c3.webp" : "/assets/ui_c2.webp" };
   if (step.pack) return { label: PACKS.find((x) => x.id === step.pack)?.name ?? "Pack", img: `/assets/pack_${step.pack}.webp` };
   if (step.runner !== undefined) return { label: RUNNERS[step.runner].name, img: portrait(step.runner), rarity: STARTER_RARITY[step.runner] };
   const c = roadChar(step.char);
