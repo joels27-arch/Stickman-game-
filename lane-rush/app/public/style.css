@@ -3089,3 +3089,8 @@ html, body { background: var(--k1); }
 .mr-league { margin-top: 6px; padding: 8px 14px; border-radius: 16px; border: 2px solid rgba(255, 255, 255, 0.6); background: linear-gradient(135deg, color-mix(in srgb, var(--t) 85%, #fff) 0%, var(--t) 50%, color-mix(in srgb, var(--t) 60%, #000) 100%); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35); }
 .mr-league b { color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
 .mr-league img { width: 40px; height: 40px; }
+/* tournaments: every card exactly the same size */
+#tourneyList .trow { height: 116px; min-height: 0; overflow: hidden; }
+#tourneyList .tr-txt { min-width: 0; }
+#tourneyList .tr-txt b, #tourneyList .tr-txt small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#tourneyList .tr-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

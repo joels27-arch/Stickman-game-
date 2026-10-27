@@ -2684,9 +2684,10 @@ function renderCompete() {
       el("i", { class: "tr-go", text: "›" }),
     );
   $("#tourneyList").replaceChildren(
-    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, prizeEl(LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0)), { live: w.open, ready, desc: "10 matches vs bots. Win medals!" }),
+    // Grand Tour and Endless Run first, the Weekend League below them
     ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, prizeEl(t.prize[0]), { desc: t.text })),
     row("endless", ENDLESS_T.img, "Endless Run", tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, prizeEl(ENDLESS_T.prize[0]), { desc: ENDLESS_T.text }),
+    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, prizeEl(LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0)), { live: w.open, ready, desc: "10 matches vs bots. Win medals!" }),
   );
   if (!tourneyModal.hidden) renderTourneySheet();
 }
