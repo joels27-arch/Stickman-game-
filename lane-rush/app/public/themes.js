@@ -112,7 +112,7 @@ export const THEMES = [
   T("artlist", "Artlist", "🎬", {
     sky: { top: "#050507", mid: "#16161c", horizon: "#3a2e10" }, sun: null, night: true, fog: ["#141418", 50, 230], clouds: false,
     light: { hemi: ["#fff2cc", "#18181e", 1.15], sun: ["#ffffff", 1.4] }, far: "#101014", near: "#1c1c22",
-    ground: { style: "grid", colors: ["#121216", "#ffc81e"] }, track: { style: "tiles", colors: ["#26262c", "#2e2e36", "#1e1e24"], kerb: "#ffc81e", lines: "#ffffff" },
+    ground: { style: "grid", colors: ["#1c1a40", "#ffc81e"] }, track: { style: "tiles", colors: ["#3b3f9a", "#4549ab", "#30348a"], kerb: "#ffc81e", lines: "#ffc81e" },
     props: [["building", 5, { c: ["#1e1e24", "#26262e", "#2a2a2a"] }, [1, 2.4], true], ["lamp", 2, { c: ["#2a2a30"], accent: ["#ffc81e", "#ffffff"] }, null, true]],
     arches: ["#ffc81e", "#ffffff"], hills: 0, fx: "dust",
   }),
