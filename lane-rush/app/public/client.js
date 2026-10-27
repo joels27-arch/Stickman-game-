@@ -123,12 +123,15 @@ function gamesPlayed() {
     return 0;
   }
 }
-/** What each games step gives: the four starters you didn't pick, then Nova, Kiko and Gloop. */
+/** Runners on the Medal Road (won with medal points, not games played): the four starters you didn't pick, then Nova, Kiko and Gloop. */
+const MEDAL_RUNNER_PTS = [15, 35, 58, 88, 150, 275, 470];
 function gamesRoad() {
   const s = starterChoice();
   const list = s === "all" ? [{ runner: KIKO }, { char: "gloop" }] : [...FIRST_FIVE.filter((i) => i !== (s ?? 0)).map((i) => ({ runner: i })), { runner: NOVA }, { runner: KIKO }, { char: "gloop" }];
-  return list.map((r, k) => ({ ...r, games: GAMES_STEPS[k + GAMES_STEPS.length - list.length] }));
+  return list.map((r, k) => ({ ...r, pts: MEDAL_RUNNER_PTS[k + MEDAL_RUNNER_PTS.length - list.length] }));
 }
+/** Every stop on the Medal Road: the rewards plus those runners, in order. */
+const roadSteps = () => [...ROAD, ...gamesRoad()].sort((a, b) => a.pts - b.pts);
 const gamesStepOf = (c) => gamesRoad().find((g) => (c.cid ?? c.id) === g.char || (g.runner !== undefined && g.runner === c.idx));
 
 
@@ -649,7 +652,7 @@ const TOUR = [
   { sel: ".stats-hero", open: "stats", img: "/assets/lg_bronze.webp", title: "Your profile", text: "Your stats and how you rank." },
   { sel: "#tourneyList", page: "compete", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "Win coin prizes." },
   { sel: "#skinGrid .ccard", page: "skins", img: "/assets/tab_skins.webp", title: "Skins", text: "Pick who you race with." },
-  { sel: "#trophyRoad", page: "missions", img: "/assets/tab_missions.webp", title: "Missions", text: "Missions and the Trophy Road." },
+  { sel: "#trophyRoad", page: "missions", img: "/assets/tab_missions.webp", title: "Missions", text: "Missions and the Medal Road." },
   { sel: "#packRow .pack-card", page: "shop", img: "/assets/tab_shop.webp", title: "Shop", text: "Packs and characters." },
   { sel: "#endlessBtn", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life. I'll teach you as you run!", last: true },
 ];
@@ -1011,7 +1014,7 @@ $("#starterGo").addEventListener("click", () => {
   $("#starterModal").hidden = true;
   world.setShowcase?.(i);
   renderCollPill();
-  showUnlock({ kind: "char", char: { name: RUNNERS[i].name, rarity: STARTER_RARITY[i], img: `/assets/lu_${RUNNERS[i].file}.webp` } }, () => toast("Play games to unlock the others on the Trophy Road"));
+  showUnlock({ kind: "char", char: { name: RUNNERS[i].name, rarity: STARTER_RARITY[i], img: `/assets/lu_${RUNNERS[i].file}.webp` } }, () => toast("Win medals to unlock the others on the Medal Road"));
 });
 $("#askSave").addEventListener("click", () => {
   sfx.tap();
@@ -1205,15 +1208,15 @@ function allChars() {
   ];
 }
 const ownsChar = (c) => (c.idx !== undefined ? wallet.owns(c.idx) : wallet.has(c.id));
-const VIA_LABEL = { starter: "Free", coins: "Coins", pack: "Packs", pass: "Season Pass", road: "Trophy Road" };
+const VIA_LABEL = { starter: "Free", coins: "Coins", pack: "Packs", pass: "Season Pass", road: "Medal Road" };
 const VIA_ICON = { starter: "✅", coins: "🪙", pack: "🎁", pass: "⭐", road: "🏆" };
 function howToGet(c) {
   if (c.via === "starter") return "Free to play.";
   if (c.via === "coins") return `${c.coins.toLocaleString()} coins in the Shop.`;
   if (c.via === "pack") return "Found in packs.";
   if (c.idx in PASS_RUNNERS) return `Season Pass, level ${PASS_RUNNERS[c.idx]}.`;
-  if (gamesStepOf(c)) return `Trophy Road: play ${gamesStepOf(c).games} game${gamesStepOf(c).games > 1 ? "s" : ""}.`;
-  if (c.via === "road") return `Trophy Road, at ${ROAD.find((r) => (c.idx !== undefined ? r.runner === c.idx : r.char === c.id)).pts.toLocaleString()} 🏆.`;
+  if (gamesStepOf(c)) return `Medal Road, at ${gamesStepOf(c).pts.toLocaleString()} 🏅.`;
+  if (c.via === "road") return `Medal Road, at ${ROAD.find((r) => (c.idx !== undefined ? r.runner === c.idx : r.char === c.id)).pts.toLocaleString()} 🏆.`;
   return `Gold Pass, level ${c.passLv ?? 30}.`;
 }
 /** The short lock label on a runner card you can't race with yet. */
@@ -1221,7 +1224,7 @@ function lockLabel(i) {
   const c = RUNNERS[i]?.cid && allChars().find((x) => x.id === RUNNERS[i].cid);
   if (c) return `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}`;
   const g = gamesRoad().find((x) => x.runner === i);
-  if (g) return `🏆 ${g.games} game${g.games > 1 ? "s" : ""}`;
+  if (g) return `🏅 ${g.pts}`;
   return i in PASS_RUNNERS ? `⭐ Pass Lv ${PASS_RUNNERS[i]}` : i in ROAD_RUNNERS ? `🏆 ${ROAD_RUNNERS[i]}` : "Locked";
 }
 function collectionCount() {
@@ -1256,7 +1259,7 @@ function charCard(c, n, onClick) {
   return b;
 }
 const byRarity = (x, y) => RARITY_ORDER.indexOf(x.rarity) - RARITY_ORDER.indexOf(y.rarity);
-const VIA_GROUP = { coins: "🪙 Buy with coins", pack: "🎁 From packs", pass: "⭐ Season Pass", road: "🏆 Trophy Road" };
+const VIA_GROUP = { coins: "🪙 Buy with coins", pack: "🎁 From packs", pass: "⭐ Season Pass", road: "🏅 Medal Road" };
 /** Characters split by how you get them (in this order), each group sorted common → legendary; empty groups left out. */
 function charGroups(list, order) {
   return order.map((via) => [via, list.filter((c) => c.via === via).sort(byRarity)]).filter(([, l]) => l.length);
@@ -1383,7 +1386,7 @@ function inspectChar(c) {
     btn.textContent = "In your collection ✓";
     btn.disabled = true;
   } else if (c.via === "road") {
-    btn.textContent = "See the Trophy Road";
+    btn.textContent = "See the Medal Road";
     action = () => {
       charModal.hidden = true;
       showScreen("home");
@@ -2305,7 +2308,7 @@ const road = {
   ready() {
     const p = rank.points();
     const done = this.claimed();
-    return ROAD.filter((r) => r.pts <= p && !done.includes(r.pts));
+    return roadSteps().filter((r) => r.pts <= p && !done.includes(r.pts));
   },
 };
 function claimRoad(step, node) {
@@ -2316,7 +2319,7 @@ function claimRoad(step, node) {
   if (step.coins) {
     wallet.addCoins(step.coins);
     coinRain(node, 14);
-    toast(`Trophy Road: +${info.label}!`);
+    toast(`Medal Road: +${info.label}!`);
   } else if (step.pack) {
     const pk = PACKS.find((x) => x.id === step.pack);
     openPackAnim(pk, grantPack(pk));
@@ -2391,7 +2394,7 @@ function renderTrophyRoad() {
       "div",
       { class: "road-head" },
       el("img", { src: r.img, alt: "" }),
-      el("div", {}, el("b", { text: "Trophy Road" }), el("span", { text: next ? `${r.name} · ${next.pts - p} pts to ${roadInfo(next).label}` : `${r.name} · road complete. Legend!` })),
+      el("div", {}, el("b", { text: "Medal Road" }), el("span", { text: next ? `${r.name} · ${next.pts - p} pts to ${roadInfo(next).label}` : `${r.name} · road complete. Legend!` })),
       el("em", { text: `${p.toLocaleString()} 🏆` }),
     ),
     track,
@@ -2440,49 +2443,7 @@ function gamesClaimed() {
   }
 }
 /** Steps played for but not collected yet. */
-const gamesReady = () => gamesRoad().filter((g) => g.games <= gamesPlayed() && !gamesClaimed().includes(g.games));
-function claimGamesStep(step) {
-  if (step.games > gamesPlayed() || gamesClaimed().includes(step.games)) return;
-  local.setItem("lr:groad", JSON.stringify([...gamesClaimed(), step.games]));
-  const c = step.char ? allChars().find((x) => x.id === step.char) : allChars().find((x) => x.idx === step.runner);
-  if (ownsChar(c)) {
-    wallet.addCoins(300);
-    toast(`${c.name} is already yours: +300 coins`);
-  } else {
-    giveItem(step.char ?? step.runner);
-    renderCollPill();
-    showUnlock({ kind: "char", char: { name: c.name, rarity: c.rarity, img: c.hero } });
-  }
-  sfx.finish();
-  renderRoadFull();
-  renderRankPill();
-}
-function gamesRoadBox() {
-  const n = gamesPlayed();
-  return el(
-    "div",
-    { class: "rv-games" },
-    el("b", { text: `Runners for playing · ${n} game${n === 1 ? "" : "s"} played` }),
-    el(
-      "div",
-      { class: "rg-row" },
-      ...gamesRoad().map((g) => {
-        const c = g.char ? allChars().find((x) => x.id === g.char) : allChars().find((x) => x.idx === g.runner);
-        const done = gamesClaimed().includes(g.games);
-        const due = !done && n >= g.games;
-        const b = el(
-          "button",
-          { class: `rg-step${done ? " got" : due ? " due" : ""}`, type: "button" },
-          el("img", { src: c.img, alt: "" }),
-          due ? el("em", { class: "rg-claim", text: "Claim!" }) : el("small", { text: done ? "✓" : `${g.games} game${g.games > 1 ? "s" : ""}` }),
-          el("em", { text: c.name }),
-        );
-        b.addEventListener("click", () => due && claimGamesStep(g));
-        return b;
-      }),
-    ),
-  );
-}
+const gamesReady = () => []; // runners come with medal points now (they are stops on the Medal Road)
 function renderRoadFull() {
   const p = rank.points();
   const done = road.claimed();
@@ -2493,7 +2454,6 @@ function renderRoadFull() {
       el("b", { text: "How you earn 🏆" }),
       el("span", { text: `Medals in races with friends: 🥇 +${MEDAL_PTS.gold} · 🥈 +${MEDAL_PTS.silver} · 🥉 +${MEDAL_PTS.bronze} · any other place +${LAST_PLACE_PTS}` }),
     ),
-    gamesRoadBox(),
   ];
   let side = 0;
   let youShown = false;
@@ -2512,7 +2472,7 @@ function renderRoadFull() {
     b.addEventListener("click", () => ready && claimRoad(step, b));
     return b;
   };
-  for (const step of ROAD) {
+  for (const step of roadSteps()) {
     if (!youShown && step.pts > p) {
       youShown = true;
       rows.push(you());
