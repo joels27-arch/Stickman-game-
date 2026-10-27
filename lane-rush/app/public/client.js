@@ -1929,11 +1929,11 @@ function fitHomeArt() {
     return;
   }
   if (homePage !== PAGE.play) return; // keep it where it was; only the Play page decides
-  const logo = $(".hp-play .home-road");
   const dock = $(".hp-play .home-dock");
   const top0 = art.getBoundingClientRect().top;
-  // offsetTop/Height ignore the logo's pop-in animation (a transform)
-  const top = logo.getBoundingClientRect().top - (logo.getBoundingClientRect().height - logo.offsetHeight) / 2 + logo.offsetHeight - top0 + 4;
+  // the free space starts under the top bar
+  const bar = $("#home .home-top, #home header");
+  const top = (bar ? bar.getBoundingClientRect().bottom : 60) - top0 + 4;
   const bottom = dock.getBoundingClientRect().top - top0 - 6;
   if (!dock.offsetHeight) return;
   // always full width (a squeezed picture looks bad): centred in the gap, but the
@@ -1947,9 +1947,8 @@ function fitHomeArt() {
 addEventListener("resize", fitHomeArt);
 if ("ResizeObserver" in window) {
   const ro = new ResizeObserver(() => fitHomeArt());
-  for (const sel of [".hp-play .home-dock", ".hp-play .home-road"]) ro.observe($(sel));
+  ro.observe($(".hp-play .home-dock"));
 }
-$(".hp-play .home-road").addEventListener("animationend", fitHomeArt);
 $(".home-art img").addEventListener("load", fitHomeArt);
 
 function setHomePage(i, animate = true) {
@@ -1968,10 +1967,7 @@ function setHomePage(i, animate = true) {
     t.setAttribute("aria-selected", String(on));
   }
   if (homePage === PAGE.compete) renderCompete();
-  if (homePage === PAGE.missions) {
-    renderDaily();
-    renderCareer();
-  }
+  if (homePage === PAGE.missions) showMissionTab(missionTab);
   if (homePage === PAGE.skins) renderSkins();
   if (homePage === PAGE.shop) {
     mountShop($("#shopHome"));
@@ -2345,7 +2341,7 @@ function claimRoad(step, node) {
     showUnlock({ kind: "char", char: { name: info.label, rarity: info.rarity, img: info.img } });
   }
   renderTrophyRoad();
-  if (!roadModal.hidden) renderRoadFull();
+  if (roadOpen()) renderRoadFull();
   renderRankPill();
 }
 function renderTrophyRoad() {
@@ -2407,14 +2403,33 @@ function renderTrophyRoad() {
     if (cur) track.scrollLeft = cur.offsetLeft - track.clientWidth / 2 + cur.clientWidth / 2;
   });
   renderMissionDots(); // a reward waiting on the road lights the Missions tab
-  if (!roadModal.hidden) renderRoadFull();
+  if (roadOpen()) renderRoadFull();
 }
 /**
  * The whole Trophy Road, top to bottom: a road down the middle with a numbered stop for each reward,
  * the rewards on alternating sides, a big banner where each league starts (its character rides on it),
  * and you on the road where you are.
  */
-const roadModal = $("#roadModal");
+/** The Missions page has two tabs: the Trophy Road and the missions (daily + career). */
+let missionTab = "road";
+function showMissionTab(tab) {
+  missionTab = tab;
+  for (const b of document.querySelectorAll(".m-tab")) b.classList.toggle("on", b.dataset.mt === tab);
+  $("#mtRoad").hidden = tab !== "road";
+  $("#mtMissions").hidden = tab !== "missions";
+  if (tab === "road") renderRoadFull();
+  else {
+    renderDaily();
+    renderCareer();
+  }
+}
+for (const b of document.querySelectorAll(".m-tab"))
+  b.addEventListener("click", () => {
+    if (b.dataset.mt === missionTab) return;
+    sfx.tap();
+    showMissionTab(b.dataset.mt);
+  });
+const roadOpen = () => homePage === PAGE.missions && missionTab === "road";
 /** The games road: a new runner after 1, 3, 5, 10, 20, 50 and 100 games, collected on the Trophy Road. */
 function gamesClaimed() {
   try {
@@ -2533,17 +2548,17 @@ function renderRoadFull() {
   list.replaceChildren(...rows);
   requestAnimationFrame(() => {
     const y = list.querySelector(".rv-you");
-    if (y) list.scrollTop = y.offsetTop - list.clientHeight / 2;
+    const sc = list.closest(".hp-scroll");
+    if (y && sc) sc.scrollTop = Math.max(0, y.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - sc.clientHeight / 2);
   });
 }
 function openRoad() {
   sfx.tap();
-  renderRoadFull();
-  roadModal.hidden = false;
+  missionTab = "road";
+  if (game.mode !== "home") return;
+  setHomePage(PAGE.missions);
 }
 $("#trophyRoad")?.addEventListener("click", openRoad);
-$("#roadClose").addEventListener("click", () => (roadModal.hidden = true));
-roadModal.addEventListener("click", (e) => e.target === roadModal && (roadModal.hidden = true));
 
 /** Full Weekend League card (shown in the detail sheet): 10 matches, a mode each, rewards by medals. */
 function weekendCard() {
@@ -8469,15 +8484,10 @@ function renderRankPill() {
   $("#rankPillImg").src = r.img;
   $("#rankBadgeBtn").title = `${r.name} · ${rp} league pts`;
   renderProfile();
-  // the league card on the Tournaments page
-  $("#leagueImg").src = r.img;
-  $("#leagueName").textContent = r.name;
-  $("#leagueBar").style.width = r.next == null ? "100%" : `${Math.round(((rp - r.from) / (r.next - r.from)) * 100)}%`;
-  $("#leagueNext").textContent = r.next == null ? `${rp} pts · top league` : `${rp} pts · ${r.next - rp} more to ${rankOf(r.next).name}`;
-  // something to collect (a reward for trophies or a runner for games played): the card says so
+  // something to collect on the Trophy Road (a reward for trophies or a runner for games played): its tab says so
   const waiting = road.ready().length + gamesReady().length;
-  $("#leagueCard").classList.toggle("ready", waiting > 0);
-  $("#leagueCard .lc-go").textContent = waiting ? `🎁 Claim ${waiting}` : "Open ›";
+  const rd = $('.m-tab[data-mt="road"] .dot');
+  if (rd) rd.hidden = !waiting;
 }
 
 // ── friends: everyone you've been in a room with, and their rank ──
@@ -8562,7 +8572,6 @@ function openRank() {
   openRoad();
 }
 $("#rankBadgeBtn").addEventListener("click", openRank);
-$("#leagueCard").addEventListener("click", openRank);
 for (const chip of document.querySelectorAll(".medal-chip")) chip.addEventListener("click", openRank);
 $("#profileCard").addEventListener("click", openStats);
 // ── Stats page: places, records, modes, and how you stand among your friends ──
@@ -8752,7 +8761,14 @@ function renderMissionDots() {
     return; // still starting up: the career table isn't defined yet
   }
   const daily = dailyChallenges().some((q) => dailyState().done[q.id] && !dailyState().claimed[q.id]);
-  const gold = road.ready().length > 0;
+  let gold = road.ready().length > 0;
+  try {
+    gold ||= gamesReady().length > 0;
+  } catch {
+    /* still starting up */
+  }
+  const md = $('.m-tab[data-mt="missions"] .dot');
+  if (md) md.hidden = !(daily || career);
   $("#careerDot").hidden = !career;
   const dot = document.querySelector(`.htab[data-page="${PAGE.missions}"] .dot`);
   if (dot) dot.hidden = !(daily || career || gold);
