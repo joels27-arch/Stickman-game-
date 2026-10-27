@@ -586,6 +586,31 @@
       <button id="poDone" class="gbtn po-done" type="button" hidden>Collect</button>
     </div>
 
+    <!-- first play: tutorial or skip -->
+    <div id="tutAsk" class="modal" hidden>
+      <div class="sheet ta-sheet" role="dialog" aria-modal="true" aria-labelledby="tutAskTitle">
+        <img class="ta-pic" src="/assets/m_wave.webp" alt="" />
+        <h2 id="tutAskTitle">New here?</h2>
+        <p>A quick run teaches you every move.</p>
+        <button id="tutYes" class="btn big go" type="button">Play tutorial</button>
+        <button id="tutNo" class="btn ghost ta-skip" type="button">Skip</button>
+      </div>
+    </div>
+    <!-- Endless Run: runner and map, then go -->
+    <div id="endlessSetup" class="modal" hidden>
+      <div class="sheet es-sheet" role="dialog" aria-modal="true" aria-labelledby="esTitle">
+        <h2 id="esTitle">Endless Run</h2>
+        <h3 class="pick-title">Runner</h3>
+        <div id="esChars" class="es-chars"></div>
+        <h3 class="pick-title">Map</h3>
+        <div id="esMaps" class="map-pick es-maps"></div>
+        <div class="es-foot">
+          <button id="esClose" class="btn ghost" type="button">Cancel</button>
+          <button id="esGo" class="btn big go" type="button">Run! →</button>
+        </div>
+      </div>
+    </div>
+
     <div id="toast" class="toast"></div>
 
     <script>

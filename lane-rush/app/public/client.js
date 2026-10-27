@@ -1782,7 +1782,8 @@ function onState(msg) {
       game.endlessSent = true;
       if (v.mode !== "survival") act({ type: "mode", mode: "survival" });
       // the tutorial run is on the meadow; after that any map. Load it all, then start
-      const map = local.getItem("lr:endlessTut") ? RANDOM_MAPS[Math.floor(Math.random() * RANDOM_MAPS.length)] : "meadow";
+      const picked = game.endlessMap && game.endlessMap !== "random" && RANDOM_MAPS.includes(game.endlessMap) ? game.endlessMap : null;
+      const map = !local.getItem("lr:endlessTut") ? "meadow" : picked ?? RANDOM_MAPS[Math.floor(Math.random() * RANDOM_MAPS.length)];
       if (v.map !== map) act({ type: "map", map });
       showScreen("race");
       showCurtain(map);
@@ -1892,24 +1893,88 @@ function renderEndlessBest() {
   const box = $("#endlessBest");
   if (box) box.textContent = best ? `Your best: ${best.toLocaleString()} m` : "How far can you get?";
 }
+// ── first play: tutorial or skip? Then Endless Run asks for a runner and a map ──
+const needsTutAsk = () => !local.getItem("lr:endlessTut");
+let afterTutAsk = null;
+/** Run `go`, but the very first time ask first: play the tutorial, or skip it. */
+function tutGate(go) {
+  if (!needsTutAsk()) return go();
+  afterTutAsk = go;
+  $("#tutAsk").hidden = false;
+}
+$("#tutYes").addEventListener("click", () => {
+  sfx.tap();
+  $("#tutAsk").hidden = true;
+  afterTutAsk = null;
+  game.endlessMap = null;
+  startEndless(); // the tutorial is the first endless run (on the meadow)
+});
+$("#tutNo").addEventListener("click", () => {
+  sfx.tap();
+  $("#tutAsk").hidden = true;
+  local.setItem("lr:endlessTut", "1"); // still playable from Settings → How to run
+  local.setItem("lr:tutDone", "1");
+  const go = afterTutAsk;
+  afterTutAsk = null;
+  go?.();
+});
+let esMap = "random";
+function openEndlessSetup() {
+  const cur = preferredChar();
+  const order = RUNNERS.map((_, i) => i).filter((i) => wallet.owns(i));
+  $("#esChars").replaceChildren(
+    ...order.map((i) => {
+      const b = el("button", { class: `es-char${i === cur ? " on" : ""}`, type: "button", style: `--team:${RUNNERS[i].color}`, "aria-label": RUNNERS[i].name }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }));
+      b.addEventListener("click", () => {
+        sfx.tap();
+        local.setItem("lr:char", String(i));
+        world.setShowcase?.(i);
+        for (const z of $("#esChars").children) z.classList.toggle("on", z === b);
+      });
+      return b;
+    }),
+  );
+  const maps = () =>
+    ["random", ...RANDOM_MAPS].map((key) => {
+      const b = el("button", { class: `map-card${esMap === key ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style: key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)` }, el("b", { text: MAP_INFO[key].label }));
+      b.addEventListener("click", () => {
+        sfx.tap();
+        esMap = key;
+        $("#esMaps").replaceChildren(...maps());
+      });
+      return b;
+    });
+  $("#esMaps").replaceChildren(...maps());
+  $("#endlessSetup").hidden = false;
+  $("#esChars .on")?.scrollIntoView({ block: "nearest", inline: "center" });
+}
+$("#esGo").addEventListener("click", () => {
+  sfx.unlock();
+  $("#endlessSetup").hidden = true;
+  game.endlessMap = esMap;
+  startEndless();
+});
+$("#esClose").addEventListener("click", () => ($("#endlessSetup").hidden = true));
 $("#endlessBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
-  startEndless();
+  tutGate(openEndlessSetup);
 });
 $("#packOdds").addEventListener("click", (e) => e.currentTarget.classList.toggle("open")); // the pack odds: 2 lines, tap for all
 $("#soloBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
-  openSoloRoom();
+  tutGate(openSoloRoom);
 });
 $("#createBtn").addEventListener("click", () => {
   sfx.unlock();
   if (!requireName()) return;
-  game.solo = false;
-  game.endless = false;
-  game.wantMode = null;
-  connect(newCode(), true);
+  tutGate(() => {
+    game.solo = false;
+    game.endless = false;
+    game.wantMode = null;
+    connect(newCode(), true);
+  });
 });
 $("#joinBtn").addEventListener("click", () => {
   sfx.unlock();
