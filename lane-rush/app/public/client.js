@@ -7419,7 +7419,7 @@ const COACH = {
   drop: { title: "Swipe DOWN on the button", text: "Drop it behind you!", keys: "Q on the keyboard", g: "bdown" },
   aim: { title: "Swipe up and SIDEWAYS", text: "Throw it into another lane!", keys: "1 2 3 4 on the keyboard = that lane", g: "bside" },
 };
-const COACH_MOVES = ["lane", "jump", "slide"];
+const COACH_MOVES = ["lane", "jump"]; // (no gates any more: nothing to slide under in the tutorial)
 const COACH_ITEMS = ["throw", "drop"];
 const COACH_SLOW = 0; // the run waits until you make the move
 const COACH_UNTIL_M = 1500; // after this, it stops teaching either way
