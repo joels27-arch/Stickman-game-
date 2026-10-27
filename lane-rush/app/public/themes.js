@@ -108,5 +108,13 @@ export const THEMES = [
     props: [["iceberg", 3, { c: ["#d0e8f8", "#ffffff"] }, [1, 2.2]], ["pine", 2, { leaf: ["#1a3a3a"] }]],
     fx: "snow", hills: 1.6,
   }),
+  // Artlist: a night-time film studio lot (its obstacles are Artlist 3D models; only Unit-X runs here)
+  T("artlist", "Artlist", "🎬", {
+    sky: { top: "#050507", mid: "#16161c", horizon: "#3a2e10" }, sun: null, night: true, fog: ["#141418", 50, 230], clouds: false,
+    light: { hemi: ["#fff2cc", "#18181e", 1.15], sun: ["#ffffff", 1.4] }, far: "#101014", near: "#1c1c22",
+    ground: { style: "grid", colors: ["#121216", "#ffc81e"] }, track: { style: "tiles", colors: ["#26262c", "#2e2e36", "#1e1e24"], kerb: "#ffc81e", lines: "#ffffff" },
+    props: [["building", 5, { c: ["#1e1e24", "#26262e", "#2a2a2a"] }, [1, 2.4], true], ["lamp", 2, { c: ["#2a2a30"], accent: ["#ffc81e", "#ffffff"] }, null, true]],
+    arches: ["#ffc81e", "#ffffff"], hills: 0, fx: "dust",
+  }),
 ];
 

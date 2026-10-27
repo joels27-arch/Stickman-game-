@@ -52,6 +52,7 @@ export const RACE_LIMIT_MS: number;
 export const AFTER_FIRST_MS: number;
 export const LOBBY_GRACE_MS: number;
 export const CHARACTERS: number;
+export const RANDOM_MAPS: string[];
 export const POWERS: string[];
 export const BANANA_AHEAD_M: number;
 export const BANANA_BEHIND_M: number;

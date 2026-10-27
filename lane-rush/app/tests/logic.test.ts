@@ -1166,7 +1166,7 @@ describe("moving obstacles", () => {
   it("has a recipe for every themed map, with the same movers", async () => {
     const { THEMES } = await import("../public/themes.js");
     expect(L.MAPS.slice(6)).toEqual(THEMES.map((t: { id: string }) => t.id));
-    expect(L.MAPS.length).toBe(19);
+    expect(L.MAPS.length).toBe(20);
     for (const t of THEMES as { id: string; movers?: string }[]) expect(L.MAP_MOVERS[t.id]).toBe(t.movers);
   });
 
