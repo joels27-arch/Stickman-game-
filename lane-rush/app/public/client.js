@@ -4301,17 +4301,18 @@ const world = (() => {
     if (!mapLoads.has(map)) {
       const P = assets.props;
       const glb = (file, key, size) => loadGLB(`/assets/${file}.glb`).then((g) => (P[key] = fitProp(g.scene, size)));
+      // the grandstand is built in code (crisp at any distance, 3 meshes): a raked bank of
+      // seats packed with a cheering crowd, a front wall with ad boards, a roof on posts
       const stand = () =>
-        loadGLB("/assets/st_stand.glb").then((g) => {
-          // the stand's long side runs along the track
-          P.stadiumStand = fitProp(g.scene, { width: 34 });
+        Promise.resolve().then(() => {
+          P.stadiumStand = codeStand();
           P.stadiumStand.userData.len = 34;
         });
       const jobs =
         map === "city"
           ? [glb("ct_tower", "cityTower", { height: 30 }), glb("ct_shop", "cityShop", { height: 13 }), loadLod("cityTower", "ct_tower", { height: 30 }), loadLod("cityShop", "ct_shop", { height: 13 }), glb("ct_lamp", "cityLamp", { height: 5.2 }), glb("ct_taxi", "taxi", { width: 2.6 }), glb("ct_pigeon", "pigeon", { width: 1.0 }), loadGLB("/assets/ct_road.glb").then((g) => (P.cityTileNext = fitTile(g.scene, true))), loadLodTile("cityTile", "ct_road", true)]
           : map === "stadium"
-          ? [stand(), glb("st_light", "stadiumLight", { height: 30 }), loadLod("stadiumStand", "st_stand", { width: 34 }), loadLod("stadiumLight", "st_light", { height: 30 }), glb("st_ball", "football", { width: 0.8 }), glb("st_cam", "spidercam", { width: 1.1 }), loadGLB("/assets/st_pitch.glb").then((g) => (P.stadiumTileNext = fitTile(g.scene))), loadLodTile("stadiumTile", "st_pitch")]
+          ? [stand(), glb("st_light", "stadiumLight", { height: 30 }), loadLod("stadiumLight", "st_light", { height: 30 }), glb("st_ball", "football", { width: 0.8 }), glb("st_cam", "spidercam", { width: 1.1 }), loadGLB("/assets/st_pitch.glb").then((g) => (P.stadiumTileNext = fitTile(g.scene))), loadLodTile("stadiumTile", "st_pitch")]
           : map === "space"
           ? [glb("sp_dome", "spaceDome", { height: 7 }), glb("sp_rocket", "spaceRocket", { height: 14 }), loadLod("spaceDome", "sp_dome", { height: 7 }), loadLod("spaceRocket", "sp_rocket", { height: 14 }), glb("sp_dish", "spaceDish", { height: 5 }), glb("sp_asteroid", "asteroid", { width: 0.9 }), glb("sp_ufo", "ufo", { width: 2.4 }), loadGLB("/assets/sp_walk.glb").then((g) => (P.spaceTileNext = fitTile(g.scene, true))), loadLodTile("spaceTile", "sp_walk", true)]
           : map === "farm"
@@ -4616,10 +4617,9 @@ const world = (() => {
       loadGLBOr("md_blossom", "tree_blossom").then((g) => (assets.props.blossom = fitProp(g.scene, { height: 5.4 }))),
       loadGLBOr("md_bush", "bush").then((g) => (assets.props.bush = fitProp(g.scene, { width: 2.4 }))),
       // light far versions (colour baked in, a few hundred triangles) for scenery past LOD_NEAR
-      ...[["oak", "md_oak", { height: 6.5 }], ["pine", "md_pine", { height: 6.2 }], ["blossom", "md_blossom", { height: 5.4 }], ["bush", "md_bush", { width: 2.4 }], ["rocks", "md_rocks", { width: 2.2 }], ["cloud", "md_cloud", { width: 1 }]].map(([k, f, size]) => loadLod(k, f, size)),
+      ...[["oak", "md_oak", { height: 6.5 }], ["pine", "md_pine", { height: 6.2 }], ["blossom", "md_blossom", { height: 5.4 }], ["bush", "md_bush", { width: 2.4 }], ["rocks", "md_rocks", { width: 2.2 }]].map(([k, f, size]) => loadLod(k, f, size)),
       loadGLBOr("md_rocks", "rocks").then((g) => (assets.props.rocks = fitProp(g.scene, { width: 2.2 }))),
       Promise.resolve().then(() => (assets.props.fence = pickerFence())), // built in code: crisp and ~150 triangles
-      loadGLBOr("md_cloud", "cloud").then((g) => (assets.props.cloud = fitProp(g.scene, { width: 1 }))),
     ];
     // the bar moves with the bytes downloaded (and finished files), never backwards
     let shown = 0;
@@ -5372,6 +5372,82 @@ const world = (() => {
     for (let z = 30; z < TRACK_LEN + 160; z += 110) for (const side of [-1, 1]) add(P.stadiumLight, side * (edge + 26), MEADOW_Y, z, 1, side > 0 ? -Math.PI / 2 : Math.PI / 2);
   }
 
+  /** A grandstand, 34 m long (along x), facing +z: the crowd bank rises away from the pitch. */
+  function codeStand() {
+    const L = 34;
+    const D = 13; // depth of the seating bank
+    const H = 9; // height at the back
+    // the crowd: rows of seats, a fan in most of them, in team colours
+    const c = document.createElement("canvas");
+    c.width = 1024;
+    c.height = 256;
+    const g = c.getContext("2d");
+    const rows = 14;
+    const rh = c.height / rows;
+    const shirts = ["#e8322a", "#e8322a", "#2a5ae8", "#2a5ae8", "#ffffff", "#ffd23f", "#1a1a1a", "#3ac060"];
+    const skins = ["#f2c7a0", "#d9a27a", "#a8704a", "#6e4a30"];
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let y = 0; y < rows; y++) {
+      g.fillStyle = y % 2 ? "#5a6478" : "#4a5468"; // the concrete step
+      g.fillRect(0, y * rh, c.width, rh);
+      g.fillStyle = "#2b3242";
+      g.fillRect(0, y * rh + rh - 3, c.width, 3); // the shadow under each step
+      for (let x = 4; x < c.width; x += 12) {
+        if (rnd() < 0.12) continue; // an empty seat
+        g.fillStyle = shirts[Math.floor(rnd() * shirts.length)];
+        g.fillRect(x, y * rh + rh * 0.45, 9, rh * 0.42);
+        g.fillStyle = skins[Math.floor(rnd() * skins.length)];
+        g.beginPath();
+        g.arc(x + 4.5, y * rh + rh * 0.3, 3.6, 0, Math.PI * 2);
+        g.fill();
+        if (rnd() < 0.08) { // a flag waving
+          g.fillStyle = rnd() < 0.5 ? "#e8322a" : "#2a5ae8";
+          g.fillRect(x + 8, y * rh, 10, rh * 0.35);
+        }
+      }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = renderer?.capabilities.getMaxAnisotropy?.() ?? 4;
+    const root = new THREE.Group();
+    // the raked bank (a slope from the front wall up to the back)
+    const slope = Math.hypot(D, H - 2);
+    const bank = new THREE.Mesh(new THREE.PlaneGeometry(L, slope), new THREE.MeshLambertMaterial({ map: tex }));
+    bank.rotation.x = -Math.atan2(D, H - 2);
+    bank.position.set(0, 2 + (H - 2) / 2, -D / 2);
+    // the front wall with an ad strip, the back wall and the roof
+    const wallTex = (() => {
+      const w = document.createElement("canvas");
+      w.width = 512;
+      w.height = 32;
+      const q = w.getContext("2d");
+      const ads = [["#e8322a", "LANE RUSH"], ["#1a1a1a", "4 FRIENDS"], ["#2a5ae8", "GO GO GO"], ["#ffd23f", "PARTY!"]];
+      ads.forEach(([bg, t], i) => {
+        q.fillStyle = bg;
+        q.fillRect(i * 128, 0, 128, 32);
+        q.fillStyle = bg === "#ffd23f" ? "#1a1a1a" : "#ffffff";
+        q.font = "bold 20px sans-serif";
+        q.textAlign = "center";
+        q.fillText(t, i * 128 + 64, 23);
+      });
+      const t = new THREE.CanvasTexture(w);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    })();
+    const shell = new THREE.MeshLambertMaterial({ color: "#3a4256" });
+    const front = new THREE.Mesh(new THREE.BoxGeometry(L, 2, 0.4), [shell, shell, shell, shell, new THREE.MeshBasicMaterial({ map: wallTex }), shell]);
+    front.position.set(0, 1, 0);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(L, H + 3, 0.6), shell);
+    back.position.set(0, (H + 3) / 2, -D - 0.3);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(L, 0.4, D * 0.75), new THREE.MeshLambertMaterial({ color: "#e8ecf2" }));
+    roof.position.set(0, H + 3, -D * 0.62);
+    roof.rotation.x = -0.06;
+    root.add(bank, front, back, roof);
+    for (const o of root.children) o.castShadow = o.receiveShadow = false;
+    return root;
+  }
+
   function buildSpace(add, group, r, edge) {
     const P = assets.props;
     const railMat = new THREE.MeshBasicMaterial({ color: "#38f0ff" });
@@ -5398,11 +5474,22 @@ const world = (() => {
    * The meadow's track: a raised red running track (top at y = 0, the meadow
    * below) with white kerbs down both sides. One box each: cheap on phones.
    */
-  function runningTrack(tex = null, sideColor = "#a8402f", kerbColor = "#f4f1e8") {
+  function runningTrack(tex = null, sideColor = "#1f4a8f", kerbColor = "#f4f1e8") {
     const len = TRACK_LEN + 220;
     const g = new THREE.Group();
     if (!tex) {
-      tex = texLoader.load("/assets/track_red.jpg");
+      // the meadow: a blue rubber running track (fine grain, drawn here: nothing to download)
+      const c = document.createElement("canvas");
+      c.width = c.height = 256;
+      const q = c.getContext("2d");
+      q.fillStyle = "#2f6fd6";
+      q.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 9000; i++) {
+        const v = Math.random();
+        q.fillStyle = v < 0.5 ? "rgba(20,50,120,0.35)" : v < 0.85 ? "rgba(120,170,255,0.3)" : "rgba(255,255,255,0.25)";
+        q.fillRect(Math.random() * 256, Math.random() * 256, 1.5, 1.5);
+      }
+      tex = new THREE.CanvasTexture(c);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
       tex.repeat.set(TRACK_W / 3, len / 3);
@@ -6076,14 +6163,42 @@ const world = (() => {
       fallbackArch.visible = false;
     }
 
-    // 3D clouds drifting in the sky; the group follows the camera
+    // soft painted clouds drifting in the sky (billboards: always fluffy, never flat grey);
+    // the group follows the camera
+    const cloudTexs = [0, 1, 2].map((k) => {
+      const c = document.createElement("canvas");
+      c.width = 512;
+      c.height = 256;
+      const g = c.getContext("2d");
+      let seed = 11 + k * 97;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const puffs = [];
+      for (let i = 0; i < 9; i++) puffs.push([90 + rnd() * 330, 120 + rnd() * 50 - (i % 3) * 18, 50 + rnd() * 55]);
+      // a soft shade underneath first, then the bright puffs on top
+      for (const [x, y, r] of puffs) {
+        const sh = g.createRadialGradient(x, y + r * 0.35, 0, x, y + r * 0.35, r);
+        sh.addColorStop(0, "rgba(200,210,235,0.9)");
+        sh.addColorStop(1, "rgba(200,210,235,0)");
+        g.fillStyle = sh;
+        g.fillRect(0, 0, 512, 256);
+      }
+      for (const [x, y, r] of puffs) {
+        const gr = g.createRadialGradient(x - r * 0.2, y - r * 0.25, 0, x, y, r);
+        gr.addColorStop(0, "rgba(255,255,255,1)");
+        gr.addColorStop(0.6, "rgba(255,255,255,0.92)");
+        gr.addColorStop(1, "rgba(255,255,255,0)");
+        g.fillStyle = gr;
+        g.fillRect(0, 0, 512, 256);
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    });
     for (let i = 0; i < 16; i++) {
-      const c = (lodProps.get("cloud") ?? P.cloud).clone();
-      c.scale.multiplyScalar(14 + r() * 22);
-      c.position.set((r() - 0.5) * 320, 38 + r() * 40, -40 - r() * 230);
-      c.rotation.y = (r() - 0.5) * 0.6;
-      // unlit, so the clouds stay bright white instead of picking up grey shading
-      c.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ map: o.material.map, vertexColors: Boolean(o.geometry.attributes.color), color: "#ffffff", fog: false }); });
+      const c = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTexs[i % 3], fog: false, transparent: true, depthWrite: false, opacity: 0.95 }));
+      const w = 40 + r() * 50;
+      c.scale.set(w, w * 0.5, 1);
+      c.position.set((r() - 0.5) * 320, 42 + r() * 40, -60 - r() * 230);
       c.userData.drift = 0.6 + r() * 1.2;
       clouds.add(c);
     }
