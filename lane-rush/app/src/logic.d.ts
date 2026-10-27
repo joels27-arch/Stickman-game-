@@ -119,6 +119,7 @@ export const COUNTRIES: [string, string][];
 export const MEDALS: string[];
 export const MIN_RACERS_FOR_MEDALS: number;
 export const MAP_MOVERS: Record<string, string>;
+export const MOVER_BASES: string[];
 export function rewards(state: unknown): Record<string, { place: number; medal: string | null }>;
 export const MOVER_KINDS: Record<string, { map: string; half: number; period: number; clear: string; slows?: boolean }>;
 export function moverX(m: { kind: string; phase: number }, t: number): number;

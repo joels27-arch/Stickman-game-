@@ -41,6 +41,7 @@ import {
   MAPS,
   RANDOM_MAPS,
   MAP_MOVERS,
+  MOVER_BASES,
   EMOTES,
   BANANA_AHEAD_M,
   BOWL_SPEED,
@@ -965,12 +966,13 @@ function askStarter() {
     ...FIRST_FIVE.map((i) => el("span", { class: "pf-zone", style: `--team:${RUNNERS[i].color}`, "data-i": String(i) }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }))),
   );
   $("#starterGrid").className = "pf-row pf-odds";
+  $("#starterGrid").prepend(el("p", { class: "pf-odds-head" }, el("b", { text: "1 of these 5" }), el("span", { text: " is inside. It's yours!" })));
   $("#starterGrid").hidden = false;
   $("#starterGo").hidden = true;
   $("#starterPack").hidden = false;
   $("#starterPack").classList.remove("burst");
   $("#starterTitle").textContent = "Your Starter Pack";
-  $("#starterSub").textContent = "One of these 5 is inside";
+  $("#starterSub").textContent = "";
   $("#starterModal").hidden = false;
 }
 function giveStarter(i) {
@@ -985,41 +987,18 @@ $("#starterPack").addEventListener("click", () => {
   const pack = $("#starterPack");
   if (pack.classList.contains("burst")) return;
   const win = FIRST_FIVE[Math.floor(Math.random() * FIRST_FIVE.length)];
-  giveStarter(win); // saved right away: closing the app mid-spin can't lose it
+  giveStarter(win); // saved right away: closing the app mid-animation can't lose it
   sfx.pack?.();
   buzz(30);
+  // the pack shakes, bursts open, and your runner comes out
   pack.classList.add("burst");
-  $("#starterTitle").textContent = "Opening…";
+  $("#starterGrid").classList.add("gone");
   $("#starterSub").textContent = "";
-  const zones = [...$("#starterGrid").children];
-  const end = zones.findIndex((z) => Number(z.dataset.i) === win);
-  // spin: about three laps, slowing down, stopping on the winner
-  const steps = zones.length * 3 + end;
-  let k = 0;
-  const spin = () => {
-    zones.forEach((z, j) => z.classList.toggle("on", j === k % zones.length));
-    sfx.tap?.();
-    if (k >= steps) {
-      setTimeout(() => {
-        zones.forEach((z, j) => z.classList.toggle("lose", j !== end));
-        zones[end].classList.add("win");
-        sfx.finish();
-        buzz(60);
-        $("#starterTitle").textContent = `You got ${RUNNERS[win].name}!`;
-        setTimeout(() => {
-          $("#starterModal").hidden = true;
-          showUnlock({ kind: "char", char: { name: RUNNERS[win].name, rarity: STARTER_RARITY[win], img: `/assets/lu_${RUNNERS[win].file}.webp` } }, () => toast("Win medals to unlock the others on the Medal Road"));
-        }, 1300);
-      }, 250);
-      return;
-    }
-    k++;
-    setTimeout(spin, 70 + Math.pow(k / steps, 3) * 380);
-  };
   setTimeout(() => {
-    pack.hidden = true;
-    spin();
-  }, 650);
+    $("#starterModal").hidden = true;
+    sfx.finish();
+    showUnlock({ kind: "char", char: { name: RUNNERS[win].name, rarity: STARTER_RARITY[win], img: `/assets/lu_${RUNNERS[win].file}.webp` } }, () => toast("Win medals to unlock the others on the Medal Road"));
+  }, 900);
 });
 $("#askSave").addEventListener("click", () => {
   sfx.tap();
@@ -6716,7 +6695,7 @@ const world = (() => {
   }
   /** Download a map's moving obstacles ahead of time, so they never pop in as emoji. */
   function preloadMovers(map) {
-    const base = MAP_MOVERS[map] ?? (MAPS.indexOf(map) > 5 ? "meadow" : map);
+    const base = MAP_MOVERS[map] ?? (MOVER_BASES.includes(map) ? map : "meadow");
     const kinds = Object.keys(MOVER_KINDS).filter((k) => MOVER_KINDS[k].map === base && MOVER_MODEL[k].file);
     return Promise.all(kinds.map((k) => loadModeProp(MOVER_MODEL[k].file, { width: MOVER_MODEL[k].size, maxHeight: MOVER_MODEL[k].size * 1.5 })));
   }
