@@ -2448,61 +2448,48 @@ const gamesReady = () => []; // runners come with medal points now (they are sto
 function renderRoadFull() {
   const p = rank.points();
   const done = road.claimed();
+  const r = rankOf(p);
+  const nextLg = LEAGUES.find((l) => l.min > p);
+  const lgOf = (pts) => [...LEAGUES].reverse().find((l) => pts >= l.min) ?? LEAGUES[0];
+  const span = nextLg ? nextLg.min - r.league.min : 1;
+  const fill = nextLg ? Math.round(((p - r.league.min) / span) * 100) : 100;
+  // the header: your medal points and the bar to the next league
   const rows = [
     el(
       "div",
-      { class: "rv-how" },
-      el("b", { text: "How you earn 🏆" }),
-      el("span", { text: `Medals in races with friends: 🥇 +${MEDAL_PTS.gold} · 🥈 +${MEDAL_PTS.silver} · 🥉 +${MEDAL_PTS.bronze} · any other place +${LAST_PLACE_PTS}` }),
+      { class: "mr-head" },
+      el("div", { class: "mr-title" }, el("b", { text: "Medal Road" })),
+      el(
+        "div",
+        { class: "mr-pts" },
+        el("img", { src: `/assets/lg_${r.league.id}.webp`, alt: "" }),
+        el("div", { class: "mr-mid" }, el("p", {}, el("b", { text: p.toLocaleString() }), el("small", { text: "Medal points" })), el("span", { class: "mr-bar" }, el("i", { style: `width:${fill}%` }))),
+        el("img", { src: `/assets/lg_${(nextLg ?? r.league).id}.webp`, alt: "" }),
+      ),
+      el("p", { class: "mr-how", text: `🥇 +${MEDAL_PTS.gold} · 🥈 +${MEDAL_PTS.silver} · 🥉 +${MEDAL_PTS.bronze} · other places +${LAST_PLACE_PTS}` }),
     ),
   ];
-  let side = 0;
   let youShown = false;
-  const you = () => el("div", { class: "rv-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: `You · ${p.toLocaleString()} 🏆` }));
-  const card = (step) => {
-    const info = roadInfo(step);
-    const got = done.includes(step.pts);
-    const ready = step.pts <= p && !got;
-    const b = el(
-      "button",
-      { class: `rv-card${step.char ? ` char ${info.rarity}` : ""}${got ? " got" : ""}${ready ? " ready" : ""}${step.pts > p ? " locked" : ""}`, type: "button" },
-      el("img", { src: info.img, alt: "" }),
-      el("small", { text: info.label }),
-      got ? el("i", { class: "rv-tick", text: "✓" }) : ready ? el("em", { class: "rv-claim", text: "Claim!" }) : el("i", { class: "rv-lock", text: "🔒" }),
-    );
-    b.addEventListener("click", () => ready && claimRoad(step, b));
-    return b;
-  };
+  const you = () => el("div", { class: "rv-you mr-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: `You · ${p.toLocaleString()}` }));
   for (const step of roadSteps()) {
     if (!youShown && step.pts > p) {
       youShown = true;
       rows.push(you());
     }
-    const reached = step.pts <= p ? " reached" : "";
-    const league = LEAGUES.find((l) => l.min === step.pts);
-    if (league) {
-      rows.push(
-        el(
-          "div",
-          { class: `rv-league lg-${league.id}${reached}` },
-          el("span", { class: "rv-lname" }, el("b", { text: league.name }), el("small", { text: "League" })),
-          el("img", { class: "rv-badge", src: `/assets/lg_${league.id}.webp`, alt: "" }),
-          el("em", { class: "rv-pts", text: step.pts.toLocaleString() }),
-          card(step),
-        ),
-      );
-      continue;
-    }
-    const left = side++ % 2 === 0;
-    rows.push(
-      el(
-        "div",
-        { class: `rv-row ${left ? "l" : "r"}${reached}` },
-        card(step),
-        el("i", { class: "rv-link" }),
-        el("b", { class: "rv-node", text: step.pts.toLocaleString() }),
-      ),
+    const league = LEAGUES.find((l) => l.min === step.pts && l.min > 0);
+    if (league) rows.push(el("div", { class: `mr-league tier-${league.id}` }, el("img", { src: `/assets/lg_${league.id}.webp`, alt: "" }), el("b", { text: `${league.name} League` })));
+    const info = roadInfo(step);
+    const got = done.includes(step.pts);
+    const ready = step.pts <= p && !got;
+    const b = el(
+      "button",
+      { class: `mr-row tier-${lgOf(step.pts).id}${got ? " got" : ""}${ready ? " ready" : ""}${step.pts > p ? " locked" : ""}${step.char || step.runner !== undefined ? " char" : ""}`, type: "button" },
+      el("span", { class: "mr-badge" }, el("b", { text: step.pts.toLocaleString() }), el("small", { text: "PTS" })),
+      el("span", { class: "mr-reward" }, el("img", { src: info.img, alt: "" }), el("small", { text: info.label })),
+      el("span", { class: "mr-act" }, got ? el("i", { class: "mr-tick", text: "✓" }) : ready ? el("em", { text: "Claim" }) : el("i", { class: "mr-lock", text: "🔒" })),
     );
+    b.addEventListener("click", () => ready && claimRoad(step, b));
+    rows.push(b);
   }
   if (!youShown) rows.push(you());
   const list = $("#roadFull");
