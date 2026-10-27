@@ -1210,7 +1210,7 @@ function renderItems() {
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
 const STARTER_RARITY = ["rare", "rare", "rare", "rare", "epic", "epic", "rare", "epic", "epic", "epic", "legendary", "rare", "legendary"]; // nothing below rare
 /** A collectible that is also a 3D runner: its runner index (you can race with it). */
-const runnerOf = (id) => (id in CID_RUNNER ? { idx: CID_RUNNER[id], playable: true, tag: RUNNERS[CID_RUNNER[id]].tag } : {});
+const runnerOf = (id) => (id in CID_RUNNER ? { idx: CID_RUNNER[id], playable: true, tag: RUNNERS[CID_RUNNER[id]].tag, img: portrait(CID_RUNNER[id]) } : {}); // 3D runners: the same framed portrait as the starters
 function allChars() {
   return [
     ...RUNNERS.slice(0, STARTERS).map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : i in ROAD_RUNNERS || gamesRoad().some((g) => g.runner === i) ? "road" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
@@ -2790,6 +2790,15 @@ function changed(node, ...key) {
   return true;
 }
 const lobbySig = (v) => v.players.map((p) => [p.id, p.name, p.char, p.country, p.gone, p.ready, p.rp, p.bot]);
+let lobbyTab = "runners";
+let lobbyTabCode = null;
+$("#lobbyTabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-lt]");
+  if (!b || b.dataset.lt === lobbyTab) return;
+  sfx.tap();
+  lobbyTab = b.dataset.lt;
+  if (net.view) renderLobby(net.view);
+});
 function renderLobby(v) {
   rememberFriends(v);
   $("#lobby").classList.toggle("solo-room", Boolean(game.solo));
@@ -2888,7 +2897,16 @@ function renderLobby(v) {
   const mode = MODES[Math.max(0, Math.min(n, 4) - 1)];
   const gm = v.mode || "survival";
   // only the host chooses mode and map; invited friends just pick a runner
-  $("#hostPicks").hidden = !isHost;
+  // the host gets two tabs: runners (yours and everyone else's) first, the room settings behind the second
+  if (v.code !== lobbyTabCode) {
+    lobbyTabCode = v.code;
+    lobbyTab = "runners";
+  }
+  $("#lobbyTabs").hidden = !isHost || Boolean(game.fixed);
+  for (const b of $("#lobbyTabs").children) b.classList.toggle("on", b.dataset.lt === lobbyTab);
+  const roomTab = isHost && !game.fixed && lobbyTab === "room";
+  $("#hostPicks").hidden = !isHost || (!game.fixed && !roomTab);
+  $("#ltRunners").hidden = roomTab;
   // league and tournament matches have a set mode
   $("#modePick").hidden = $("#modePick").previousElementSibling.hidden = Boolean(game.fixed);
   const modePick = $("#modePick");

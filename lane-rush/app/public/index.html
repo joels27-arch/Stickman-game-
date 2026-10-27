@@ -209,11 +209,18 @@
             <div class="wallet" title="Your medals"></div>
             <button class="country-chip" type="button" aria-label="Country you cheer for"></button>
           </div>
-          <h3 class="pick-title runner-title">Choose your runner</h3>
-          <div id="lobbySpot" class="spotlight"></div>
-          <div id="picker" class="picker"></div>
-          <div id="slots" class="slots"></div>
-          <div class="emote-row lobby-emotes" aria-label="Send an emote"></div>
+          <div id="lobbyTabs" class="m-tabs lobby-tabs" role="tablist" hidden>
+            <button class="m-tab on" type="button" data-lt="runners">🏃 Runners</button>
+            <button class="m-tab" type="button" data-lt="room">⚙️ Room settings</button>
+          </div>
+          <div id="ltRunners">
+            <h3 class="pick-title">In this room</h3>
+            <div id="slots" class="slots"></div>
+            <h3 class="pick-title runner-title">Choose your runner</h3>
+            <div id="lobbySpot" class="spotlight"></div>
+            <div id="picker" class="picker"></div>
+            <div class="emote-row lobby-emotes" aria-label="Send an emote"></div>
+          </div>
           <div id="hostPicks" class="host-picks">
             <h3 class="pick-title">Game mode</h3>
             <div id="modePick" class="mode-pick"></div>
