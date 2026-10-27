@@ -89,6 +89,7 @@ const RUNNERS = [
   { name: "Captain Brainstorm", color: "#7c3aed", file: "c10", tag: "Storm Hero", cid: "brainstorm" },
   { name: "Pandu", color: "#d23a2a", file: "c11", tag: "Karate Panda", cid: "pandu" },
   { name: "Siete", color: "#e02424", file: "c12", tag: "Football Star", cid: "striker" },
+  { name: "Unit-X", color: "#9aa8bd", file: "c13", tag: "Chrome Robot", cid: "unitx" },
 ];
 const STARTERS = 8; // the first 8 runners; the rest are collectibles
 /** Collection id → runner index, for the collectibles that are 3D runners. */
