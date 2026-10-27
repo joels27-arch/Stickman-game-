@@ -603,7 +603,7 @@ function toast(text) {
 
 /** Higgsfield character-select portrait (upper body, posed) for runner i. */
 function portrait(i) {
-  return `/assets/pp${RUNNERS[i]?.pp ?? i}.webp`;
+  return `/assets/pp${RUNNERS[i]?.pp ?? i}.webp?v=3`; // v: new framing (bust old cached copies)
 }
 
 function el(tag, attrs = {}, ...kids) {
