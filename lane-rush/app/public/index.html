@@ -222,16 +222,16 @@
             <div id="modePick" class="mode-pick"></div>
             <div id="partyPick" class="chip-pick party-pick" hidden></div>
             <label class="bot-toggle"><input type="checkbox" id="botToggle" checked /> <span>🤖 Fill empty spots with bots</span></label>
+            <h3 class="pick-title">Rounds</h3>
+            <div id="roundPick" class="chip-pick"></div>
+            <h3 class="pick-title" id="botLevelTitle">Bot opponents</h3>
+            <div id="botLevelPick" class="chip-pick"></div>
             <h3 class="pick-title">Map</h3>
             <div id="mapPick" class="map-pick"></div>
             <p id="mapNote" class="pick-note"></p>
-            <h3 class="pick-title">Rounds</h3>
-            <div id="roundPick" class="chip-pick"></div>
             <h3 class="pick-title prize-title">Prize for the top 3</h3>
             <div id="prizePick" class="chip-pick prize-pick"></div>
             <p id="prizeNote" class="pick-note"></p>
-          <h3 class="pick-title" id="botLevelTitle">Bot opponents</h3>
-          <div id="botLevelPick" class="chip-pick"></div>
           </div>
           <div class="lobby-actions">
             <button id="lockBtn" class="btn big go"><span class="flagico">✓</span> Lock in <span class="arrow">→</span></button>
@@ -374,10 +374,11 @@
     <!-- first visit: pick your first runner (tap one, then confirm) -->
     <div id="starterModal" class="modal pick-first" hidden>
       <div class="sheet pf-sheet" role="dialog" aria-modal="true" aria-labelledby="starterTitle">
-        <h2 id="starterTitle">Pick your runner</h2>
-        <p class="pf-sub">The others unlock as you play</p>
-        <div id="starterGrid" class="pf-row"></div>
-        <button id="starterGo" class="btn big go pf-go" type="button" disabled>Tap a runner</button>
+        <h2 id="starterTitle">Your Starter Pack</h2>
+        <p class="pf-sub" id="starterSub">5 runners inside. You keep 1</p>
+        <button id="starterPack" class="pf-pack" type="button" aria-label="Open the Starter Pack"><img src="/assets/pack_mega.webp" alt="" /><b>Tap to open</b></button>
+        <div id="starterGrid" class="pf-row" hidden></div>
+        <button id="starterGo" class="btn big go pf-go" type="button" disabled hidden>Tap a runner</button>
       </div>
     </div>
     <div id="countryModal" class="modal" hidden>
