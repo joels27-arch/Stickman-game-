@@ -164,9 +164,9 @@ const withFlag = (name, code) => (code ? `${flagOf(code)} ${name}` : name);
 const countryName = (code) => (COUNTRIES.find(([c]) => c === code) || [])[1] || "";
 const MODES = ["Solo", "Duo", "Trio", "Squad"];
 const GAME_MODE_INFO = {
-  survival: { label: "Survival", icon: "❤️", tag: "Main mode", text: "3 hearts. Last one standing wins." },
   random: { label: "Party", icon: "🎉", tag: "All modes", text: "A random mode every round." },
   sprint: { label: "Classic Race", icon: "🏁", tag: "700 m", text: "First to the finish line wins." },
+  survival: { label: "Survival", icon: "❤️", tag: "3 hearts", text: "3 hearts. Last one standing wins." },
   chase: { label: "Brain Chase", icon: "🧠", tag: "Run for it", text: "Outrun the giant brain!" },
   coinrush: { label: "Coin Rush", icon: "🪙", tag: "90 seconds", text: "Most coins wins." },
   grandtour: { label: "Grand Tour", icon: "🌍", tag: "Tournament", text: "One round of every mode." },
@@ -980,8 +980,28 @@ function askStarter() {
   $("#starterGrid").classList.remove("chosen");
   $("#starterGo").disabled = true;
   $("#starterGo").textContent = "Tap a runner";
+  // sealed first: a Starter Pack to tap open, then the five fly out
+  $("#starterPack").hidden = false;
+  $("#starterPack").classList.remove("burst");
+  $("#starterGrid").hidden = $("#starterGo").hidden = true;
+  $("#starterTitle").textContent = "Your Starter Pack";
+  $("#starterSub").textContent = "5 runners inside. You keep 1";
   $("#starterModal").hidden = false;
 }
+$("#starterPack").addEventListener("click", () => {
+  const pack = $("#starterPack");
+  if (pack.classList.contains("burst")) return;
+  sfx.pack?.();
+  buzz(30);
+  pack.classList.add("burst");
+  setTimeout(() => {
+    pack.hidden = true;
+    $("#starterTitle").textContent = "Pick 1 of 5";
+    $("#starterSub").textContent = "The others unlock as you play";
+    $("#starterGrid").hidden = $("#starterGo").hidden = false;
+    $("#starterGrid").classList.add("reveal");
+  }, 650);
+});
 $("#starterGo").addEventListener("click", () => {
   const i = starterPick;
   if (i == null) return;
@@ -2829,7 +2849,10 @@ function renderLobby(v) {
   const me = v.players.find((p) => p.id === playerId);
   const picker = $("#picker");
   if (changed(picker, lobbySig(v), RUNNERS.map((_, i) => wallet.owns(i)))) picker.replaceChildren();
-  if (!picker.children.length) RUNNERS.forEach((r, i) => {
+  // your runners first, the locked ones below
+  const order = RUNNERS.map((_, i) => i).sort((a, b) => wallet.owns(b) - wallet.owns(a));
+  if (!picker.children.length) order.forEach((i) => {
+    const r = RUNNERS[i];
     const owner = v.players.find((p) => p.char === i);
     const mine = owner?.id === playerId;
     const locked = !wallet.owns(i);
@@ -8796,7 +8819,6 @@ function passXp(n) {
 /** What each level gives. Free: coins, packs, a trail. Gold: more of everything, exclusives, and the level-30 character. Never medals: those are only won in races. */
 function passReward(level, track) {
   if (track === "free") {
-    if (level === 1) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
     for (const [i, lv] of Object.entries(PASS_RUNNERS)) if (level === lv) return { runner: Number(i), label: RUNNERS[i].name, img: portrait(Number(i)) };
     if (level === 30) return { coins: 800, label: "800 coins", img: "/assets/ui_c3.webp" };
     if (level % 10 === 5) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
@@ -8805,6 +8827,8 @@ function passReward(level, track) {
   }
   if (level === 30) return { char: PASS_CHAR.id, label: PASS_CHAR.name, img: `/assets/pk_${PASS_CHAR.id}.webp` };
   if (level === 1) return { char: "sharky", label: "Sharky", img: "/assets/sc_sharky.webp" };
+  // a pack after a few games: buying the Gold Pass gives Sharky now, a pack soon after
+  if (level === 3) return { pack: "mega", label: "Mega Pack", img: "/assets/pack_mega.webp" };
   if (level === 15) return { char: "pandu", label: "Pandu", img: "/assets/sc_pandu.webp" };
   if (level === 10) return { item: "trail:neon", label: "Neon trail", icon: "🌈" };
   if (level === 20) return { coins: 1000, label: "1,000 coins", img: "/assets/ui_c3.webp" };
