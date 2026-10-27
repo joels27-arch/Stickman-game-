@@ -1114,9 +1114,21 @@ function giveItem(id) {
 // Unit-X, once for everyone (to try the Artlist map)
 // The Boulder left the game: whoever had him gets Big Dunk in his place
 if (wallet.has("boulder")) giveItem("dunk");
+// (players from before: new players earn him on the Medal Road)
 if (!local.getItem("lr:gift:unitx")) {
-  giveItem("unitx");
+  if (local.getItem("lr:asked")) giveItem("unitx");
   local.setItem("lr:gift:unitx", "1");
+}
+// undo that gift for new players who got it anyway (with 25 medal points it counted as)
+if (!local.getItem("lr:fix:unitx") && starterChoice() !== "all") {
+  local.setItem("lr:fix:unitx", "1");
+  let roadDone = [];
+  try { roadDone = JSON.parse(local.getItem("lr:troad") || "[]"); } catch { /* none */ }
+  if (wallet.has("unitx") && !(Array.isArray(roadDone) && roadDone.includes(220))) {
+    local.setItem("lr:owned", JSON.stringify(wallet.owned().filter((id) => id !== "unitx")));
+    const lp = Number(local.getItem("lr:lp"));
+    if (lp >= 25) local.setItem("lr:lp", String(lp - 25));
+  }
 }
 /** The Artlist map is Unit-X only: everyone on it runs as Unit-X. */
 const UNITX = CID_RUNNER.unitx;
@@ -2298,7 +2310,7 @@ function goldEver() {
   const n = Number(local.getItem("lr:goldEver"));
   if (local.getItem("lr:goldEver") !== null && Number.isFinite(n)) return n;
   let start = wallet.medals().gold;
-  for (const c of COLLECTION) if (c.legacy?.medal === "gold" && wallet.has(c.id)) start += c.legacy.count;
+  if (starterChoice() === "all") for (const c of COLLECTION) if (c.legacy?.medal === "gold" && wallet.has(c.id)) start += c.legacy.count;
   local.setItem("lr:goldEver", String(start));
   return start;
 }
@@ -8343,7 +8355,8 @@ const rank = {
       let pts = 0;
       const m = wallet.medals();
       for (const k of MEDALS) pts += m[k] * MEDAL_PTS[k];
-      for (const c of COLLECTION) if (c.legacy && wallet.has(c.id)) pts += c.legacy.count * MEDAL_PTS[c.legacy.medal];
+      // (a brand-new player starts at 0: road characters they get don't count as spent medals)
+      if (local.getItem("lr:asked")) for (const c of COLLECTION) if (c.legacy && wallet.has(c.id)) pts += c.legacy.count * MEDAL_PTS[c.legacy.medal];
       local.setItem("lr:lp", String(pts));
       // friends' old rank points don't mean anything any more; they update the next time you race them
       const f = friendsList();
