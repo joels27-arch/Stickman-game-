@@ -60,15 +60,21 @@
         var fill = document.getElementById("bootFill");
         var txt = document.getElementById("bootText");
         var shown = 0;
+        var creep = 0;
+        var prev = 0;
         var li = Math.floor(Math.random() * LINES.length);
         var last = 0;
         window.__bootTarget = 0;
         function step(t) {
           if (!document.getElementById("boot") || window.__bootFail) return;
+          var dt = prev ? Math.min(0.1, (t - prev) / 1000) : 0;
+          prev = t;
           var target = window.__bootTarget || 0;
-          // creeps ahead on its own (slower near 90%), catches up with the real progress, races to 100 when done
-          var goal = target >= 1 ? 100 : Math.max(target * 100, shown + (92 - shown) * 0.006);
-          shown += (goal - shown) * (target >= 1 ? 0.22 : 0.07);
+          // by time, not frames (same speed on every phone): creeps ahead on its own (slowing near 92%),
+          // follows the real progress within a moment, races to 100 when done
+          creep += (92 - creep) * (1 - Math.exp(-dt / 5));
+          var goal = target >= 1 ? 100 : Math.max(target * 100, creep);
+          shown += (goal - shown) * (1 - Math.exp(-dt / (target >= 1 ? 0.12 : 0.35)));
           if (Math.abs(goal - shown) < 0.05) shown = goal;
           fill.style.width = shown.toFixed(1) + "%";
           if (t - last > 1400) { last = t; li = (li + 1) % LINES.length; }
