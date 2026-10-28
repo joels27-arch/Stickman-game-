@@ -10637,11 +10637,9 @@ window.__bootStarted = true;
 maybeAskName(true);
 world
   .load((f) => {
-    const pct = Math.round(f * 100);
-    $("#loadHint").textContent = `Loading 3D runners… ${pct}%`;
-    $("#bootFill").style.width = `${pct}%`;
-    $("#bootText").textContent = `Loading… ${pct}%`;
-    $("#boot").setAttribute("aria-valuenow", String(pct));
+    // the bar itself glides on its own (index.html); this is the real progress it follows
+    window.__bootTarget = f;
+    $("#boot").setAttribute("aria-valuenow", String(Math.round(f * 100)));
   })
   .then(() => {
     try {
@@ -10649,10 +10647,9 @@ world
     } catch {}
     $("#loadHint").textContent = "";
     // the loading screen fills up, then fades away
-    $("#bootFill").style.width = "100%";
-    $("#bootText").textContent = "Let's go!";
-    setTimeout(() => $("#boot").classList.add("done"), 250);
-    setTimeout(() => $("#boot").remove(), 900);
+    window.__bootTarget = 1; // the bar races to 100%, then the screen fades
+    setTimeout(() => $("#boot").classList.add("done"), 550);
+    setTimeout(() => $("#boot").remove(), 1200);
     createBtn.disabled = joinBtn.disabled = soloBtn.disabled = endlessBtn.disabled = false;
     renderMissionDots(); // everything is defined now: show what's waiting
     world.buildScenery();
@@ -10665,6 +10662,7 @@ world
   })
   .catch((err) => {
     console.error(err);
+    window.__bootFail = true; // the bar stops; the message below stays
     $("#loadHint").textContent = "Couldn't load the 3D models — check your connection and reload.";
     // reload a fresh copy once by itself; after that, a button
     let tried = true;

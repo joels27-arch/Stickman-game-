@@ -48,10 +48,36 @@
       <div class="boot-main">
         <h1 class="logo boot-logo"><span class="w1">4</span><span class="w2">FRIENDS</span></h1>
         <div class="boot-bar"><i id="bootFill"></i></div>
-        <small id="bootText">Loading… 0%</small>
+        <small id="bootText">Tying shoelaces… 0%</small>
         <button id="bootRetry" class="boot-retry" type="button" hidden onclick="location.reload()">Try again</button>
       </div>
     </div>
+    <script>
+      // the loading bar: glides smoothly from 0 to 100 (never jumps, never stalls) with a silly line
+      // every moment. The game reports its real progress in window.__bootTarget (0…1).
+      (function () {
+        var LINES = ["Tying shoelaces…", "Polishing the finish line…", "Bribing the bananas…", "Parking the buses…", "Teaching Rex to jump…", "Warming up the rockets…", "Counting coins (twice)…", "Hiding mystery boxes…", "Chasing a runaway brain…", "Feeding Gloop…", "Stretching hamstrings…", "Waxing the track…", "Untangling the bots…", "Loading extra fun…"];
+        var fill = document.getElementById("bootFill");
+        var txt = document.getElementById("bootText");
+        var shown = 0;
+        var li = Math.floor(Math.random() * LINES.length);
+        var last = 0;
+        window.__bootTarget = 0;
+        function step(t) {
+          if (!document.getElementById("boot") || window.__bootFail) return;
+          var target = window.__bootTarget || 0;
+          // creeps ahead on its own (slower near 90%), catches up with the real progress, races to 100 when done
+          var goal = target >= 1 ? 100 : Math.max(target * 100, shown + (92 - shown) * 0.006);
+          shown += (goal - shown) * (target >= 1 ? 0.22 : 0.07);
+          if (Math.abs(goal - shown) < 0.05) shown = goal;
+          fill.style.width = shown.toFixed(1) + "%";
+          if (t - last > 1400) { last = t; li = (li + 1) % LINES.length; }
+          txt.textContent = shown >= 99.5 ? "Let's go! 100%" : LINES[li] + " " + Math.floor(shown) + "%";
+          requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      })();
+    </script>
     <script>
       // the loading screen never just hangs: an error shows what went wrong, and a stalled load offers a retry
       (function () {
@@ -626,6 +652,7 @@
         function offer() {
           var t = document.getElementById("bootText");
           if (!t || !document.getElementById("boot")) return;
+          window.__bootFail = true;
           t.innerHTML = '<button type="button" style="font:inherit;font-weight:800;padding:8px 18px;border-radius:12px;border:2px solid #fff;background:#b6f72a;color:#1a2300">Tap to reload</button>';
           t.firstChild.onclick = function () {
             location.replace("/?r=" + Date.now());
