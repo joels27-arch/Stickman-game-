@@ -953,21 +953,27 @@ window.addEventListener("keydown", (e) => e.key === "Escape" && !countryModal.hi
 for (const chip of document.querySelectorAll(".country-chip")) chip.addEventListener("click", () => openCountry("Country you cheer for"));
 // after the first round (any mode): ask for a name and, if they like, a country. Asked once.
 const askModal = $("#askModal");
-function maybeAskName() {
+function maybeAskName(now = false) {
   if (local.getItem("lr:asked")) return;
   local.setItem("lr:asked", "1");
-  setTimeout(() => {
-    if (game.mode !== "home" && game.mode !== "results") return;
+  const show = () => {
+    if (!now && game.mode !== "home" && game.mode !== "results") return;
     const n = local.getItem("lr:name") || "";
     $("#askName").value = /^Runner\d{3}$/.test(n) ? "" : n;
     $("#askName").placeholder = n || "Your name";
     renderCountryChips();
     askModal.hidden = false;
-  }, 1400);
+  };
+  if (now) show();
+  else setTimeout(show, 1400);
 }
+/** The game has loaded (the starter pack waits for it; the name is asked while it loads). */
+let bootDone = false;
+let starterWaiting = false;
 /** First visit: a Starter Pack with one of five runners inside. Tap it open: a spin through the five lands on yours. */
 function askStarter() {
   if (starterChoice() !== null) return;
+  if (!bootDone) return void (starterWaiting = true); // opens as soon as the game has loaded
   $("#starterGrid").replaceChildren(
     ...FIRST_FIVE.map((i) => el("span", { class: "pf-zone", style: `--team:${RUNNERS[i].color}`, "data-i": String(i) }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }))),
   );
@@ -10627,6 +10633,8 @@ const endlessBtn = $("#endlessBtn");
 createBtn.disabled = joinBtn.disabled = soloBtn.disabled = endlessBtn.disabled = true;
 renderEndlessBest();
 window.__bootStarted = true;
+// a brand-new player gives their name (and country) on the loading screen, while the game loads
+maybeAskName(true);
 world
   .load((f) => {
     const pct = Math.round(f * 100);
@@ -10652,7 +10660,8 @@ world
     if (net.view?.phase === "lobby") renderLobby(net.view);
     // a brand-new player first sees the game; then Nia invites them to a first run that teaches as they play
     // a brand-new player is asked their name first (the first endless run then teaches the moves by itself)
-    if (!local.getItem("lr:asked")) setTimeout(() => game.mode === "home" && maybeAskName(), 900);
+    bootDone = true;
+    if (starterWaiting) setTimeout(askStarter, 600);
   })
   .catch((err) => {
     console.error(err);

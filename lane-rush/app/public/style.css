@@ -3102,3 +3102,5 @@ html, body { background: var(--k1); }
 .htab .dot.lbl { width: auto; height: 22px; min-width: 22px; padding: 0 4px; top: 0; right: calc(50% - 36px); display: grid; grid-auto-flow: column; place-items: center; border-radius: 12px; font-size: 12px; font-style: normal; line-height: 1; }
 .htab .dot.lbl[hidden] { display: none; }
 .ask-country { justify-self: center; margin: 2px 0 6px; }
+/* the name prompt (and its country list) sits on top of the loading screen */
+#askModal, #countryModal { z-index: 300; }
