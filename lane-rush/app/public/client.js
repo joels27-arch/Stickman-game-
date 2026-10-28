@@ -10373,7 +10373,11 @@ function frame(now) {
         fd = watch.dispD;
       }
     }
-    const tx = laneX(fx) * 0.75;
+    // phones in portrait: the camera sits further back, higher and nearer the middle, so all four lanes fit
+    const portrait = camera.aspect < 0.8;
+    const camBack = portrait ? 5.6 : 4.7;
+    const camUp = portrait ? 3.1 : 2.65;
+    const tx = laneX(fx) * (portrait ? 0.3 : 0.75);
     const back = game.lookBack && !me.out;
     // countdown intro: a sweeping fly-past in front of the whole line-up (everyone
     // cheering), then a glide in behind your runner just before the gun
@@ -10395,13 +10399,13 @@ function frame(now) {
       introPath.points[0].set(0, 2.4, fz - 11.5);
       introPath.points[1].set(side * 3.2, 4.2, fz - 5.5);
       introPath.points[2].set(side * 2.4, 4.6, fz + 1.5);
-      introPath.points[3].set(tx, 2.65, fz + 4.7);
+      introPath.points[3].set(tx, camUp, fz + camBack);
       introPath.getPoint(e, camPos);
       // look at the middle of the line-up, then turn to look down the track
       const k = THREE.MathUtils.smoothstep(p, 0.6, 1);
       introLook = new THREE.Vector3(0, 1.0, fz).lerp(new THREE.Vector3(tx * 0.8, 1.15, fz - 10), k);
     } else {
-      camGoal.set(tx, back ? 2.5 + fy * 0.6 : 2.65 + fy * 0.75, back ? fz - 4.2 : fz + 4.7); // reused: no garbage per frame (closer and lower: your runner big, the track fast)
+      camGoal.set(tx, back ? 2.5 + fy * 0.6 : camUp + fy * 0.75, back ? fz - 4.2 : fz + camBack); // reused: no garbage per frame (closer and lower: your runner big, the track fast)
       camPos.lerp(camGoal, Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     }
     camera.position.copy(camPos);
@@ -10430,7 +10434,13 @@ function frame(now) {
     world.syncBowls(net.view?.bowls || [], serverNow());
     // feel the speed: wider view and speed lines on a rocket or boost
     // the view opens up a little as you speed up (and a lot on a rocket or boost)
-    const zoom = intro ? 66 + 10 * (1 - THREE.MathUtils.smoothstep(forced ?? 1 - Math.max(0, toGo) / Math.max(introLen, 0.01), 0.55, 1)) : me.power === "rocket" ? 80 : me.boostT > 0 || me.sprintT > 0 ? 70 : 62 + clamp((me.speed - BASE_SPEED) * 0.45, 0, 5);
+    let zoom = intro ? 66 + 10 * (1 - THREE.MathUtils.smoothstep(forced ?? 1 - Math.max(0, toGo) / Math.max(introLen, 0.01), 0.55, 1)) : me.power === "rocket" ? 80 : me.boostT > 0 || me.sprintT > 0 ? 70 : 62 + clamp((me.speed - BASE_SPEED) * 0.45, 0, 5);
+    // never narrower than all four lanes (with a margin) a few metres ahead of your runner
+    if (!intro) {
+      const halfW = LANE_W * 1.5 + 0.9 + Math.abs(tx);
+      const need = THREE.MathUtils.radToDeg(2 * Math.atan(halfW / (camBack + 5) / camera.aspect));
+      zoom = Math.min(100, Math.max(zoom, need));
+    }
     if (Math.abs(camera.fov - zoom) > 0.1) {
       camera.fov += (zoom - camera.fov) * Math.min(1, dt * 5);
       camera.updateProjectionMatrix();
