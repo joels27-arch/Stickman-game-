@@ -3104,3 +3104,7 @@ html, body { background: var(--k1); }
 .ask-country { justify-self: center; margin: 2px 0 6px; }
 /* the name prompt (and its country list) sits on top of the loading screen */
 #askModal, #countryModal { z-index: 300; }
+/* loading bar: one compositor animation (smooth even while the page is busy), eased to 92% */
+.boot-bar { overflow: hidden; }
+.boot-bar i { width: 100%; transform: scaleX(0); transform-origin: left center; border-radius: 999px; will-change: transform; animation: bootGlide 9s cubic-bezier(0.12, 0.75, 0.3, 1) forwards; }
+@keyframes bootGlide { from { transform: scaleX(0.02); } to { transform: scaleX(0.92); } }
