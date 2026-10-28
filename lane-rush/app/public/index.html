@@ -54,31 +54,36 @@
     </div>
     <script>
       // the loading bar: glides smoothly from 0 to 100 (never jumps, never stalls) with a silly line
-      // every moment. The game reports its real progress in window.__bootTarget (0…1).
+      // every moment. The game sets window.__bootTarget to 1 when it is ready.
       (function () {
         var LINES = ["Tying shoelaces…", "Polishing the finish line…", "Bribing the bananas…", "Parking the buses…", "Teaching Rex to jump…", "Warming up the rockets…", "Counting coins (twice)…", "Hiding mystery boxes…", "Chasing a runaway brain…", "Feeding Gloop…", "Stretching hamstrings…", "Waxing the track…", "Untangling the bots…", "Loading extra fun…"];
         var fill = document.getElementById("bootFill");
         var txt = document.getElementById("bootText");
-        var shown = 0;
-        var creep = 0;
-        var prev = 0;
+        // the bar's glide is a CSS animation (it keeps running smoothly even while the page is busy
+        // building the game); when the game is ready it races to 100%
         var li = Math.floor(Math.random() * LINES.length);
         var last = 0;
+        var finishing = false;
         window.__bootTarget = 0;
+        function scale() {
+          var m = getComputedStyle(fill).transform;
+          var v = m && m !== "none" ? parseFloat(m.split("(")[1]) : 0;
+          return isFinite(v) ? v : 0;
+        }
         function step(t) {
           if (!document.getElementById("boot") || window.__bootFail) return;
-          var dt = prev ? Math.min(0.1, (t - prev) / 1000) : 0;
-          prev = t;
-          var target = window.__bootTarget || 0;
-          // by time, not frames (same speed on every phone): creeps ahead on its own (slowing near 92%),
-          // follows the real progress within a moment, races to 100 when done
-          creep += (92 - creep) * (1 - Math.exp(-dt / 5));
-          var goal = target >= 1 ? 100 : Math.max(target * 100, creep);
-          shown += (goal - shown) * (1 - Math.exp(-dt / (target >= 1 ? 0.12 : 0.35)));
-          if (Math.abs(goal - shown) < 0.05) shown = goal;
-          fill.style.width = shown.toFixed(1) + "%";
+          if (!finishing && (window.__bootTarget || 0) >= 1) {
+            finishing = true;
+            var cur = scale();
+            fill.style.animation = "none";
+            fill.style.transform = "scaleX(" + cur + ")";
+            void fill.offsetWidth;
+            fill.style.transition = "transform 0.4s ease-out";
+            fill.style.transform = "scaleX(1)";
+          }
+          var pct = Math.floor(scale() * 100);
           if (t - last > 1400) { last = t; li = (li + 1) % LINES.length; }
-          txt.textContent = shown >= 99.5 ? "Let's go! 100%" : LINES[li] + " " + Math.floor(shown) + "%";
+          txt.textContent = pct >= 99 ? "Let's go! 100%" : LINES[li] + " " + pct + "%";
           requestAnimationFrame(step);
         }
         requestAnimationFrame(step);
