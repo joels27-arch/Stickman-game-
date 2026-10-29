@@ -65,8 +65,8 @@ Alle müssen `[]` (keine Fehler) bzw. alle Missionen `true` melden.
 Vorher `node build.cjs`. Dann Ordner per Drag & Drop auf Netlify (`src/` und `build.cjs` stören dort nicht), oder `netlify deploy --prod --dir .`
 
 ## iOS-App (TestFlight)
-- Ordner `../jj-la-ios/` (Capacitor 8, SPM, App-ID `com.joel.jjla`, nur iPhone, Querformat, Vollbild). Anleitung: `jj-la-ios/ANLEITUNG-TESTFLIGHT.md`.
-- „App aktualisieren“: in `jj-la-ios/` `npm install && npm run sync` (kopiert das gebaute Spiel nach `ios/App/App/public/`, ohne Service-Worker), dann `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj` +1, committen.
+- Ordner `mobile/` (Capacitor 8, SPM, App-ID `com.joel.jjla`, nur iPhone, Querformat, Vollbild). Anleitung: `mobile/ANLEITUNG-TESTFLIGHT.md`.
+- „App aktualisieren“: in `mobile/` `npm install && npm run sync` (kopiert das gebaute Spiel nach `ios/App/App/public/`, ohne Service-Worker), dann `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj` +1, committen.
 
 ## Offene Punkte
 - Radio-MP3s einbauen, sobald Joel welche schickt.

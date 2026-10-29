@@ -9,9 +9,9 @@ App-ID: `com.joel.jjla` · Name: „JJ in Los Angeles“ · nur iPhone · nur Qu
 - Die Apple-ID deines Kollegen (seine E-Mail-Adresse).
 
 ## 1. Projekt auf den Mac holen
-1. Auf github.com das Repo öffnen, Branch `claude/new-session-w0yb8o` wählen → **Code → Download ZIP**, entpacken.
-   (Oder im Terminal: `git clone -b claude/new-session-w0yb8o <repo-url>`.)
-2. Im Finder in den Ordner `jj-la-ios/ios/App/` gehen und **`App.xcodeproj`** doppelklicken. Xcode öffnet sich.
+1. Auf github.com das Repo öffnen, Branch `main` wählen → **Code → Download ZIP**, entpacken.
+   (Oder im Terminal: `git clone -b main <repo-url>`.)
+2. Im Finder in den Ordner `jj-la/mobile/ios/App/` gehen und **`App.xcodeproj`** doppelklicken. Xcode öffnet sich.
 3. Kurz warten: Xcode lädt oben links „Package Dependencies“ (Capacitor) automatisch herunter.
 
 ## 2. Signieren (einmalig)
@@ -45,7 +45,7 @@ App-ID: `com.joel.jjla` · Name: „JJ in Los Angeles“ · nur iPhone · nur Qu
 ## Neue Spielversion in die App bringen
 Wenn das Spiel (`jj-la/`) geändert wurde, Claude sagen: „App aktualisieren“. Dann wird `ios/App/App/public/` neu befüllt
 und die Build-Nummer erhöht. Danach am Mac nur **Product → Archive → Distribute** wiederholen.
-(Selbst machen: in `jj-la-ios/` `npm install` und `npm run sync`, in Xcode bei **General → Build** die Zahl um 1 erhöhen.)
+(Selbst machen: in `jj-la/mobile/` `npm install` und `npm run sync`, in Xcode bei **General → Build** die Zahl um 1 erhöhen.)
 
 ## Häufige Fehler
 - **„No account for team“ / Signing-Fehler** → Schritt 2 wiederholen, richtiges Team wählen.

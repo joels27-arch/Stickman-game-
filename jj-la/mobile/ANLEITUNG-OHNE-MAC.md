@@ -12,7 +12,7 @@ Damit dein Kollege schon spielen kann, während Apple dein Konto prüft.
 2. **Add new site → Import an existing project → GitHub** → Repo **Stickman-game-** auswählen
    (falls es fehlt: „Configure the Netlify app on GitHub“ und das Repo freigeben).
 3. Einstellungen:
-   - **Branch to deploy:** `claude/new-session-w0yb8o`
+   - **Branch to deploy:** `main`
    - **Base directory:** leer lassen
    - **Build command:** leer lassen
    - **Publish directory:** `jj-la`
@@ -67,7 +67,7 @@ Nur falls deine Bundle-ID nicht `com.joel.jjla` ist: fünftes Secret `BUNDLE_ID`
 
 ### Schritt 6: Build starten
 - Einfach Claude schreiben: **„TestFlight-Build starten“** – oder selbst:
-  im Repo (Branch `claude/new-session-w0yb8o`) die Datei `jj-la-ios/BUILD.txt` öffnen → Stift → Zahl um 1 erhöhen → **Commit changes**.
+  im Repo (Branch `main`) die Datei `jj-la/mobile/BUILD.txt` öffnen → Stift → Zahl um 1 erhöhen → **Commit changes**.
 - Im Reiter **Actions** läuft dann „iOS TestFlight“ (~10–20 Minuten). Grüner Haken = hochgeladen.
 - Nach weiteren 5–30 Minuten ist der Build in App Store Connect unter **TestFlight** sichtbar.
 

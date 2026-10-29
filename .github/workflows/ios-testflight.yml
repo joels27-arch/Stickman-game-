@@ -1,13 +1,13 @@
-# Baut die iOS-App (jj-la-ios) auf einem Mac in der Cloud und lädt sie zu TestFlight hoch.
-# Startet bei jedem Push auf diesen Branch, der jj-la-ios/ ändert (z. B. jj-la-ios/BUILD.txt).
+# Baut die iOS-App (jj-la/mobile) auf einem Mac in der Cloud und lädt sie zu TestFlight hoch.
+# Startet bei jedem Push auf main, der jj-la/mobile/ ändert (z. B. jj-la/mobile/BUILD.txt).
 # Braucht diese Repository-Secrets (Settings → Secrets and variables → Actions):
 #   APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (Inhalt der .p8-Datei)
 # Optional: BUNDLE_ID (Standard com.joel.jjla). Fehlen die Secrets, endet der Lauf ohne Fehler.
 name: iOS TestFlight
 on:
   push:
-    branches: ['claude/new-session-w0yb8o']
-    paths: ['jj-la-ios/**', '.github/workflows/ios-testflight.yml']
+    branches: ['main']
+    paths: ['jj-la/mobile/**', '.github/workflows/ios-testflight.yml']
   workflow_dispatch:
 jobs:
   testflight:
@@ -25,7 +25,7 @@ jobs:
         id: chk
         run: |
           if [ -z "$TEAM" ] || [ -z "$KEY_ID" ] || [ -z "$ISSUER" ] || [ -z "$KEY_P8" ]; then
-            echo "::notice::Apple-Secrets fehlen noch – Build übersprungen. Siehe jj-la-ios/ANLEITUNG-OHNE-MAC.md"
+            echo "::notice::Apple-Secrets fehlen noch – Build übersprungen. Siehe jj-la/mobile/ANLEITUNG-OHNE-MAC.md"
             echo "ok=0" >> "$GITHUB_OUTPUT"
           else
             echo "ok=1" >> "$GITHUB_OUTPUT"
@@ -44,7 +44,7 @@ jobs:
         if: steps.chk.outputs.ok == '1'
         run: |
           BID="${BUNDLE:-com.joel.jjla}"
-          xcodebuild -project jj-la-ios/ios/App/App.xcodeproj -scheme App -configuration Release \
+          xcodebuild -project jj-la/mobile/ios/App/App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
             DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic PRODUCT_BUNDLE_IDENTIFIER="$BID" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
