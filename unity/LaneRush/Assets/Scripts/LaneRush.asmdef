@@ -2,7 +2,8 @@
     "name": "LaneRush",
     "rootNamespace": "LaneRush",
     "references": [
-        "glTFast"
+        "glTFast",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

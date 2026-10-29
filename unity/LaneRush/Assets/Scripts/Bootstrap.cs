@@ -9,7 +9,7 @@ namespace LaneRush
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Start()
         {
-            if (Object.FindObjectOfType<Game>() != null) return;
+            if (Object.FindFirstObjectByType<Game>() != null) return;
             var go = new GameObject("Lane Rush");
             go.AddComponent<Game>();
         }

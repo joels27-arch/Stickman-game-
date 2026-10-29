@@ -4,7 +4,7 @@ The web game (`lane-rush/`), step by step in Unity. **Step 1: the Endless Run.**
 
 ## Open and play
 
-1. Install **Unity 2022.3 LTS** (Unity Hub → Installs). Unity 6 works too: say yes when it offers to upgrade.
+1. Install **Unity 6000.4.6f1** (Unity Hub → Installs).
 2. Unity Hub → **Add** → pick this folder (`unity/LaneRush`). The first open takes a few minutes
    (it downloads glTFast, the package that loads the 3D runners).
 3. Optional, for the real 3D runners: run `./fetch-runners.sh` once (it downloads the 19 runner

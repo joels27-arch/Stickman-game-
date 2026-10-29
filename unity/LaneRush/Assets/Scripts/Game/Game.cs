@@ -37,7 +37,7 @@ namespace LaneRush
             cam = Camera.main;
             if (cam == null) cam = new GameObject("Main Camera") { tag = "MainCamera" }.AddComponent<Camera>();
             cam.nearClipPlane = 0.1f;
-            foreach (var l in FindObjectsOfType<Light>()) if (l.type == LightType.Directional) l.gameObject.SetActive(false); // ours is per map
+            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) if (l.type == LightType.Directional) l.gameObject.SetActive(false); // ours is per map
 
             world = new GameObject("World").AddComponent<World>();
             view = new GameObject("Course view").AddComponent<CourseView>();
@@ -122,16 +122,14 @@ namespace LaneRush
         // ── controls ──
         void ReadInput()
         {
-            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A)) runner.Move(-1);
-            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D)) runner.Move(1);
-            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.Space)) runner.Jump();
-            if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S)) runner.Slide();
-            if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Return)) runner.UseItem();
+            if (Controls.Pressed(GameKey.Left)) runner.Move(-1);
+            if (Controls.Pressed(GameKey.Right)) runner.Move(1);
+            if (Controls.Pressed(GameKey.Jump)) runner.Jump();
+            if (Controls.Pressed(GameKey.Slide)) runner.Slide();
+            if (Controls.Pressed(GameKey.Item)) runner.UseItem();
 
             // swipes (touch, or a mouse drag in the editor): one move per swipe
-            bool down = Input.touchCount > 0 ? Input.GetTouch(0).phase == TouchPhase.Began : Input.GetMouseButtonDown(0);
-            bool held = Input.touchCount > 0 || Input.GetMouseButton(0);
-            Vector2 pos = Input.touchCount > 0 ? Input.GetTouch(0).position : (Vector2)Input.mousePosition;
+            Controls.Pointer(out bool down, out bool held, out Vector2 pos);
             if (down && !OverItemButton(pos)) { swipeFrom = pos; swiped = false; }
             if (!held) swipeFrom = null;
             if (swipeFrom.HasValue && !swiped)
