@@ -88,7 +88,7 @@ namespace LaneRush
         {
             while (next < Items.Count && Items[next].Z - Rules.RampLen < d + Ahead) Spawn(Items[next++]);
             while (nextCoin < Coins.Count && Coins[nextCoin].Z < d + Ahead) Spawn(Coins[nextCoin++]);
-            for (int i = 0; i < next; i++) Update(Items[i], d, runTime);
+            for (int i = 0; i < next; i++) Animate(Items[i], d, runTime);
             for (int i = 0; i < nextCoin; i++)
             {
                 var c = Coins[i];
@@ -98,7 +98,7 @@ namespace LaneRush
             }
         }
 
-        void Update(CourseItem it, double d, double runTime)
+        void Animate(CourseItem it, double d, double runTime)
         {
             if (it.Go == null) return;
             double end = it.Kind == ItemKind.Bus ? it.Z1 : it.Z;

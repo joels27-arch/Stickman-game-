@@ -1,8 +1,11 @@
 // The runner you see: one of the game's rigged 3D runners (the same .glb files as the web game,
-// loaded at runtime with glTFast from StreamingAssets/Runners), playing run / jump / slide / fall
-// clips. Until it has loaded, or if the file isn't there, a simple stand-in figure runs instead.
+// loaded at runtime with glTFast), playing run / jump / slide / fall clips. A runner comes from
+// StreamingAssets/Runners if it's there, else from the download cache, else it's downloaded from
+// the live game once and cached. Until it has loaded (or offline) a simple stand-in figure runs.
 using System.IO;
+using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Networking;
 #if LANERUSH_GLTFAST
 using GLTFast;
 #endif
@@ -30,8 +33,12 @@ namespace LaneRush
         };
         static Color Hex(string h) { ColorUtility.TryParseHtmlString(h, out var c); return c; }
 
+        const string Site = "https://lane-rush-party.higgsfield.app/assets/";
+        int loadId; // a newer Setup() wins over a load still in flight
+
         public void Setup(int runner)
         {
+            loadId++;
             foreach (Transform ch in transform) Destroy(ch.gameObject);
             anim = null;
             BuildStandIn(Colors[Mathf.Clamp(runner, 0, Colors.Length - 1)]);
@@ -64,18 +71,37 @@ namespace LaneRush
         }
 
 #if LANERUSH_GLTFAST
+        /// <summary>The runner's .glb bytes: bundled, cached, or downloaded once (null if offline).</summary>
+        static async Task<byte[]> Bytes(string name)
+        {
+            string bundled = Path.Combine(Application.streamingAssetsPath, "Runners", name + ".glb");
+            if (!bundled.Contains("://") && File.Exists(bundled)) return File.ReadAllBytes(bundled);
+            string cached = Path.Combine(Application.persistentDataPath, "Runners", name + ".glb");
+            if (File.Exists(cached)) return File.ReadAllBytes(cached);
+            using (var req = UnityWebRequest.Get(Site + name + ".glb"))
+            {
+                var op = req.SendWebRequest();
+                while (!op.isDone) await Task.Yield();
+                if (req.result != UnityWebRequest.Result.Success) { Debug.LogWarning("Lane Rush: couldn't download runner " + name + ": " + req.error); return null; }
+                var data = req.downloadHandler.data;
+                Directory.CreateDirectory(Path.GetDirectoryName(cached));
+                File.WriteAllBytes(cached, data);
+                return data;
+            }
+        }
+
         async void Load(int runner)
         {
-            string file = Path.Combine(Application.streamingAssetsPath, "Runners", Files[Mathf.Clamp(runner, 0, Files.Length - 1)] + ".glb");
-            string uri = file.Contains("://") ? file : "file://" + file;
-            if (!file.Contains("://") && !File.Exists(file)) return; // not downloaded: the stand-in stays
+            int id = loadId;
+            var data = await Bytes(Files[Mathf.Clamp(runner, 0, Files.Length - 1)]);
+            if (data == null || this == null || id != loadId) return;
             var gltf = new GltfImport();
-            var ok = await gltf.Load(uri, new ImportSettings { AnimationMethod = AnimationMethod.Legacy });
-            if (!ok || this == null) return;
+            var ok = await gltf.Load(data, null, new ImportSettings { AnimationMethod = AnimationMethod.Legacy });
+            if (!ok || this == null || id != loadId) return;
             var holder = new GameObject("Model").transform;
             holder.SetParent(transform, false);
             ok = await gltf.InstantiateMainSceneAsync(holder);
-            if (!ok || this == null) { if (holder != null) Destroy(holder.gameObject); return; }
+            if (!ok || this == null || id != loadId) { if (holder != null) Destroy(holder.gameObject); return; }
             // fit: CharH tall, feet on the ground
             var rends = holder.GetComponentsInChildren<Renderer>();
             if (rends.Length > 0)
