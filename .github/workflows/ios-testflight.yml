@@ -1,0 +1,71 @@
+# Baut die iOS-App (jj-la-ios) auf einem Mac in der Cloud und lädt sie zu TestFlight hoch.
+# Startet bei jedem Push auf diesen Branch, der jj-la-ios/ ändert (z. B. jj-la-ios/BUILD.txt).
+# Braucht diese Repository-Secrets (Settings → Secrets and variables → Actions):
+#   APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (Inhalt der .p8-Datei)
+# Optional: BUNDLE_ID (Standard com.joel.jjla). Fehlen die Secrets, endet der Lauf ohne Fehler.
+name: iOS TestFlight
+on:
+  push:
+    branches: ['claude/new-session-w0yb8o']
+    paths: ['jj-la-ios/**', '.github/workflows/ios-testflight.yml']
+  workflow_dispatch:
+jobs:
+  testflight:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      TEAM: ${{ secrets.APPLE_TEAM_ID }}
+      KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+      KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      BUNDLE: ${{ secrets.BUNDLE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secrets prüfen
+        id: chk
+        run: |
+          if [ -z "$TEAM" ] || [ -z "$KEY_ID" ] || [ -z "$ISSUER" ] || [ -z "$KEY_P8" ]; then
+            echo "::notice::Apple-Secrets fehlen noch – Build übersprungen. Siehe jj-la-ios/ANLEITUNG-OHNE-MAC.md"
+            echo "ok=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=1" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Xcode wählen
+        if: steps.chk.outputs.ok == '1'
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+          xcodebuild -version
+      - name: API-Schlüssel ablegen
+        if: steps.chk.outputs.ok == '1'
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8"
+      - name: Archivieren
+        if: steps.chk.outputs.ok == '1'
+        run: |
+          BID="${BUNDLE:-com.joel.jjla}"
+          xcodebuild -project jj-la-ios/ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic PRODUCT_BUNDLE_IDENTIFIER="$BID" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            -allowProvisioningUpdates -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8" \
+            -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER" archive
+      - name: Zu TestFlight hochladen
+        if: steps.chk.outputs.ok == '1'
+        run: |
+          cat > "$RUNNER_TEMP/export.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/export.plist" -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8" \
+            -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER"
+          echo "::notice::Hochgeladen! In 5–30 Minuten erscheint Build ${{ github.run_number }} in App Store Connect unter TestFlight."
