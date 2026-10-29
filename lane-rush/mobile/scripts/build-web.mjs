@@ -2,11 +2,11 @@
  * Build the app's web files (`www/`) from the Lane Rush website.
  *
  * The game itself is never copied into this folder's sources: `www/` is made
- * fresh each time from `../lane-rush/app`, the same way the website's build
+ * fresh each time from `../app`, the same way the website's build
  * makes `dist/client/`:
  *
- *   www/**        ← ../lane-rush/app/public (client, styles, art, three.js)
- *   www/logic.js  ← ../lane-rush/app/src/logic.js (the rules, shared with the server)
+ *   www/**        ← ../app/public (client, styles, art, three.js)
+ *   www/logic.js  ← ../app/src/logic.js (the rules, shared with the server)
  *   www/native.js ← native/native.js, loaded by index.html before the game
  *
  * The art and three.js are not in git; `npm run assets` downloads them first.
@@ -17,7 +17,7 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const mobile = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const game = resolve(mobile, "../lane-rush/app");
+const game = resolve(mobile, "../app");
 const www = resolve(mobile, "www");
 
 // Web-only files the app doesn't need.
@@ -35,7 +35,7 @@ async function exists(path) {
 // Without these the app would install and then hang on its loading screen.
 for (const need of ["public/assets/c0.glb", "public/vendor/three.module.js"]) {
   if (!(await exists(resolve(game, need)))) {
-    console.error(`missing ../lane-rush/app/${need}: run \`npm run assets\` first`);
+    console.error(`missing ../app/${need}: run \`npm run assets\` first`);
     process.exit(1);
   }
 }
@@ -61,4 +61,4 @@ if (html.split(MARKER).length !== 2) {
 }
 await writeFile(page, html.replace(MARKER, `<script src="/native.js"></script>\n    ${MARKER}`));
 
-console.log("built www/ from ../lane-rush/app");
+console.log("built www/ from ../app");

@@ -7,18 +7,18 @@ Gold Pass button still unlocks the pass for free, as on the website.
 
 ## How the app is put together
 
-The game is not copied into this folder. It stays in `../lane-rush/app`, and
+The game is not copied into this folder. It stays in `../app`, and
 each build takes it from there:
 
 ```
-../lane-rush/app/public/**      →  www/**          the client, styles, art, three.js
-../lane-rush/app/src/logic.js   →  www/logic.js    the rules, shared with the server
+../app/public/**      →  www/**          the client, styles, art, three.js
+../app/src/logic.js   →  www/logic.js    the rules, shared with the server
 native/native.js                →  www/native.js   the app's differences (below)
 www/                            →  ios/App/App/public/   (npx cap sync)
 ```
 
 `www/` and `ios/App/App/public/` are generated and git-ignored: a change to the
-game is made in `../lane-rush/app`, never there.
+game is made in `../app`, never there.
 
 `native/native.js` is loaded before the game. In the app, the game's files are
 served by the app itself (`capacitor://localhost`), and the client builds
@@ -51,7 +51,7 @@ Lane Rush has two halves, both hosted by Higgsfield at
 A race:
 
 1. The phone opens a WebSocket to `/ws/ABCD`. Cloudflare sends everyone who
-   uses the code `ABCD` to the same room (`../lane-rush/app/src/worker.ts`).
+   uses the code `ABCD` to the same room (`../app/src/worker.ts`).
 2. The room (`src/room.ts`) runs the rules (`src/logic.js`): who is in the
    lobby, the mode and map, the bots, the official clock and the countdown.
 3. Every phone builds the same course from the same seed and runs its own
@@ -84,7 +84,7 @@ The same server can run on your own Cloudflare account. Roughly:
 
 1. Install [Bun](https://bun.sh) and run `npx wrangler login` with your
    Cloudflare account.
-2. In `../lane-rush/app`: `bun install`, `../fetch-assets.sh`,
+2. In `../app`: `bun install`, `../fetch-assets.sh`,
    `bun run build`, then deploy with a production Wrangler config (the
    `wrangler.jsonc` there is for local dev only: give it your own `name` and
    route or domain, and keep the `ROOMS` Durable Object binding and its
@@ -99,7 +99,7 @@ Apple developer team `GPR2C9QVS4` signed in to Xcode.
 
 ```bash
 npm install
-npm run assets     # once: downloads the art and three.js into ../lane-rush/app/public (not in git)
+npm run assets     # once: downloads the art and three.js into ../app/public (not in git)
 npm run sync       # builds www/ and copies it into the iOS project
 npm run open       # opens the project in Xcode
 ```

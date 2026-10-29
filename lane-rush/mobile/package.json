@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Lane Rush (4 Friends) as an iOS app: the web game bundled with Capacitor",
   "scripts": {
-    "assets": "bash ../lane-rush/fetch-assets.sh",
+    "assets": "bash ../fetch-assets.sh",
     "build": "node scripts/build-web.mjs",
     "sync": "npm run build && cap sync ios",
     "open": "cap open ios"

@@ -1,0 +1,3 @@
+node_modules/
+# Built by scripts/build-web.mjs from ../app (never edit it here)
+www/
