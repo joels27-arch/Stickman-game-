@@ -1,0 +1,22 @@
+{
+    "name": "LaneRush",
+    "rootNamespace": "LaneRush",
+    "references": [
+        "glTFast"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.cloud.gltfast",
+            "expression": "6.0.0",
+            "define": "LANERUSH_GLTFAST"
+        }
+    ],
+    "noEngineReferences": false
+}
