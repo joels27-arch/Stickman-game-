@@ -4794,7 +4794,7 @@ const world = (() => {
   // ── hologram spawn: the runner is "printed" from the feet up. Above the build
   // line a teal lattice ghost, at it a glowing scan edge, below it the real model
   // with a teal tint that fades; sparks gather at the line and code rains round them.
-  const HOLO_S = 1.7; // build time
+  const HOLO_S = 1.3; // build time
   let codeTex = null;
   function codeRainTex() {
     if (codeTex) return codeTex;
@@ -4854,7 +4854,7 @@ const world = (() => {
     };
     m.customProgramCacheKey = () => "holo";
   }
-  function holoFx(r, mats, delay) {
+  function holoFx(r, mats, delay, held) {
     const u = { uOn: { value: 1 }, uCut: { value: -99 }, uTint: { value: 1 }, uTime: { value: 0 } };
     for (const m of mats) {
       holoPatch(m, u);
@@ -4878,7 +4878,7 @@ const world = (() => {
     fx.add(rain, pts);
     r.group.add(fx);
     if (r.tag) r.tag.visible = false;
-    const t0 = performance.now() / 1000 + delay;
+    let t0 = performance.now() / 1000 + delay;
     const end = () => {
       u.uOn.value = 0;
       r.group.remove(fx);
@@ -4890,6 +4890,7 @@ const world = (() => {
     };
     rain.onBeforeRender = () => {
       const now = performance.now() / 1000;
+      if (held?.()) t0 = now + delay; // the clock starts once the runner can actually be seen
       const t = now - t0;
       const baseY = r.group.matrixWorld.elements[13];
       u.uTime.value = now;
@@ -5015,8 +5016,8 @@ const world = (() => {
       r.tag = tag;
     }
     r.play("idle", 0);
-    /** Play the hologram build-up, starting after `delay` seconds. */
-    r.materialize = (delay = 0) => holoFx(r, mats, delay);
+    /** Play the hologram build-up, starting `delay` seconds after `held()` (if given) stops returning true. */
+    r.materialize = (delay = 0, held) => holoFx(r, mats, delay, held);
     return r;
   }
 
@@ -7827,7 +7828,8 @@ function enterRace(v) {
   scene.add(me.runner.group);
   const spawnFx = v.phase === "countdown"; // everyone is printed in at the start line, one after another
   let spawnN = 0;
-  if (spawnFx) me.runner.materialize(0.2 + 0.35 * spawnN++);
+  const curtainDown = () => !curtain.hidden; // nobody sees the start line behind the loading curtain
+  if (spawnFx) me.runner.materialize(0.15 + 0.22 * spawnN++, curtainDown);
 
   for (const p of v.players) {
     if (p.id === playerId) continue;
@@ -7838,7 +7840,7 @@ function enterRace(v) {
     r.dispD = p.d;
     r.dispX = laneX(p.lane);
     scene.add(r.runner.group);
-    if (spawnFx) r.runner.materialize(0.2 + 0.35 * spawnN++);
+    if (spawnFx) r.runner.materialize(0.15 + 0.22 * spawnN++, curtainDown);
   }
 
   const dots = $("#dots");
