@@ -4791,6 +4791,136 @@ const world = (() => {
   }
 
   // ── character instances ──
+  // ── hologram spawn: the runner is "printed" from the feet up. Above the build
+  // line a teal lattice ghost, at it a glowing scan edge, below it the real model
+  // with a teal tint that fades; sparks gather at the line and code rains round them.
+  const HOLO_S = 1.7; // build time
+  let codeTex = null;
+  function codeRainTex() {
+    if (codeTex) return codeTex;
+    const c = document.createElement("canvas");
+    c.width = 256;
+    c.height = 512;
+    const g = c.getContext("2d");
+    g.font = "bold 20px monospace";
+    g.textAlign = "center";
+    const glyphs = "01アイウエオカキクケコサシスセソタチツテト7Z<>{}#$%";
+    for (let col = 0; col < 12; col++) {
+      if (Math.random() < 0.3) continue; // gaps between the streams
+      const x = 11 + col * 21.3;
+      const len = 6 + Math.floor(Math.random() * 14);
+      const y0 = Math.floor(Math.random() * 24);
+      for (let i = 0; i < len; i++) {
+        const a = i === len - 1 ? 1 : 0.15 + (0.6 * i) / len; // bright head, fading tail
+        g.fillStyle = i === len - 1 ? `rgba(220,255,245,${a})` : `rgba(60,255,200,${a})`;
+        g.fillText(glyphs[Math.floor(Math.random() * glyphs.length)], x, ((y0 + i) * 21) % 512);
+      }
+    }
+    codeTex = new THREE.CanvasTexture(c);
+    codeTex.wrapS = codeTex.wrapT = THREE.RepeatWrapping;
+    codeTex.repeat.set(3, 1);
+    return codeTex;
+  }
+  /** Teach a body material the hologram build (a no-op once uOn is 0). */
+  function holoPatch(m, u) {
+    m.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, u);
+      sh.vertexShader = sh.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying vec3 vHolo;")
+        .replace("#include <project_vertex>", "#include <project_vertex>\nvHolo = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <common>", "#include <common>\nvarying vec3 vHolo;\nuniform float uOn, uCut, uTint, uTime;")
+        .replace(
+          "#include <dithering_fragment>",
+          `#include <dithering_fragment>
+          if (uOn > 0.5) {
+            vec3 holo = vec3(0.2, 1.0, 0.82);
+            float d = vHolo.y - uCut;
+            if (d > 0.0) {
+              // not built yet: a see-through lattice that thins out higher up
+              vec3 f = abs(fract(vHolo * 9.0) - 0.5);
+              float line = step(0.44, max(max(f.x, f.y), f.z));
+              float spark = step(0.985, fract(sin(dot(floor(vHolo * 40.0), vec3(12.9898, 78.233, 37.719)) + uTime * 3.0) * 43758.5453));
+              float fade = exp(-d * 1.6);
+              if (max(line, spark) * fade < 0.12) discard;
+              gl_FragColor = vec4(holo * (0.6 + spark), 1.0);
+            } else {
+              float edge = 1.0 - smoothstep(0.0, 0.18, -d);
+              float scan = 0.75 + 0.25 * sin(vHolo.y * 70.0 - uTime * 10.0);
+              gl_FragColor.rgb = mix(gl_FragColor.rgb, holo * scan * 0.8, uTint * 0.7) + holo * edge * 2.2 * uTint;
+            }
+          }`,
+        );
+    };
+    m.customProgramCacheKey = () => "holo";
+  }
+  function holoFx(r, mats, delay) {
+    const u = { uOn: { value: 1 }, uCut: { value: -99 }, uTint: { value: 1 }, uTime: { value: 0 } };
+    for (const m of mats) {
+      holoPatch(m, u);
+      m.needsUpdate = true;
+    }
+    const fx = new THREE.Group();
+    // code rain: an open cylinder of falling glyphs round the runner
+    const rainMat = new THREE.MeshBasicMaterial({ map: codeRainTex(), transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false });
+    const rain = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, CHAR_H * 1.9, 20, 1, true), rainMat);
+    rain.position.y = CHAR_H * 0.9;
+    rain.frustumCulled = false; // its onBeforeRender drives the whole effect
+    // sparks that swirl in and gather at the build line
+    const N = 90;
+    const pos = new Float32Array(N * 3);
+    const seed = Array.from({ length: N }, () => ({ a: Math.random() * 6.283, r: 0.5 + Math.random() * 0.9, h: Math.random(), s: 0.6 + Math.random() * 1.4 }));
+    const pg = new THREE.BufferGeometry();
+    pg.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const pm = new THREE.PointsMaterial({ map: glowTex(), color: "#5effd8", size: 0.09, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, toneMapped: false });
+    const pts = new THREE.Points(pg, pm);
+    pts.frustumCulled = false;
+    fx.add(rain, pts);
+    r.group.add(fx);
+    if (r.tag) r.tag.visible = false;
+    const t0 = performance.now() / 1000 + delay;
+    const end = () => {
+      u.uOn.value = 0;
+      r.group.remove(fx);
+      pg.dispose();
+      pm.dispose();
+      rain.geometry.dispose();
+      rainMat.dispose();
+      if (r.tag) r.tag.visible = true;
+    };
+    rain.onBeforeRender = () => {
+      const now = performance.now() / 1000;
+      const t = now - t0;
+      const baseY = r.group.matrixWorld.elements[13];
+      u.uTime.value = now;
+      codeTex.offset.y = (now * 0.35) % 1;
+      if (t < 0) {
+        u.uCut.value = baseY - 1; // waiting for its turn: lattice only
+        rainMat.opacity = 0.5;
+        return;
+      }
+      const p = Math.min(1, t / HOLO_S);
+      const e = p * p * (3 - 2 * p);
+      u.uCut.value = baseY - 0.05 + e * (CHAR_H + 0.35);
+      const after = Math.max(0, t - HOLO_S) / 0.6; // tint and rain fade once built
+      u.uTint.value = 1 - Math.min(1, after);
+      rainMat.opacity = 0.6 * (1 - Math.min(1, after));
+      pm.opacity = 1 - Math.min(1, after * 1.5);
+      const lineY = e * (CHAR_H + 0.35) - 0.05;
+      for (let i = 0; i < N; i++) {
+        const s = seed[i];
+        const k = (s.h + t * s.s * 0.5) % 1; // each spark falls in toward the line, then starts again
+        const a = s.a + t * s.s * 1.5;
+        const rad = s.r * (1 - k) * 0.9 + 0.15;
+        pos[i * 3] = Math.cos(a) * rad;
+        pos[i * 3 + 1] = lineY + (1 - k) * 0.9;
+        pos[i * 3 + 2] = Math.sin(a) * rad;
+      }
+      pg.attributes.position.needsUpdate = true;
+      if (after >= 1) end();
+    };
+  }
+
   function makeRunner(charIdx, name, color, isMe) {
     const a = assets.chars[charIdx];
     const g = new THREE.Group();
@@ -4885,6 +5015,8 @@ const world = (() => {
       r.tag = tag;
     }
     r.play("idle", 0);
+    /** Play the hologram build-up, starting after `delay` seconds. */
+    r.materialize = (delay = 0) => holoFx(r, mats, delay);
     return r;
   }
 
@@ -7391,6 +7523,7 @@ const world = (() => {
     r.group.position.set(0, 0, -3);
     r.pivot.rotation.y = 0.35;
     r.play("idle", 0);
+    r.materialize(0);
     scene.add(r.group);
     show = { char: charIdx, r };
   }
@@ -7692,6 +7825,9 @@ function enterRace(v) {
   const myChar = charOn(mine?.char ?? 0, v.raceMap);
   me.runner = world.makeRunner(myChar, mine?.name ?? "", RUNNERS[myChar].color, true);
   scene.add(me.runner.group);
+  const spawnFx = v.phase === "countdown"; // everyone is printed in at the start line, one after another
+  let spawnN = 0;
+  if (spawnFx) me.runner.materialize(0.2 + 0.35 * spawnN++);
 
   for (const p of v.players) {
     if (p.id === playerId) continue;
@@ -7702,6 +7838,7 @@ function enterRace(v) {
     r.dispD = p.d;
     r.dispX = laneX(p.lane);
     scene.add(r.runner.group);
+    if (spawnFx) r.runner.materialize(0.2 + 0.35 * spawnN++);
   }
 
   const dots = $("#dots");
