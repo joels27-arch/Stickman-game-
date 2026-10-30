@@ -3108,3 +3108,13 @@ html, body { background: var(--k1); }
 .boot-bar { overflow: hidden; }
 .boot-bar i { width: 100%; transform: scaleX(0); transform-origin: left center; border-radius: 999px; will-change: transform; animation: bootGlide 9s cubic-bezier(0.12, 0.75, 0.3, 1) forwards; }
 @keyframes bootGlide { from { transform: scaleX(0.02); } to { transform: scaleX(0.92); } }
+/* cloud save */
+.cloud-sheet { width: min(400px, 100%); }
+.cloud-body { display: grid; gap: 12px; padding: 4px 2px 6px; color: #fff; text-align: center; }
+.cloud-body p { margin: 0; font-weight: 700; font-size: 14px; line-height: 1.35; color: rgba(255, 255, 255, 0.88); }
+.cloud-body .cloud-big { font-size: 46px; line-height: 1; }
+.cloud-code { justify-self: center; padding: 12px 18px; border-radius: 16px; background: #fff; color: #1d1f3a; font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 900; font-size: 26px; letter-spacing: 0.08em; box-shadow: 0 4px 0 #121c63; user-select: all; -webkit-user-select: all; }
+.cloud-body .btn { width: 100%; }
+.cloud-body small { color: rgba(255, 255, 255, 0.7); font-weight: 700; }
+.cloud-input { width: 100%; padding: 14px; border-radius: 14px; border: 3px solid #b6f72a; background: #0b1224; color: #fff; text-align: center; font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 900; font-size: 22px; letter-spacing: 0.08em; text-transform: uppercase; }
+.cloud-err { color: #ff8a8a !important; }

@@ -1032,7 +1032,156 @@ function renderSettings() {
   $("#setMusic").checked = p.music !== false;
   $("#setBuzz").checked = p.buzz !== false;
   $("#setCountryName").textContent = myCountry() ? `${flagOf(myCountry())} ${countryName(myCountry())}` : "Not set";
+  $("#setCloudSub").textContent = cloudCode() ? `Saved · code ${prettyCode(cloudCode())}` : "Keep it safe and play on any phone";
 }
+// ── cloud save: your progress on the server under a save code, so it's safe and plays on any phone ──
+const CLOUD_CODE = "lr:cloud"; // the save code (12 letters/digits)
+const CLOUD_AT = "lr:cloudAt"; // when it was last saved (ms)
+const CLOUD_SKIP = new Set([CLOUD_CODE, CLOUD_AT, "lr:bootFix"]);
+let cloudLast = ""; // what was uploaded last (no upload when nothing changed)
+let cloudBusy = false;
+const cloudCode = () => local.getItem(CLOUD_CODE) || "";
+const prettyCode = (c) => c.replace(/(.{4})(?=.)/g, "$1-");
+/** Everything this device keeps about you (all the game's "lr:" keys). */
+function cloudData() {
+  const out = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("lr:") && !CLOUD_SKIP.has(k)) out[k] = localStorage.getItem(k);
+    }
+  } catch {
+    /* storage blocked */
+  }
+  return JSON.stringify(out);
+}
+/** Upload your progress (a new save code the first time). `quiet`: no messages (auto-save). */
+async function cloudSave(quiet = false) {
+  if (cloudBusy) return false;
+  const data = cloudData();
+  const code = cloudCode();
+  if (quiet && (!code || data === cloudLast)) return false;
+  cloudBusy = true;
+  try {
+    const res = await fetch("/api/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: code || null, data }), keepalive: quiet && data.length < 60000 });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error || "save failed");
+    local.setItem(CLOUD_CODE, out.code);
+    local.setItem(CLOUD_AT, String(out.at));
+    cloudLast = data;
+    return true;
+  } catch (err) {
+    if (!quiet) toast("Couldn't save: check your connection");
+    return false;
+  } finally {
+    cloudBusy = false;
+  }
+}
+/** Replace this device's progress with a save, then restart the game with it. */
+async function cloudLoad(code) {
+  const res = await fetch(`/api/save?code=${encodeURIComponent(code)}`);
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.error || "Couldn't load that save");
+  const saved = JSON.parse(out.data);
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith("lr:")) localStorage.removeItem(k);
+    for (const [k, v] of Object.entries(saved)) if (k.startsWith("lr:") && typeof v === "string") localStorage.setItem(k, v);
+    localStorage.setItem(CLOUD_CODE, code);
+    localStorage.setItem(CLOUD_AT, String(out.at));
+  } catch {
+    throw new Error("This phone can't store the save");
+  }
+  location.reload();
+}
+const cloudModal = $("#cloudModal");
+function agoText(at) {
+  const s = Math.max(0, (Date.now() - at) / 1000);
+  return s < 60 ? "just now" : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} days ago`;
+}
+function renderCloud(mode = "save") {
+  const body = $("#cloudBody");
+  const code = cloudCode();
+  if (mode === "load") {
+    $("#cloudTitle").textContent = "Load progress";
+    const input = el("input", { class: "cloud-input", maxlength: "16", placeholder: "XXXX-XXXX-XXXX", autocomplete: "off", autocapitalize: "characters", spellcheck: "false" });
+    const msg = el("p", { text: "Type the save code from your other phone. Your progress there comes to this phone." });
+    const go = el("button", { class: "btn big go", type: "button", text: "Load my progress" });
+    go.addEventListener("click", async () => {
+      const c = input.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (c.length !== 12) return (msg.textContent = "A save code has 12 letters and numbers."), msg.classList.add("cloud-err");
+      if (!confirm("Load this save? It replaces the progress on this phone.")) return;
+      go.disabled = true;
+      go.textContent = "Loading…";
+      try {
+        await cloudLoad(c);
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.classList.add("cloud-err");
+        go.disabled = false;
+        go.textContent = "Load my progress";
+      }
+    });
+    body.replaceChildren(el("div", { class: "cloud-big", text: "📲" }), msg, input, go);
+    setTimeout(() => input.focus(), 50);
+    return;
+  }
+  $("#cloudTitle").textContent = "Your progress";
+  if (!code) {
+    const go = el("button", { class: "btn big go", type: "button", text: "Save my progress" });
+    go.addEventListener("click", async () => {
+      go.disabled = true;
+      go.textContent = "Saving…";
+      if (await cloudSave()) {
+        sfx.unlock?.();
+        renderCloud();
+        renderSettings();
+      } else {
+        go.disabled = false;
+        go.textContent = "Save my progress";
+      }
+    });
+    body.replaceChildren(
+      el("div", { class: "cloud-big", text: "☁️" }),
+      el("p", { text: "Save your runners, coins and medals online. You get a save code: with it you can play on another phone, or get everything back if you lose this one." }),
+      go,
+    );
+    return;
+  }
+  const at = Number(local.getItem(CLOUD_AT)) || 0;
+  const now = el("button", { class: "btn big go", type: "button", text: "Save now" });
+  now.addEventListener("click", async () => {
+    now.disabled = true;
+    now.textContent = "Saving…";
+    cloudLast = ""; // save even if nothing changed
+    if (await cloudSave()) toast("Saved!");
+    renderCloud();
+  });
+  const copy = el("button", { class: "btn small ghost", type: "button", text: "Copy code" });
+  copy.addEventListener("click", () => {
+    navigator.clipboard?.writeText(prettyCode(code)).then(() => toast("Code copied"), () => toast(prettyCode(code)));
+  });
+  body.replaceChildren(
+    el("p", { text: "Your save code" }),
+    el("div", { class: "cloud-code", text: prettyCode(code) }),
+    el("p", { text: "Write it down or take a screenshot: it's the key to your progress. On another phone: Settings → Load progress." }),
+    el("small", { text: `Saves by itself after every race · last saved ${at ? agoText(at) : "never"}` }),
+    now,
+    copy,
+  );
+}
+function openCloud(mode) {
+  renderCloud(mode);
+  setModal.hidden = true;
+  cloudModal.hidden = false;
+}
+$("#setCloud").addEventListener("click", () => openCloud("save"));
+$("#setLoad").addEventListener("click", () => openCloud("load"));
+$("#cloudClose").addEventListener("click", () => (cloudModal.hidden = true));
+cloudModal.addEventListener("click", (e) => e.target === cloudModal && (cloudModal.hidden = true));
+// saved by itself: when you leave the game (app to the background, tab closed) and now and then
+document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && cloudSave(true));
+setInterval(() => game.mode !== "race" && cloudSave(true), 90000);
+
 $("#settingsBtn").addEventListener("click", () => {
   renderSettings();
   setModal.hidden = false;
@@ -3227,6 +3376,7 @@ function fmtTime(ms) {
 
 function showResults(v) {
   game.mode = "results";
+  setTimeout(() => cloudSave(true), 2500); // after every race (once the rewards are in)
   showScreen("results");
   renderResults(v);
   maybeAskName();

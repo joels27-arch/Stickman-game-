@@ -441,11 +441,22 @@
           <label class="set-row"><span><b>🔊 Sound effects</b><small>Jumps, coins, hits, menus</small></span><input type="checkbox" id="setSound" /></label>
           <label class="set-row"><span><b>🎵 Music</b><small>Menu and race music</small></span><input type="checkbox" id="setMusic" /></label>
           <label class="set-row"><span><b>📳 Vibration</b><small>Buzz on hits and big moments</small></span><input type="checkbox" id="setBuzz" /></label>
+          <button id="setCloud" class="set-row btnrow cloud-row" type="button"><span><b>☁️ Save progress</b><small id="setCloudSub">Keep it safe and play on any phone</small></span><i>›</i></button>
+          <button id="setLoad" class="set-row btnrow" type="button"><span><b>📲 Load progress</b><small>From another phone, with your save code</small></span><i>›</i></button>
           <button id="setCountry" class="set-row btnrow" type="button"><span><b>🌍 Country</b><small id="setCountryName">Not set</small></span><i>›</i></button>
           <button id="setUnlock" class="set-row btnrow" type="button"><span><b>🔓 Unlock all runners</b><small>Every character, free</small></span><i>›</i></button>
           <button id="setTut" class="set-row btnrow" type="button"><span><b>👆 How to run</b><small>Play the tutorial again on your next endless run</small></span><i>›</i></button>
           <button id="setRestart" class="set-row btnrow" type="button"><span><b>🔄 Start over</b><small>New account: deletes all progress on this device</small></span><i>›</i></button>
         </div>
+      </div>
+    </div>
+
+    <!-- cloud save: your progress on the server under a save code; load it on any phone -->
+    <div id="cloudModal" class="modal gmodal" hidden>
+      <div class="gsheet cloud-sheet" role="dialog" aria-modal="true" aria-labelledby="cloudTitle">
+        <div class="ribbon"><h2 id="cloudTitle">Your progress</h2></div>
+        <button id="cloudClose" class="gclose" type="button" aria-label="Close">✕</button>
+        <div id="cloudBody" class="cloud-body"></div>
       </div>
     </div>
 

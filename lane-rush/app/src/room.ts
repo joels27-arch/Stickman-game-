@@ -137,6 +137,18 @@ export class Room extends DurableObject<Env> {
   // ── connection lifecycle ───────────────────────────────────────────────
 
   override async fetch(request: Request): Promise<Response> {
+    // a cloud save (this instance is "save:<hash>", never a room: see worker.ts)
+    const path = new URL(request.url).pathname;
+    if (path === "/__save/get") {
+      const save = (await this.ctx.storage.get("save")) ?? null;
+      return new Response(JSON.stringify(save), { headers: { "Content-Type": "application/json" } });
+    }
+    if (path === "/__save/put") {
+      const { data } = (await request.json()) as { data: string };
+      const at = Date.now();
+      await this.ctx.storage.put("save", { data, at });
+      return new Response(JSON.stringify({ at }), { headers: { "Content-Type": "application/json" } });
+    }
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected a websocket upgrade", { status: 426 });
     }
