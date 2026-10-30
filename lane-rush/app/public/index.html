@@ -70,9 +70,11 @@
           var v = m && m !== "none" ? parseFloat(m.split("(")[1]) : 0;
           return isFinite(v) ? v : 0;
         }
+        var following = false; // the bar now follows the real download progress
         function step(t) {
           if (!document.getElementById("boot") || window.__bootFail) return;
-          if (!finishing && (window.__bootTarget || 0) >= 1) {
+          var target = window.__bootTarget || 0;
+          if (!finishing && target >= 1) {
             finishing = true;
             var cur = scale();
             fill.style.animation = "none";
@@ -80,6 +82,18 @@
             void fill.offsetWidth;
             fill.style.transition = "transform 0.4s ease-out";
             fill.style.transform = "scaleX(1)";
+          } else if (!finishing) {
+            // the glide only gets the bar going: as files arrive, the real progress takes over and keeps it moving
+            var real = Math.min(0.97, target);
+            var now = scale();
+            if (!following && real > now + 0.02) {
+              following = true;
+              fill.style.animation = "none";
+              fill.style.transform = "scaleX(" + now + ")";
+              void fill.offsetWidth;
+              fill.style.transition = "transform 0.6s ease-out";
+            }
+            if (following && real > now) fill.style.transform = "scaleX(" + real + ")";
           }
           var pct = Math.floor(scale() * 100);
           if (t - last > 1400) { last = t; li = (li + 1) % LINES.length; }

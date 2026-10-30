@@ -3106,8 +3106,8 @@ html, body { background: var(--k1); }
 #askModal, #countryModal { z-index: 300; }
 /* loading bar: one compositor animation (smooth even while the page is busy), eased to 92% */
 .boot-bar { overflow: hidden; }
-.boot-bar i { width: 100%; transform: scaleX(0); transform-origin: left center; border-radius: 999px; will-change: transform; animation: bootGlide 9s cubic-bezier(0.12, 0.75, 0.3, 1) forwards; }
-@keyframes bootGlide { from { transform: scaleX(0.02); } to { transform: scaleX(0.92); } }
+.boot-bar i { width: 100%; transform: scaleX(0); transform-origin: left center; border-radius: 999px; will-change: transform; animation: bootGlide 14s cubic-bezier(0.12, 0.75, 0.3, 1) forwards; }
+@keyframes bootGlide { from { transform: scaleX(0.02); } to { transform: scaleX(0.6); } } /* then the real progress carries it on */
 /* cloud save */
 .cloud-sheet { width: min(400px, 100%); }
 .cloud-body { display: grid; gap: 12px; padding: 4px 2px 6px; color: #fff; text-align: center; }
