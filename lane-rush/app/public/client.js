@@ -4905,7 +4905,7 @@ const world = (() => {
       codeTex.offset.y = (now * 0.35) % 1;
       if (t < 0) {
         u.uCut.value = baseY - 1; // waiting for its turn: lattice only
-        rainMat.opacity = 0.5;
+        rainMat.opacity = 0.7;
         return;
       }
       const p = Math.min(1, t / HOLO_S);
@@ -4913,7 +4913,7 @@ const world = (() => {
       u.uCut.value = baseY - 0.05 + e * (CHAR_H + 0.35);
       const after = Math.max(0, t - HOLO_S) / 0.6; // tint and rain fade once built
       u.uTint.value = 1 - Math.min(1, after);
-      rainMat.opacity = 0.6 * (1 - Math.min(1, after));
+      rainMat.opacity = 0.85 * (1 - Math.min(1, after));
       pm.opacity = 1 - Math.min(1, after * 1.5);
       const lineY = e * (CHAR_H + 0.35) - 0.05;
       for (let i = 0; i < N; i++) {
