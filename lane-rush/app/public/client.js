@@ -4855,8 +4855,15 @@ const world = (() => {
     m.customProgramCacheKey = () => "holo";
   }
   function holoFx(r, mats, delay, held) {
-    const u = { uOn: { value: 1 }, uCut: { value: -99 }, uTint: { value: 1 }, uTime: { value: 0 } };
+    r.holoEnd?.(); // a second build on the same runner replaces the first
+    // one set of uniforms per runner: a compiled program keeps the ones it was built with
+    const u = (r.holoU ??= { uOn: { value: 1 }, uCut: { value: -99 }, uTint: { value: 1 }, uTime: { value: 0 } });
+    u.uOn.value = 1;
+    u.uCut.value = -99;
+    u.uTint.value = 1;
     for (const m of mats) {
+      if (m.userData.holo) continue;
+      m.userData.holo = true;
       holoPatch(m, u);
       m.needsUpdate = true;
     }
@@ -4879,7 +4886,8 @@ const world = (() => {
     r.group.add(fx);
     if (r.tag) r.tag.visible = false;
     let t0 = performance.now() / 1000 + delay;
-    const end = () => {
+    const end = (r.holoEnd = () => {
+      r.holoEnd = null;
       u.uOn.value = 0;
       r.group.remove(fx);
       pg.dispose();
@@ -4887,7 +4895,7 @@ const world = (() => {
       rain.geometry.dispose();
       rainMat.dispose();
       if (r.tag) r.tag.visible = true;
-    };
+    });
     rain.onBeforeRender = () => {
       const now = performance.now() / 1000;
       if (held?.()) t0 = now + delay; // the clock starts once the runner can actually be seen
