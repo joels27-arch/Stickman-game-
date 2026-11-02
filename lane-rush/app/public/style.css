@@ -3118,3 +3118,13 @@ html, body { background: var(--k1); }
 .cloud-body small { color: rgba(255, 255, 255, 0.7); font-weight: 700; }
 .cloud-input { width: 100%; padding: 14px; border-radius: 14px; border: 3px solid #b6f72a; background: #0b1224; color: #fff; text-align: center; font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 900; font-size: 22px; letter-spacing: 0.08em; text-transform: uppercase; }
 .cloud-err { color: #ff8a8a !important; }
+
+/* privacy policy / Impressum: long text in a scrolling sheet */
+.legal-sheet { width: min(460px, 100%); }
+.legal-body { max-height: min(62vh, 560px); overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px 6px 8px; color: rgba(255, 255, 255, 0.9); font-size: 13.5px; line-height: 1.45; text-align: left; }
+.legal-body h3 { margin: 14px 0 4px; font-size: 15px; color: #fff; }
+.legal-body h3:first-child { margin-top: 2px; }
+.legal-body p, .legal-body ul { margin: 0 0 8px; }
+.legal-body ul { padding-left: 18px; }
+.legal-body a { color: #b9f35a; }
+.legal-body small { color: rgba(255, 255, 255, 0.6); }

@@ -1178,6 +1178,69 @@ $("#setCloud").addEventListener("click", () => openCloud("save"));
 $("#setLoad").addEventListener("click", () => openCloud("load"));
 $("#cloudClose").addEventListener("click", () => (cloudModal.hidden = true));
 cloudModal.addEventListener("click", (e) => e.target === cloudModal && (cloudModal.hidden = true));
+// ── privacy policy and Impressum ──
+/** Who runs the game (German law: the Impressum names a person and a postal address). */
+const OPERATOR = { name: "", street: "", city: "", country: "Germany", email: "" };
+const LEGAL = {
+  privacy: {
+    title: "Privacy",
+    html: () => `
+      <h3>The short version</h3>
+      <p>No accounts, no ads, no tracking, no analytics. Your progress lives on your phone. The only things that reach our server are what a multiplayer race needs and, if you choose to, your cloud save.</p>
+      <h3>Who is responsible</h3>
+      <p>${legalWho()}</p>
+      <h3>Stored on your device</h3>
+      <p>Your name, country, coins, runners, medals, settings and stats are kept in your browser's local storage on this device. They never leave it unless you race online or use cloud save. "Start over" in Settings deletes them; so does clearing the site's data in your browser.</p>
+      <h3>Multiplayer races</h3>
+      <p>When you create or join a room, the game server receives your name, country flag, chosen runner and your position in the race, and shares them with the other players in that room. This data is only kept while the room is open.</p>
+      <h3>Cloud save (optional)</h3>
+      <p>Only if you tap "Save progress": a copy of your game progress (the data listed above) is stored on the server under a random save code. Anyone with the code can load it, so keep it to yourself. We store the save under a scrambled form of the code and nothing else about you. Saves are kept until the game shuts down; ask us at the contact above to delete yours.</p>
+      <h3>Hosting and server logs</h3>
+      <p>The game is hosted by Higgsfield on Cloudflare's network. When you open it, your IP address and browser details reach their servers as part of every web request, and may be logged briefly for security and to keep the service running (legal basis: legitimate interest, Art. 6(1)(f) GDPR).</p>
+      <h3>Fonts</h3>
+      <p>The game's fonts are loaded from Google Fonts, which means your browser connects to Google's servers and Google receives your IP address. See Google's privacy policy at <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a>.</p>
+      <h3>Purchases</h3>
+      <p>Coins and packs in the game are play money: there are no real-money purchases at the moment.</p>
+      <h3>Children</h3>
+      <p>The game asks for no real names, e-mail addresses or other personal details. Please don't use your real full name as your player name.</p>
+      <h3>Your rights</h3>
+      <p>Under the GDPR you can ask for access to, correction or deletion of your data, restrict or object to its processing, and complain to a data protection authority. Since we hold almost nothing that identifies you, the quickest way is usually "Start over" in Settings; for a cloud save, send us its code.</p>
+      <p><small>Last updated: ${LEGAL_DATE}</small></p>`,
+  },
+  imprint: {
+    title: "Impressum",
+    html: () => `
+      <h3>Angaben gemäß § 5 DDG</h3>
+      <p>${legalWho()}</p>
+      <h3>Verantwortlich für den Inhalt</h3>
+      <p>${esc(OPERATOR.name) || "—"}</p>
+      <h3>Haftung für Inhalte und Links</h3>
+      <p>Wir erstellen die Inhalte dieses Spiels mit Sorgfalt, übernehmen aber keine Gewähr für ihre Richtigkeit und Vollständigkeit. Für Inhalte externer Links sind ausschließlich deren Betreiber verantwortlich.</p>
+      <h3>Streitschlichtung</h3>
+      <p>Wir sind nicht bereit und nicht verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>`,
+  },
+};
+const LEGAL_DATE = "2 November 2026";
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function legalWho() {
+  const o = OPERATOR;
+  const lines = [o.name, o.street, o.city, o.country].filter(Boolean).map(esc);
+  if (o.email) lines.push(`E-Mail: <a href="mailto:${esc(o.email)}">${esc(o.email)}</a>`);
+  return lines.join("<br>");
+}
+const legalModal = $("#legalModal");
+function openLegal(kind) {
+  $("#legalTitle").textContent = LEGAL[kind].title;
+  $("#legalBody").innerHTML = LEGAL[kind].html();
+  $("#legalBody").scrollTop = 0;
+  setModal.hidden = true;
+  legalModal.hidden = false;
+}
+$("#setPrivacy").addEventListener("click", () => openLegal("privacy"));
+$("#setImprint").addEventListener("click", () => openLegal("imprint"));
+$("#legalClose").addEventListener("click", () => (legalModal.hidden = true));
+legalModal.addEventListener("click", (e) => e.target === legalModal && (legalModal.hidden = true));
+
 // saved by itself: when you leave the game (app to the background, tab closed) and now and then
 document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && cloudSave(true));
 setInterval(() => game.mode !== "race" && cloudSave(true), 90000);
