@@ -98,6 +98,9 @@ const RUNNERS = [
   { name: "MC Gold", color: "#f0b400", file: "c16", tag: "Rap Star", cid: "rapstar" },
   { name: "Momo", color: "#e9ecef", file: "c17", tag: "Snow Buddy", cid: "momo" },
   { name: "Glorb", color: "#8a4fd8", file: "c18", tag: "Space Octopus", cid: "glorb" },
+  { name: "Disco Dash", color: "#e040fb", file: "c20", tag: "Dance Machine", cid: "dancer" },
+  { name: "Pharaoh Ra", color: "#2f6fd8", file: "c21", tag: "Sun King", cid: "ra" },
+  { name: "Aurum", color: "#f2b705", file: "c22", tag: "Golden Champion", cid: "aurum" },
 ];
 const STARTERS = 8; // the first 8 runners; the rest are collectibles
 /** Collection id → runner index, for the collectibles that are 3D runners. */
@@ -1420,7 +1423,7 @@ function allChars() {
     ...COLLECTION.map((c) => ({ ...c, img: c.pic ?? `/assets/sc_${c.id}.webp`, hero: c.pic ?? `/assets/sc_${c.id}.webp`, ...runnerOf(c.id) })),
     ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp`, ...runnerOf(c.id) })),
     { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp`, ...runnerOf(PASS_CHAR.id) },
-    ...ROAD_CHARS.map((c) => ({ ...c, via: c.via ?? "road", img: `/assets/rd_${c.id}.webp`, hero: `/assets/rd_${c.id}.webp` })),
+    ...ROAD_CHARS.map((c) => ({ ...c, via: c.via ?? "road", img: `/assets/rd_${c.id}.webp`, hero: `/assets/rd_${c.id}.webp`, ...runnerOf(c.id) })),
   ];
 }
 const ownsChar = (c) => (c.idx !== undefined ? wallet.owns(c.idx) : wallet.has(c.id));
