@@ -1576,7 +1576,6 @@ charModal.addEventListener("click", (e) => e.target === charModal && (charModal.
 const PACK_CHARS = [
   { id: "brainz", name: "Prof. Brainz", rarity: "legendary", dupe: 1500 },
   { id: "ra", name: "Pharaoh Ra", rarity: "epic", dupe: 600 },
-  { id: "zorp", name: "Zorp", rarity: "rare", dupe: 300 },
   { id: "glorb", name: "Glorb", rarity: "epic", dupe: 600 },
   { id: "dancer", name: "Disco Dash", rarity: "legendary", dupe: 1500 },
 ];
@@ -2445,7 +2444,6 @@ function untilText(ms) {
 
 /** Characters only found on the Trophy Road (the others on it are in COLLECTION, via "road"). */
 const ROAD_CHARS = [
-  { id: "titan", name: "Titan", rarity: "legendary" },
   { id: "aurum", name: "Aurum", rarity: "legendary", via: "pack" }, // found in packs now (kept here for its picture)
 ];
 /** Each step: the league points it needs and what it gives. Every league starts with a character. */
@@ -2490,7 +2488,7 @@ const ROAD = [
   { pts: 2150, pack: "legend" },
   { pts: 2400, pack: "legend" },
   { pts: 2650, coins: 5000 },
-  { pts: 2900, char: "titan" },
+  { pts: 2900, pack: "legend" },
   { pts: 3250, pack: "legend" },
   { pts: 3600, coins: 6000 },
   { pts: 4000, pack: "legend" },
@@ -10911,7 +10909,7 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 
 // characters taken out of the game: whoever owned one gets coins for it, once
 {
-  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000, mo: 300, porky: 900, frosty: 600, thunderjack: 1500, kai: 800, leo: 800, zed: 1500, hoops: 1500, zara: 300, captainstar: 300, magic: 1500, unitx: 800 };
+  const GONE = { luna: 800, toto: 1200, blaze: 1800, jax: 3000, aria: 2500, fin: 600, ace: 1500, foxy: 2200, kingcrown: 9000, mo: 300, porky: 900, frosty: 600, thunderjack: 1500, kai: 800, leo: 800, zed: 1500, hoops: 1500, zara: 300, captainstar: 300, magic: 1500, unitx: 800, zorp: 300, titan: 2500 };
   const owned = wallet.owned();
   const had = owned.filter((id) => id in GONE && !local.getItem(`lr:refund:${id}`));
   if (had.length) {
