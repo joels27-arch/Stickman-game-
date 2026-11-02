@@ -4578,7 +4578,7 @@ const world = (() => {
   const fileProgress = new Map();
   /** The Artlist remake of a model (md_*), or the original if that file is missing. */
   function loadGLBOr(file, fallback) {
-    return loadGLB(`/assets/${file}.glb`, 2).catch(() => loadGLB(`/assets/${fallback}.glb`));
+    return loadGLB(`/assets/${file}.glb?v=bl1`, 2).catch(() => loadGLB(`/assets/${fallback}.glb`)); // v: the Blender-made props (bust cached copies)
   }
   // a dropped download (flaky mobile data, a deploy swapping files) retries twice, fresh from the server
   function loadGLB(url, tries = 3) {
@@ -4799,15 +4799,15 @@ const world = (() => {
     const jobs = [
       ...[0, 1, 2, 3].map((i) => ensureChar(i)),
       // obstacles: `${kind}${look}` (see LOOKS in logic.js)
-      loadGLBOr("md_hurdle", "hurdle2").then((g) => (assets.props.hurdle0 = fitProp(g.scene, { width: 1.75, maxHeight: 0.72 }))),
+      loadGLBOr("bl_hurdle", "md_hurdle").then((g) => (assets.props.hurdle0 = fitProp(g.scene, { width: 1.75, maxHeight: 0.72 }))),
       loadGLBOr("md_hay", "hay").then((g) => (assets.props.hurdle1 = fitProp(g.scene, { width: 1.7, maxHeight: 0.7 }))),
-      loadGLBOr("md_gate", "gate2").then((g) => (assets.props.gate0 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
+      loadGLBOr("bl_gate", "md_gate").then((g) => (assets.props.gate0 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
       loadGLBOr("md_arch", "arch").then((g) => (assets.props.gate1 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
-      loadGLBOr("md_crates", "crates").then((g) => (assets.props.crate0 = fitProp(g.scene, { width: 1.45, maxHeight: 2.6 }))),
+      loadGLBOr("bl_crates", "md_crates").then((g) => (assets.props.crate0 = fitProp(g.scene, { width: 1.45, maxHeight: 2.6 }))),
       // the cow faces you and stands tall: far too big to jump, so you dodge it like the crates
       loadGLBOr("md_cow", "cow").then((g) => (assets.props.crate1 = fitProp(g.scene, { height: 2.5, maxWidth: 1.8, lengthwise: true }))),
       loadGLBOr("md_tires", "tires").then((g) => (assets.props.crate2 = fitProp(g.scene, { width: 1.4, maxHeight: 2.5 }))),
-      loadGLBOr("md_barrel", "barrel").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
+      loadGLBOr("bl_barrel", "md_barrel").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
       loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
       // nice-to-haves: the game still runs with stand-ins if one of these fails
       // power-up models (made with Higgsfield): the rocket backpack, the storm cloud, the glue puddle, the boxing glove
@@ -6260,7 +6260,7 @@ const world = (() => {
   const lodProps = new Map(); // key → light far version (a holder fitted like the full one)
   const lodFile = new Map(); // full prop → key
   function loadLod(key, file, size) {
-    return loadGLB(`/assets/${file}_lod.glb`)
+    return loadGLB(`/assets/${file}_lod.glb?v=bl1`)
       .then((g) => lodProps.set(key, fitProp(g.scene, size)))
       .catch(() => {}); // no far version: the full one is used all the way
   }
