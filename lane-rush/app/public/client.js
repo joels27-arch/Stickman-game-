@@ -434,7 +434,7 @@ const sfx = (() => {
   let loading = false;
   const buffers = new Map();
   const SAMPLES = ["tap", "coin", "unlock", "boom", "whoosh", "cheer", "slip", "thunder", "pack", "bonk", "dizzy"];
-  const MUSIC = { menu: 0.16, race1: 0.13, race2: 0.13, race3: 0.13 }; // loop volumes: soft, under the game sounds
+  const MUSIC = { menu: 0.2, race1: 0.16, race2: 0.16, race3: 0.16 }; // loop volumes: soft chill-house, under the game sounds
   const RACE_TRACKS = ["race1", "race2", "race3"]; // a different one each race
   const ensure = () => {
     if (!ctx) {
@@ -447,7 +447,7 @@ const sfx = (() => {
       loading = true;
       // effects first (small), then the music
       Promise.all(SAMPLES.map((n) => load(n, `/assets/sfx_${n}.mp3`))).then(() =>
-        Promise.all(Object.keys(MUSIC).map((n) => load(`m:${n}`, `/assets/music_${n}.mp3`))).then(syncMusic),
+        Promise.all(Object.keys(MUSIC).map((n) => load(`m:${n}`, `/assets/music_${n}.mp3?v=2`))).then(syncMusic),
       );
     }
     return ctx;
