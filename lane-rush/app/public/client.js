@@ -4582,6 +4582,7 @@ const world = (() => {
   }
   // a dropped download (flaky mobile data, a deploy swapping files) retries twice, fresh from the server
   function loadGLB(url, tries = 3) {
+    if (!url.includes("?")) url += "?v=bl1"; // the Blender-made props replaced files of the same name: skip stale cached copies
     fileProgress.set(url, fileProgress.get(url) ?? 0);
     const attempt = (n) =>
       new Promise((resolve, reject) =>

@@ -15,6 +15,7 @@ from mathutils import Vector
 
 def reset():
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    _mats.clear()  # the factory reset removed them
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
     sc.cycles.device = "CPU"
@@ -216,7 +217,7 @@ def preview(objs, path, size=(900, 420), cam_loc=(0, -7.5, 2.4), look=(0, 0, 0.8
     bg.inputs["Strength"].default_value = 0.9
     bpy.ops.object.light_add(type="SUN", location=(4, -4, 8), rotation=(math.radians(50), math.radians(10), math.radians(35)))
     bpy.context.active_object.data.energy = 3.5
-    bpy.ops.mesh.primitive_plane_add(size=40, location=(0, 0, 0))
+    bpy.ops.mesh.primitive_plane_add(size=600, location=(0, 0, 0))
     ground = bpy.context.active_object
     g = bpy.data.materials.new("ground")
     g.use_nodes = True
