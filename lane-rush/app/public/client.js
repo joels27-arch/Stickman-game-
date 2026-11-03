@@ -4811,19 +4811,19 @@ const world = (() => {
       loadGLBOr("bl_box", "box").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
       // nice-to-haves: the game still runs with stand-ins if one of these fails
       // power-up models (made with Higgsfield): the rocket backpack, the storm cloud, the glue puddle, the boxing glove
-      loadGLB("/assets/pw3d_rocket.glb").then((g) => (assets.props.jetpack = fitProp(g.scene, { height: 0.95 }))).catch(() => {}),
-      loadGLB("/assets/pw3d_cloud.glb").then((g) => (assets.props.storm = fitProp(g.scene, { width: 1.7 }))).catch(() => {}),
-      loadGLB("/assets/pw3d_glue.glb").then((g) => (assets.props.glue = fitProp(g.scene, { width: 1, maxHeight: 0.12 }))).catch(() => {}),
-      loadGLB("/assets/pw3d_glove.glb").then((g) => (assets.props.glove = fitProp(g.scene, { height: 0.9 }))).catch(() => {}),
+      loadGLBOr("bl_rocket", "pw3d_rocket").then((g) => (assets.props.jetpack = fitProp(g.scene, { height: 0.95 }))).catch(() => {}),
+      loadGLBOr("bl_cloud", "pw3d_cloud").then((g) => (assets.props.storm = fitProp(g.scene, { width: 1.7 }))).catch(() => {}),
+      loadGLBOr("bl_glue", "pw3d_glue").then((g) => (assets.props.glue = fitProp(g.scene, { width: 1, maxHeight: 0.12 }))).catch(() => {}),
+      loadGLBOr("bl_glove", "pw3d_glove").then((g) => (assets.props.glove = fitProp(g.scene, { height: 0.9 }))).catch(() => {}),
       loadGLB("/assets/throw.glb").then((g) => (throwClip = g.animations[0] ? upperBody(g.animations[0]) : null)).catch(() => {}),
-      loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
+      loadGLBOr("bl_banana", "banana").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
       // gates are wide enough that their pillars stand outside the fences
       loadGLBOr("bl_boost_pad", "boost_pad").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
       loadGLBOr("bl_bus", "bus").then((g) => (assets.props.bus = fitBus(g.scene))).catch(() => {}),
       // the Artlist bus and ramp: every other bus uses them (to compare with the first pair)
       loadGLB("/assets/bus2.glb").then((g) => (assets.props.bus2 = fitBus(g.scene, BUS2_TURN))).catch(() => {}),
       loadGLBOr("bl_ramp", "ramp2").then((g) => (assets.props.ramp2 = fitRamp(g.scene))).catch(() => {}),
-      loadGLB("/assets/bowling_ball.glb").then((g) => (assets.props.bowlingBall = fitProp(g.scene, { width: 0.75 }))).catch(() => (assets.props.bowlingBall = ballStandIn())),
+      loadGLBOr("bl_bowling_ball", "bowling_ball").then((g) => (assets.props.bowlingBall = fitProp(g.scene, { width: 0.75 }))).catch(() => (assets.props.bowlingBall = ballStandIn())),
       loadGLBOr("bl_gate_finish", "gate_finish").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8.5 }))).catch(() => {}),
       loadGLBOr("bl_gate_start", "start_line").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8 }))).catch(() => {}),
       loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
@@ -7307,7 +7307,7 @@ const world = (() => {
       fallback.position.y = 2.6;
       brainObj.add(fallback);
       scene.add(brainObj);
-      loadModeProp("brain", { width: 6.5, maxHeight: 6.5 }).then((m) => {
+      loadModeProp("bl_brain", { width: 6.5, maxHeight: 6.5 }).then((m) => {
         if (!m || !brainObj || modeKind !== "chase") return;
         brainObj.remove(fallback);
         const inner = sizeTo(m.clone(), 5.6);
@@ -7343,7 +7343,7 @@ const world = (() => {
       bombObj.visible = false;
       bombHop = { holder: null, from: null, t0: 0 };
       scene.add(bombObj);
-      loadModeProp("bomb", { width: 0.95, maxHeight: 1.2 }).then((m) => {
+      loadModeProp("bl_bomb", { width: 0.95, maxHeight: 1.2 }).then((m) => {
         if (!m || !bombObj || modeKind !== "potato") return;
         body.remove(spr);
         // centre the model on the body so it spins in place right over the runner's head
