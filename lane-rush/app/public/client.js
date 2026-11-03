@@ -4587,7 +4587,7 @@ const world = (() => {
     const attempt = (n) =>
       new Promise((resolve, reject) =>
         loader.load(
-          n ? `${url}?r=${Date.now()}` : url,
+          n ? `${url}${url.includes("?") ? "&" : "?"}r=${Date.now()}` : url,
           (g) => {
             fileProgress.set(url, 1);
             resolve(g);
@@ -6983,12 +6983,12 @@ const world = (() => {
     chicken: { file: "chicken", size: 0.85, emoji: "🐔", y: 0 },
     wave: { file: null, size: 1, emoji: "🌊", y: 0 },
     crab: { file: "crab", size: 0.85, emoji: "🦀", y: 0 },
-    taxi: { file: "taxi", size: 2.6, emoji: "🚕", y: 0 },
-    pigeons: { file: "pigeon", size: 1, emoji: "🐦", y: 1.45 },
-    football: { file: "football", size: 0.8, emoji: "⚽", y: 0 },
-    spidercam: { file: "spidercam", size: 1.1, emoji: "🎥", y: 1.45 },
-    asteroid: { file: "asteroid", size: 0.9, emoji: "☄️", y: 0 },
-    ufo: { file: "ufo", size: 2.4, emoji: "🛸", y: 2.6 },
+    taxi: { file: "ct_taxi", size: 2.6, emoji: "🚕", y: 0 },
+    pigeons: { file: "ct_pigeon", size: 1, emoji: "🐦", y: 1.45 },
+    football: { file: "st_ball", size: 0.8, emoji: "⚽", y: 0 },
+    spidercam: { file: "st_cam", size: 1.1, emoji: "🎥", y: 1.45 },
+    asteroid: { file: "sp_asteroid", size: 0.9, emoji: "☄️", y: 0 }, // file names, not the map props' keys: a failed load must never blank those
+    ufo: { file: "sp_ufo", size: 2.4, emoji: "🛸", y: 2.6 },
   };
   // the UFO's tractor beam (the model comes from sp_ufo.glb)
   function ufoBeam() {
@@ -7129,12 +7129,12 @@ const world = (() => {
     return obj;
   }
   const propLoads = {};
+  /** Mode and mover models, kept apart from assets.props so a failed download can never blank a map's own prop. */
   function loadModeProp(name, size) {
     if (!propLoads[name]) {
-      assets.props[name] = null;
       propLoads[name] = loadGLB(`/assets/${name}.glb`)
-        .then((g) => (assets.props[name] = fitProp(g.scene, size)))
-        .catch(() => (assets.props[name] = null));
+        .then((g) => fitProp(g.scene, size))
+        .catch(() => null);
     }
     return propLoads[name];
   }
