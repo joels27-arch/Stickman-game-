@@ -446,7 +446,7 @@ const sfx = (() => {
     if (!loading) {
       loading = true;
       // effects first (small), then the music
-      Promise.all(SAMPLES.map((n) => load(n, `/assets/sfx_${n}.mp3`))).then(() =>
+      Promise.all(SAMPLES.map((n) => load(n, `/assets/sfx_${n === "coin" ? "coin2" : n}.mp3`))).then(() => // coin2: the bright two-note chime
         Promise.all(Object.keys(MUSIC).map((n) => load(`m:${n}`, `/assets/music_${n}.mp3?v=2`))).then(syncMusic),
       );
     }
