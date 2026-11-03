@@ -4800,15 +4800,15 @@ const world = (() => {
       ...[0, 1, 2, 3].map((i) => ensureChar(i)),
       // obstacles: `${kind}${look}` (see LOOKS in logic.js)
       loadGLBOr("bl_hurdle", "md_hurdle").then((g) => (assets.props.hurdle0 = fitProp(g.scene, { width: 1.75, maxHeight: 0.72 }))),
-      loadGLBOr("md_hay", "hay").then((g) => (assets.props.hurdle1 = fitProp(g.scene, { width: 1.7, maxHeight: 0.7 }))),
+      loadGLBOr("bl_hay", "md_hay").then((g) => (assets.props.hurdle1 = fitProp(g.scene, { width: 1.7, maxHeight: 0.7 }))),
       loadGLBOr("bl_gate", "md_gate").then((g) => (assets.props.gate0 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
-      loadGLBOr("md_arch", "arch").then((g) => (assets.props.gate1 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
+      loadGLBOr("bl_arch", "md_arch").then((g) => (assets.props.gate1 = fitProp(g.scene, { width: 1.95, maxHeight: 2.2 }))),
       loadGLBOr("bl_crates", "md_crates").then((g) => (assets.props.crate0 = fitProp(g.scene, { width: 1.45, maxHeight: 2.6 }))),
       // the cow faces you and stands tall: far too big to jump, so you dodge it like the crates
-      loadGLBOr("md_cow", "cow").then((g) => (assets.props.crate1 = fitProp(g.scene, { height: 2.5, maxWidth: 1.8, lengthwise: true }))),
-      loadGLBOr("md_tires", "tires").then((g) => (assets.props.crate2 = fitProp(g.scene, { width: 1.4, maxHeight: 2.5 }))),
+      loadGLBOr("bl_cow", "md_cow").then((g) => (assets.props.crate1 = fitProp(g.scene, { height: 2.5, maxWidth: 1.8, lengthwise: true }))),
+      loadGLBOr("bl_tires", "md_tires").then((g) => (assets.props.crate2 = fitProp(g.scene, { width: 1.4, maxHeight: 2.5 }))),
       loadGLBOr("bl_barrel", "md_barrel").then((g) => (assets.props.roller0 = fitProp(g.scene, { width: 1.5, maxHeight: 1.0 }))),
-      loadGLB("/assets/box.glb").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
+      loadGLBOr("bl_box", "box").then((g) => (assets.props.box = fitProp(g.scene, { width: 0.95 }))),
       // nice-to-haves: the game still runs with stand-ins if one of these fails
       // power-up models (made with Higgsfield): the rocket backpack, the storm cloud, the glue puddle, the boxing glove
       loadGLB("/assets/pw3d_rocket.glb").then((g) => (assets.props.jetpack = fitProp(g.scene, { height: 0.95 }))).catch(() => {}),
@@ -4818,14 +4818,14 @@ const world = (() => {
       loadGLB("/assets/throw.glb").then((g) => (throwClip = g.animations[0] ? upperBody(g.animations[0]) : null)).catch(() => {}),
       loadGLB("/assets/banana.glb").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
       // gates are wide enough that their pillars stand outside the fences
-      loadGLB("/assets/boost_pad.glb").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
-      loadGLB("/assets/bus.glb").then((g) => (assets.props.bus = fitBus(g.scene))).catch(() => {}),
+      loadGLBOr("bl_boost_pad", "boost_pad").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
+      loadGLBOr("bl_bus", "bus").then((g) => (assets.props.bus = fitBus(g.scene))).catch(() => {}),
       // the Artlist bus and ramp: every other bus uses them (to compare with the first pair)
       loadGLB("/assets/bus2.glb").then((g) => (assets.props.bus2 = fitBus(g.scene, BUS2_TURN))).catch(() => {}),
-      loadGLB("/assets/ramp2.glb").then((g) => (assets.props.ramp2 = fitRamp(g.scene))).catch(() => {}),
+      loadGLBOr("bl_ramp", "ramp2").then((g) => (assets.props.ramp2 = fitRamp(g.scene))).catch(() => {}),
       loadGLB("/assets/bowling_ball.glb").then((g) => (assets.props.bowlingBall = fitProp(g.scene, { width: 0.75 }))).catch(() => (assets.props.bowlingBall = ballStandIn())),
-      loadGLB("/assets/gate_finish.glb").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8.5 }))).catch(() => {}),
-      loadGLBOr("start_line", "gate_start").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8 }))).catch(() => {}),
+      loadGLBOr("bl_gate_finish", "gate_finish").then((g) => (assets.props.finishGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8.5 }))).catch(() => {}),
+      loadGLBOr("bl_gate_start", "start_line").then((g) => (assets.props.startGate = fitProp(squareUp(g.scene), { width: TRACK_W * 1.65, maxHeight: 8 }))).catch(() => {}),
       loadGLB("/assets/ground.glb").then((g) => (assets.props.ground = fitTile(g.scene))),
       loadGLBOr("md_oak", "tree_oak").then((g) => (assets.props.oak = fitProp(g.scene, { height: 6.5 }))),
       loadGLBOr("md_pine", "tree_pine").then((g) => (assets.props.pine = fitProp(g.scene, { height: 6.2 }))),
@@ -6802,7 +6802,7 @@ const world = (() => {
       raceGroup.add(bus);
       cullables.push({ obj: bus, z: b.z0, z1: b.z1 });
       if (b.ramp === false) continue;
-      const ramp = artlist && assets.props.ramp2 ? assets.props.ramp2.clone() : makeRamp();
+      const ramp = assets.props.ramp2 ? assets.props.ramp2.clone() : makeRamp(); // the Blender ramp on every map
       ramp.position.set(laneX(b.lane), 0, -(b.z0 - RAMP_LEN));
       raceGroup.add(ramp);
       cullables.push({ obj: ramp, z: b.z0 - RAMP_LEN, z1: b.z0 });
