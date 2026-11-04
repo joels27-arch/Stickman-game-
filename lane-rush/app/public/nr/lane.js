@@ -6,6 +6,7 @@
    paint, with the painted sky in the reflection instead of the planar-reflection pass (too heavy for phones). */
 import * as THREE from "three";
 import { GLTFLoader } from "/vendor/jsm/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "./meshopt_decoder.js";
 import { U, noiseTexture } from "./shared.js";
 
 /** Lane Rush map → Neon Rush world */
@@ -221,8 +222,8 @@ function toneMap(root) {
 }
 
 const glbs = {};
-const loader = new GLTFLoader();
-const glb = (name) => glbs[name] ?? (glbs[name] = loader.loadAsync(`/assets/nr_${name}.glb?v=1`));
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const glb = (name) => glbs[name] ?? (glbs[name] = loader.loadAsync(`/assets/nr_${name}.glb?v=2`));
 /** The shared props (lamps, sign gantries, the START gantry) and their materials, as Neon Rush's main.js makes them. */
 let propsP = null;
 function nrProps() {
