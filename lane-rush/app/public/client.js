@@ -5510,7 +5510,7 @@ const world = (() => {
         nrActive = v;
         v.container.visible = true;
       })
-      .catch(() => {});
+      .catch((e) => console.error("Neon Rush world", w, "failed:", e));
   }
   function nrTick(d, dt) {
     if (!nrActive) return;
@@ -5523,7 +5523,12 @@ const world = (() => {
     // behind the start line: the world's own scenery turned round (a snapshot at the start), drawn only
     // while the camera looks back (the countdown fly-past, the BEHIND view) and the start is still in sight
     if (!v.back && d < 1) {
-      v.back = backdropOf(v);
+      try {
+        v.back = backdropOf(v);
+      } catch (e) {
+        v.back = new THREE.Group(); // nothing behind the start, but the race goes on
+        console.warn("backdrop", e);
+      }
       if (v.back) scene.add(v.back);
     }
     if (v.back) v.back.visible = nrLookBack && d < 420;
@@ -10914,11 +10919,11 @@ function frame(now) {
     const camUp = portrait ? 3.1 : 2.65;
     const tx = laneX(fx) * (portrait ? 0.3 : 0.75);
     const back = game.lookBack && !me.out;
-    // countdown intro: a sweeping fly-past in front of the whole line-up (everyone
-    // cheering), then a glide in behind your runner just before the gun
+    // countdown intro: a high shot down the course over the line-up, then a glide in
+    // behind your runner just before the gun
     const toGo = net.view ? (net.view.startAt - serverNow()) / 1000 : 0;
-    // The opening shot: one slow, continuous move. It starts low in front of the
-    // line-up, rises over the runners and settles exactly where the running camera
+    // The opening shot: one slow, continuous move. It starts high behind the line-up,
+    // sinks over the runners and settles exactly where the running camera
     // sits at the gun, so there is never a cut. It takes whatever countdown is left.
     const introLen = game.introLen ?? 0;
     const forced = game.introForce; // tests can hold the shot at any point (0 … 1)
@@ -10931,14 +10936,15 @@ function frame(now) {
       const q = THREE.MathUtils.smoothstep(p, 0.45, 1);
       const e = p < 0.45 ? (0.06 * p) / 0.45 : 0.06 + 0.94 * q;
       const side = laneX(fx) > 0 ? -1 : 1; // sweep round on the open side
-      introPath.points[0].set(0, 2.4, fz - 11.5);
-      introPath.points[1].set(side * 3.2, 4.2, fz - 5.5);
-      introPath.points[2].set(side * 2.4, 4.6, fz + 1.5);
+      // always facing down the track (behind the start line there is nothing to see): high above and
+      // behind the line-up, the whole course ahead in view, then down in behind your runner
+      introPath.points[0].set(side * 4.5, 11, fz + 17);
+      introPath.points[1].set(side * 3.4, 7.5, fz + 12);
+      introPath.points[2].set(side * 1.4, 4.6, fz + 8);
       introPath.points[3].set(tx, camUp, fz + camBack);
       introPath.getPoint(e, camPos);
-      // look at the middle of the line-up, then turn to look down the track
-      const k = THREE.MathUtils.smoothstep(p, 0.6, 1);
-      introLook = new THREE.Vector3(0, 1.0, fz).lerp(new THREE.Vector3(tx * 0.8, 1.15, fz - 10), k);
+      const k = THREE.MathUtils.smoothstep(p, 0.5, 1);
+      introLook = new THREE.Vector3(0, 0.6, fz - 26).lerp(new THREE.Vector3(tx * 0.8, 1.15, fz - 10), k);
     } else {
       camGoal.set(tx, back ? 2.5 + fy * 0.6 : camUp + fy * 0.75, back ? fz - 4.2 : fz + camBack); // reused: no garbage per frame (closer and lower: your runner big, the track fast)
       camPos.lerp(camGoal, Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
@@ -10953,7 +10959,7 @@ function frame(now) {
     else if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
     else camLook.set(tx * 0.8, 1.15 + fy * 0.6, fz - 10);
     camera.lookAt(camLook);
-    world.lookBack(intro || back);
+    world.lookBack(back);
     world.cull(back ? fd - 30 : fd);
     world.syncBananas(net.view?.bananas || [], slipped);
     world.syncCloud(net.view?.cloud, (id) => {

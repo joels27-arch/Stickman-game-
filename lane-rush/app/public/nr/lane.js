@@ -223,7 +223,17 @@ function toneMap(root) {
 
 const glbs = {};
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const glb = (name) => glbs[name] ?? (glbs[name] = loader.loadAsync(`/assets/nr_${name}.glb?v=2`));
+const plainLoader = new GLTFLoader();
+// the compressed file first; if its decoder fails (or hangs) in this browser, the original uncompressed one
+const glb = (name) =>
+  glbs[name] ??
+  (glbs[name] = Promise.race([
+    MeshoptDecoder.ready.then(() => loader.loadAsync(`/assets/nr_${name}.glb?v=2`)),
+    new Promise((_, no) => setTimeout(() => no(new Error("meshopt timeout")), 25000)),
+  ]).catch((e) => {
+    console.warn("Neon Rush model", name, "compressed load failed, using the original:", e?.message ?? e);
+    return plainLoader.loadAsync(`/assets/nr_raw_${name}.glb?v=1`);
+  }));
 /** The shared props (lamps, sign gantries, the START gantry) and their materials, as Neon Rush's main.js makes them. */
 let propsP = null;
 function nrProps() {
