@@ -111,13 +111,13 @@ export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
 /** The classic maps (3D models), then the themed ones built in code (public/themes.js: same ids). */
-export const MAPS = ["space", "city", "stadium", "snowy", "candy", "crystal", "mars", "deepsea", "lava", "egypt", "icecream", "aurora", "artlist", "uranus"]; // City and Stadium came back as Neon Rush worlds; retired: Meadow, Beach, Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet, Fairy Forest, Farm, Neon Night, Rainbow Road, Cloud Kingdom, Synthwave
+export const MAPS = ["space", "city", "stadium", "snowy", "candy", "crystal", "mars", "deepsea", "lava", "egypt", "icecream", "aurora", "artlist", "uranus", "jungle"]; // City and Stadium came back as Neon Rush worlds; retired: Meadow, Beach, Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet, Fairy Forest, Farm, Neon Night, Rainbow Road, Cloud Kingdom, Synthwave
 /** The maps a "random" pick draws from: Artlist is only raced when picked by name. */
 /** A new room starts on this map. */
 export const DEFAULT_MAP = "candy";
 export const RANDOM_MAPS = MAPS.filter((m) => m !== "artlist");
 /** Themed maps borrow a classic map's moving obstacles (the rest use the meadow's logs and bees). */
-export const MAP_MOVERS = { mars: "space", deepsea: "beach", egypt: "farm" };
+export const MAP_MOVERS = { mars: "space", deepsea: "beach", egypt: "farm", jungle: "farm" };
 /** The maps with their own moving obstacles; every other map uses the meadow's (or MAP_MOVERS). */
 export const MOVER_BASES = ["meadow", "farm", "beach", "city", "stadium", "space"];
 /** A Party Cup is three rounds; each placing scores points, most points wins. */

@@ -95,5 +95,12 @@ export const THEMES = [
     ground: { style: "speckle", colors: ["#140a2a", "#1a0e34", "#0e0820"] }, track: { style: "tiles", colors: ["#1e2a4a", "#24325a", "#141c36"], kerb: "#1a2240", lines: "#a89ee0" },
     props: [], hills: 0,
   }),
+  // a Neon Rush world (Jungle Temple): its own scenery, sky and road; this only sets the light, fog and weather
+  T("jungle", "Jungle Temple", "🌴", {
+    sky: { top: "#5a8ab0", mid: "#c8d8a0", horizon: "#ffe0a0" }, sun: "#fff0c0", fog: ["#8c9a68", 80, 320],
+    light: { hemi: ["#fff4dc", "#4a6a3a", 1.1], sun: ["#ffe8b8", 2.0] }, far: "#5a7a48", near: "#4a6a3a",
+    ground: { style: "speckle", colors: ["#3a5a2a", "#4a6a34", "#2e4a22"] }, track: { style: "tiles", colors: ["#6a6a58", "#7a7a66", "#5a5a4a"], kerb: "#8a8a74" },
+    props: [], hills: 1, movers: "farm",
+  }),
 ];
 

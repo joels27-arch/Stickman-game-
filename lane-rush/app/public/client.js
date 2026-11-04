@@ -2123,7 +2123,7 @@ $("#tutNo").addEventListener("click", () => {
   go?.();
 });
 /** A map card's picture: the Neon Rush painting where the map has one, else its old screenshot. */
-const NR_CARDS = new Set(["candy", "icecream", "snowy", "aurora", "crystal", "deepsea", "lava", "egypt", "uranus", "space", "city", "stadium"]);
+const NR_CARDS = new Set(["candy", "icecream", "snowy", "aurora", "crystal", "deepsea", "lava", "egypt", "uranus", "space", "city", "stadium", "jungle"]);
 const mapPic = (key) => (NR_CARDS.has(key) ? `/assets/nr_map_${key}.webp` : `/assets/map_${key}.webp`);
 let esMap = "random";
 function openEndlessSetup() {
@@ -5384,6 +5384,7 @@ const world = (() => {
     deepsea: plate("sea", 0.28, "#0c325c"),
     lava: plate("volcano", 0.28, "#3d1618"),
     egypt: plate("egypt", 0.51, "#b96c2e"),
+    jungle: plate("jungle", 0.32, "#6a7a4a"),
   };
   /**
    * A painted plate round the whole view (the Neon Rush way): the picture straight down
@@ -5402,7 +5403,7 @@ const world = (() => {
     return plateTexs[file];
   }
   // Neon Rush road decks for the themed maps: a 1024 tile, glossy, the map's own sky lying in it
-  const NR_DECK = { candy: "candy", icecream: "candy", crystal: "brain", lava: "volcano", egypt: "egypt", uranus: "uranus", aurora: "ice", snowy: "cloud", deepsea: "sand" };
+  const NR_DECK = { candy: "candy", icecream: "candy", crystal: "brain", lava: "volcano", egypt: "egypt", jungle: "jungle", uranus: "uranus", aurora: "ice", snowy: "cloud", deepsea: "sand" };
   function deckMat(id, len) {
     const t = texLoader.load(`/assets/nr_deck_${NR_DECK[id]}.webp`);
     t.colorSpace = THREE.SRGBColorSpace;

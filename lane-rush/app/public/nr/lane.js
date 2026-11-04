@@ -10,7 +10,7 @@ import { MeshoptDecoder } from "./meshopt_decoder.js";
 import { U, noiseTexture } from "./shared.js";
 
 /** Lane Rush map → Neon Rush world */
-export const NR_WORLD = { city: "earth", stadium: "stadium", space: "orbit", candy: "candy", icecream: "candy", crystal: "brain", lava: "volcano", snowy: "cloud", aurora: "ice", deepsea: "sea", egypt: "egypt", uranus: "uranus" };
+export const NR_WORLD = { city: "earth", stadium: "stadium", space: "orbit", candy: "candy", icecream: "candy", crystal: "brain", lava: "volcano", snowy: "cloud", aurora: "ice", deepsea: "sea", egypt: "egypt", uranus: "uranus", jungle: "jungle" };
 
 const C = (r, g, b) => new THREE.Color(r, g, b);
 /** Per world: road kind, deck picture, sky, horizon of the plate, ground plane (y or null), fog (linear) and density, parapet LED. */
@@ -24,6 +24,7 @@ export const NR = {
   cloud: { kind: 10, sky: "cloud", hz: 0.44, deck: "cloud", ground: null, fog: C(0.98, 0.82, 0.62), density: 0.0005, led: C(1.9, 1.25, 0.45), marble: true },
   ice: { kind: 4, sky: "ice", hz: 0.06, deck: "ice", ground: -0.5, fog: C(0.06, 0.16, 0.2), density: 0.00072, led: C(0.2, 2.8, 3.4) },
   sea: { kind: 2, sky: "sea", hz: 0.28, deck: "sand", ground: null, fog: C(0.012, 0.085, 0.14), density: 0.0032, led: C(0.2, 2.2, 3.0) },
+  jungle: { kind: 12, sky: "jungle", hz: 0.32, deck: "jungle", ground: -1.5, fog: C(0.5, 0.55, 0.38), density: 0.0011, led: C(0.7, 2.8, 0.5), moss: true },
   egypt: { kind: 13, sky: "egypt", hz: 0.51, deck: "egypt", ground: -2, fog: C(0.78, 0.5, 0.3), density: 0.0016, led: C(2.4, 1.6, 0.5), stone: true },
   uranus: { kind: 14, sky: "uranus", hz: 0.38, deck: "uranus", ground: -0.5, fog: C(0.07, 0.1, 0.22), density: 0.00045, led: C(1.8, 0.7, 3.6) },
 };
@@ -106,6 +107,7 @@ export function deckMaterial(w) {
           col = lava*vec3(.42, .32, .3)*(1. - hot) + vec3(4.4, 1.15, .12)*hot*hot*beat*.6 + refl*F*.3;
         }
         if (uKind == 10.) col = texture2D(tDeck, p/16.).rgb*vec3(.9, .83, .72) + refl*G*.6;          // Cloud City: polished marble
+        if (uKind == 12.) col = texture2D(tDeck, p/10.).rgb*vec3(.62, .66, .55) + refl*(.05 + .3*pow(1. - max(V.y, 0.), 3.));   // Jungle Temple: old mossy paving
         if (uKind == 13.){                                        // Valley of the Kings: sandstone, gold inlay in the sun
           vec3 t = texture2D(tDeck, p/12.).rgb;
           float gold = smoothstep(.12, .3, t.r - t.b*1.25)*smoothstep(.55, .8, t.r);
@@ -119,6 +121,7 @@ export function deckMaterial(w) {
         if (uKind == 8.){ lineC = vec3(1.5, 1.45, 1.4); edgeC = vec3(1.7, 1.6, 1.5); }
         if (uKind == 9.){ lineC = vec3(2.4, .9, .16); edgeC = vec3(3.8, 1.2, .14); }
         if (uKind == 10.){ lineC = vec3(2.2, 1.5, .6); edgeC = vec3(3., 1.9, .6); }
+        if (uKind == 12.){ lineC = vec3(2., 1.6, .5); edgeC = vec3(.7, 2.8, .5); }
         if (uKind == 13.){ lineC = vec3(2.4, 1.6, .5); edgeC = vec3(3.4, 2., .5); }
         if (uKind == 14.){ lineC = vec3(.6, 1.8, 2.8); edgeC = vec3(1.8, .7, 3.6); }
         float dash = smoothstep(.5, .54, fract(p.y/14.))*smoothstep(1., .96, fract(p.y/14.));
@@ -163,6 +166,7 @@ export function groundPlane(w) {
           col = g*(.62 + .18*step(.5, fract(p.y/24.)))*vec3(.85, 1., .85) + plate(R)*F*.15;
         }
         if (uKind == 0.) col += vec3(9., 3.6, 1.7)*pow(max(dot(R, normalize(vec3(0., .085, -1.))), 0.), 900.);    // sun glitter on the sea
+        if (uKind == 12.) col = mix(col, col*vec3(.55, .8, .6) + vec3(.01, .03, .02), .7);   // a green jungle lagoon
         if (uKind == 8.) col = mix(mix(vec3(1., .66, .76), vec3(.72, .92, .86), .5 + .5*sin(p.x*.02 + p.y*.013)), plate(R), F*.6);   // strawberry milk
         if (uKind == 9.){                                                                                       // a lava river
           float crust = smoothstep(.2, .6, .5 + .5*sin(p.x*.13 + sin(p.y*.09 + uTime*.3)*2.)*sin(p.y*.11 - uTime*.2));
@@ -191,7 +195,7 @@ export function groundPlane(w) {
 export function parapets(w, len, x, back = 60) {
   const cfg = NR[w];
   const g = new THREE.Group();
-  const wall = new THREE.MeshStandardMaterial({ color: cfg.marble ? 0xf2ede4 : cfg.stone ? 0xc9a36b : 0x15131c, roughness: cfg.marble || cfg.stone ? 0.5 : 0.35, metalness: cfg.marble || cfg.stone ? 0 : 0.6 });
+  const wall = new THREE.MeshStandardMaterial({ color: cfg.marble ? 0xf2ede4 : cfg.stone ? 0xc9a36b : cfg.moss ? 0x3a4030 : 0x15131c, roughness: cfg.marble || cfg.stone || cfg.moss ? 0.5 : 0.35, metalness: cfg.marble || cfg.stone || cfg.moss ? 0 : 0.6 });
   const led = new THREE.MeshBasicMaterial({ color: cfg.led });
   const top = new THREE.MeshBasicMaterial({ color: cfg.rail ? C(2.6, 0.4, 0.5) : C(2.8, 0.25, 2.3).multiplyScalar(0.34) });
   for (const s of [-1, 1]) {
@@ -369,6 +373,7 @@ export function loadWorld(w) {
       volcano: () => m2.makeVolcanoWorld(container, plate, models, noise),
       cloud: () => m2.makeCloudWorld(container, plate, models, noise),
       egypt: () => m3.makeEgyptWorld(container, plate, models),
+      jungle: () => m3.makeJungleWorld(container, plate, models),
       uranus: () => m3.makeUranusWorld(container, plate, models),
     }[w];
     const world = make();
