@@ -5358,11 +5358,57 @@ const world = (() => {
    * Maps with their own painted sky (Higgsfield panoramas wrapped round the
    * world, loaded the first time the map is picked); the rest use the day sky.
    */
+  // plate skies (Neon Rush paintings): `hz` is the horizon's height in the image, from the bottom
+  const plate = (name, hz, fog) => ({ plate: `nr_sky_${name}.webp`, hz, bg: fog, fog, clouds: false });
   const MAP_SKY = {
-    space: { file: "space_pano.jpg", turn: 0.62, drop: 60, bg: "#0b0722", fog: "#1b1240", clouds: false },
-    city: { file: "city_pano.jpg", turn: 0, drop: 46, bg: "#3f9ae6", fog: "#cfe6f5", clouds: true },
-    uranus: { paint: buildUranusSky, bg: "#12062e", fog: "#3a1464", clouds: false },
+    space: plate("orbit", 0.44, "#6f879c"),
+    city: plate("sunset", 0.06, "#281d25"),
+    stadium: plate("stadium", 0.15, "#3e5270"),
+    uranus: plate("uranus", 0.38, "#9db8e0"),
+    candy: plate("candy", 0.38, "#dbbcca"),
+    icecream: plate("candy", 0.38, "#dbbcca"),
+    snowy: plate("cloud", 0.44, "#c3a284"),
+    aurora: plate("ice", 0.06, "#2d5067"),
+    crystal: plate("brain", 0.28, "#241c4a"),
+    deepsea: plate("sea", 0.28, "#0c325c"),
+    lava: plate("volcano", 0.28, "#3d1618"),
+    egypt: plate("egypt", 0.51, "#b96c2e"),
   };
+  /**
+   * A painted plate round the whole view (the Neon Rush way): the picture straight down
+   * the track, mirrored beyond its edges so it never shows a seam, its bright parts lifted
+   * so they glow. It rides with the camera, so it is always infinitely far away.
+   */
+  function plateSky(file, hz) {
+    const t = texLoader.load(`/assets/${file}`);
+    t.colorSpace = THREE.SRGBColorSpace;
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(300, 48, 24),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        fog: false,
+        uniforms: { tS: { value: t }, hz: { value: hz } },
+        vertexShader: "varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+        fragmentShader: `uniform sampler2D tS; uniform float hz; varying vec3 vDir;
+          void main() {
+            vec3 d = normalize(vDir);
+            float az = atan(d.x, -d.z) / 1.1;                // the picture spans ~126 degrees ahead
+            az = abs(mod(az + 1.0, 4.0) - 2.0) - 1.0;         // mirrored beyond (and behind)
+            float el = asin(clamp(d.y, -1.0, 1.0));
+            vec2 uv = vec2(az * 0.5 + 0.5, clamp(hz + el / 0.933, 0.002, 0.998));
+            vec3 c = texture2D(tS, uv).rgb;
+            float L = dot(c, vec3(0.2126, 0.7152, 0.0722));
+            c *= 1.0 + 0.35 * smoothstep(0.7, 1.0, L);       // highlights a touch hotter (they bloom)
+            gl_FragColor = vec4(c, 1.0);
+          }`,
+      }),
+    );
+    mesh.frustumCulled = false;
+    mesh.renderOrder = -1;
+    mesh.onBeforeRender = (_r, _s, cam) => mesh.position.copy(cam.position);
+    return mesh;
+  }
   const mapSkies = {}; // map -> group
   function mapSkyGroup(map) {
     if (mapSkies[map]) return mapSkies[map];
@@ -5370,6 +5416,10 @@ const world = (() => {
     scene.add(g);
     mapSkies[map] = g;
     const sky = MAP_SKY[map];
+    if (sky.plate) {
+      g.add(plateSky(sky.plate, sky.hz));
+      return g;
+    }
     if (sky.paint) {
       sky.paint(g);
       return g;
