@@ -10919,11 +10919,11 @@ function frame(now) {
     const camUp = portrait ? 3.1 : 2.65;
     const tx = laneX(fx) * (portrait ? 0.3 : 0.75);
     const back = game.lookBack && !me.out;
-    // countdown intro: a high shot down the course over the line-up, then a glide in
+    // countdown intro: a low shot down the course past the line-up, then a glide in
     // behind your runner just before the gun
     const toGo = net.view ? (net.view.startAt - serverNow()) / 1000 : 0;
-    // The opening shot: one slow, continuous move. It starts high behind the line-up,
-    // sinks over the runners and settles exactly where the running camera
+    // The opening shot: one slow, continuous move. It starts low behind the line-up,
+    // glides up to the runners and settles exactly where the running camera
     // sits at the gun, so there is never a cut. It takes whatever countdown is left.
     const introLen = game.introLen ?? 0;
     const forced = game.introForce; // tests can hold the shot at any point (0 … 1)
@@ -10936,15 +10936,15 @@ function frame(now) {
       const q = THREE.MathUtils.smoothstep(p, 0.45, 1);
       const e = p < 0.45 ? (0.06 * p) / 0.45 : 0.06 + 0.94 * q;
       const side = laneX(fx) > 0 ? -1 : 1; // sweep round on the open side
-      // always facing down the track (behind the start line there is nothing to see): high above and
-      // behind the line-up, the whole course ahead in view, then down in behind your runner
-      introPath.points[0].set(side * 4.5, 11, fz + 17);
-      introPath.points[1].set(side * 3.4, 7.5, fz + 12);
-      introPath.points[2].set(side * 1.4, 4.6, fz + 8);
+      // always facing down the track (behind the start line there is nothing to see): low behind the
+      // line-up, under the START gantry and down the course, then in behind your runner
+      introPath.points[0].set(side * 3.2, 3.0, fz + 17);
+      introPath.points[1].set(side * 2.6, 3.3, fz + 12);
+      introPath.points[2].set(side * 1.3, 3.6, fz + 8);
       introPath.points[3].set(tx, camUp, fz + camBack);
       introPath.getPoint(e, camPos);
       const k = THREE.MathUtils.smoothstep(p, 0.5, 1);
-      introLook = new THREE.Vector3(0, 0.6, fz - 26).lerp(new THREE.Vector3(tx * 0.8, 1.15, fz - 10), k);
+      introLook = new THREE.Vector3(0, 1.8, fz - 30).lerp(new THREE.Vector3(tx * 0.8, 1.15, fz - 10), k);
     } else {
       camGoal.set(tx, back ? 2.5 + fy * 0.6 : camUp + fy * 0.75, back ? fz - 4.2 : fz + camBack); // reused: no garbage per frame (closer and lower: your runner big, the track fast)
       camPos.lerp(camGoal, Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
