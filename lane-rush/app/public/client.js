@@ -5978,8 +5978,8 @@ const world = (() => {
    * The meadow's track: a raised red running track (top at y = 0, the meadow
    * below) with white kerbs down both sides. One box each: cheap on phones.
    */
-  function runningTrack(tex = null, sideColor = "#1f4a8f", kerbColor = "#f4f1e8", topMat = null) {
-    const len = TRACK_LEN + 220;
+  function runningTrack(tex = null, sideColor = "#1f4a8f", kerbColor = "#f4f1e8", topMat = null, back = 60) {
+    const len = TRACK_LEN + 160 + back; // from `back` metres behind the start line to past the finish
     const g = new THREE.Group();
     if (!tex && !topMat) {
       // the meadow: a blue rubber running track (fine grain, drawn here: nothing to download)
@@ -6003,12 +6003,12 @@ const world = (() => {
     const top = topMat ?? new THREE.MeshLambertMaterial({ map: tex });
     const deck = new THREE.Mesh(new THREE.BoxGeometry(TRACK_W, -MEADOW_Y, len), [side, side, top, side, side, side]);
     deck.receiveShadow = true; // runners' and obstacles' shadows land on the track
-    deck.position.set(0, MEADOW_Y / 2, -(len / 2 - 60));
+    deck.position.set(0, MEADOW_Y / 2, -(len / 2 - back));
     g.add(deck);
     const kerbMat = new THREE.MeshLambertMaterial({ color: kerbColor });
     for (const s of [-1, 1]) {
       const kerb = new THREE.Mesh(new THREE.BoxGeometry(0.45, -MEADOW_Y + 0.12, len), kerbMat);
-      kerb.position.set(s * (TRACK_W / 2 + 0.22), MEADOW_Y / 2 + 0.06, -(len / 2 - 60));
+      kerb.position.set(s * (TRACK_W / 2 + 0.22), MEADOW_Y / 2 + 0.06, -(len / 2 - back));
       g.add(kerb);
     }
     return g;
@@ -6562,8 +6562,9 @@ const world = (() => {
     const nrw = NR_WORLD[map];
     if (nrw) {
       // a Neon Rush world: its road deck, parapets and lake here; its scenery streams in its own container
-      const len = TRACK_LEN + 220;
-      group.add(runningTrack(null, "#0e0b16", "#1a1624", deckMaterial(nrw)), parapets(nrw, len, TRACK_W / 2 + 0.45));
+      // behind the start line the road runs on into the fog (no backdrop wall): a camera looking back sees the same world
+      const back = 460;
+      group.add(runningTrack(null, "#0e0b16", "#1a1624", deckMaterial(nrw), back), parapets(nrw, TRACK_LEN + 160 + back, TRACK_W / 2 + 0.45, back));
       const lake = groundPlane(nrw);
       if (lake) group.add(lake);
     } else if (map === "meadow") group.add(runningTrack());
@@ -6652,7 +6653,7 @@ const world = (() => {
     }
     cull = batchScenery(group, cull, batches);
     batchSink = null;
-    group.add(startBackdrop(map));
+    if (!nrw) group.add(startBackdrop(map));
     scene.add(group);
     return { group, cull, batches };
   }

@@ -188,7 +188,7 @@ export function groundPlane(w) {
 }
 
 /** Parapets along both edges: a dark wall with a glowing LED strip and a bright top line (Neon Rush's road edge). */
-export function parapets(w, len, x) {
+export function parapets(w, len, x, back = 60) {
   const cfg = NR[w];
   const g = new THREE.Group();
   const wall = new THREE.MeshStandardMaterial({ color: cfg.marble ? 0xf2ede4 : cfg.stone ? 0xc9a36b : 0x15131c, roughness: cfg.marble || cfg.stone ? 0.5 : 0.35, metalness: cfg.marble || cfg.stone ? 0 : 0.6 });
@@ -196,11 +196,11 @@ export function parapets(w, len, x) {
   const top = new THREE.MeshBasicMaterial({ color: cfg.rail ? C(2.6, 0.4, 0.5) : C(2.8, 0.25, 2.3).multiplyScalar(0.34) });
   for (const s of [-1, 1]) {
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.75, len), wall);
-    body.position.set(s * x, 0.375, -len / 2 + 60);
+    body.position.set(s * x, 0.375, -len / 2 + back);
     const strip = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, len), led);
-    strip.position.set(s * x, 0.49, -len / 2 + 60);
+    strip.position.set(s * x, 0.49, -len / 2 + back);
     const lip = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.05, len), top);
-    lip.position.set(s * x, 0.77, -len / 2 + 60);
+    lip.position.set(s * x, 0.77, -len / 2 + back);
     g.add(body, strip, lip);
   }
   return g;
