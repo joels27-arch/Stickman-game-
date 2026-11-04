@@ -3697,15 +3697,21 @@ function loadBloom() {
         const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: startGfx.aa ? 4 : 0 });
         const composer = new EffectComposer(renderer, rt);
         composer.addPass(new RenderPass(scene, camera));
-        composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.6, 0.4, 0.86));
+        const pass = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.6, 0.4, 0.86);
+        composer.addPass(pass);
         composer.addPass(new OutputPass());
-        bloom = { composer, ratio: 0, w: 0, h: 0 };
+        bloom = { composer, pass, ratio: 0, w: 0, h: 0 };
       })
       .catch(() => (bloom = "loading")); // no bloom files: stay plain
   }
   return false;
 }
-function renderBloom(dt) {
+/** Neon Rush's look: its HDR colours were graded at about half our exposure, and only real highlights bloom. */
+const NR_GRADE = { exposure: 0.6, threshold: 1.25, strength: 0.55, radius: 0.55 };
+const PLAIN_GRADE = { exposure: 1.14, threshold: 0.86, strength: 0.6, radius: 0.4 };
+function renderBloom(dt, grade = PLAIN_GRADE) {
+  renderer.toneMappingExposure = grade.exposure;
+  Object.assign(bloom.pass, { threshold: grade.threshold, strength: grade.strength, radius: grade.radius });
   const ratio = renderer.getPixelRatio();
   const size = renderer.getSize(new THREE.Vector2());
   if (bloom.ratio !== ratio || bloom.w !== size.x || bloom.h !== size.y) {
@@ -10955,8 +10961,11 @@ function frame(now) {
   if (game.mode === "race" || game.mode === "results-pending") world.stepRunCoins(me.d);
   if (startGfx.shadows) world.followSun(camera.position.x * 0.5, camera.position.z - 9);
   world.tick(camera.position.z, dt, game.mode === "race" ? me.speed : 0);
-  if ((world.activeMap === "uranus" || NR_WORLD[world.activeMap]) && loadBloom()) renderBloom(dt); // the neon of the Neon Rush worlds blooms
-  else renderer?.render(scene, camera);
+  if (NR_WORLD[world.activeMap] && loadBloom()) renderBloom(dt, NR_GRADE); // the neon of the Neon Rush worlds blooms
+  else {
+    if (renderer) renderer.toneMappingExposure = NR_WORLD[world.activeMap] ? NR_GRADE.exposure : PLAIN_GRADE.exposure;
+    renderer?.render(scene, camera);
+  }
   perfHud?.frame(dt * 1000);
   renderMirror();
   adaptQuality(dt);
