@@ -4522,7 +4522,7 @@ const world = (() => {
   }
   function ensureMap(map) {
     if (map === "artlist") return ensureArtlist();
-    if (map === "meadow" || THEME[map] || mapReady(map)) return Promise.resolve();
+    if (map === "meadow" || THEME[map] || NR_WORLD[map] || mapReady(map)) return Promise.resolve();
     if (!mapLoads.has(map)) {
       const P = assets.props;
       const glb = (file, key, size) => loadGLB(`/assets/${file}.glb`).then((g) => (P[key] = fitProp(g.scene, size)));
@@ -5321,7 +5321,7 @@ const world = (() => {
   };
   function mapReady(map) {
     if (map === "artlist") return artlistDone && Boolean(assets.props.ground);
-    if (THEME[map]) return Boolean(assets.props.ground); // themed maps need nothing more to load
+    if (THEME[map] || NR_WORLD[map]) return Boolean(assets.props.ground); // themed and Neon Rush maps load their own pieces as they go
     if (BUILT_MAPS.has(map)) return Boolean(assets.props[`${map}Tile`]);
     if (map === "farm") return Boolean(assets.props.farmTile);
     if (map === "beach") return Boolean(assets.props.boardTile);

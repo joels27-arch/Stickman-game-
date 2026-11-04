@@ -111,7 +111,7 @@ export const HEART_EVERY_M = 420;
 
 /** Where you race. The host picks one; a Party Cup visits them in turn. */
 /** The classic maps (3D models), then the themed ones built in code (public/themes.js: same ids). */
-export const MAPS = ["space", "snowy", "candy", "crystal", "mars", "deepsea", "lava", "egypt", "icecream", "aurora", "artlist", "uranus"]; // retired: Meadow, Beach, Stadium, Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet, Fairy Forest, Farm, City, Neon Night, Rainbow Road, Cloud Kingdom, Synthwave
+export const MAPS = ["space", "city", "stadium", "snowy", "candy", "crystal", "mars", "deepsea", "lava", "egypt", "icecream", "aurora", "artlist", "uranus"]; // City and Stadium came back as Neon Rush worlds; retired: Meadow, Beach, Red Canyon, Volcano, Wild West, Ghost Town, Alien Planet, Fairy Forest, Farm, Neon Night, Rainbow Road, Cloud Kingdom, Synthwave
 /** The maps a "random" pick draws from: Artlist is only raced when picked by name. */
 /** A new room starts on this map. */
 export const DEFAULT_MAP = "candy";
