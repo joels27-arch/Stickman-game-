@@ -5358,6 +5358,7 @@ const world = (() => {
     ground.material.needsUpdate = true;
     ground.visible = map !== "uranus" && !NR_WORLD[map]; // nothing under the road out in space; Neon Rush worlds bring their own lake
     chalk.color.set(theme?.track.lines ?? "#ffffff");
+    for (const l of chalkLines) l.visible = !NR_WORLD[map]; // the Neon Rush deck paints its own neon lines
     if (!sharedBuilt) buildShared();
   }
   let sharedBuilt = false;
