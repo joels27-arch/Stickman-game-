@@ -133,7 +133,7 @@ export function deckMaterial(w) {
   m.uniforms.uTime = U.uTime;
   m.uniforms.tSky.value = skyTex(w);
   m.uniforms.tNoise.value = noiseTexture();
-  if (cfg.deck) m.uniforms.tDeck.value = loadTex(`nr_deck_${cfg.deck}.webp`, true);
+  if (cfg.deck) m.uniforms.tDeck.value = loadTex(cfg.deck === "asphalt" ? "nr_asphalt.webp" : `nr_deck_${cfg.deck}.webp`, true);
   return m;
 }
 
