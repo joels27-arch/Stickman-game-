@@ -2121,6 +2121,9 @@ $("#tutNo").addEventListener("click", () => {
   afterTutAsk = null;
   go?.();
 });
+/** A map card's picture: the Neon Rush painting where the map has one, else its old screenshot. */
+const NR_CARDS = new Set(["candy", "icecream", "snowy", "aurora", "crystal", "deepsea", "lava", "egypt", "uranus", "space", "city"]);
+const mapPic = (key) => (NR_CARDS.has(key) ? `/assets/nr_map_${key}.webp` : `/assets/map_${key}.webp`);
 let esMap = "random";
 function openEndlessSetup() {
   const cur = preferredChar();
@@ -2139,7 +2142,7 @@ function openEndlessSetup() {
   );
   const maps = () =>
     ["random", ...RANDOM_MAPS].map((key) => {
-      const b = el("button", { class: `map-card${esMap === key ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style: key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)` }, el("b", { text: MAP_INFO[key].label }));
+      const b = el("button", { class: `map-card${esMap === key ? " on" : ""}${key === "random" ? " random" : ""}`, type: "button", style: key === "random" ? "" : `--pic:url(${mapPic(key)})` }, el("b", { text: MAP_INFO[key].label }));
       b.addEventListener("click", () => {
         sfx.tap();
         esMap = key;
@@ -3226,7 +3229,7 @@ function renderLobby(v) {
   if (changed($("#mapPick"), mp, isHost)) $("#mapPick").replaceChildren(
     ...["random", ...MAPS].map((key) => {
       const info = MAP_INFO[key];
-      const style = key === "random" ? "" : `--pic:url(/assets/map_${key}.webp)`;
+      const style = key === "random" ? "" : `--pic:url(${mapPic(key)})`;
       const on = mp === key;
       const b = el(
         "button",
