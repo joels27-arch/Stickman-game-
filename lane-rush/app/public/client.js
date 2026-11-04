@@ -16,6 +16,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "/vendor/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "/vendor/jsm/utils/SkeletonUtils.js";
 import { THEMES } from "/themes.js";
+import { NR_WORLD, NR, deckMaterial, groundPlane, parapets, loadWorld, tickUniforms } from "/nr/lane.js";
 import {
   buildCourse,
   TRACK_LEN,
@@ -5349,7 +5350,7 @@ const world = (() => {
     ground.material.color.set(look.color);
     ground.material.map = theme ? patternTex(theme.ground, 6, 700, GROUND_LEN) : typeof look.tex === "string" ? groundTex(look.tex) : look.tex ? grassTex : null;
     ground.material.needsUpdate = true;
-    ground.visible = map !== "uranus"; // nothing under the road out in space
+    ground.visible = map !== "uranus" && !NR_WORLD[map]; // nothing under the road out in space; Neon Rush worlds bring their own lake
     chalk.color.set(theme?.track.lines ?? "#ffffff");
     if (!sharedBuilt) buildShared();
   }
@@ -5466,7 +5467,52 @@ const world = (() => {
     return g;
   }
   /** Sky, fog and clouds per map. */
+  // ── Neon Rush worlds: built once, then switched with the map; they ride along with the runner ──
+  const nrLoaded = {};
+  let nrWant = null;
+  let nrActive = null;
+  let nrTime = 0;
+  let nrLastD = 0;
+  function nrActivate(w) {
+    nrWant = w;
+    nrActive = null;
+    for (const v of Object.values(nrLoaded)) v.container.visible = false;
+    if (!w) return;
+    loadWorld(w)
+      .then((v) => {
+        nrLoaded[w] = v;
+        if (!v.container.parent) scene.add(v.container);
+        if (nrWant !== w) return;
+        nrActive = v;
+        v.container.visible = true;
+      })
+      .catch(() => {});
+  }
+  function nrTick(d, dt) {
+    if (!nrActive) return;
+    nrTime += dt;
+    tickUniforms(nrWant, nrTime);
+    nrActive.container.position.set(0, 0, -d);
+    nrActive.world.update(nrTime, Math.max(0, d - nrLastD), d);
+    nrLastD = d;
+  }
   function setSky(map) {
+    const nrw = NR_WORLD[map];
+    nrActivate(nrw ?? null);
+    if (nrw) {
+      // a Neon Rush world brings its own sky: no dome, no painted plate, no clouds
+      applyLook(THEME[map] ?? DAY_LOOK);
+      for (const g of Object.values(mapSkies)) g.visible = false;
+      skyGroup.visible = false;
+      clouds.visible = false;
+      const fog = NR[nrw].fog;
+      scene.fog.color.copy(fog);
+      scene.fog.near = 70;
+      scene.fog.far = 390;
+      scene.background = fog.clone();
+      setWeather(THEME[map]?.fx ?? null);
+      return;
+    }
     const own = MAP_SKY[map];
     const theme = THEME[map];
     if (own) mapSkyGroup(map);
@@ -6492,7 +6538,14 @@ const world = (() => {
     };
     const built = BUILT_MAPS.has(map);
     const theme = THEME[map];
-    if (map === "meadow") group.add(runningTrack());
+    const nrw = NR_WORLD[map];
+    if (nrw) {
+      // a Neon Rush world: its road deck, parapets and lake here; its scenery streams in its own container
+      const len = TRACK_LEN + 220;
+      group.add(runningTrack(null, "#0e0b16", "#1a1624", deckMaterial(nrw)), parapets(nrw, len, TRACK_W / 2 + 0.45));
+      const lake = groundPlane(nrw);
+      if (lake) group.add(lake);
+    } else if (map === "meadow") group.add(runningTrack());
     else if (!theme) {
       const tile = built ? P[`${map}Tile`] : map === "farm" ? P.farmTile : map === "beach" ? P.boardTile : P.ground;
       tile.userData.ground = true;
@@ -6509,7 +6562,8 @@ const world = (() => {
       }
     }
     const edge = TRACK_W / 2;
-    if (map === "city") buildCity(add, group, r, edge);
+    if (nrw);
+    else if (map === "city") buildCity(add, group, r, edge);
     else if (map === "stadium") buildStadium(add, group, r, edge);
     else if (map === "space") buildSpace(add, group, r, edge);
     else if (map === "uranus") buildUranus(group, edge);
@@ -7633,6 +7687,7 @@ const world = (() => {
 
   // barrels start rolling at you when you get close; boxes spin and bob
   function animateCourse(d, raceT, dt) {
+    nrTick(d, dt);
     for (const r of rollers) {
       if (r.startedAt === null && raceT !== null && d >= r.z0 - ROLLER_TRIGGER_M) {
         r.startedAt = raceT;
@@ -10900,7 +10955,7 @@ function frame(now) {
   if (game.mode === "race" || game.mode === "results-pending") world.stepRunCoins(me.d);
   if (startGfx.shadows) world.followSun(camera.position.x * 0.5, camera.position.z - 9);
   world.tick(camera.position.z, dt, game.mode === "race" ? me.speed : 0);
-  if (world.activeMap === "uranus" && loadBloom()) renderBloom(dt);
+  if ((world.activeMap === "uranus" || NR_WORLD[world.activeMap]) && loadBloom()) renderBloom(dt); // the neon of the Neon Rush worlds blooms
   else renderer?.render(scene, camera);
   perfHud?.frame(dt * 1000);
   renderMirror();
