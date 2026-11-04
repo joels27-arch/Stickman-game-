@@ -5379,9 +5379,30 @@ const world = (() => {
    * the track, mirrored beyond its edges so it never shows a seam, its bright parts lifted
    * so they glow. It rides with the camera, so it is always infinitely far away.
    */
-  function plateSky(file, hz) {
-    const t = texLoader.load(`/assets/${file}`);
+  const plateTexs = {};
+  /** A plate's texture, shared by its sky and (as a reflection) the glossy track under it. */
+  function plateTex(file) {
+    if (!plateTexs[file]) {
+      const t = texLoader.load(`/assets/${file}`);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.mapping = THREE.EquirectangularReflectionMapping; // only the track's reflection reads this
+      plateTexs[file] = t;
+    }
+    return plateTexs[file];
+  }
+  // Neon Rush road decks for the themed maps: a 1024 tile, glossy, the map's own sky lying in it
+  const NR_DECK = { candy: "candy", icecream: "candy", crystal: "brain", lava: "volcano", egypt: "egypt", uranus: "uranus", aurora: "ice", snowy: "cloud", deepsea: "sand" };
+  function deckMat(id, len) {
+    const t = texLoader.load(`/assets/nr_deck_${NR_DECK[id]}.webp`);
     t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(TRACK_W / 4.8, len / 4.8);
+    t.anisotropy = renderer?.capabilities.getMaxAnisotropy?.() ?? 4;
+    const sky = MAP_SKY[id]?.plate;
+    return new THREE.MeshStandardMaterial({ map: t, roughness: id === "deepsea" ? 0.85 : 0.3, metalness: 0.05, envMap: sky ? plateTex(sky) : null, envMapIntensity: 0.85 });
+  }
+  function plateSky(file, hz) {
+    const t = plateTex(file);
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(300, 48, 24),
       new THREE.ShaderMaterial({
@@ -5887,10 +5908,10 @@ const world = (() => {
    * The meadow's track: a raised red running track (top at y = 0, the meadow
    * below) with white kerbs down both sides. One box each: cheap on phones.
    */
-  function runningTrack(tex = null, sideColor = "#1f4a8f", kerbColor = "#f4f1e8") {
+  function runningTrack(tex = null, sideColor = "#1f4a8f", kerbColor = "#f4f1e8", topMat = null) {
     const len = TRACK_LEN + 220;
     const g = new THREE.Group();
-    if (!tex) {
+    if (!tex && !topMat) {
       // the meadow: a blue rubber running track (fine grain, drawn here: nothing to download)
       const c = document.createElement("canvas");
       c.width = c.height = 256;
@@ -5907,9 +5928,9 @@ const world = (() => {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
       tex.repeat.set(TRACK_W / 3, len / 3);
     }
-    tex.anisotropy = renderer?.capabilities.getMaxAnisotropy?.() ?? 4;
+    if (tex) tex.anisotropy = renderer?.capabilities.getMaxAnisotropy?.() ?? 4;
     const side = new THREE.MeshLambertMaterial({ color: sideColor });
-    const top = new THREE.MeshLambertMaterial({ map: tex });
+    const top = topMat ?? new THREE.MeshLambertMaterial({ map: tex });
     const deck = new THREE.Mesh(new THREE.BoxGeometry(TRACK_W, -MEADOW_Y, len), [side, side, top, side, side, side]);
     deck.receiveShadow = true; // runners' and obstacles' shadows land on the track
     deck.position.set(0, MEADOW_Y / 2, -(len / 2 - 60));
@@ -6173,7 +6194,8 @@ const world = (() => {
   function buildThemed(theme, group, r, edge) {
     const len = TRACK_LEN + 220;
     const tc = theme.track.colors;
-    group.add(runningTrack(patternTex(theme.track, 3, TRACK_W, len), new THREE.Color(tc[2] ?? tc[0]).multiplyScalar(0.75), theme.track.kerb));
+    const deck = NR_DECK[theme.id] ? deckMat(theme.id, len) : null;
+    group.add(runningTrack(deck ? null : patternTex(theme.track, 3, TRACK_W, len), new THREE.Color(tc[2] ?? tc[0]).multiplyScalar(0.75), theme.track.kerb, deck));
     group.add(meadowHills(edge, patternTex(theme.ground, 6, 130, TRACK_LEN + 400), theme.hills));
     // scatter the recipe's props, weighted, both sides
     const kinds = theme.props.map(([kind, w, colors, scale, glow]) => ({ kind, w, colors, scale: scale ?? [0.8, 1.3], glow: Boolean(glow), items: [] }));
