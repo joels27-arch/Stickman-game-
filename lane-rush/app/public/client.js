@@ -2123,7 +2123,7 @@ $("#tutNo").addEventListener("click", () => {
   go?.();
 });
 /** A map card's picture: the Neon Rush painting where the map has one, else its old screenshot. */
-const NR_CARDS = new Set(["candy", "icecream", "snowy", "aurora", "crystal", "deepsea", "lava", "egypt", "uranus", "space", "city"]);
+const NR_CARDS = new Set(["candy", "icecream", "snowy", "aurora", "crystal", "deepsea", "lava", "egypt", "uranus", "space", "city", "stadium"]);
 const mapPic = (key) => (NR_CARDS.has(key) ? `/assets/nr_map_${key}.webp` : `/assets/map_${key}.webp`);
 let esMap = "random";
 function openEndlessSetup() {

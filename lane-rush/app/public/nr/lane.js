@@ -303,8 +303,8 @@ export function startGate() {
       set.add(lens);
       return lens;
     });
-    // Neon Rush's road is 15.2 m between parapets, Lane Rush's about 10.5: the gantry shrinks to fit
-    set.scale.setScalar(0.72);
+    // full Neon Rush size: smaller, the light boxes sat right in the intro camera's flight path
+    set.scale.setScalar(1);
     const setLights = (red, green) => {
       lenses.forEach((l, i) => {
         const c = l.material.uniforms.uC.value;
