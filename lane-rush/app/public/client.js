@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "/vendor/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "/vendor/jsm/utils/SkeletonUtils.js";
 import { THEMES } from "/themes.js";
-import { NR_WORLD, NR, deckMaterial, groundPlane, parapets, loadWorld, tickUniforms } from "/nr/lane.js";
+import { NR_WORLD, NR, deckMaterial, groundPlane, parapets, loadWorld, tickUniforms, startGate } from "/nr/lane.js";
 import {
   buildCourse,
   TRACK_LEN,
@@ -5480,7 +5480,21 @@ const world = (() => {
   let nrActive = null;
   let nrTime = 0;
   let nrLastD = 0;
+  let startArch = null; // the Blender START arch (our own maps)
+  let nrGate = null; // Neon Rush's START gantry with its race lights (the Neon Rush maps)
+  let nrGateLoad = null;
   function nrActivate(w) {
+    if (w && !nrGateLoad)
+      nrGateLoad = startGate()
+        .then((v) => {
+          nrGate = v;
+          scene.add(v.group);
+          v.group.visible = Boolean(NR_WORLD[activeMap]);
+          if (startArch) startArch.visible = !NR_WORLD[activeMap];
+        })
+        .catch(() => {});
+    if (startArch) startArch.visible = !w || !nrGate;
+    if (nrGate) nrGate.group.visible = Boolean(w);
     nrWant = w;
     nrActive = null;
     for (const v of Object.values(nrLoaded)) v.container.visible = false;
@@ -6712,8 +6726,9 @@ const world = (() => {
 
     // Higgsfield start and finish gates
     if (P.startGate) {
-      const g = P.startGate.clone();
+      const g = (startArch = P.startGate.clone());
       g.position.set(0, 0, 0); // right on the start line
+      g.visible = !NR_WORLD[activeMap];
       scene.add(g);
     }
     if (P.finishGate) {
@@ -7764,6 +7779,10 @@ const world = (() => {
     mapReady,
     preloadMovers,
     warmUp,
+    /** The Neon Rush gantry's race lights: `red` lights lit, or all `green` on the gun. */
+    startLights(red, green) {
+      nrGate?.setLights(red, green);
+    },
     get activeMap() {
       return activeMap;
     },
@@ -10987,6 +11006,7 @@ function updateHud() {
   if (left > 3000) label = "Ready?";
   else if (left > 0) label = String(Math.ceil(left / 1000));
   else if (left > -700) label = "GO!";
+  world.startLights(left > 3000 ? 0 : left > 2000 ? 1 : left > 1000 ? 2 : left > 0 ? 3 : 0, left <= 0);
   if (label !== lastCount) {
     cd.textContent = label;
     cd.classList.remove("pop");

@@ -9,12 +9,14 @@ import { GLTFLoader } from "/vendor/jsm/loaders/GLTFLoader.js";
 import { U, noiseTexture } from "./shared.js";
 
 /** Lane Rush map → Neon Rush world */
-export const NR_WORLD = { space: "orbit", candy: "candy", icecream: "candy", crystal: "brain", lava: "volcano", snowy: "cloud", aurora: "ice", deepsea: "sea", egypt: "egypt", uranus: "uranus" };
+export const NR_WORLD = { city: "earth", stadium: "stadium", space: "orbit", candy: "candy", icecream: "candy", crystal: "brain", lava: "volcano", snowy: "cloud", aurora: "ice", deepsea: "sea", egypt: "egypt", uranus: "uranus" };
 
 const C = (r, g, b) => new THREE.Color(r, g, b);
 /** Per world: road kind, deck picture, sky, horizon of the plate, ground plane (y or null), fog (linear) and density, parapet LED. */
 export const NR = {
-  orbit: { kind: 1, sky: "orbit", hz: 0.44, deck: null, ground: null, fog: C(0.1, 0.22, 0.55), density: 0.00032, led: C(0.2, 2.8, 3.4) },
+  earth: { kind: 0, sky: "earth", hz: 0.06, deck: "asphalt", ground: -9, fog: C(0.72, 0.28, 0.34), density: 0.00078, led: C(0.2, 2.8, 3.4), lamps: true, gantries: true, towers: true },
+  stadium: { kind: 6, sky: "stadium", hz: 0.15, deck: "asphalt", ground: -0.25, fog: C(0.04, 0.06, 0.13), density: 0.0006, led: C(0.2, 2.8, 3.4), lamps: true },
+  orbit: { kind: 1, sky: "orbit", hz: 0.44, deck: null, ground: null, fog: C(0.1, 0.22, 0.55), density: 0.00032, led: C(0.2, 2.8, 3.4), lamps: true },
   candy: { kind: 8, sky: "candy", hz: 0.38, deck: "candy", ground: -0.7, fog: C(0.97, 0.76, 0.83), density: 0.00052, led: C(2.6, 0.5, 0.9), rail: true },
   brain: { kind: 7, sky: "brain", hz: 0.28, deck: "brain", ground: null, fog: C(0.13, 0.06, 0.24), density: 0.0015, led: C(1.5, 0.5, 3.4) },
   volcano: { kind: 9, sky: "volcano", hz: 0.28, deck: "volcano", ground: -6, fog: C(0.17, 0.05, 0.03), density: 0.0012, led: C(3.4, 1, 0.1) },
@@ -74,6 +76,12 @@ export function deckMaterial(w) {
         float F = .035 + .965*pow(1. - max(V.y, 0.), 5.);
         vec3 col = vec3(.03, .025, .04) + refl*F*.6;
         float G = .1 + .75*pow(1. - max(V.y, 0.), 3.);
+        if (uKind == 0. || uKind == 6.){                          // asphalt, wet: the sky lies in it
+          vec3 alb = texture2D(tDeck, p/8.).rgb, alb2 = texture2D(tDeck, p.yx/29. + .37).rgb;
+          vec3 base = alb*(.35 + alb2*.5)*vec3(.09, .07, .12)*2.2 + vec3(.022, .01, .022);
+          float wet = uKind == 6. ? .45 : .62;
+          col = base*(1. - F*wet) + refl*F*wet*1.4;
+        }
         if (uKind == 1.){                                         // Orbit: a mirror with the planet showing through
           vec3 below = plate(-V*vec3(1., -1., 1.));
           col = below*.16*vec3(.7, .85, 1.) + refl*(.10 + .9*pow(1. - max(V.y, 0.), 3.5));
@@ -135,11 +143,11 @@ export function groundPlane(w) {
   if (cfg.ground == null) return null;
   const m = new THREE.ShaderMaterial({
     fog: true,
-    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { tSky: { value: null }, uHz: { value: cfg.hz }, uKind: { value: cfg.kind } }]),
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { tSky: { value: null }, tGrass: { value: null }, uHz: { value: cfg.hz }, uKind: { value: cfg.kind } }]),
     vertexShader: VS,
     fragmentShader: `
       varying vec3 vW; varying float vDepth;
-      uniform float uKind, uTime;
+      uniform float uKind, uTime; uniform sampler2D tGrass;
       ${PLATE_GLSL}
       ${FOG}
       void main(){
@@ -149,6 +157,11 @@ export function groundPlane(w) {
         vec3 R = reflect(-V, normalize(vec3(rip.x, 1., rip.y)));
         float F = .03 + .97*pow(1. - max(V.y, 0.), 4.5);
         vec3 col = mix(vec3(.012, .02, .03), plate(R)*.85, min(1., F + .1));
+        if (uKind == 6.){                                                                                       // the pitch: mown stripes, a little dew
+          vec3 g = texture2D(tGrass, p/14.).rgb;
+          col = g*(.62 + .18*step(.5, fract(p.y/24.)))*vec3(.85, 1., .85) + plate(R)*F*.15;
+        }
+        if (uKind == 0.) col += vec3(9., 3.6, 1.7)*pow(max(dot(R, normalize(vec3(0., .085, -1.))), 0.), 900.);    // sun glitter on the sea
         if (uKind == 8.) col = mix(mix(vec3(1., .66, .76), vec3(.72, .92, .86), .5 + .5*sin(p.x*.02 + p.y*.013)), plate(R), F*.6);   // strawberry milk
         if (uKind == 9.){                                                                                       // a lava river
           float crust = smoothstep(.2, .6, .5 + .5*sin(p.x*.13 + sin(p.y*.09 + uTime*.3)*2.)*sin(p.y*.11 - uTime*.2));
@@ -165,6 +178,7 @@ export function groundPlane(w) {
   });
   m.uniforms.uTime = U.uTime;
   m.uniforms.tSky.value = skyTex(w);
+  if (cfg.kind === 6) m.uniforms.tGrass.value = loadTex("nr_grass.webp", true);
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), m);
   plane.rotation.x = -Math.PI / 2;
   plane.position.y = cfg.ground;
@@ -208,17 +222,134 @@ function toneMap(root) {
 
 const glbs = {};
 const loader = new GLTFLoader();
+const glb = (name) => glbs[name] ?? (glbs[name] = loader.loadAsync(`/assets/nr_${name}.glb?v=1`));
+/** The shared props (lamps, sign gantries, the START gantry) and their materials, as Neon Rush's main.js makes them. */
+let propsP = null;
+function nrProps() {
+  return (propsP ??= glb("props").then((g) => {
+    const props = {};
+    for (const n of ["lamp", "gantry", "startgate", "startlamp", "startlens"]) props[n] = g.scene.getObjectByName(n);
+    const std = (o) => new THREE.MeshStandardMaterial(o);
+    const mats = {
+      carbon: std({ color: 0x0c0c10, metalness: 0.5, roughness: 0.36 }),
+      steel: std({ color: 0x24252b, metalness: 0.9, roughness: 0.34 }),
+      alloy: std({ color: 0xbfc1c8, metalness: 1, roughness: 0.25 }),
+      panel: std({ color: 0xc4c6cc, metalness: 0.25, roughness: 0.38 }),
+      dark: std({ color: 0x050507, metalness: 0.2, roughness: 0.5 }),
+      gold: std({ color: 0xffb84a, metalness: 1, roughness: 0.22 }),
+      amber: new THREE.MeshBasicMaterial({ color: C(9, 3.6, 0.3) }),
+      tail: new THREE.MeshBasicMaterial({ color: C(12, 0.3, 0.4) }),
+      headlamp: new THREE.MeshBasicMaterial({ color: C(10, 11, 12) }),
+      cyan: new THREE.MeshBasicMaterial({ color: C(0.8, 6, 7.5) }),
+      led: new THREE.MeshBasicMaterial({ color: C(6, 6, 6) }),
+    };
+    return { props, mats };
+  }));
+}
+/** Lane Rush's road edge, where Neon Rush's parapet-top lamps stand (its own road is wider). */
+const HALF = 4.7;
+
+/**
+ * Neon Rush's START gantry with its three race lights (LED-grid lenses), scaled to Lane Rush's track.
+ * Resolves to { group, setLights(red, green) }: red = how many lights are lit red, green = all green (go).
+ */
+export function startGate() {
+  return nrProps().then(({ props, mats }) => {
+    const set = new THREE.Group();
+    const startLed = new THREE.MeshBasicMaterial({ color: C(5, 8, 1.2) });
+    const sign = new THREE.MeshBasicMaterial({ color: C(4.2, 6.4, 1.1) });
+    const swap = (n) => (n === "led" ? startLed : n === "signface" ? sign : n === "bezel" ? mats.alloy : mats[n] || mats.steel);
+    const dress = (o) => {
+      o.traverse((m) => {
+        if (m.isMesh) {
+          m.material = swap(m.material.name);
+          m.frustumCulled = false;
+        }
+      });
+      return o;
+    };
+    set.add(dress(props.startgate.clone(true)));
+    let lensGeo;
+    props.startlens.traverse((o) => {
+      if (o.isMesh) lensGeo = o.geometry;
+    });
+    const lenses = [-2.9, 0, 2.9].map((x) => {
+      const unit = dress(props.startlamp.clone(true));
+      unit.position.set(x, 6.75, 0);
+      set.add(unit);
+      const lens = new THREE.Mesh(
+        lensGeo,
+        new THREE.ShaderMaterial({
+          side: THREE.DoubleSide,
+          uniforms: { uC: { value: new THREE.Color(0, 0, 0) } },
+          vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.); }",
+          fragmentShader: `varying vec2 vUv; uniform vec3 uC;
+            void main(){
+              vec2 q = vUv - .5, g = fract(vUv*17.) - .5;
+              float r = length(q)*2.;
+              float led = smoothstep(.42, .22, length(g));
+              float lit = dot(uC, vec3(.3, .6, .1));
+              vec3 c = vec3(.012, .012, .016) + vec3(.05)*led;
+              c += uC*(led*(1.1 - r*.35) + .2);
+              c += vec3(.3, .32, .36)*smoothstep(.1, .0, abs(length(q - vec2(-.1, .12)) - .3))*smoothstep(-.02, .2, q.y)*(1. - min(lit, 1.)*.7)*.45;
+              gl_FragColor = vec4(c, 1.);
+              ${END}
+            }`,
+        }),
+      );
+      lens.position.copy(unit.position);
+      lens.frustumCulled = false;
+      set.add(lens);
+      return lens;
+    });
+    // Neon Rush's road is 15.2 m between parapets, Lane Rush's about 10.5: the gantry shrinks to fit
+    set.scale.setScalar(0.72);
+    const setLights = (red, green) => {
+      lenses.forEach((l, i) => {
+        const c = l.material.uniforms.uC.value;
+        if (green) c.setRGB(0.06, 3.4, 0.8);
+        else if (i < red) c.setRGB(2.1, 0, 0.02);
+        else c.setRGB(0, 0, 0);
+      });
+      if (green) startLed.color.setRGB(0.5, 9, 2.6);
+      else startLed.color.setRGB(5, 8, 1.2);
+    };
+    return { group: set, setLights };
+  });
+}
+
 const worlds = {};
 /** Build (once) a Neon Rush world into its own container; resolves to { container, world }. */
 export function loadWorld(w) {
   if (worlds[w]) return worlds[w];
+  const cfg = NR[w];
   const plate = skyTex(w);
-  const glb = glbs[w] ?? (glbs[w] = loader.loadAsync(`/assets/nr_${w}.glb?v=1`));
-  worlds[w] = Promise.all([glb, import("./maps.js"), import("./maps2.js"), import("./maps3.js")]).then(([g, m1, m2, m3]) => {
+  const models = w === "earth" ? Promise.resolve(null) : w === "stadium" ? Promise.all([glb("stadium2"), glb("stadium1")]) : glb(w);
+  const extras = cfg.lamps ? Promise.all([nrProps(), import("./scenery.js"), import("./sky.js")]) : Promise.resolve(null);
+  worlds[w] = Promise.all([models, extras, import("./maps.js"), import("./maps2.js"), import("./maps3.js")]).then(([g, ex, m1, m2, m3]) => {
     const container = new THREE.Group();
-    const models = g.scene;
+    const models = g?.scene;
     const noise = noiseTexture();
+    // lamps on the parapets (and on the Sunset Strip the sign gantries and the city towers)
+    let scenery = null;
+    if (ex) {
+      const [{ props, mats }, { Scenery }] = ex;
+      scenery = new Scenery(container, props, mats, loadTex("nr_facade.webp", true), HALF);
+      scenery.setWorld(true, Boolean(cfg.gantries), Boolean(cfg.towers));
+    }
     const make = {
+      earth: () => {
+        const sky = ex[2].makeSky(plate, loadTex("nr_skyline.webp"));
+        const group = new THREE.Group();
+        group.add(sky);
+        container.add(group);
+        return { group, sky, update() {} };
+      },
+      stadium: () => {
+        // the jumbotron shows the race in Neon Rush (its blur pass); here it shows the stadium sky
+        const pipe = { blurred: { texture: plate } };
+        return m2.makeArenaWorld(container, plate, loadTex("nr_crowd.webp", true), g[0].scene, g[1].scene, pipe, loadTex("nr_fans.webp"));
+      },
       orbit: () => m1.makeOrbitWorld(container, plate, models),
       sea: () => m1.makeSeaWorld(container, plate, models, noise),
       ice: () => m1.makeIceWorld(container, plate, models),
@@ -231,6 +362,14 @@ export function loadWorld(w) {
     }[w];
     const world = make();
     world.group.visible = true;
+    if (scenery) {
+      const own = world.update.bind(world);
+      world.update = (t, ds, dist) => {
+        own(t, ds, dist, dist);
+        world.sky?.position.set(0, 3, 8);
+        scenery.update(dist);
+      };
+    }
     toneMap(container);
     return { container, world };
   });
