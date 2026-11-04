@@ -383,3 +383,19 @@ export function tickUniforms(w, t) {
   U.uFogColor.value.copy(NR[w].fog);
   U.uFogDensity.value = NR[w].density;
 }
+
+/**
+ * Behind the start line: the world as it stands at the start, turned round to face the other way.
+ * A snapshot (shared geometry and materials, no own updates), without a second sky.
+ */
+export function backdropOf(v) {
+  const sky = v.world.sky;
+  const was = sky?.visible;
+  if (sky) sky.visible = false;
+  const back = v.container.clone(true);
+  if (sky) sky.visible = was;
+  back.position.set(0, 0, 0);
+  back.rotation.y = Math.PI;
+  back.visible = false;
+  return back;
+}

@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "/vendor/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "/vendor/jsm/utils/SkeletonUtils.js";
 import { THEMES } from "/themes.js";
-import { NR_WORLD, NR, deckMaterial, groundPlane, parapets, loadWorld, tickUniforms, startGate } from "/nr/lane.js";
+import { NR_WORLD, NR, deckMaterial, groundPlane, parapets, loadWorld, tickUniforms, startGate, backdropOf } from "/nr/lane.js";
 import {
   buildCourse,
   TRACK_LEN,
@@ -5497,7 +5497,10 @@ const world = (() => {
     if (nrGate) nrGate.group.visible = Boolean(w);
     nrWant = w;
     nrActive = null;
-    for (const v of Object.values(nrLoaded)) v.container.visible = false;
+    for (const v of Object.values(nrLoaded)) {
+      v.container.visible = false;
+      if (v.back) v.back.visible = false;
+    }
     if (!w) return;
     loadWorld(w)
       .then((v) => {
@@ -5513,10 +5516,19 @@ const world = (() => {
     if (!nrActive) return;
     nrTime += dt;
     tickUniforms(nrWant, nrTime);
-    nrActive.container.position.set(0, 0, -d);
-    nrActive.world.update(nrTime, Math.max(0, d - nrLastD), d);
+    const v = nrActive;
+    v.container.position.set(0, 0, -d);
+    v.world.update(nrTime, Math.max(0, d - nrLastD), d);
     nrLastD = d;
+    // behind the start line: the world's own scenery turned round (a snapshot at the start), drawn only
+    // while the camera looks back (the countdown fly-past, the BEHIND view) and the start is still in sight
+    if (!v.back && d < 1) {
+      v.back = backdropOf(v);
+      if (v.back) scene.add(v.back);
+    }
+    if (v.back) v.back.visible = nrLookBack && d < 420;
   }
+  let nrLookBack = false;
   function setSky(map) {
     const nrw = NR_WORLD[map];
     nrActivate(nrw ?? null);
@@ -7783,6 +7795,10 @@ const world = (() => {
     /** The Neon Rush gantry's race lights: `red` lights lit, or all `green` on the gun. */
     startLights(red, green) {
       nrGate?.setLights(red, green);
+    },
+    /** The camera looks back past the start line (the intro fly-past, the BEHIND view). */
+    lookBack(v) {
+      nrLookBack = v;
     },
     get activeMap() {
       return activeMap;
@@ -10937,6 +10953,7 @@ function frame(now) {
     else if (back) camLook.set(tx * 0.8, 1.0, fz + 12);
     else camLook.set(tx * 0.8, 1.15 + fy * 0.6, fz - 10);
     camera.lookAt(camLook);
+    world.lookBack(intro || back);
     world.cull(back ? fd - 30 : fd);
     world.syncBananas(net.view?.bananas || [], slipped);
     world.syncCloud(net.view?.cloud, (id) => {
