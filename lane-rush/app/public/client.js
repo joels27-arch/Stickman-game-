@@ -1469,7 +1469,7 @@ function renderItems() {
 // ── the character catalog: every character, its rarity and how you get it ──
 
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
-const STARTER_RARITY = ["rare", "rare", "rare", "rare", "epic", "epic", "rare", "epic", "epic", "epic", "legendary", "rare", "legendary"]; // nothing below rare
+const STARTER_RARITY = ["rare", "rare", "rare", "rare", "rare", "rare", "rare", "epic", "epic", "epic", "legendary", "rare", "legendary"]; // nothing below rare
 /** A collectible that is also a 3D runner: its runner index (you can race with it). */
 const runnerOf = (id) => (id in CID_RUNNER ? { idx: CID_RUNNER[id], playable: true, tag: RUNNERS[CID_RUNNER[id]].tag, img: portrait(CID_RUNNER[id]) } : {}); // 3D runners: the same framed portrait as the starters
 function allChars() {
