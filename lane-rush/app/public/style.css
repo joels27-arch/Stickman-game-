@@ -3152,3 +3152,24 @@ html, body { background: var(--k1); }
 .lb-sc { border: 0; border-radius: 12px; padding: 8px 6px; background: transparent; color: #fff; font: inherit; font-weight: 900; font-size: 14px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lb-sc.on { background: linear-gradient(180deg, #6ff0c8, #18c08f); color: #053d2c; box-shadow: 0 3px 0 #075c43; }
 .lb-pick { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+/* Starter Pack, "mystery" look: dark night, light swirling round the pack, the five as rim-lit silhouettes */
+.pf-mystery { background: radial-gradient(ellipse at 50% 40%, #1b2a7a 0%, #0c1240 45%, #050826 100%); }
+.pf-mystery .pf-sheet { background: none; border: 0; box-shadow: none; gap: 10px; min-height: min(760px, 100%); justify-content: space-between; padding: 26px 12px 18px; }
+.pf-mystery .pf-sheet h2 { font-family: inherit; font-style: normal; font-weight: 700; font-size: 15px; letter-spacing: 0.08em; color: rgba(255, 255, 255, 0.85); -webkit-text-stroke: 0; text-shadow: none; text-transform: none; }
+.pf-mystery .pf-sub:empty { display: none; }
+.pf-mystery .pf-pack { position: relative; gap: 22px; }
+.pf-mystery .pf-pack img { position: relative; z-index: 1; width: min(210px, 52vw); filter: drop-shadow(0 0 26px rgba(170, 90, 255, 0.55)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5)); }
+.pf-mystery .pf-pack b { position: relative; z-index: 1; font-family: inherit; font-style: normal; font-weight: 800; font-size: 20px; text-transform: none; color: #ffcf6a; text-shadow: 0 0 12px rgba(255, 190, 70, 0.9), 0 0 26px rgba(255, 150, 40, 0.5); }
+/* two thin light trails orbiting the pack (purple and gold), tilted like a ring around it */
+.pf-swirl { position: absolute; left: 50%; top: 42%; width: min(330px, 84vw); aspect-ratio: 1; border-radius: 50%; translate: -50% -50%; border: 3px solid transparent; border-top-color: rgba(186, 120, 255, 0.95); border-right-color: rgba(186, 120, 255, 0.25); filter: blur(1.5px) drop-shadow(0 0 8px #a35bff); animation: pfOrbit 3.2s linear infinite; pointer-events: none; }
+.pf-swirl.b { width: min(290px, 74vw); border-top-color: rgba(255, 196, 80, 0.95); border-right-color: rgba(255, 196, 80, 0.2); filter: blur(1.5px) drop-shadow(0 0 8px #ffb330); animation-duration: 2.4s; animation-direction: reverse; }
+@keyframes pfOrbit { from { transform: rotateX(62deg) rotateZ(0deg); } to { transform: rotateX(62deg) rotateZ(360deg); } }
+.pf-mystery .pf-pack.burst .pf-swirl { animation-duration: 0.5s; opacity: 0; transition: opacity 0.6s 0.4s; }
+/* the line-up of silhouettes */
+.pf-shadows { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; gap: 2px; margin: 0; padding: 0 2px; border: 0; background: radial-gradient(ellipse at 50% 100%, rgba(80, 110, 255, 0.25), transparent 70%); }
+.pf-shadow { display: grid; justify-items: center; transition: transform 500ms cubic-bezier(0.2, 1.4, 0.4, 1), opacity 400ms; }
+.pf-shadow img { width: 100%; max-height: 22vh; object-fit: contain; object-position: bottom; filter: brightness(0) drop-shadow(0 0 1.5px var(--team)) drop-shadow(0 0 6px var(--team)); transition: filter 600ms; }
+.pf-shadow.win { transform: scale(1.25) translateY(-6px); z-index: 1; }
+.pf-shadow.win img { filter: brightness(1) drop-shadow(0 0 16px var(--team)); }
+.pf-shadow.lose { opacity: 0.15; transform: scale(0.9); }

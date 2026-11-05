@@ -991,16 +991,16 @@ let starterWaiting = false;
 function askStarter() {
   if (starterChoice() !== null) return;
   if (!bootDone) return void (starterWaiting = true); // opens as soon as the game has loaded
+  // the five as dark silhouettes, each with its own coloured rim light: one of them is inside
   $("#starterGrid").replaceChildren(
-    ...FIRST_FIVE.map((i) => el("span", { class: "pf-zone", style: `--team:${RUNNERS[i].color}`, "data-i": String(i) }, el("img", { src: portrait(i), alt: "" }), el("b", { text: RUNNERS[i].name }))),
+    ...FIRST_FIVE.map((i) => el("span", { class: "pf-shadow", style: `--team:${RUNNERS[i].color}`, "data-i": String(i) }, el("img", { src: `/assets/lu_${RUNNERS[i].file}.webp?v=4`, alt: RUNNERS[i].name }))),
   );
-  $("#starterGrid").className = "pf-row pf-odds";
-  $("#starterGrid").prepend(el("p", { class: "pf-odds-head" }, el("b", { text: "1 of these 5" }), el("span", { text: " is inside. It's yours!" })));
+  $("#starterGrid").className = "pf-row pf-shadows";
   $("#starterGrid").hidden = false;
   $("#starterGo").hidden = true;
   $("#starterPack").hidden = false;
   $("#starterPack").classList.remove("burst");
-  $("#starterTitle").textContent = "Your Starter Pack";
+  $("#starterTitle").textContent = "Starter Pack";
   $("#starterSub").textContent = "";
   $("#starterModal").hidden = false;
 }
@@ -1021,13 +1021,14 @@ $("#starterPack").addEventListener("click", () => {
   buzz(30);
   // the pack shakes, bursts open, and your runner comes out
   pack.classList.add("burst");
-  $("#starterGrid").classList.add("gone");
   $("#starterSub").textContent = "";
+  // yours steps out of the dark in full colour, the others fade away
+  for (const s of $("#starterGrid").children) s.classList.add(Number(s.dataset.i) === win ? "win" : "lose");
   setTimeout(() => {
     $("#starterModal").hidden = true;
     sfx.finish();
     showUnlock({ kind: "char", char: { name: RUNNERS[win].name, rarity: STARTER_RARITY[win], img: `/assets/lu_${RUNNERS[win].file}.webp?v=4` } }, () => toast("Win medals to unlock the others on the Medal Road"));
-  }, 900);
+  }, 1500);
 });
 $("#askSave").addEventListener("click", () => {
   sfx.tap();
