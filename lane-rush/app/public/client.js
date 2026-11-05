@@ -316,7 +316,18 @@ const wallet = {
     } catch {
       gained = 0; // still starting up
     }
+    let ever = null;
+    try {
+      ever = medalsEver(); // counted from the old wallet first
+      for (const k of MEDALS) ever[k] += Math.max(0, (m[k] ?? 0) - (this.medals()[k] ?? 0));
+    } catch {
+      ever = null; // still starting up
+    }
     local.setItem("lr:medals", JSON.stringify(m));
+    if (ever) {
+      local.setItem("lr:medalsEver", JSON.stringify(ever));
+      lbSoon();
+    }
     if (gained) rank.add(gained);
     if (goldWon) local.setItem("lr:goldEver", String(goldEver() + goldWon));
     renderWallet();
@@ -614,7 +625,7 @@ function toast(text) {
 
 /** Higgsfield character-select portrait (upper body, posed) for runner i. */
 function portrait(i) {
-  return `/assets/pp${RUNNERS[i]?.pp ?? i}.webp?v=3`; // v: new framing (bust old cached copies)
+  return `/assets/pp${RUNNERS[i]?.pp ?? i}.webp?v=4`; // v: bumped whenever a slot gets a new runner (browsers keep old copies)
 }
 
 function el(tag, attrs = {}, ...kids) {
@@ -1013,7 +1024,7 @@ $("#starterPack").addEventListener("click", () => {
   setTimeout(() => {
     $("#starterModal").hidden = true;
     sfx.finish();
-    showUnlock({ kind: "char", char: { name: RUNNERS[win].name, rarity: STARTER_RARITY[win], img: `/assets/lu_${RUNNERS[win].file}.webp` } }, () => toast("Win medals to unlock the others on the Medal Road"));
+    showUnlock({ kind: "char", char: { name: RUNNERS[win].name, rarity: STARTER_RARITY[win], img: `/assets/lu_${RUNNERS[win].file}.webp?v=4` } }, () => toast("Win medals to unlock the others on the Medal Road"));
   }, 900);
 });
 $("#askSave").addEventListener("click", () => {
@@ -1420,7 +1431,7 @@ const STARTER_RARITY = ["rare", "rare", "rare", "rare", "epic", "epic", "rare", 
 const runnerOf = (id) => (id in CID_RUNNER ? { idx: CID_RUNNER[id], playable: true, tag: RUNNERS[CID_RUNNER[id]].tag, img: portrait(CID_RUNNER[id]) } : {}); // 3D runners: the same framed portrait as the starters
 function allChars() {
   return [
-    ...RUNNERS.slice(0, STARTERS).map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : i in ROAD_RUNNERS || gamesRoad().some((g) => g.runner === i) ? "road" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp`, playable: true })),
+    ...RUNNERS.slice(0, STARTERS).map((r, i) => ({ id: `r${i}`, idx: i, name: r.name, tag: r.tag, rarity: STARTER_RARITY[i] ?? "common", via: i in PASS_RUNNERS ? "pass" : i in ROAD_RUNNERS || gamesRoad().some((g) => g.runner === i) ? "road" : "starter", img: portrait(i), hero: `/assets/lu_${r.file}.webp?v=4`, playable: true })),
     ...COLLECTION.map((c) => ({ ...c, img: c.pic ?? `/assets/sc_${c.id}.webp`, hero: c.pic ?? `/assets/sc_${c.id}.webp`, ...runnerOf(c.id) })),
     ...PACK_CHARS.map((c) => ({ ...c, via: "pack", img: `/assets/pk_${c.id}.webp`, hero: `/assets/pk_${c.id}.webp`, ...runnerOf(c.id) })),
     { ...PASS_CHAR, rarity: "legendary", via: "pass", img: `/assets/pk_${PASS_CHAR.id}.webp`, hero: `/assets/pk_${PASS_CHAR.id}.webp`, ...runnerOf(PASS_CHAR.id) },
@@ -2581,6 +2592,42 @@ function roadInfo(step) {
   const c = roadChar(step.char);
   return { label: c.name, img: ROAD_CHARS.includes(c) ? `/assets/rd_${c.id}.webp` : c.pic ?? `/assets/sc_${c.id}.webp`, rarity: c.rarity };
 }
+/** Medals won, ever, by colour (spending them never counts back): what the leaderboard ranks. */
+function medalsEver() {
+  let e = null;
+  try { e = JSON.parse(local.getItem("lr:medalsEver") || "null"); } catch { /* start it below */ }
+  if (!e || typeof e !== "object") {
+    const m = wallet.medals();
+    e = { gold: Math.max(m.gold, goldEver()), silver: m.silver, bronze: m.bronze };
+    local.setItem("lr:medalsEver", JSON.stringify(e));
+  }
+  const out = {};
+  for (const k of MEDALS) out[k] = Number.isInteger(e[k]) && e[k] > 0 ? e[k] : 0;
+  return out;
+}
+/** This device's private leaderboard key (never shown to anyone). */
+function lbId() {
+  let id = local.getItem("lr:lbid");
+  if (!id || !/^[a-z0-9]{20}$/.test(id)) {
+    id = randomId(20);
+    local.setItem("lr:lbid", id);
+  }
+  return id;
+}
+function lbSend() {
+  const e = medalsEver();
+  return fetch("/api/lb", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: lbId(), name: myName() || "Runner", country: myCountry(), char: preferredChar(), g: e.gold, s: e.silver, b: e.bronze }),
+  });
+}
+let lbTimer = 0;
+/** Medals changed: tell the leaderboard a little later (one request for a burst of changes). */
+function lbSoon() {
+  clearTimeout(lbTimer);
+  lbTimer = setTimeout(() => lbSend().catch(() => {}), 4000);
+}
 /** Gold medals won, ever (a stat: spending them never counted back). */
 function goldEver() {
   const n = Number(local.getItem("lr:goldEver"));
@@ -2625,7 +2672,7 @@ function claimRoad(step, node) {
     } else {
       giveItem(step.runner);
       renderCollPill();
-      showUnlock({ kind: "char", char: { name: info.label, rarity: info.rarity, img: `/assets/lu_${RUNNERS[step.runner].file}.webp` } });
+      showUnlock({ kind: "char", char: { name: info.label, rarity: info.rarity, img: `/assets/lu_${RUNNERS[step.runner].file}.webp?v=4` } });
     }
   } else if (wallet.has(step.char)) {
     const n = ROAD_DUPE[info.rarity] ?? 800;
@@ -3371,7 +3418,7 @@ function renderLineup(v, { isHost, gm, mp }) {
       "div",
       { class: `lx-ped p${i + 1}${isMe ? " me" : ""}${ok ? " ok" : ""}${p.gone ? " gone" : ""}` },
       isMe ? el("span", { class: "lx-you", text: "YOU" }) : el("span", { class: "lx-say", text: p.gone ? "Away…" : TAUNTS[hash(p.id) % TAUNTS.length] }),
-      el("img", { class: "lx-char", src: `/assets/lu_${RUNNERS[p.char]?.file ?? "c0"}.webp`, alt: RUNNERS[p.char]?.name ?? "" }),
+      el("img", { class: "lx-char", src: `/assets/lu_${RUNNERS[p.char]?.file ?? "c0"}.webp?v=4`, alt: RUNNERS[p.char]?.name ?? "" }),
       el(
         "div",
         { class: "lx-block" },
@@ -9401,7 +9448,83 @@ function openRank() {
   openRoad();
 }
 $("#rankBadgeBtn").addEventListener("click", openRank);
-for (const chip of document.querySelectorAll(".medal-chip")) chip.addEventListener("click", openRank);
+for (const chip of document.querySelectorAll(".medal-chip")) chip.addEventListener("click", openLeaderboard);
+lbSoon(); // so you show up on the leaderboard with the medals you already have
+
+// ── medal leaderboard: everyone's medals won ever (spending them never counts back) ──
+const lbModal = $("#lbModal");
+let lbTab = "total";
+let lbData = null;
+function openLeaderboard() {
+  sfx.tap();
+  lbModal.hidden = false;
+  renderLeaderboard();
+  lbSend()
+    .catch(() => {})
+    .then(() => fetch(`/api/lb?id=${lbId()}`, { cache: "no-store" }))
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .then((d) => {
+      lbData = d;
+      renderLeaderboard();
+    })
+    .catch(() => {
+      lbData = { error: true };
+      renderLeaderboard();
+    });
+}
+$("#lbClose").addEventListener("click", () => (lbModal.hidden = true));
+lbModal.addEventListener("click", (e) => {
+  if (e.target === lbModal) return (lbModal.hidden = true);
+  const t = e.target.closest("[data-lb]");
+  if (!t) return;
+  sfx.tap();
+  lbTab = t.dataset.lb;
+  renderLeaderboard();
+});
+const LB_TABS = [
+  ["total", "🏅", "Total"],
+  ["gold", MEDAL_IMG.gold, "Gold"],
+  ["silver", MEDAL_IMG.silver, "Silver"],
+  ["bronze", MEDAL_IMG.bronze, "Bronze"],
+];
+function renderLeaderboard() {
+  const tabs = el(
+    "div",
+    { class: "lb-tabs" },
+    ...LB_TABS.map(([k, icon, label]) =>
+      el("button", { type: "button", class: `lb-tab${k === lbTab ? " on" : ""}`, "data-lb": k }, icon.startsWith("/") ? el("img", { src: icon, alt: "" }) : el("i", { text: icon }), el("span", { text: label })),
+    ),
+  );
+  const score = (x) => (lbTab === "gold" ? x.g : lbTab === "silver" ? x.s : lbTab === "bronze" ? x.b : x.g + x.s + x.b);
+  const row = (x) =>
+    el(
+      "div",
+      { class: `lb-row${x.me ? " me" : ""}${x.rank <= 3 ? ` top${x.rank}` : ""}` },
+      el("em", { text: x.rank <= 3 ? ["🥇", "🥈", "🥉"][x.rank - 1] : `#${x.rank}` }),
+      el("img", { src: x.me ? myAvatar() : portrait(x.char ?? 0), alt: "" }),
+      el("span", {}, el("b", { text: `${flagOf(x.country)} ${x.name}${x.me ? " (you)" : ""}`.trim() }), el("small", {}, `🥇${x.g} · 🥈${x.s} · 🥉${x.b}`)),
+      el("strong", { text: score(x).toLocaleString() }),
+    );
+  let body;
+  if (!lbData) body = el("p", { class: "stats-empty", text: "Loading…" });
+  else if (lbData.error) body = el("p", { class: "stats-empty", text: "Can't reach the leaderboard right now. Try again in a moment." });
+  else {
+    const board = lbData[lbTab] ?? { top: [], me: null };
+    const mine = board.me;
+    body = el(
+      "div",
+      { class: "lb-list" },
+      ...(board.top.length ? board.top.map(row) : [el("p", { class: "stats-empty", text: "No medals won yet. Be the first!" })]),
+      ...(mine && mine.rank > board.top.length ? [el("div", { class: "lb-gap", text: "⋯" }), row(mine)] : []),
+    );
+  }
+  const ever = medalsEver();
+  $("#lbBody").replaceChildren(
+    tabs,
+    el("p", { class: "lb-sub", text: lbData?.players ? `${lbData.players.toLocaleString()} runners with medals · you: 🥇${ever.gold} 🥈${ever.silver} 🥉${ever.bronze}` : `You: 🥇${ever.gold} 🥈${ever.silver} 🥉${ever.bronze}` }),
+    body,
+  );
+}
 $("#profileCard").addEventListener("click", openStats);
 // ── Stats page: places, records, modes, and how you stand among your friends ──
 const statsModal = $("#statsModal");
@@ -9724,7 +9847,7 @@ function claimPass(level, track, tile) {
       giveItem(r.runner);
       renderCollPill();
       passModal.hidden = true;
-      showUnlock({ kind: "char", char: { name: r.label, rarity: STARTER_RARITY[r.runner], img: `/assets/lu_${RUNNERS[r.runner].file}.webp` } });
+      showUnlock({ kind: "char", char: { name: r.label, rarity: STARTER_RARITY[r.runner], img: `/assets/lu_${RUNNERS[r.runner].file}.webp?v=4` } });
     }
   }
   else if (r.pack) {

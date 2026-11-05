@@ -76,9 +76,53 @@ async function handleSave(request: Request, env: Env, url: URL): Promise<Respons
   return json({ error: "method not allowed" }, 405);
 }
 
+// ── medal leaderboard ──────────────────────────────────────────────────────
+//   POST /api/lb {id, name, country, char, g, s, b}  -> {ok}
+//   GET  /api/lb?id=<your id>  -> {players, total|gold|silver|bronze: {top: [...], me}}
+// One Durable Object holds everyone ("lb:global"). Ids are private random keys; they never go out.
+const LB_ID_RE = /^[A-Za-z0-9]{16,32}$/;
+const lbStub = (env: Env) => env.ROOMS.get(env.ROOMS.idFromName("lb:global"));
+const count = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 ? Math.min(v as number, 1_000_000) : 0);
+
+async function handleLb(request: Request, env: Env, url: URL): Promise<Response> {
+  if (request.method === "GET") {
+    const id = url.searchParams.get("id") ?? "";
+    const res = await lbStub(env).fetch("https://lb/__lb/get?id=" + encodeURIComponent(LB_ID_RE.test(id) ? id : ""));
+    return json(await res.json());
+  }
+  if (request.method === "POST") {
+    const text = await request.text();
+    if (text.length > 1000) return json({ error: "too big" }, 413);
+    let b: Record<string, unknown>;
+    try {
+      b = JSON.parse(text);
+    } catch {
+      return json({ error: "bad request" }, 400);
+    }
+    const id = String(b.id ?? "");
+    if (!LB_ID_RE.test(id)) return json({ error: "bad id" }, 400);
+    const name = String(b.name ?? "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 14) || "Runner";
+    const country = /^[A-Z]{2}$/.test(String(b.country ?? "")) ? String(b.country) : "";
+    const char = Number.isInteger(b.char) && (b.char as number) >= 0 && (b.char as number) < 64 ? (b.char as number) : 0;
+    const entry = { id, name, country, char, g: count(b.g), s: count(b.s), b: count(b.b) };
+    await lbStub(env).fetch("https://lb/__lb/post", { method: "POST", body: JSON.stringify(entry) });
+    return json({ ok: true });
+  }
+  return json({ error: "method not allowed" }, 405);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/lb") {
+      try {
+        return await handleLb(request, env, url);
+      } catch (err) {
+        console.error("leaderboard failed:", err instanceof Error ? err.stack : String(err));
+        return json({ error: "server error" }, 500);
+      }
+    }
 
     if (url.pathname === "/api/save") {
       try {

@@ -83,7 +83,56 @@ const PLAYER_RE = /^[A-Za-z0-9_-]{1,40}$/;
 
 const SYSTEM = "__system";
 
+/** One player on the medal leaderboard (medals won ever; the id is a private random key from their device). */
+export interface LbEntry {
+  id: string;
+  name: string;
+  country: string;
+  char: number;
+  g: number;
+  s: number;
+  b: number;
+  at?: number;
+}
+const LB_KINDS = ["total", "gold", "silver", "bronze"] as const;
+const LB_TOP = 50;
+const lbScore = (e: LbEntry, k: (typeof LB_KINDS)[number]) => (k === "gold" ? e.g : k === "silver" ? e.s : k === "bronze" ? e.b : e.g + e.s + e.b);
+/** Ties: more gold first, then silver, then whoever got there first. */
+const lbCmp = (k: (typeof LB_KINDS)[number]) => (a: LbEntry, b: LbEntry) =>
+  lbScore(b, k) - lbScore(a, k) || b.g - a.g || b.s - a.s || (a.at ?? 0) - (b.at ?? 0);
+
 export class Room extends DurableObject<Env> {
+  /** The leaderboard instance only: every player, loaded once from storage. */
+  private lb: Map<string, LbEntry> | null = null;
+  private async lbLoad(): Promise<Map<string, LbEntry>> {
+    if (!this.lb) {
+      const all = await this.ctx.storage.list<LbEntry>({ prefix: "p:" });
+      this.lb = new Map([...all.values()].map((e) => [e.id, e]));
+    }
+    return this.lb;
+  }
+  private async lbPost(e: LbEntry): Promise<Response> {
+    const lb = await this.lbLoad();
+    const old = lb.get(e.id);
+    // medals won ever only go up; the time is when the score last changed (ties: first there wins)
+    const next: LbEntry = { ...e, at: (old && old.g === e.g && old.s === e.s && old.b === e.b ? old.at : undefined) ?? Date.now() };
+    lb.set(e.id, next);
+    await this.ctx.storage.put("p:" + e.id, next);
+    return Response.json({ ok: true });
+  }
+  private async lbGet(me: string): Promise<Response> {
+    const all = [...(await this.lbLoad()).values()].filter((e) => e.g + e.s + e.b > 0);
+    const out: Record<string, unknown> = { players: all.length };
+    for (const k of LB_KINDS) {
+      const sorted = all.sort(lbCmp(k)).slice();
+      const pub = (e: LbEntry, i: number) => ({ rank: i + 1, name: e.name, country: e.country, char: e.char, g: e.g, s: e.s, b: e.b, me: e.id === me });
+      const top = sorted.slice(0, LB_TOP).map(pub);
+      const mine = sorted.findIndex((e) => e.id === me);
+      out[k] = { top, me: mine >= 0 ? pub(sorted[mine]!, mine) : null };
+    }
+    return Response.json(out);
+  }
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
@@ -149,6 +198,8 @@ export class Room extends DurableObject<Env> {
       await this.ctx.storage.put("save", { data, at });
       return new Response(JSON.stringify({ at }), { headers: { "Content-Type": "application/json" } });
     }
+    if (path === "/__lb/post") return this.lbPost((await request.json()) as LbEntry);
+    if (path === "/__lb/get") return this.lbGet(new URL(request.url).searchParams.get("id") ?? "");
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected a websocket upgrade", { status: 426 });
     }
