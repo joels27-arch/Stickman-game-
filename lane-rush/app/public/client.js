@@ -671,9 +671,9 @@ const TOUR = [
   { sel: "#roomRow", img: "/assets/tab_play.webp", title: "Play with friends", text: "Create a room or join a friend's." },
   { sel: "#soloBtn", img: "/assets/pw_rocket.png", title: "Quick Race", text: "Jump into a race, any mode." },
   { sel: ".stats-hero", open: "stats", img: "/assets/lg_bronze.webp", title: "Your profile", text: "Your stats and how you rank." },
-  { sel: "#tourneyList", page: "compete", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "Win coin prizes." },
+  { sel: "#tourneyList", page: "compete", img: "/assets/tab_trophy.webp", title: "Tournaments", text: "Win coin prizes. Your missions are here too." },
   { sel: "#skinGrid .ccard", page: "skins", img: "/assets/tab_skins.webp", title: "Skins", text: "Pick who you race with." },
-  { sel: "#trophyRoad", page: "missions", img: "/assets/tab_missions.webp", title: "Missions", text: "Missions and the Medal Road." },
+  { sel: "#trophyRoad", page: "missions", img: "/assets/tab_missions.webp", title: "Medal Road", text: "Win medals, collect rewards." },
   { sel: "#packRow .pack-card", page: "shop", img: "/assets/tab_shop.webp", title: "Shop", text: "Packs and characters." },
   { sel: "#endlessBtn", img: "/assets/ui_flame.webp", title: "Your first run!", text: "One life. I'll teach you as you run!", last: true },
 ];
@@ -2310,12 +2310,12 @@ function setHomePage(i, animate = true) {
     t.classList.toggle("on", on);
     t.setAttribute("aria-selected", String(on));
   }
-  if (homePage === PAGE.compete) renderCompete();
-  if (homePage === PAGE.missions) {
-    // open on the tab that has something to collect
-    if (!missionsWaiting[missionTab]) missionTab = missionsWaiting.road ? "road" : missionsWaiting.missions ? "missions" : missionTab;
-    showMissionTab(missionTab);
+  if (homePage === PAGE.compete) {
+    renderCompete();
+    renderDaily(); // the missions sit under the tournaments
+    renderCareer();
   }
+  if (homePage === PAGE.missions) showMissionTab("road");
   if (homePage === PAGE.skins) renderSkins();
   if (homePage === PAGE.shop) {
     mountShop($("#shopHome"));
@@ -2799,31 +2799,13 @@ function renderTrophyRoad() {
  * the rewards on alternating sides, a big banner where each league starts (its character rides on it),
  * and you on the road where you are.
  */
-/** The Missions page has two tabs: the Trophy Road and the missions (daily + career). */
+/** The first page is the Medal Road (the missions moved to the Tournaments page). */
 let missionTab = "road";
-function showMissionTab(tab) {
-  missionTab = tab;
-  for (const b of document.querySelectorAll(".m-tab[data-mt]")) b.classList.toggle("on", b.dataset.mt === tab);
-  $("#mtRoad").hidden = tab !== "road";
-  $("#mtMissions").hidden = tab !== "missions";
-  // the page title and its tab in the bottom bar follow the tab you're on
-  const title = tab === "road" ? "Medal Road" : "Missions";
-  $("#missionsTitle").textContent = title;
-  const tabLabel = document.querySelector('.htab[data-page="0"] span');
-  if (tabLabel) tabLabel.textContent = title;
-  if (tab === "road") renderRoadFull();
-  else {
-    renderDaily();
-    renderCareer();
-  }
+function showMissionTab() {
+  missionTab = "road";
+  renderRoadFull();
 }
-for (const b of document.querySelectorAll(".m-tab[data-mt]"))
-  b.addEventListener("click", () => {
-    if (b.dataset.mt === missionTab) return;
-    sfx.tap();
-    showMissionTab(b.dataset.mt);
-  });
-const roadOpen = () => homePage === PAGE.missions && missionTab === "road";
+const roadOpen = () => homePage === PAGE.missions;
 /** The games road: a new runner after 1, 3, 5, 10, 20, 50 and 100 games, collected on the Trophy Road. */
 function gamesClaimed() {
   try {
@@ -9405,8 +9387,6 @@ function renderRankPill() {
   renderProfile();
   // something to collect on the Trophy Road (a reward for trophies or a runner for games played): its tab says so
   const waiting = road.ready().length + gamesReady().length;
-  const rd = $('.m-tab[data-mt="road"] .dot');
-  if (rd) rd.hidden = !waiting;
   renderMissionDots(); // and the badge on the bottom tab
 }
 
@@ -9792,16 +9772,12 @@ function renderMissionDots() {
   } catch {
     /* still starting up */
   }
-  const md = $('.m-tab[data-mt="missions"] .dot');
-  if (md) md.hidden = !(daily || career);
   $("#careerDot").hidden = !career;
-  // the bottom tab says WHICH has something to collect: 🏅 Medal Road, 📋 Missions
+  // a dot on each bottom tab with something to collect: the Medal Road, and the missions on Tournaments
   const dot = document.querySelector(`.htab[data-page="${PAGE.missions}"] .dot`);
-  if (dot) {
-    dot.hidden = !(daily || career || gold);
-    dot.textContent = `${gold ? "🏅" : ""}${daily || career ? "📋" : ""}`;
-    dot.classList.add("lbl");
-  }
+  if (dot) dot.hidden = !gold;
+  const cdot = document.querySelector(`.htab[data-page="${PAGE.compete}"] .dot`);
+  if (cdot) cdot.hidden = !(daily || career);
   missionsWaiting = { road: gold, missions: daily || career };
   $("#dailyDot").hidden = !daily;
   renderStoreDot();

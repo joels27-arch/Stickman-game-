@@ -3176,3 +3176,7 @@ html, body { background: var(--k1); }
 #starterModal.pf-mystery .pf-sheet { background: radial-gradient(ellipse at 50% 38%, #24318c 0%, #0e1548 48%, #050826 100%); border: 0; box-shadow: 0 0 0 1px rgba(140, 160, 255, 0.18), 0 20px 60px rgba(0, 0, 0, 0.6); }
 #starterModal.pf-mystery .pf-sheet::before, #starterModal.pf-mystery .pf-sheet::after { display: none; }
 .ccard .cname.long { font-size: 0.78em; letter-spacing: -0.02em; }
+.home-top .icon-btn { display: grid; place-items: center; }
+.home-top .icon-btn .gear { width: 22px; height: 22px; display: block; }
+.cm-ribbon { margin-top: 26px; }
+.compete-missions { display: flex; flex-direction: column; gap: 10px; }
