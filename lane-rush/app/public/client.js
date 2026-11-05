@@ -5587,7 +5587,7 @@ const world = (() => {
     lava: plate("volcano", 0.28, "#3d1618"),
     egypt: plate("egypt", 0.51, "#b96c2e"),
     jungle: plate("jungle", 0.32, "#6a7a4a"),
-    meadow: plate("valley", 0.42, "#cfe0e6"), // Sunny Valley: a painted countryside, the 3D hills fade into its haze
+    meadow: plate("valley", 0.24, "#cfe0e6"), // Sunny Valley: a painted countryside, the 3D hills fade into its haze
   };
   /**
    * A painted plate round the whole view (the Neon Rush way): the picture straight down
