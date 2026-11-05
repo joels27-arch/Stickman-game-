@@ -3281,3 +3281,6 @@ html, body { background: var(--k1); }
 .trow.tb { height: auto; max-height: none; overflow: visible; }
 .trow.tb::after { border-radius: inherit; }
 .trow.tb .tr-prize { display: inline-flex; align-items: center; gap: 4px; }
+#tourneyList .trow.tb { height: auto; min-height: 128px; overflow: visible; }
+#tourneyList .trow.tb .tr-prize { flex-direction: row; max-width: none; padding: 5px 10px; font-size: 13px; white-space: nowrap; }
+#tourneyList .trow.tb .tr-prize img { width: 18px; height: 24px; }
