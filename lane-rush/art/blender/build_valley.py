@@ -57,10 +57,9 @@ def fence(x0=0.0):
     dark = mat("vl_wood_dark", "#7d5228", rough=0.85)
     p = []
     for sx in (-1.45, 1.45):
-        p.append(box((0.13, 0.13, 1.05), (x0 + sx, 0, 0.52), dark, bevel=0.03, segs=2, name="post"))
-        p.append(box((0.16, 0.16, 0.05), (x0 + sx, 0, 1.06), dark, bevel=0.02, segs=2, name="cap"))
+        p.append(box((0.13, 0.13, 1.05), (x0 + sx, 0, 0.52), dark, bevel=0.025, segs=1, name="post"))
     for z in (0.45, 0.85):
-        p.append(box((3.0, 0.08, 0.14), (x0, 0.06, z), wood, bevel=0.03, segs=2, name="rail"))
+        p.append(box((3.0, 0.08, 0.14), (x0, 0.06, z), wood, bevel=0.025, segs=1, name="rail"))
     return join(p, "fence")
 
 
@@ -129,6 +128,9 @@ if __name__ == "__main__":
         bake_ao(o, distance=0.8)
     preview(list(objs.values()), os.path.abspath(os.path.join(OUT, "preview_valley.jpg")), size=(1500, 560), cam_loc=(4.0, -17, 4.0), look=(4.0, 0, 2.2), lens=30)
     for name, o in objs.items():
-        export(o, os.path.abspath(os.path.join(OUT, f"{name}.glb")))
         if name in ("vl_tree1", "vl_tree2", "vl_tree3", "vl_poplar", "vl_bale", "vl_flowers"):
-            export(lod_copy(o, 0.2), os.path.abspath(os.path.join(OUT, f"{name}_lod.glb")))  # far version
+            # many on screen at once: the near version is thinned to 45 %, the far one to 15 %
+            export(lod_copy(o, 0.45), os.path.abspath(os.path.join(OUT, f"{name}.glb")))
+            export(lod_copy(o, 0.15), os.path.abspath(os.path.join(OUT, f"{name}_lod.glb")))
+        else:
+            export(o, os.path.abspath(os.path.join(OUT, f"{name}.glb")))
