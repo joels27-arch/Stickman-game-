@@ -3214,3 +3214,27 @@ html, body { background: var(--k1); }
 #tourneyList[hidden], #mtMissions[hidden] { display: none !important; }
 .char-story { margin: 2px 6px 0; text-align: center; font-size: 14px; font-weight: 700; font-style: italic; line-height: 1.35; color: rgba(255, 255, 255, 0.88); }
 .char-story[hidden], .char-how[hidden] { display: none; }
+/* mythic: the rarity above legendary (Siete, Big Dunk, Disco Dash): hot pink into violet */
+.ccard.mythic { background: linear-gradient(180deg, #ff6fd8, #b21eff); box-shadow: 0 5px 0 #4d0a6e; }
+.coll-grid .ccard.mythic { --rc: #e03cff; --rc-hi: #ffb3f0; --rc-dark: #4d0a6e; --rc-bg: #b21eff; }
+.coll-grid .ccard.mythic .cpic::after { content: "♛ ✦ ♛"; position: absolute; top: 6%; left: 0; right: 0; text-align: center; font-size: 11px; color: #fff; text-shadow: 0 0 6px #ff4fd8; }
+.char-hero .glow.mythic { background-color: rgba(255, 79, 216, 0.35); }
+.char-tags .tag.mythic { background: linear-gradient(90deg, #ff4fd8, #8a2bff); }
+.bp-card.mythic, .av-tile.mythic { background: linear-gradient(180deg, #ff6fd8, #b21eff); }
+.pcard.mythic { background: linear-gradient(180deg, #ff9ae6, #e03cff 50%, #6a12a8); box-shadow: 0 8px 0 #3a0660, 0 0 90px rgba(255, 79, 216, 1); }
+.pcard.hero.mythic { --hero-glow: rgba(255, 79, 216, 0.95); }
+.pcard-back.mythic { --back-a: #ff4fd8; --back-b: #8a2bff; }
+.pack-open[data-reveal="mythic"] { --ray: rgba(255, 79, 216, 0.5); }
+.rv-card.char.mythic { border-color: #ffd0f5; background: linear-gradient(180deg, #ff6fd8, #9a1ee0); box-shadow: 0 4px 0 #4d0a6e, 0 0 18px rgba(255, 79, 216, 0.9); }
+.acard.mythic { background: linear-gradient(180deg, #ff6fd8, #8a2bff); }
+.rnode.star.mythic .rbubble { background: linear-gradient(180deg, #ffe0fa, #ffa8ec); }
+.rf-row.star.mythic { background: linear-gradient(90deg, rgba(255, 79, 216, 0.4), rgba(255, 255, 255, 0.08)); }
+/* Medal Road: the league card is the heading; a divider starts the road; "you" sits on a line across the road */
+.mr-head { margin-bottom: 4px; }
+.mr-section { display: flex; align-items: center; gap: 10px; margin: 14px 2px 6px; }
+.mr-section i { flex: 1; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35)); }
+.mr-section i:last-child { background: linear-gradient(90deg, rgba(255, 255, 255, 0.35), transparent); }
+.mr-section span { font-family: var(--display); font-style: italic; font-weight: 900; font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.85); white-space: nowrap; }
+.mr-you-line { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.mr-you-line > i { flex: 1; height: 3px; border-radius: 3px; background: repeating-linear-gradient(90deg, #b6f72a 0 10px, transparent 10px 16px); opacity: 0.8; }
+.mr-you-line .mr-you { margin: 0; flex: none; }

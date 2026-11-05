@@ -156,12 +156,12 @@ const COLLECTION = [
   { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "pack" },
   { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "epic", via: "pass", passLv: 15 },
   { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pass", passLv: 1 }, // yours the moment you buy the Gold Pass
-  { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "pack", legacy: { medal: "gold", count: 6 } },
+  { id: "striker", name: "Siete", color: "#e02424", rarity: "mythic", via: "pack", legacy: { medal: "gold", count: 6 } },
   // heroes and stars
-  { id: "webster", name: "Webster", color: "#1a6a78", rarity: "epic", via: "pack" },
-  { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "epic", via: "road" },
-  { id: "dunk", name: "Big Dunk", color: "#14b8b0", rarity: "legendary", via: "pack" },
-  { id: "rapstar", name: "MC Gold", color: "#f0b400", rarity: "epic", via: "road", pic: "/assets/pk_rapstar.webp" },
+  { id: "webster", name: "Webster", color: "#1a6a78", rarity: "legendary", via: "pack" },
+  { id: "gloop", name: "Gloop", color: "#3a1a5a", rarity: "legendary", via: "road" },
+  { id: "dunk", name: "Big Dunk", color: "#14b8b0", rarity: "mythic", via: "pack" },
+  { id: "rapstar", name: "MC Gold", color: "#f0b400", rarity: "legendary", via: "road", pic: "/assets/pk_rapstar.webp" },
 ];
 const MEDAL_IMG = { gold: "/assets/medal_gold.png", silver: "/assets/medal_silver.png", bronze: "/assets/medal_bronze.png" };
 const MEDAL_ICON = { gold: "🥇", silver: "🥈", bronze: "🥉" };
@@ -1498,7 +1498,7 @@ function renderItems() {
 }
 // ── the character catalog: every character, its rarity and how you get it ──
 
-const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
+const RARITY_ORDER = ["common", "rare", "epic", "legendary", "mythic"]; // mythic: above legendary, only three runners
 const STARTER_RARITY = ["rare", "rare", "rare", "rare", "rare", "rare", "rare", "epic", "epic", "epic", "legendary", "epic", "legendary"]; // nothing below rare
 /** A collectible that is also a 3D runner: its runner index (you can race with it). */
 const runnerOf = (id) => (id in CID_RUNNER ? { idx: CID_RUNNER[id], playable: true, tag: RUNNERS[CID_RUNNER[id]].tag, img: portrait(CID_RUNNER[id]) } : {}); // 3D runners: the same framed portrait as the starters
@@ -1542,7 +1542,7 @@ function renderCollPill() {
   $("#skinPct").textContent = "";
 }
 /** A character card: the picture on its rarity colour, the name in big letters, a rarity tag; locked ones show a padlock (and the price, for shop characters). */
-const RARITY_ICON = { common: "●", rare: "◆", epic: "✦", legendary: "★" };
+const RARITY_ICON = { common: "●", rare: "◆", epic: "✦", legendary: "★", mythic: "♛" };
 function charCard(c, n, onClick) {
   const owned = ownsChar(c);
   const sel = false; // runners are picked when you play, not here
@@ -1759,25 +1759,25 @@ const PACK_CHARS = [
   { id: "brainz", name: "Prof. Brainz", rarity: "legendary", dupe: 1500 },
   { id: "ra", name: "Pharaoh Ra", rarity: "epic", dupe: 600 },
   { id: "glorb", name: "Glorb", rarity: "epic", dupe: 600 },
-  { id: "dancer", name: "Disco Dash", rarity: "legendary", dupe: 1500 },
+  { id: "dancer", name: "Disco Dash", rarity: "mythic", dupe: 3000 },
 ];
 /**
  * Two packs, one character each: a new one unlocks it, one you already have pays coins instead.
  * odds: chance for each rarity.
  */
 const PACKS = [
-  { id: "mega", name: "Mega Pack", price: 900, img: "/assets/pack_mega.webp", odds: { rare: 0.55, epic: 0.37, legendary: 0.08 } },
-  { id: "legend", name: "Legend Pack", price: 2500, img: "/assets/pack_legend.webp", odds: { rare: 0, epic: 0.65, legendary: 0.35 } },
+  { id: "mega", name: "Mega Pack", price: 900, img: "/assets/pack_mega.webp", odds: { rare: 0.55, epic: 0.36, legendary: 0.07, mythic: 0.02 } },
+  { id: "legend", name: "Legend Pack", price: 2500, img: "/assets/pack_legend.webp", odds: { rare: 0, epic: 0.6, legendary: 0.32, mythic: 0.08 } },
 ];
 /** Coins for a character you already have. */
-const DUPE_COINS = { common: 60, rare: 100, epic: 300, legendary: 800 };
+const DUPE_COINS = { common: 60, rare: 100, epic: 300, legendary: 800, mythic: 1500 };
 const pct = (x) => `${Math.round(x * 1000) / 10}%`;
 
 /** Every character a pack can hold: the starters and the pack characters (not Trophy Road or Season Pass ones). */
 const packPool = () => allChars().filter((c) => c.via === "pack" || c.via === "starter");
 function rollRarity(odds) {
   let r = Math.random();
-  for (const rarity of ["legendary", "epic", "rare", "common"]) {
+  for (const rarity of ["mythic", "legendary", "epic", "rare", "common"]) {
     if (r < (odds[rarity] ?? 0)) return rarity;
     r -= odds[rarity] ?? 0;
   }
@@ -1830,7 +1830,7 @@ function renderPacks() {
         el("img", { class: "pack-img", src: pk.img, alt: "" }),
         el("b", { text: pk.name }),
         el("small", { class: "pk-cards", text: "1 character" }),
-        el("small", { class: "pk-odds", text: `Legendary ${pct(pk.odds.legendary)} · Epic ${pct(pk.odds.epic)}` }),
+        el("small", { class: "pk-odds", text: `Mythic ${pct(pk.odds.mythic)} · Legendary ${pct(pk.odds.legendary)} · Epic ${pct(pk.odds.epic)}` }),
         btn,
       );
     }),
@@ -1844,8 +1844,8 @@ const packOpen = $("#packOpen");
 let po = null;
 const PACK_TAPS = 4; // taps to burst a pack open
 /** Pack rarities → the PackFX tiers (banner, glow, fireworks, timings). */
-const PACKFX_TIER = { common: "gold", rare: "gold", epic: "diamond", legendary: "galaxy" };
-const PACKFX_BANNER = { common: ["NEW RUNNER", "Here they come"], rare: ["RARE RUNNER", "Here they come"], epic: ["EPIC RUNNER!", "Epic runner incoming"], legendary: ["LEGENDARY!", "A legend is coming"] };
+const PACKFX_TIER = { common: "gold", rare: "gold", epic: "diamond", legendary: "galaxy", mythic: "galaxy" };
+const PACKFX_BANNER = { mythic: ["MYTHIC!!", "The rarest of them all"], common: ["NEW RUNNER", "Here they come"], rare: ["RARE RUNNER", "Here they come"], epic: ["EPIC RUNNER!", "Epic runner incoming"], legendary: ["LEGENDARY!", "A legend is coming"] };
 /** One runner out of a pack, with the 5v5 Legacy opening (the reward is already credited: this only shows it). */
 function packFxOpen(pack, it) {
   const c = it.char;
@@ -1857,6 +1857,7 @@ function packFxOpen(pack, it) {
   const tag = c.tag ?? (c.idx !== undefined ? RUNNERS[c.idx]?.tag : null);
   PackFX.open({
     rarity: PACKFX_TIER[c.rarity] ?? "gold",
+    color: c.rarity === "mythic" ? "#ff4fd8" : null, // mythic: the galaxy opening in hot pink
     teamColor: c.idx !== undefined ? RUNNERS[c.idx]?.color : null,
     packImage: pack.img,
     packColor: { mega: "#b46bff", legend: "#ffd23e" }[pack.id] ?? "#b46bff",
@@ -1999,9 +2000,9 @@ function packStep() {
     card.classList.add("hero");
     card.append(el("em", { class: "pnew", text: "NEW!" }));
     $("#poCard").replaceChildren(card);
-    confetti($("#poFx"), rarity === "legendary" ? 90 : rarity === "epic" ? 60 : 40, rarity);
+    confetti($("#poFx"), rarity === "legendary" || rarity === "mythic" ? 90 : rarity === "epic" ? 60 : 40, rarity);
     sfx.finish();
-    if (rarity === "legendary") setTimeout(() => sfx.cheer(), 250);
+    if (rarity === "legendary" || rarity === "mythic") setTimeout(() => sfx.cheer(), 250);
     buzz([30, 40, 80]);
     $("#poHint").textContent = po.i < po.items.length - 1 ? `Tap for the next one (${po.i + 1}/${po.items.length})` : "Tap to continue";
     setTimeout(() => po && (po.busy = false), 700);
@@ -2013,7 +2014,7 @@ packOpen.addEventListener("click", (e) => {
 });
 /** Confetti bursting out from the middle of the screen, in a rarity's colours. */
 function confetti(box, n, rarity) {
-  const cols = { legendary: ["#ffd23f", "#fff2a8", "#ff9f1c", "#ffffff"], epic: ["#c27bff", "#ff7ad9", "#ffffff", "#7ab8ff"], rare: ["#4fc3ff", "#7cf2c8", "#ffffff"], common: ["#ffffff", "#b6f72a"] }[rarity] ?? ["#ffffff"];
+  const cols = { mythic: ["#ff4fd8", "#b21eff", "#ffd23f", "#ffffff"], legendary: ["#ffd23f", "#fff2a8", "#ff9f1c", "#ffffff"], epic: ["#c27bff", "#ff7ad9", "#ffffff", "#7ab8ff"], rare: ["#4fc3ff", "#7cf2c8", "#ffffff"], common: ["#ffffff", "#b6f72a"] }[rarity] ?? ["#ffffff"];
   for (let i = 0; i < n; i++) {
     const c = el("i", { class: "conf", style: `background:${cols[i % cols.length]}` });
     box.append(c);
@@ -2727,7 +2728,7 @@ const ROAD = [
   { pts: 10000, coins: 25000 },
 ];
 /** Coins instead, for a road character you already own (from the old medal shop). */
-const ROAD_DUPE = { epic: 800, legendary: 1500 };
+const ROAD_DUPE = { epic: 800, legendary: 1500, mythic: 2500 };
 const roadChar = (id) => ROAD_CHARS.find((c) => c.id === id) ?? COLLECTION.find((c) => c.id === id);
 function roadInfo(step) {
   if (step.coins) return { label: `${step.coins.toLocaleString()} coins`, img: step.coins >= 2500 ? "/assets/ui_c3.webp" : "/assets/ui_c2.webp" };
@@ -2962,8 +2963,12 @@ function renderRoadFull() {
       el("p", { class: "mr-how", text: `🥇 +${MEDAL_PTS.gold} · 🥈 +${MEDAL_PTS.silver} · 🥉 +${MEDAL_PTS.bronze} · other places +${LAST_PLACE_PTS}` }),
     ),
   ];
+  // the header is the page's heading; the road itself starts below this divider
+  rows.push(el("div", { class: "mr-section" }, el("i"), el("span", { text: "🏁 The road · your rewards" }), el("i")));
   let youShown = false;
-  const you = () => el("div", { class: "rv-you mr-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: `You · ${p.toLocaleString()}` }));
+  // where you are ON the road: a line across it with you in the middle
+  const you = () =>
+    el("div", { class: "mr-you-line" }, el("i"), el("div", { class: "rv-you mr-you" }, el("img", { src: myAvatar(), alt: "" }), el("b", { text: p > 0 ? `You · ${p.toLocaleString()} pts` : "You start here" })), el("i"));
   for (const step of roadSteps()) {
     if (!youShown && step.pts > p) {
       youShown = true;
