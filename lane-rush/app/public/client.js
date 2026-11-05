@@ -1019,16 +1019,35 @@ $("#starterPack").addEventListener("click", () => {
   giveStarter(win); // saved right away: closing the app mid-animation can't lose it
   sfx.pack?.();
   buzz(30);
-  // the pack shakes, bursts open, and your runner comes out
+  // the pack bursts open first; until then all five stay dark
   pack.classList.add("burst");
   $("#starterSub").textContent = "";
-  // yours steps out of the dark in full colour, the others fade away
-  for (const s of $("#starterGrid").children) s.classList.add(Number(s.dataset.i) === win ? "win" : "lose");
-  setTimeout(() => {
-    $("#starterModal").hidden = true;
-    sfx.finish();
-    showUnlock({ kind: "char", char: { name: RUNNERS[win].name, rarity: STARTER_RARITY[win], img: `/assets/lu_${RUNNERS[win].file}.webp?v=4` } }, () => toast("Win medals to unlock the others on the Medal Road"));
-  }, 1500);
+  const shadows = [...$("#starterGrid").children];
+  const end = shadows.findIndex((s) => Number(s.dataset.i) === win);
+  // then a light runs along the five silhouettes, slowing down, and stops on yours
+  const steps = shadows.length * 3 + ((end - 0 + shadows.length) % shadows.length);
+  let k = 0;
+  const hop = () => {
+    shadows.forEach((s, j) => s.classList.toggle("hot", j === k % shadows.length));
+    sfx.lane?.();
+    if (k >= steps) {
+      // yours steps out of the dark in full colour, the others fade away
+      setTimeout(() => {
+        for (const s of shadows) s.classList.remove("hot");
+        shadows.forEach((s, j) => s.classList.add(j === end ? "win" : "lose"));
+        sfx.finish();
+        buzz([30, 40, 70]);
+      }, 250);
+      setTimeout(() => {
+        $("#starterModal").hidden = true;
+        showUnlock({ kind: "char", char: { name: RUNNERS[win].name, rarity: STARTER_RARITY[win], img: `/assets/lu_${RUNNERS[win].file}.webp?v=4` } }, () => toast("Win medals to unlock the others on the Medal Road"));
+      }, 1900);
+      return;
+    }
+    k++;
+    setTimeout(hop, 70 + Math.pow(k / steps, 3) * 380);
+  };
+  setTimeout(hop, 900);
 });
 $("#askSave").addEventListener("click", () => {
   sfx.tap();
@@ -1749,11 +1768,9 @@ const PACKFX_BANNER = { common: ["NEW RUNNER", "Here they come"], rare: ["RARE R
 /** One runner out of a pack, with the 5v5 Legacy opening (the reward is already credited: this only shows it). */
 function packFxOpen(pack, it) {
   const c = it.char;
-  const card = charCard(c, 0, () => {});
-  card.querySelector(".fav")?.remove();
-  card.classList.remove("locked");
-  card.classList.add("got");
-  card.querySelector(".padlock")?.remove();
+  // the reveal shows the whole character (the full-body render), never its card
+  const full = c.idx !== undefined && RUNNERS[c.idx]?.file ? `/assets/lu_${RUNNERS[c.idx].file}.webp?v=4` : c.hero ?? c.img;
+  const fig = el("div", { class: `pkx-full ${c.rarity}` }, el("img", { src: full, alt: c.name }));
   PackFX.config.sound = prefs().sound !== false;
   PackFX.config.vibrate = prefs().buzz !== false;
   const tag = c.tag ?? (c.idx !== undefined ? RUNNERS[c.idx]?.tag : null);
@@ -1764,7 +1781,7 @@ function packFxOpen(pack, it) {
     packColor: { mega: "#b46bff", legend: "#ffd23e" }[pack.id] ?? "#b46bff",
     banner: PACKFX_BANNER[c.rarity] ?? PACKFX_BANNER.rare,
     clues: [{ label: "Rarity", value: c.rarity.toUpperCase(), size: "sm2" }, ...(tag ? [{ label: "Style", value: tag, size: "sm3" }] : [])],
-    cardHTML: card.outerHTML,
+    cardHTML: fig.outerHTML,
     name: c.name,
     subtitle: `${c.rarity[0].toUpperCase()}${c.rarity.slice(1)} runner${tag ? ` · ${tag}` : ""}`,
     note: it.dupe ? null : "✓ Added to your runners",

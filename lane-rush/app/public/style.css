@@ -3180,3 +3180,9 @@ html, body { background: var(--k1); }
 .home-top .icon-btn .gear { width: 22px; height: 22px; display: block; }
 .cm-ribbon { margin-top: 26px; }
 .compete-missions { display: flex; flex-direction: column; gap: 10px; }
+/* starter pack: a light runs along the dark line-up before yours lights up */
+.pf-shadow.hot { transform: scale(1.12) translateY(-4px); }
+.pf-shadow.hot img { filter: brightness(0) drop-shadow(0 0 3px #fff) drop-shadow(0 0 14px var(--team)) drop-shadow(0 0 26px var(--team)); }
+/* pack reveal: the whole character, standing in the light */
+.pkx-full { display: grid; justify-items: center; }
+.pkx-full img { width: 100%; max-height: 52vh; object-fit: contain; filter: drop-shadow(0 0 22px var(--lc)) drop-shadow(0 12px 18px rgba(0, 0, 0, 0.55)); }
