@@ -127,7 +127,7 @@ export function makeOrbitWorld(scene, tPlate, models){
       float L = dot(c, vec3(.2126, .7152, .0722));
       float aurora = max(c.g - max(c.r, c.b*.72), 0.);
       c += vec3(.05, 1., .72)*aurora*3.2*(.75 + .55*sin(uv.x*26. + uT*1.2 + sin(uv.x*9. - uT*.8)*2.));
-      c *= 1.3 + 4.5*smoothstep(.8, 1., L)*(1. + .07*sin(uT*1.7));
+      c *= 1.3 + 1.4*smoothstep(.8, 1., L)*(1. + .07*sin(uT*1.7));   // the sun glows but no longer blinds (was 4.5)
       c *= 1. + (textureLod(tN, uv*9. + uT*.05, 0.).r - .5)*1.5*(1. - inside)*(1. - smoothstep(.2, .6, L));   // stars twinkle
       c *= front;
       c += vec3(.002, .003, .008)*(1. - front);
