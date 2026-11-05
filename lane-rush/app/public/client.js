@@ -464,7 +464,7 @@ const sfx = (() => {
     if (!loading) {
       loading = true;
       // effects first (small), then the music
-      Promise.all(SAMPLES.map((n) => load(n, `/assets/sfx_${n === "coin" ? "coin2" : n}.mp3`))).then(() => // coin2: the bright two-note chime
+      Promise.all(SAMPLES.map((n) => load(n, `/assets/sfx_${n === "coin" ? "coin3" : n}.mp3`))).then(() => // coin3: two soft bell notes (art/sfx/coin.py)
         Promise.all(Object.keys(MUSIC).map((n) => load(`m:${n}`, `/assets/music_${n}.mp3?v=2`))).then(syncMusic),
       );
     }
@@ -4724,7 +4724,7 @@ const world = (() => {
   }
   function ensureMap(map) {
     if (map === "artlist") return ensureArtlist();
-    if (map === "meadow" || THEME[map] || NR_WORLD[map] || mapReady(map)) return Promise.resolve();
+    if (THEME[map] || NR_WORLD[map] || mapReady(map)) return Promise.resolve();
     if (!mapLoads.has(map)) {
       const P = assets.props;
       const glb = (file, key, size) => loadGLB(`/assets/${file}.glb`).then((g) => (P[key] = fitProp(g.scene, size)));
@@ -4735,8 +4735,28 @@ const world = (() => {
           P.stadiumStand = codeStand();
           P.stadiumStand.userData.len = 34;
         });
+      // Sunny Valley: the Blender countryside kit (art/blender/build_valley.py) and classic wooden obstacles
+      const vl = (file, key, size, lod) => [glb(file, key, size), ...(lod ? [loadLod(key, file, size)] : [])];
       const jobs =
-        map === "city"
+        map === "meadow"
+          ? [
+              ...vl("vl_tree1", "vlTree1", { height: 7.2 }, true),
+              ...vl("vl_tree2", "vlTree2", { height: 7.8 }, true),
+              ...vl("vl_tree3", "vlTree3", { height: 5.6 }, true),
+              ...vl("vl_poplar", "vlPoplar", { height: 9.5 }, true),
+              ...vl("vl_bale", "vlBale", { height: 1.35 }, true),
+              ...vl("vl_flowers", "vlFlowers", { width: 1.5 }, true),
+              glb("vl_fence", "vlFence", { width: 2.95 }),
+              glb("windmill", "windmill", { height: 13 }),
+              loadLod("windmill", "windmill", { height: 13 }),
+              glb("vl_hurdle", "vl_hurdle0", { width: 1.75, maxHeight: 0.72 }),
+              glb("vl_hay", "vl_hurdle1", { width: 1.7, maxHeight: 0.7 }),
+              glb("vl_gate", "vl_gate0", { width: 1.95, maxHeight: 2.2 }),
+              glb("vl_arch", "vl_gate1", { width: 1.95, maxHeight: 2.2 }),
+              glb("vl_crate", "vl_crate0", { width: 1.45, maxHeight: 2.6 }),
+              glb("vl_barrel", "vl_roller0", { width: 1.5, maxHeight: 1.0 }),
+            ]
+          : map === "city"
           ? [glb("ct_tower", "cityTower", { height: 30 }), glb("ct_shop", "cityShop", { height: 13 }), loadLod("cityTower", "ct_tower", { height: 30 }), loadLod("cityShop", "ct_shop", { height: 13 }), glb("ct_lamp", "cityLamp", { height: 5.2 }), glb("ct_taxi", "taxi", { width: 2.6 }), glb("ct_pigeon", "pigeon", { width: 1.0 }), loadGLB("/assets/ct_road.glb").then((g) => (P.cityTileNext = fitTile(g.scene, true))), loadLodTile("cityTile", "ct_road", true)]
           : map === "stadium"
           ? [stand(), glb("st_light", "stadiumLight", { height: 30 }), loadLod("stadiumLight", "st_light", { height: 30 }), glb("st_ball", "football", { width: 0.8 }), glb("st_cam", "spidercam", { width: 1.1 }), loadGLB("/assets/st_pitch.glb").then((g) => (P.stadiumTileNext = fitTile(g.scene))), loadLodTile("stadiumTile", "st_pitch")]
@@ -4773,7 +4793,8 @@ const world = (() => {
         map,
         Promise.all(jobs)
           .then(() => {
-            if (map === "farm") P.farmTile = P.farmTileNext;
+            if (map === "meadow") P.valleyReady = true;
+            else if (map === "farm") P.farmTile = P.farmTileNext;
             else if (map === "beach") P.boardTile = P.boardTileNext;
             else P[`${map}Tile`] = P[`${map}TileNext`];
           })
@@ -5527,12 +5548,21 @@ const world = (() => {
     if (BUILT_MAPS.has(map)) return Boolean(assets.props[`${map}Tile`]);
     if (map === "farm") return Boolean(assets.props.farmTile);
     if (map === "beach") return Boolean(assets.props.boardTile);
+    if (map === "meadow") return Boolean(assets.props.ground && assets.props.valleyReady);
     return Boolean(assets.props.ground);
   }
   function buildScenery(map = "meadow") {
     if (!mapReady(map)) map = "meadow";
     if (!assets.props.ground) return;
-    if (!mapScenery[map]) mapScenery[map] = buildMap(map);
+    // the meadow built before its Blender kit arrived: build it again now that it's here
+    if (map === "meadow" && mapScenery.meadow && !mapScenery.meadow.valley && assets.props.valleyReady) {
+      scene.remove(mapScenery.meadow.group);
+      delete mapScenery.meadow;
+    }
+    if (!mapScenery[map]) {
+      mapScenery[map] = buildMap(map);
+      if (map === "meadow") mapScenery.meadow.valley = Boolean(assets.props.valleyReady);
+    }
     mapScenery[map].used = performance.now();
     // keep the last few maps built (quick rematches); free the rest so long sessions don't grow
     const built = Object.entries(mapScenery).filter(([k]) => k !== map && k !== "meadow");
@@ -6763,7 +6793,7 @@ const world = (() => {
   }
 
   function buildMap(map) {
-    for (const k of ["oak", "pine", "blossom", "bush", "rocks", "wheat", "sunflowers", "palm", "umbrella", "cityTower", "cityShop", "stadiumStand", "stadiumLight", "spaceDome", "spaceRocket", "barn", "windmill", "hut", "lighthouse"]) if (assets.props[k]) lodFile.set(assets.props[k], k);
+    for (const k of ["oak", "pine", "blossom", "bush", "rocks", "wheat", "sunflowers", "palm", "umbrella", "cityTower", "cityShop", "stadiumStand", "stadiumLight", "spaceDome", "spaceRocket", "barn", "windmill", "hut", "lighthouse", "vlTree1", "vlTree2", "vlTree3", "vlPoplar", "vlBale", "vlFlowers"]) if (assets.props[k]) lodFile.set(assets.props[k], k);
     const group = new THREE.Group();
     let cull = [];
     const batches = [];
@@ -6803,7 +6833,7 @@ const world = (() => {
     if (!built && !theme) {
       for (let z = -40; z < TRACK_LEN + 120; z += 2.9) {
         // on the meadow the fence stands on the white kerb
-        for (const side of [-1, 1]) map === "meadow" ? add(P.fence, side * (TRACK_W / 2 + 0.22), 0.12, z, 1, Math.PI / 2) : add(P.fence, side * (TRACK_W / 2 - 0.1), 0, z, 1, Math.PI / 2);
+        for (const side of [-1, 1]) map === "meadow" ? add(P.vlFence ?? P.fence, side * (TRACK_W / 2 + 0.3), 0.12, z, 1, Math.PI / 2) : add(P.fence, side * (TRACK_W / 2 - 0.1), 0, z, 1, Math.PI / 2);
       }
     }
     const edge = TRACK_W / 2;
@@ -6815,23 +6845,28 @@ const world = (() => {
     else if (theme) buildThemed(theme, group, r, edge);
 
     if (map === "meadow") {
-      // rolling hills either side, a strip of flowers along the fence, then trees, bushes and the odd rock
+      // the countryside of the concept: rolling hills, flowers along the fence, a close row of round
+      // storybook trees, hay bales and poplar lines out in the fields, a windmill on the hills now and then
       group.add(meadowHills(edge), meadowFlowers(edge, r));
-      const trees = [P.oak, P.pine, P.blossom];
-      for (let z = -60; z < TRACK_LEN + 160; z += 5 + r() * 5) {
-        for (const side of [-1, 1]) {
-          const roll = r();
-          const x = side * (edge + 2.5 + r() * 26);
-          if (roll < 0.55) add(trees[Math.floor(r() * 3)], x, MEADOW_Y + hillY(Math.abs(x) - edge, z), z, 0.8 + r() * 0.5, r() * Math.PI * 2);
-          else if (roll < 0.85) add(P.bush, side * (edge + 1.6 + r() * 10), MEADOW_Y, z, 0.7 + r() * 0.6, r() * Math.PI * 2);
-          // a bush hugging the fence every few metres keeps the meadow edge lively; rocks only now and then, further out
-          const extra = r();
-          if (extra < 0.55) add(P.bush, side * (edge + 1.0 + r() * 1.5), MEADOW_Y, z + r() * 4, 0.5 + r() * 0.4, r() * Math.PI * 2);
-          else if (extra < 0.7) {
-            const d = 8 + r() * 14;
-            add(P.rocks, side * (edge + d), MEADOW_Y + hillY(d, z), z, 0.6 + r() * 0.6, r() * Math.PI * 2);
+      const trees = [P.vlTree1, P.vlTree2, P.vlTree3].filter(Boolean);
+      const TAU = Math.PI * 2;
+      const onHill = (side, d, z, proto, scale) => add(proto, side * (edge + d), MEADOW_Y + hillY(d, z), z, scale, r() * TAU);
+      if (P.valleyReady)
+        for (let z = -60; z < TRACK_LEN + 160; z += 6 + r() * 5) {
+          for (const side of [-1, 1]) {
+            if (r() < 0.8) onHill(side, 4 + r() * 7, z, trees[Math.floor(r() * trees.length)], 0.8 + r() * 0.45);
+            if (r() < 0.55) add(P.vlFlowers, side * (edge + 1.4 + r() * 1.6), MEADOW_Y + 0.05, z + r() * 3, 0.8 + r() * 0.6, r() * TAU);
+            const roll = r();
+            if (roll < 0.28) onHill(side, 13 + r() * 16, z, P.vlBale, 1 + r() * 0.3);
+            else if (roll < 0.55) onHill(side, 15 + r() * 20, z, trees[Math.floor(r() * trees.length)], 1 + r() * 0.5);
           }
         }
+      // poplar lines along the field edges, a windmill out on the hills
+      for (let z = 20; P.valleyReady && z < TRACK_LEN + 160; z += 60 + r() * 40) {
+        const side = r() < 0.5 ? -1 : 1;
+        const d = 22 + r() * 8;
+        for (let k = 0; k < 5; k++) onHill(side, d, z + k * 5, P.vlPoplar, 0.9 + r() * 0.2);
+        onHill(-side, 30 + r() * 14, z + 20, P.windmill, 1);
       }
     } else if (map === "farm") {
       // wheat right up to the fences, sunflowers along them, a farmyard further out
@@ -7151,7 +7186,7 @@ const world = (() => {
         let look = row.looks?.[lane] ?? 0;
         // no cows or hay bales in the city, the stadium or space
         if (BUILT_MAPS.has(activeMap) && look === 1 && (kind === "crate" || kind === "hurdle")) look = 0;
-        const proto = (activeMap === "artlist" && assets.props[`al_${kind}`]) || assets.props[`${kind}${look}`] || assets.props[`${kind}0`];
+        const proto = (activeMap === "artlist" && assets.props[`al_${kind}`]) || (activeMap === "meadow" && (assets.props[`vl_${kind}${look}`] || assets.props[`vl_${kind}0`])) || assets.props[`${kind}${look}`] || assets.props[`${kind}0`];
         const o = proto.clone();
         o.position.set(laneX(lane), 0, -row.z);
         if (kind === "crate") o.rotation.y = ((row.z * 7 + lane) % 3 - 1) * 0.12 + (look === 1 ? (lane < 2 ? 0.5 : -0.5) : 0);
