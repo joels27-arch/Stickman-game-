@@ -3211,3 +3211,4 @@ html, body { background: var(--k1); }
 .set-group .set-row.danger i { color: #d23a3a; }
 .set-legal { margin: 10px 0 2px; text-align: center; font-size: 13px; color: rgba(255, 255, 255, 0.55); }
 .set-legal button { border: 0; background: none; padding: 4px 6px; font: inherit; font-weight: 800; color: rgba(255, 255, 255, 0.8); text-decoration: underline; cursor: pointer; }
+#tourneyList[hidden], #mtMissions[hidden] { display: none !important; }
