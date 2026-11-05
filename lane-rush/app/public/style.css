@@ -3215,11 +3215,11 @@ html, body { background: var(--k1); }
 .char-story { margin: 2px 6px 0; text-align: center; font-size: 14px; font-weight: 700; font-style: italic; line-height: 1.35; color: rgba(255, 255, 255, 0.88); }
 .char-story[hidden], .char-how[hidden] { display: none; }
 /* mythic: the rarity above legendary (Siete, Big Dunk, Disco Dash): hot pink into violet */
-.ccard.mythic { background: linear-gradient(180deg, #ff6fd8, #b21eff); box-shadow: 0 5px 0 #4d0a6e; }
-.coll-grid .ccard.mythic { --rc: #e03cff; --rc-hi: #ffb3f0; --rc-dark: #4d0a6e; --rc-bg: #b21eff; }
-.coll-grid .ccard.mythic .cpic::after { content: "♛ ✦ ♛"; position: absolute; top: 6%; left: 0; right: 0; text-align: center; font-size: 11px; color: #fff; text-shadow: 0 0 6px #ff4fd8; }
+.ccard.mythic { background: linear-gradient(180deg, #ff4f7a, #c4002f); box-shadow: 0 5px 0 #5a0018, 0 0 0 2px #ffd23f; }
+.coll-grid .ccard.mythic { --rc: #ff2e63; --rc-hi: #ffd23f; --rc-dark: #5a0018; --rc-bg: #d10f4a; }
+.coll-grid .ccard.mythic .cpic::after { content: "♛ ✦ ♛"; position: absolute; top: 6%; left: 0; right: 0; text-align: center; font-size: 11px; color: #fff; text-shadow: 0 0 6px #ffd23f; }
 .char-hero .glow.mythic { background-color: rgba(255, 79, 216, 0.35); }
-.char-tags .tag.mythic { background: linear-gradient(90deg, #ff4fd8, #8a2bff); }
+.char-tags .tag.mythic { background: linear-gradient(90deg, #ff2e63, #c4002f); box-shadow: 0 0 0 2px #ffd23f; }
 .bp-card.mythic, .av-tile.mythic { background: linear-gradient(180deg, #ff6fd8, #b21eff); }
 .pcard.mythic { background: linear-gradient(180deg, #ff9ae6, #e03cff 50%, #6a12a8); box-shadow: 0 8px 0 #3a0660, 0 0 90px rgba(255, 79, 216, 1); }
 .pcard.hero.mythic { --hero-glow: rgba(255, 79, 216, 0.95); }
