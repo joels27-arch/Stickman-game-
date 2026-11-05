@@ -1000,6 +1000,8 @@ function askStarter() {
   $("#starterGo").hidden = true;
   $("#starterPack").hidden = false;
   $("#starterPack").classList.remove("burst");
+  $("#starterModal .pf-sheet").classList.remove("revealed");
+  $("#starterModal .pf-reveal")?.remove();
   $("#starterTitle").textContent = "Starter Pack";
   $("#starterSub").textContent = "";
   $("#starterModal").hidden = false;
@@ -1038,10 +1040,29 @@ $("#starterPack").addEventListener("click", () => {
         sfx.finish();
         buzz([30, 40, 70]);
       }, 250);
+      // then the whole character on its own, big, in the light (never a card)
       setTimeout(() => {
-        $("#starterModal").hidden = true;
-        showUnlock({ kind: "char", char: { name: RUNNERS[win].name, rarity: STARTER_RARITY[win], img: `/assets/lu_${RUNNERS[win].file}.webp?v=4` } }, () => toast("Win medals to unlock the others on the Medal Road"));
-      }, 1900);
+        const sheet = $("#starterModal .pf-sheet");
+        const rv = el(
+          "div",
+          { class: "pf-reveal", style: `--team:${RUNNERS[win].color}` },
+          el("i", { class: "pf-rays" }),
+          el("img", { src: `/assets/lu_${RUNNERS[win].file}.webp?v=4`, alt: "" }),
+          el("b", { text: RUNNERS[win].name }),
+          el("small", { text: `${RUNNERS[win].tag} · it's yours!` }),
+          el("em", { text: "Tap to continue" }),
+        );
+        sheet.querySelector(".pf-reveal")?.remove();
+        sheet.append(rv);
+        sheet.classList.add("revealed");
+        sfx.boost?.();
+        rv.addEventListener("click", () => {
+          $("#starterModal").hidden = true;
+          sheet.classList.remove("revealed");
+          rv.remove();
+          toast("Win medals to unlock the others on the Medal Road");
+        });
+      }, 1500);
       return;
     }
     k++;
