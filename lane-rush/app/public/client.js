@@ -1518,9 +1518,9 @@ function renderSkins() {
   const mine = all.filter(ownsChar).sort((a, b) => Number(fav.includes(b.id)) - Number(fav.includes(a.id)) || byRarity(a, b));
   const rest = all.filter((c) => !ownsChar(c)).sort(byRarity);
   let n = 0;
-  // everyone in one grid (yours first); where a locked one comes from shows when you tap it
+  // yours, then the ones still to get (not split by where they come from: that shows when you tap one)
   $("#skinGrid").replaceChildren(
-    el("h3", { class: "coll-head", text: `Runners · ${mine.length} / ${all.length}` }),
+    el("h3", { class: "coll-head", text: `Yours · ${mine.length}` }),
     ...mine.map((c) => {
       // a tap on one of your runners picks it straight away; the ⓘ shows its card
       // tap the name to race with them, the picture for their card
@@ -1535,6 +1535,7 @@ function renderSkins() {
       card.append(star);
       return card;
     }),
+    ...(rest.length ? [el("h3", { class: "coll-head", text: `Still to get · ${rest.length}` })] : []),
     ...rest.map((c) => charCard(c, n++, inspectChar)),
     ...(rest.length ? [] : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
   );
