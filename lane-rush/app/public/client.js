@@ -3017,7 +3017,6 @@ function weekendCard() {
   const full = played >= LEAGUE_MATCHES;
   const next = LEAGUE_PLAN[played];
   const pct = (x) => Math.round((x / LEAGUE_MATCHES) * 100);
-  const tierText = (t) => [t.coins ? `${t.coins}` : "", t.pack ? "Pack" : ""].filter(Boolean).join(" + ");
   return el(
     "div",
     { class: `tcard t-weekend${w.open ? " live" : ""}` },
@@ -3047,17 +3046,19 @@ function weekendCard() {
         ),
       ),
     ),
+    // medals won so far, then the five rewards as cards (got ones light up)
+    el("div", { class: "wl-bar2" }, el("span", { class: "wl-fill", style: `width:${pct(medals)}%` }), el("b", { text: `${medals} / ${LEAGUE_MATCHES} 🏅` })),
     el(
       "div",
-      { class: "wl-track" },
-      el("span", { class: "wl-fill", style: `width:${pct(medals)}%` }),
+      { class: "wl-rewards" },
       ...LEAGUE_TIERS.map((tier, i) =>
         el(
           "span",
-          { class: `wl-tier${medals >= tier.medals ? " got" : ""}${mine && st.claimed.includes(i) ? " claimed" : ""}`, style: `left:${pct(tier.medals)}%` },
+          { class: `wl-rw${medals >= tier.medals ? " got" : ""}${mine && st.claimed.includes(i) ? " claimed" : ""}` },
+          el("small", { text: `${tier.medals} 🏅` }),
           el("img", { src: tier.pack ? "/assets/pack_mega.webp" : "/assets/ui_c1.webp", alt: "" }),
-          el("small", { text: `${tier.medals}🏅` }),
-          el("em", { text: tierText(tier) }),
+          el("em", { text: tier.coins ? tier.coins.toLocaleString() : "" }),
+          tier.pack ? el("em", { class: "pk", text: "+ Pack" }) : "",
         ),
       ),
     ),
@@ -3106,20 +3107,20 @@ function renderCompete() {
   const w = leagueWindow();
   const st = leagueState();
   const ready = leagueReady(st).length > 0;
+  // a big banner each: its own colour, a large icon, what it is, the prize, and one clear button
   const row = (id, img, name, status, prize, opts = {}) =>
     el(
       "button",
-      { class: `trow${opts.live ? " live" : ""}${opts.ready ? " ready" : ""}`, type: "button", "data-open": id },
+      { class: `trow tb th-${id}${opts.live ? " live" : ""}${opts.ready ? " ready" : ""}`, type: "button", "data-open": id },
       el("img", { src: img, alt: "" }),
       el("span", { class: "tr-txt" }, el("b", { text: name }), el("small", {}, opts.live ? el("i", { class: "live-dot" }) : "", status), opts.desc ? el("span", { class: "tr-desc", text: opts.desc }) : ""),
-      opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : el("span", { class: "tr-prize" }, prize),
-      el("i", { class: "tr-go", text: "›" }),
+      el("span", { class: "tr-foot" }, el("span", { class: "tr-prize" }, el("small", { text: "Prize" }), prize), opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : el("em", { class: "tr-play", text: opts.soon ? "Details" : "Play ›" })),
     );
   $("#tourneyList").replaceChildren(
     // Grand Tour and Endless Run first, the Weekend League below them
     ...TOURNEYS.map((t) => row(t.id, t.img, t.label, t.tag, prizeEl(t.prize[0]), { desc: t.text })),
     row("endless", ENDLESS_T.img, "Endless Run", tourneyPaid().endless?.best ? `Today's best: ${tourneyPaid().endless.best.toLocaleString()} m` : ENDLESS_T.tag, prizeEl(ENDLESS_T.prize[0]), { desc: ENDLESS_T.text }),
-    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, prizeEl(LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0)), { live: w.open, ready, desc: "10 matches vs bots. Win medals!" }),
+    row("weekend", "/assets/lg_master.webp", "Weekend League", w.open ? `Live · ends in ${untilText(w.end - Date.now())}` : `Opens Friday · in ${untilText(w.start - Date.now())}`, prizeEl(LEAGUE_TIERS.reduce((a, t) => a + (t.coins ?? 0), 0)), { live: w.open, ready, soon: !w.open, desc: "10 matches vs bots. Win medals!" }),
   );
   if (!tourneyModal.hidden) renderTourneySheet();
 }
