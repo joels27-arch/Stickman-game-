@@ -120,8 +120,9 @@ export class Room extends DurableObject<Env> {
     await this.ctx.storage.put("p:" + e.id, next);
     return Response.json({ ok: true });
   }
-  private async lbGet(me: string): Promise<Response> {
-    const all = [...(await this.lbLoad()).values()].filter((e) => e.g + e.s + e.b > 0);
+  /** The boards for the whole world, or for one country (`country`, ISO code) only. */
+  private async lbGet(me: string, country: string): Promise<Response> {
+    const all = [...(await this.lbLoad()).values()].filter((e) => e.g + e.s + e.b > 0 && (!country || e.country === country));
     const out: Record<string, unknown> = { players: all.length };
     for (const k of LB_KINDS) {
       const sorted = all.sort(lbCmp(k)).slice();
@@ -199,7 +200,10 @@ export class Room extends DurableObject<Env> {
       return new Response(JSON.stringify({ at }), { headers: { "Content-Type": "application/json" } });
     }
     if (path === "/__lb/post") return this.lbPost((await request.json()) as LbEntry);
-    if (path === "/__lb/get") return this.lbGet(new URL(request.url).searchParams.get("id") ?? "");
+    if (path === "/__lb/get") {
+      const q = new URL(request.url).searchParams;
+      return this.lbGet(q.get("id") ?? "", q.get("country") ?? "");
+    }
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected a websocket upgrade", { status: 426 });
     }

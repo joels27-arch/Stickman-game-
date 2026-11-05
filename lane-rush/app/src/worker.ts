@@ -78,7 +78,7 @@ async function handleSave(request: Request, env: Env, url: URL): Promise<Respons
 
 // ── medal leaderboard ──────────────────────────────────────────────────────
 //   POST /api/lb {id, name, country, char, g, s, b}  -> {ok}
-//   GET  /api/lb?id=<your id>  -> {players, total|gold|silver|bronze: {top: [...], me}}
+//   GET  /api/lb?id=<your id>[&country=CH]  -> {players, total|gold|silver|bronze: {top: [...], me}} (world, or one country)
 // One Durable Object holds everyone ("lb:global"). Ids are private random keys; they never go out.
 const LB_ID_RE = /^[A-Za-z0-9]{16,32}$/;
 const lbStub = (env: Env) => env.ROOMS.get(env.ROOMS.idFromName("lb:global"));
@@ -87,7 +87,10 @@ const count = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 ? Math.
 async function handleLb(request: Request, env: Env, url: URL): Promise<Response> {
   if (request.method === "GET") {
     const id = url.searchParams.get("id") ?? "";
-    const res = await lbStub(env).fetch("https://lb/__lb/get?id=" + encodeURIComponent(LB_ID_RE.test(id) ? id : ""));
+    const country = url.searchParams.get("country") ?? "";
+    const res = await lbStub(env).fetch(
+      "https://lb/__lb/get?id=" + encodeURIComponent(LB_ID_RE.test(id) ? id : "") + "&country=" + (/^[A-Z]{2}$/.test(country) ? country : ""),
+    );
     return json(await res.json());
   }
   if (request.method === "POST") {

@@ -927,6 +927,8 @@ function myCountry() {
 const countryModal = $("#countryModal");
 function setCountry(code) {
   local.setItem("lr:country", code);
+  lbSoon(); // the leaderboard files you under your new country
+  if (!lbModal.hidden) lbLoad();
   renderCountryChips();
   renderFlagGrid();
   if (net.view?.joined) act({ type: "country", country: code });
@@ -9454,20 +9456,31 @@ lbSoon(); // so you show up on the leaderboard with the medals you already have
 // ── medal leaderboard: everyone's medals won ever (spending them never counts back) ──
 const lbModal = $("#lbModal");
 let lbTab = "total";
+let lbScope = "world"; // or "country": only runners from your country
 let lbData = null;
+let lbAsk = 0; // the newest request wins (switching World/Country quickly)
 function openLeaderboard() {
   sfx.tap();
   lbModal.hidden = false;
+  lbLoad();
+}
+function lbLoad() {
+  const ask = ++lbAsk;
+  lbData = null;
   renderLeaderboard();
+  if (lbScope === "country" && !myCountry()) return; // asks you to pick one (see renderLeaderboard)
+  const q = lbScope === "country" ? `&country=${myCountry()}` : "";
   lbSend()
     .catch(() => {})
-    .then(() => fetch(`/api/lb?id=${lbId()}`, { cache: "no-store" }))
+    .then(() => fetch(`/api/lb?id=${lbId()}${q}`, { cache: "no-store" }))
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
     .then((d) => {
+      if (ask !== lbAsk) return;
       lbData = d;
       renderLeaderboard();
     })
     .catch(() => {
+      if (ask !== lbAsk) return;
       lbData = { error: true };
       renderLeaderboard();
     });
@@ -9475,6 +9488,13 @@ function openLeaderboard() {
 $("#lbClose").addEventListener("click", () => (lbModal.hidden = true));
 lbModal.addEventListener("click", (e) => {
   if (e.target === lbModal) return (lbModal.hidden = true);
+  const sc = e.target.closest("[data-lbscope]");
+  if (sc) {
+    sfx.tap();
+    if (sc.dataset.lbscope === "pick") return openCountry("Your country");
+    lbScope = sc.dataset.lbscope;
+    return lbLoad();
+  }
   const t = e.target.closest("[data-lb]");
   if (!t) return;
   sfx.tap();
@@ -9488,6 +9508,13 @@ const LB_TABS = [
   ["bronze", MEDAL_IMG.bronze, "Bronze"],
 ];
 function renderLeaderboard() {
+  const cc = myCountry();
+  const scopes = el(
+    "div",
+    { class: "lb-scope" },
+    el("button", { type: "button", class: `lb-sc${lbScope === "world" ? " on" : ""}`, "data-lbscope": "world" }, "🌍 World"),
+    el("button", { type: "button", class: `lb-sc${lbScope === "country" ? " on" : ""}`, "data-lbscope": "country" }, cc ? `${flagOf(cc)} ${countryName(cc)}` : "🏳️ My country"),
+  );
   const tabs = el(
     "div",
     { class: "lb-tabs" },
@@ -9506,7 +9533,9 @@ function renderLeaderboard() {
       el("strong", { text: score(x).toLocaleString() }),
     );
   let body;
-  if (!lbData) body = el("p", { class: "stats-empty", text: "Loading…" });
+  if (lbScope === "country" && !cc)
+    body = el("div", { class: "lb-pick" }, el("p", { class: "stats-empty", text: "Pick your country to see who's best there." }), el("button", { type: "button", class: "btn small blue", "data-lbscope": "pick", text: "Pick my country" }));
+  else if (!lbData) body = el("p", { class: "stats-empty", text: "Loading…" });
   else if (lbData.error) body = el("p", { class: "stats-empty", text: "Can't reach the leaderboard right now. Try again in a moment." });
   else {
     const board = lbData[lbTab] ?? { top: [], me: null };
@@ -9514,14 +9543,16 @@ function renderLeaderboard() {
     body = el(
       "div",
       { class: "lb-list" },
-      ...(board.top.length ? board.top.map(row) : [el("p", { class: "stats-empty", text: "No medals won yet. Be the first!" })]),
+      ...(board.top.length ? board.top.map(row) : [el("p", { class: "stats-empty", text: lbScope === "country" ? `No medals in ${countryName(cc)} yet. Be the first!` : "No medals won yet. Be the first!" })]),
       ...(mine && mine.rank > board.top.length ? [el("div", { class: "lb-gap", text: "⋯" }), row(mine)] : []),
     );
   }
   const ever = medalsEver();
+  const who = lbScope === "country" ? `runners in ${countryName(cc)}` : "runners worldwide";
   $("#lbBody").replaceChildren(
+    scopes,
     tabs,
-    el("p", { class: "lb-sub", text: lbData?.players ? `${lbData.players.toLocaleString()} runners with medals · you: 🥇${ever.gold} 🥈${ever.silver} 🥉${ever.bronze}` : `You: 🥇${ever.gold} 🥈${ever.silver} 🥉${ever.bronze}` }),
+    el("p", { class: "lb-sub", text: lbData?.players ? `${lbData.players.toLocaleString()} ${who} · you: 🥇${ever.gold} 🥈${ever.silver} 🥉${ever.bronze}` : `You: 🥇${ever.gold} 🥈${ever.silver} 🥉${ever.bronze}` }),
     body,
   );
 }

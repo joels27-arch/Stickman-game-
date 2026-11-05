@@ -3148,3 +3148,7 @@ html, body { background: var(--k1); }
 .lb-row small { font-size: 11px; opacity: 0.8; }
 .lb-row strong { font-family: var(--display); font-weight: 900; font-size: 20px; }
 .lb-gap { text-align: center; opacity: 0.6; }
+.lb-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border-radius: 16px; background: rgba(0, 0, 0, 0.25); }
+.lb-sc { border: 0; border-radius: 12px; padding: 8px 6px; background: transparent; color: #fff; font: inherit; font-weight: 900; font-size: 14px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-sc.on { background: linear-gradient(180deg, #6ff0c8, #18c08f); color: #053d2c; box-shadow: 0 3px 0 #075c43; }
+.lb-pick { display: flex; flex-direction: column; align-items: center; gap: 8px; }
