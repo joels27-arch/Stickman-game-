@@ -453,18 +453,29 @@
         <div class="ribbon"><h2 id="setTitle">Settings</h2></div>
         <button id="setClose" class="gclose" type="button" aria-label="Close">✕</button>
         <div class="set-list">
-          <label class="set-row name-row"><span><b>✏️ Name</b><small>What other players see</small></span><input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Your name" /></label>
-          <label class="set-row"><span><b>🔊 Sound effects</b><small>Jumps, coins, hits, menus</small></span><input type="checkbox" id="setSound" /></label>
-          <label class="set-row"><span><b>🎵 Music</b><small>Menu and race music</small></span><input type="checkbox" id="setMusic" /></label>
-          <label class="set-row"><span><b>📳 Vibration</b><small>Buzz on hits and big moments</small></span><input type="checkbox" id="setBuzz" /></label>
-          <button id="setCloud" class="set-row btnrow cloud-row" type="button"><span><b>☁️ Save progress</b><small id="setCloudSub">Keep it safe and play on any phone</small></span><i>›</i></button>
-          <button id="setLoad" class="set-row btnrow" type="button"><span><b>📲 Load progress</b><small>From another phone, with your save code</small></span><i>›</i></button>
-          <button id="setCountry" class="set-row btnrow" type="button"><span><b>🌍 Country</b><small id="setCountryName">Not set</small></span><i>›</i></button>
-          <button id="setUnlock" class="set-row btnrow" type="button"><span><b>🔓 Unlock all runners</b><small>Every character, free</small></span><i>›</i></button>
-          <button id="setTut" class="set-row btnrow" type="button"><span><b>👆 How to run</b><small>Play the tutorial again on your next endless run</small></span><i>›</i></button>
-          <button id="setRestart" class="set-row btnrow" type="button"><span><b>🔄 Start over</b><small>New account: deletes all progress on this device</small></span><i>›</i></button>
-          <button id="setPrivacy" class="set-row btnrow" type="button"><span><b>🔒 Privacy policy</b><small>What the game stores and why</small></span><i>›</i></button>
-          <button id="setImprint" class="set-row btnrow" type="button"><span><b>📄 Impressum</b><small>Legal notice</small></span><i>›</i></button>
+          <h4 class="set-h">Profile</h4>
+          <div class="set-group">
+            <label class="set-row name-row"><span><b>✏️ Name</b></span><input id="nameInput" maxlength="14" autocomplete="nickname" placeholder="Your name" /></label>
+            <button id="setCountry" class="set-row btnrow" type="button"><span><b>🌍 Country</b></span><small id="setCountryName" class="set-val">Not set</small><i>›</i></button>
+          </div>
+          <h4 class="set-h">Sound</h4>
+          <div class="set-group">
+            <label class="set-row"><span><b>🔊 Sound effects</b></span><input type="checkbox" id="setSound" /></label>
+            <label class="set-row"><span><b>🎵 Music</b></span><input type="checkbox" id="setMusic" /></label>
+            <label class="set-row"><span><b>📳 Vibration</b></span><input type="checkbox" id="setBuzz" /></label>
+          </div>
+          <h4 class="set-h">Progress</h4>
+          <div class="set-group">
+            <button id="setCloud" class="set-row btnrow cloud-row" type="button"><span><b>☁️ Save progress</b><small id="setCloudSub">Keep it safe and play on any phone</small></span><i>›</i></button>
+            <button id="setLoad" class="set-row btnrow" type="button"><span><b>📲 Load progress</b><small>With your save code</small></span><i>›</i></button>
+          </div>
+          <h4 class="set-h">More</h4>
+          <div class="set-group">
+            <button id="setTut" class="set-row btnrow" type="button"><span><b>👆 How to run</b><small>Replay the tutorial</small></span><i>›</i></button>
+            <button id="setUnlock" class="set-row btnrow" type="button"><span><b>🔓 Unlock all runners</b></span><i>›</i></button>
+            <button id="setRestart" class="set-row btnrow danger" type="button"><span><b>🔄 Start over</b><small>Deletes all progress on this device</small></span><i>›</i></button>
+          </div>
+          <p class="set-legal"><button id="setPrivacy" type="button">Privacy policy</button> · <button id="setImprint" type="button">Impressum</button></p>
         </div>
       </div>
     </div>

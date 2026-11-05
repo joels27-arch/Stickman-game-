@@ -3197,3 +3197,17 @@ html, body { background: var(--k1); }
 .pf-rays { position: absolute; left: 50%; top: 42%; width: 760px; height: 760px; margin: -380px 0 0 -380px; border-radius: 50%; background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--team) 40%, transparent) 0 8deg, transparent 8deg 22deg); -webkit-mask-image: radial-gradient(circle, #000 12%, transparent 62%); mask-image: radial-gradient(circle, #000 12%, transparent 62%); animation: pfRays 10s linear infinite; pointer-events: none; }
 @keyframes pfRays { to { transform: rotate(360deg); } }
 @keyframes pfRevealIn { from { opacity: 0; transform: scale(0.6); } }
+/* settings: short groups, one card each, rows split by thin lines; legal links small at the bottom */
+.set-sheet .set-list { gap: 6px; }
+.set-h { margin: 8px 4px 0; font-size: 12px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.7); }
+.set-h:first-child { margin-top: 0; }
+.set-group { border-radius: 16px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 4px 0 #121c63; overflow: hidden; }
+.set-group .set-row { background: none; box-shadow: none; border-radius: 0; padding: 11px 14px; min-height: 52px; }
+.set-group .set-row + .set-row { border-top: 1px solid #e3e7f5; }
+.set-group .set-row b { font-size: 15px; }
+.set-group .set-row small { font-size: 11.5px; }
+.set-group .set-row .set-val { margin-left: auto; font-size: 13px; color: #3a4470; white-space: nowrap; }
+.set-group .set-row.danger b { color: #d23a3a; }
+.set-group .set-row.danger i { color: #d23a3a; }
+.set-legal { margin: 10px 0 2px; text-align: center; font-size: 13px; color: rgba(255, 255, 255, 0.55); }
+.set-legal button { border: 0; background: none; padding: 4px 6px; font: inherit; font-weight: 800; color: rgba(255, 255, 255, 0.8); text-decoration: underline; cursor: pointer; }
