@@ -993,6 +993,30 @@ function maybeAskName(now = false) {
 /** The game has loaded (the starter pack waits for it; the name is asked while it loads). */
 let bootDone = false;
 let starterWaiting = false;
+/**
+ * Which of the five is in the Starter Pack: a fair draw (crypto randomness), never one of the last
+ * two this device got. That memory sits outside "lr:" on purpose, so Start over doesn't wipe it.
+ */
+function pickStarter() {
+  let seen = [];
+  try {
+    seen = JSON.parse(localStorage.getItem("fr:starterSeen") || "[]");
+  } catch {
+    seen = [];
+  }
+  if (!Array.isArray(seen)) seen = [];
+  let pool = FIRST_FIVE.filter((i) => !seen.slice(-2).includes(i));
+  if (!pool.length) pool = FIRST_FIVE;
+  const r = new Uint32Array(1);
+  crypto.getRandomValues(r);
+  const win = pool[r[0] % pool.length];
+  try {
+    localStorage.setItem("fr:starterSeen", JSON.stringify([...seen, win].slice(-4)));
+  } catch {
+    /* storage blocked: still random */
+  }
+  return win;
+}
 /** First visit: a Starter Pack with one of five runners inside. Tap it open: a spin through the five lands on yours. */
 function askStarter() {
   if (starterChoice() !== null) return;
@@ -1023,7 +1047,7 @@ function giveStarter(i) {
 $("#starterPack").addEventListener("click", () => {
   const pack = $("#starterPack");
   if (pack.classList.contains("burst")) return;
-  const win = FIRST_FIVE[Math.floor(Math.random() * FIRST_FIVE.length)];
+  const win = pickStarter();
   giveStarter(win); // saved right away: closing the app mid-animation can't lose it
   sfx.pack?.();
   buzz(30);
