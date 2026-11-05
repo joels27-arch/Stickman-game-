@@ -215,7 +215,7 @@ function soloRule(v) {
   return humans <= 1 ? "3 hearts · how far can you get?" : null;
 }
 const MAP_INFO = {
-  meadow: { label: "Meadow", text: "Trees, bushes and a picket fence" },
+  meadow: { label: "Sunny Valley", text: "Golden afternoon in the countryside" },
   farm: { label: "Farm", text: "Wheat fields, barns and windmills" },
   beach: { label: "Beach", text: "Boardwalk by the sea, palms and huts" },
   city: { label: "City", text: "Down the main street between skyscrapers" },
@@ -2283,7 +2283,7 @@ $("#tutNo").addEventListener("click", () => {
   go?.();
 });
 /** A map card's picture: the Neon Rush painting where the map has one, else its old screenshot. */
-const NR_CARDS = new Set(["candy", "icecream", "snowy", "aurora", "crystal", "deepsea", "lava", "egypt", "uranus", "space", "city", "stadium", "jungle"]);
+const NR_CARDS = new Set(["meadow", "candy", "icecream", "snowy", "aurora", "crystal", "deepsea", "lava", "egypt", "uranus", "space", "city", "stadium", "jungle"]);
 const mapPic = (key) => (NR_CARDS.has(key) ? `/assets/nr_map_${key}.webp` : `/assets/map_${key}.webp`);
 let esMap = "random";
 function openEndlessSetup() {
@@ -4275,6 +4275,8 @@ const world = (() => {
   }
   /** The day look (the meadow and the classic maps). */
   const DAY_LOOK = { sky: SKY, sun: "#fff3c4", fog: [SKY.horizon, 90, 300], light: { hemi: ["#e6f6ff", "#5fae3a", 1.1], sun: ["#fff1cc", 2.1] }, far: "#97b6e6", near: "#6cbf6a", nearFoot: "#cdebd8" };
+  /** Sunny Valley (the meadow): low warm afternoon sun, cool sky fill, green bounce from the grass. */
+  const VALLEY_LOOK = { ...DAY_LOOK, sun: "#ffe2a8", fog: ["#cfe0e6", 80, 290], light: { hemi: ["#d8ecff", "#6e9e3e", 1.0], sun: ["#ffd496", 2.6] }, near: "#74c45a" };
   /** Sky, light and haze for a map's look (a theme from themes.js, or the day look). */
   let lastLook = null;
   function applyLook(look) {
@@ -5585,6 +5587,7 @@ const world = (() => {
     lava: plate("volcano", 0.28, "#3d1618"),
     egypt: plate("egypt", 0.51, "#b96c2e"),
     jungle: plate("jungle", 0.32, "#6a7a4a"),
+    meadow: plate("valley", 0.42, "#cfe0e6"), // Sunny Valley: a painted countryside, the 3D hills fade into its haze
   };
   /**
    * A painted plate round the whole view (the Neon Rush way): the picture straight down
@@ -5759,7 +5762,7 @@ const world = (() => {
     if (own) mapSkyGroup(map);
     for (const [k, g] of Object.entries(mapSkies)) g.visible = k === map;
     // a painted panorama for city and space; the dome, coloured per map, everywhere else
-    applyLook(theme ?? DAY_LOOK);
+    applyLook(theme ?? (map === "meadow" ? VALLEY_LOOK : DAY_LOOK));
     skyGroup.visible = !own;
     clouds.visible = own ? own.clouds : theme ? theme.clouds : true;
     if (own) {
@@ -6202,15 +6205,15 @@ const world = (() => {
     const len = TRACK_LEN + 160 + back; // from `back` metres behind the start line to past the finish
     const g = new THREE.Group();
     if (!tex && !topMat) {
-      // the meadow: a blue rubber running track (fine grain, drawn here: nothing to download)
+      // the meadow (Sunny Valley): a red rubber athletics track (fine grain, drawn here: nothing to download)
       const c = document.createElement("canvas");
       c.width = c.height = 256;
       const q = c.getContext("2d");
-      q.fillStyle = "#2f6fd6";
+      q.fillStyle = "#c9472f";
       q.fillRect(0, 0, 256, 256);
       for (let i = 0; i < 9000; i++) {
         const v = Math.random();
-        q.fillStyle = v < 0.5 ? "rgba(20,50,120,0.35)" : v < 0.85 ? "rgba(120,170,255,0.3)" : "rgba(255,255,255,0.25)";
+        q.fillStyle = v < 0.5 ? "rgba(120,30,18,0.35)" : v < 0.85 ? "rgba(255,150,110,0.28)" : "rgba(255,255,255,0.2)";
         q.fillRect(Math.random() * 256, Math.random() * 256, 1.5, 1.5);
       }
       tex = new THREE.CanvasTexture(c);
@@ -6787,7 +6790,7 @@ const world = (() => {
       group.add(runningTrack(null, "#0e0b16", "#1a1624", deckMaterial(nrw), back), parapets(nrw, TRACK_LEN + 160 + back, TRACK_W / 2 + 0.45, back));
       const lake = groundPlane(nrw);
       if (lake) group.add(lake);
-    } else if (map === "meadow") group.add(runningTrack());
+    } else if (map === "meadow") group.add(runningTrack(null, "#7d2a1c", "#f7f2e6"));
     else if (!theme) {
       const tile = built ? P[`${map}Tile`] : map === "farm" ? P.farmTile : map === "beach" ? P.boardTile : P.ground;
       tile.userData.ground = true;
