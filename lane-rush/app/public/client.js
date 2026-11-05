@@ -1478,7 +1478,7 @@ function charCard(c, n, onClick) {
   const sel = false; // runners are picked when you play, not here
   const forCoins = !owned && c.via === "coins";
   const can = forCoins && wallet.coins() >= c.coins;
-  const name = forCoins ? el("b", { class: `cname price${can ? "" : " short"}` }, el("i", { class: "coin" }), el("span", { text: c.coins.toLocaleString() })) : el("b", { class: "cname", text: c.name });
+  const name = forCoins ? el("b", { class: `cname price${can ? "" : " short"}` }, el("i", { class: "coin" }), el("span", { text: c.coins.toLocaleString() })) : el("b", { class: `cname${c.name.length > 12 ? " long" : ""}`, text: c.name });
   const tag = owned
     ? el("span", { class: "crar" }, el("i", { text: RARITY_ICON[c.rarity] }), el("span", { text: sel ? "Selected" : c.rarity }))
     : el("span", { class: "crar lock" }, el("i", { text: RARITY_ICON[c.rarity] }), el("span", { text: c.rarity }));
