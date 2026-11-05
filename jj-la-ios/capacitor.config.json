@@ -1,0 +1,7 @@
+{
+  "appId": "com.joel.jjla",
+  "appName": "JJ in Los Angeles",
+  "webDir": "www",
+  "backgroundColor": "#000000",
+  "ios": { "contentInset": "never", "scrollEnabled": false, "allowsLinkPreview": false }
+}
