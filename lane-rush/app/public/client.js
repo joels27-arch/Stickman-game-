@@ -1743,7 +1743,47 @@ function renderPacks() {
 const packOpen = $("#packOpen");
 let po = null;
 const PACK_TAPS = 4; // taps to burst a pack open
+/** Pack rarities → the PackFX tiers (banner, glow, fireworks, timings). */
+const PACKFX_TIER = { common: "gold", rare: "gold", epic: "diamond", legendary: "galaxy" };
+const PACKFX_BANNER = { common: ["NEW RUNNER", "Here they come"], rare: ["RARE RUNNER", "Here they come"], epic: ["EPIC RUNNER!", "Epic runner incoming"], legendary: ["LEGENDARY!", "A legend is coming"] };
+/** One runner out of a pack, with the 5v5 Legacy opening (the reward is already credited: this only shows it). */
+function packFxOpen(pack, it) {
+  const c = it.char;
+  const card = charCard(c, 0, () => {});
+  card.querySelector(".fav")?.remove();
+  card.classList.remove("locked");
+  card.classList.add("got");
+  card.querySelector(".padlock")?.remove();
+  PackFX.config.sound = prefs().sound !== false;
+  PackFX.config.vibrate = prefs().buzz !== false;
+  const tag = c.tag ?? (c.idx !== undefined ? RUNNERS[c.idx]?.tag : null);
+  PackFX.open({
+    rarity: PACKFX_TIER[c.rarity] ?? "gold",
+    teamColor: c.idx !== undefined ? RUNNERS[c.idx]?.color : null,
+    packImage: pack.img,
+    packColor: { mega: "#b46bff", legend: "#ffd23e" }[pack.id] ?? "#b46bff",
+    banner: PACKFX_BANNER[c.rarity] ?? PACKFX_BANNER.rare,
+    clues: [{ label: "Rarity", value: c.rarity.toUpperCase(), size: "sm2" }, ...(tag ? [{ label: "Style", value: tag, size: "sm3" }] : [])],
+    cardHTML: card.outerHTML,
+    name: c.name,
+    subtitle: `${c.rarity[0].toUpperCase()}${c.rarity.slice(1)} runner${tag ? ` · ${tag}` : ""}`,
+    note: it.dupe ? null : "✓ Added to your runners",
+    duplicate: it.dupe ? `ALREADY YOURS · +${it.coins} COINS` : null,
+    buttons: [{ label: it.dupe ? "Collect" : "Awesome!", primary: true }],
+    onDone: () => {
+      const done = po?.onDone;
+      po = null;
+      renderCollPill();
+      if (done) return done();
+      renderShop();
+    },
+  });
+}
 function openPackAnim(pack, items) {
+  if (window.PackFX && items.length === 1 && items[0].kind === "char") {
+    po = { pack, items, i: -1, stage: "fx" }; // callers may still hang an onDone on it
+    return packFxOpen(pack, items[0]);
+  }
   po = { pack, items, i: -1, stage: "sealed" };
   // big packs: skip straight to all the cards
   let skip = $("#poSkip");
