@@ -3278,3 +3278,6 @@ html, body { background: var(--k1); }
 .trow.tb .tr-prize .prz-v { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 13px; line-height: 1; }
 .trow.tb .tr-prize .prz-v img { width: 18px; height: 24px; object-fit: contain; filter: none; grid-row: auto; }
 .trow.tb { padding-bottom: 14px; }
+.trow.tb { height: auto; max-height: none; overflow: visible; }
+.trow.tb::after { border-radius: inherit; }
+.trow.tb .tr-prize { display: inline-flex; align-items: center; gap: 4px; }

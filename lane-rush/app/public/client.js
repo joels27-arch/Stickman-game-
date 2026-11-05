@@ -3114,7 +3114,7 @@ function renderCompete() {
       { class: `trow tb th-${id}${opts.live ? " live" : ""}${opts.ready ? " ready" : ""}`, type: "button", "data-open": id },
       el("img", { src: img, alt: "" }),
       el("span", { class: "tr-txt" }, el("b", { text: name }), el("small", {}, opts.live ? el("i", { class: "live-dot" }) : "", status), opts.desc ? el("span", { class: "tr-desc", text: opts.desc }) : ""),
-      el("span", { class: "tr-foot" }, el("span", { class: "tr-prize" }, el("small", { text: "Prize" }), prize), opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : el("em", { class: "tr-play", text: opts.soon ? "Details" : "Play ›" })),
+      el("span", { class: "tr-foot" }, el("span", { class: "tr-prize" }, "🏆 ", prize), opts.ready ? el("em", { class: "tr-claim", text: "🎁 Claim" }) : el("em", { class: "tr-play", text: opts.soon ? "Details" : "Play ›" })),
     );
   $("#tourneyList").replaceChildren(
     // Grand Tour and Endless Run first, the Weekend League below them
