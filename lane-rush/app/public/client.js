@@ -99,9 +99,9 @@ const RUNNERS = [
   { name: "MC Gold", color: "#f0b400", file: "c16", tag: "Rap Star", cid: "rapstar" },
   { name: "Momo", color: "#e9ecef", file: "c17", tag: "Snow Buddy", cid: "momo" },
   { name: "Glorb", color: "#8a4fd8", file: "c18", tag: "Space Octopus", cid: "glorb" },
-  { name: "Disco Dash", color: "#e040fb", file: "c20", tag: "Dance Machine", cid: "dancer" },
-  { name: "Pharaoh Ra", color: "#2f6fd8", file: "c21", tag: "Sun King", cid: "ra" },
-  { name: "Aurum", color: "#f2b705", file: "c22", tag: "Golden Champion", cid: "aurum" },
+  { name: "Disco Dash", color: "#e040fb", file: "c20", pp: 20, tag: "Dance Machine", cid: "dancer" },
+  { name: "Pharaoh Ra", color: "#2f6fd8", file: "c21", pp: 21, tag: "Sun King", cid: "ra" },
+  { name: "Aurum", color: "#f2b705", file: "c22", pp: 22, tag: "Golden Champion", cid: "aurum" },
 ];
 const STARTERS = 8; // the first 8 runners; the rest are collectibles
 /** Collection id → runner index, for the collectibles that are 3D runners. */
@@ -625,7 +625,7 @@ function toast(text) {
 
 /** Higgsfield character-select portrait (upper body, posed) for runner i. */
 function portrait(i) {
-  return `/assets/pp${RUNNERS[i]?.pp ?? i}.webp?v=4`; // v: bumped whenever a slot gets a new runner (browsers keep old copies)
+  return `/assets/pp${RUNNERS[i]?.pp ?? i}.webp?v=5`; // v: bumped whenever a slot gets a new runner (browsers keep old copies)
 }
 
 function el(tag, attrs = {}, ...kids) {
@@ -1481,7 +1481,7 @@ function charCard(c, n, onClick) {
   const name = forCoins ? el("b", { class: `cname price${can ? "" : " short"}` }, el("i", { class: "coin" }), el("span", { text: c.coins.toLocaleString() })) : el("b", { class: "cname", text: c.name });
   const tag = owned
     ? el("span", { class: "crar" }, el("i", { text: RARITY_ICON[c.rarity] }), el("span", { text: sel ? "Selected" : c.rarity }))
-    : el("span", { class: "crar lock" }, el("span", { text: forCoins ? "Locked" : c.idx in PASS_RUNNERS ? `Pass Lv ${PASS_RUNNERS[c.idx]}` : VIA_LABEL[c.via] }));
+    : el("span", { class: "crar lock" }, el("i", { text: RARITY_ICON[c.rarity] }), el("span", { text: c.rarity }));
   const b = el(
     "button",
     { class: `ccard ${c.rarity}${owned ? " got" : " locked"}${sel ? " sel" : ""}`, type: "button", style: `--i:${n}`, "aria-label": c.name },
@@ -1518,8 +1518,9 @@ function renderSkins() {
   const mine = all.filter(ownsChar).sort((a, b) => Number(fav.includes(b.id)) - Number(fav.includes(a.id)) || byRarity(a, b));
   const rest = all.filter((c) => !ownsChar(c)).sort(byRarity);
   let n = 0;
+  // everyone in one grid (yours first); where a locked one comes from shows when you tap it
   $("#skinGrid").replaceChildren(
-    el("h3", { class: "coll-head", text: `Yours · ${mine.length}` }),
+    el("h3", { class: "coll-head", text: `Runners · ${mine.length} / ${all.length}` }),
     ...mine.map((c) => {
       // a tap on one of your runners picks it straight away; the ⓘ shows its card
       // tap the name to race with them, the picture for their card
@@ -1534,9 +1535,8 @@ function renderSkins() {
       card.append(star);
       return card;
     }),
-    ...(rest.length
-      ? charGroups(rest, ["pack", "road", "pass"]).flatMap(([via, list]) => [el("h3", { class: "coll-head", text: `${VIA_GROUP[via]} · ${list.length}` }), ...list.map((c) => charCard(c, n++, inspectChar))])
-      : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
+    ...rest.map((c) => charCard(c, n++, inspectChar)),
+    ...(rest.length ? [] : [el("p", { class: "rempty", text: "You've collected every runner!" })]),
   );
   renderCollPill();
 }
