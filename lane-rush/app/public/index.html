@@ -195,10 +195,13 @@
         <div class="hpage hp-side hp-compete" id="hpCompete" aria-label="Tournaments">
           <div class="hp-scroll">
             <div class="ribbon teal hp-ribbon"><h2>Tournaments</h2></div>
+            <!-- two buttons: the tournaments, or the missions (daily + career) -->
+            <div class="m-tabs" role="tablist">
+              <button class="m-tab on" type="button" role="tab" data-ct="tourneys">🏆 Tournaments</button>
+              <button class="m-tab" type="button" role="tab" data-ct="missions">📋 Missions<i class="dot" hidden></i></button>
+            </div>
             <div id="tourneyList" class="tourney-list"></div>
-            <!-- missions (daily + career) live here, under the tournaments -->
-            <div class="ribbon pink hp-ribbon cm-ribbon"><h2>Missions</h2></div>
-            <div id="mtMissions" class="compete-missions">
+            <div id="mtMissions" class="compete-missions" hidden>
             <section class="m-head">
               <h3>Daily missions <i class="dot" id="dailyDot" hidden></i></h3>
               <p>New in <b id="questReset">--:--:--</b> · <span id="questSub"></span></p>

@@ -1730,7 +1730,7 @@ function packCard(rarity) {
   return { kind: "char", char: list[Math.floor(Math.random() * list.length)] };
 }
 function freePackLeft() {
-  return !local.getItem("lr:freePack");
+  return false; // no free pack any more: every pack is bought (or won)
 }
 /** Pay, roll and credit everything right away (so closing the animation can't lose items). */
 function buyPack(pack) {
@@ -2095,6 +2095,12 @@ function onState(msg) {
       if (v.mode !== game.wantMode) act({ type: "mode", mode: game.wantMode });
       game.wantMode = null;
     }
+    // Quick Race on your own: no Survival ("last one standing" means nothing against bots alone)
+    if (game.solo && !game.endless && v.host === playerId) {
+      const kinds = PARTY_KINDS.filter((k) => k !== "survival");
+      if (v.mode === "survival") act({ type: "mode", mode: "random" });
+      if ((v.party ?? PARTY_KINDS).includes("survival")) act({ type: "party", kinds });
+    }
     if (game.mode !== "lobby") enterLobby();
     renderLobby(v);
   } else if (v.phase === "countdown" || v.phase === "race") {
@@ -2348,11 +2354,7 @@ function setHomePage(i, animate = true) {
     t.classList.toggle("on", on);
     t.setAttribute("aria-selected", String(on));
   }
-  if (homePage === PAGE.compete) {
-    renderCompete();
-    renderDaily(); // the missions sit under the tournaments
-    renderCareer();
-  }
+  if (homePage === PAGE.compete) showCompeteTab(missionsWaiting.missions && competeTab !== "missions" && !competeTabPicked ? "missions" : competeTab);
   if (homePage === PAGE.missions) showMissionTab("road");
   if (homePage === PAGE.skins) renderSkins();
   if (homePage === PAGE.shop) {
@@ -2837,6 +2839,27 @@ function renderTrophyRoad() {
  * the rewards on alternating sides, a big banner where each league starts (its character rides on it),
  * and you on the road where you are.
  */
+/** The Tournaments page has two buttons: the tournaments, and the missions (daily + career). */
+let competeTab = "tourneys";
+let competeTabPicked = false; // once you pick one yourself, it stays
+function showCompeteTab(tab) {
+  competeTab = tab;
+  for (const b of document.querySelectorAll(".m-tab[data-ct]")) b.classList.toggle("on", b.dataset.ct === tab);
+  $("#tourneyList").hidden = tab !== "tourneys";
+  $("#mtMissions").hidden = tab !== "missions";
+  if (tab === "tourneys") renderCompete();
+  else {
+    renderDaily();
+    renderCareer();
+  }
+}
+for (const b of document.querySelectorAll(".m-tab[data-ct]"))
+  b.addEventListener("click", () => {
+    competeTabPicked = true;
+    if (b.dataset.ct === competeTab) return;
+    sfx.tap();
+    showCompeteTab(b.dataset.ct);
+  });
 /** The first page is the Medal Road (the missions moved to the Tournaments page). */
 let missionTab = "road";
 function showMissionTab() {
@@ -3755,7 +3778,7 @@ const canvas = $("#scene");
  *   full-detail scenery · env: sky light on materials · fx: share of particles and weather
  */
 const GFX = {
-  high: { ratio: 2, aa: true, shadows: true, lod: 50, env: true, fx: 0.9 },
+  high: { ratio: 1.5, aa: true, shadows: true, lod: 50, env: true, fx: 0.9 }, // 1.5× pixels: on a phone screen as sharp to the eye as 2×, and about half the work
   balanced: { ratio: 1.6, aa: true, shadows: false, lod: 40, env: true, fx: 0.7 },
   performance: { ratio: 1.15, aa: false, shadows: false, lod: 22, env: false, fx: 0.4 },
 };
@@ -3805,7 +3828,7 @@ function loadBloom() {
       import("/vendor/jsm/postprocessing/OutputPass.js"),
     ])
       .then(([{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }]) => {
-        const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: startGfx.aa ? 4 : 0 });
+        const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 0 }); // no MSAA on the HDR target: it was the single most expensive thing per frame
         const composer = new EffectComposer(renderer, rt);
         composer.addPass(new RenderPass(scene, camera));
         const pass = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.6, 0.4, 0.86);
@@ -3859,7 +3882,7 @@ if (renderer) {
  * steps down, and on Auto the preset steps down too (High → Balanced → Performance) and is
  * remembered for next time. It never steps back up within a session, so it can't oscillate.
  */
-const QUALITY_STEPS = [1, 0.85, 0.72];
+const QUALITY_STEPS = [1, 0.85, 0.72, 0.6];
 function applyQuality() {
   if (!renderer) return;
   gfx = GFX[gfxTier()];
@@ -3917,9 +3940,9 @@ function adaptQuality(dt) {
   raceRun.ms += dt * 1000;
   raceRun.n += 1;
   // slow = clearly missing the screen's own pace (and slower than 40 fps), for 3 seconds
-  const slow = dt * 1000 > Math.max(paceMs * 1.45, 25);
+  const slow = dt * 1000 > Math.max(paceMs * 1.3, 22);
   slowFor = slow ? slowFor + dt : Math.max(0, slowFor - dt * 0.5);
-  if (slowFor < 3) return;
+  if (slowFor < 2) return;
   slowFor = 0;
   raceRun.dropped = true;
   // on Auto, a lighter preset first; then a lower render scale
@@ -5596,6 +5619,8 @@ const world = (() => {
   let nrGate = null; // Neon Rush's START gantry with its race lights (the Neon Rush maps)
   let nrGateLoad = null;
   function nrActivate(w) {
+    // the Neon Rush worlds are lit by their own shaders: no sun shadow pass there (a whole extra render each frame)
+    if (startGfx.shadows) sun.castShadow = !w;
     if (w && !nrGateLoad)
       nrGateLoad = startGate()
         .then((v) => {
@@ -9816,6 +9841,8 @@ function renderMissionDots() {
   if (dot) dot.hidden = !gold;
   const cdot = document.querySelector(`.htab[data-page="${PAGE.compete}"] .dot`);
   if (cdot) cdot.hidden = !(daily || career);
+  const mdot = $('.m-tab[data-ct="missions"] .dot');
+  if (mdot) mdot.hidden = !(daily || career);
   missionsWaiting = { road: gold, missions: daily || career };
   $("#dailyDot").hidden = !daily;
   renderStoreDot();
