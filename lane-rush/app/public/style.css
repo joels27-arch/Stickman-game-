@@ -3173,3 +3173,5 @@ html, body { background: var(--k1); }
 .pf-shadow.win { transform: scale(1.25) translateY(-6px); z-index: 1; }
 .pf-shadow.win img { filter: brightness(1) drop-shadow(0 0 16px var(--team)); }
 .pf-shadow.lose { opacity: 0.15; transform: scale(0.9); }
+#starterModal.pf-mystery .pf-sheet { background: radial-gradient(ellipse at 50% 38%, #24318c 0%, #0e1548 48%, #050826 100%); border: 0; box-shadow: 0 0 0 1px rgba(140, 160, 255, 0.18), 0 20px 60px rgba(0, 0, 0, 0.6); }
+#starterModal.pf-mystery .pf-sheet::before, #starterModal.pf-mystery .pf-sheet::after { display: none; }
