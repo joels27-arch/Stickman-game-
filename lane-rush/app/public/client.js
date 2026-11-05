@@ -208,6 +208,12 @@ const KIND_RULE = {
   potato: "Last place holds the bomb. Overtake to lose it!",
   sprint: "First to the finish line",
 };
+/** Racing without other real players: "last one standing" means nothing, so Survival says what it is. */
+function soloRule(v) {
+  if (game.kind !== "survival") return null;
+  const humans = (v?.players ?? []).filter((p) => !p.bot && !p.gone).length;
+  return humans <= 1 ? "3 hearts · how far can you get?" : null;
+}
 const MAP_INFO = {
   meadow: { label: "Meadow", text: "Trees, bushes and a picket fence" },
   farm: { label: "Farm", text: "Wheat fields, barns and windmills" },
@@ -4722,7 +4728,7 @@ const world = (() => {
   const fileProgress = new Map();
   /** The Artlist remake of a model (md_*), or the original if that file is missing. */
   function loadGLBOr(file, fallback) {
-    return loadGLB(`/assets/${file}.glb?v=bl1`, 2).catch(() => loadGLB(`/assets/${fallback}.glb`)); // v: the Blender-made props (bust cached copies)
+    return loadGLB(`/assets/${file}.glb?v=bl2`, 2).catch(() => loadGLB(`/assets/${fallback}.glb`)); // v: the Blender-made props (bust cached copies)
   }
   // a dropped download (flaky mobile data, a deploy swapping files) retries twice, fresh from the server
   function loadGLB(url, tries = 3) {
@@ -8246,7 +8252,7 @@ function enterRace(v) {
   tag.classList.add("show");
   tag.replaceChildren(
     el("b", { text: game.endless ? "♾️ Endless run" : v.cup ? `🏆 Round ${v.cup.race}/${v.cup.races.length} · ${info.icon} ${KIND_LABEL[game.kind]}` : `${info.icon} ${KIND_LABEL[game.kind] ?? ""}` }),
-    el("small", { text: game.endless ? `One life · how far can you get?${stats.get("bestRun") ? ` Best: ${stats.get("bestRun").toLocaleString()} m` : ""}` : KIND_RULE[game.kind] ?? "" }),
+    el("small", { text: game.endless ? `One life · how far can you get?${stats.get("bestRun") ? ` Best: ${stats.get("bestRun").toLocaleString()} m` : ""}` : soloRule(v) ?? KIND_RULE[game.kind] ?? "" }),
   );
   setTimeout(() => game.round === v.round && tag.classList.remove("show"), 7000); // the mode is only shown at the start
   tag.classList.toggle("small", Boolean(v.cup)); // the cup's reel shows the mode instead
