@@ -18,10 +18,11 @@ import sys
 import bpy  # noqa: F401  (bpy first: it provides bmesh)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_round1 import prism  # noqa: E402
+from build_round1 import prism, text  # noqa: E402
 from common import bake_ao, box, cyl, export, join, mat, preview, reset, sphere, torus  # noqa: E402
 
 OUT = sys.argv[-1] if len(sys.argv) > 1 else "out"
+GLOW = 1.6  # emission strength of the light strips: bright enough to read, soft enough not to blow out under bloom
 
 
 def upper_half(o, zc):
@@ -52,10 +53,10 @@ def kit():
         "teal": mat("nx_teal", "#15b9ad", rough=0.32),
         "yellow": mat("nx_yellow", "#ffc61f", rough=0.35),
         "rubber": mat("nx_rubber", "#14161d", rough=0.75),
-        "cyan_glow": mat("nx_cyan", "#7ff6ff", rough=0.2, emit="#2ee9ff", emit_strength=5.0),
-        "pink_glow": mat("nx_pinkg", "#ff8ac4", rough=0.2, emit="#ff2e8a", emit_strength=5.0),
-        "yellow_glow": mat("nx_yellowg", "#fff1a0", rough=0.2, emit="#ffc21a", emit_strength=5.0),
-        "red_glow": mat("nx_redg", "#ff8a8a", rough=0.2, emit="#ff2a2a", emit_strength=5.0),
+        "cyan_glow": mat("nx_cyan", "#7ff6ff", rough=0.2, emit="#2ee9ff", emit_strength=GLOW),
+        "pink_glow": mat("nx_pinkg", "#ff8ac4", rough=0.2, emit="#ff2e8a", emit_strength=GLOW),
+        "yellow_glow": mat("nx_yellowg", "#fff1a0", rough=0.2, emit="#ffc21a", emit_strength=GLOW),
+        "red_glow": mat("nx_redg", "#ff8a8a", rough=0.2, emit="#ff2a2a", emit_strength=GLOW),
     }
 
 
@@ -213,6 +214,34 @@ def ramp(x0=0.0):
     return join(p, "ramp")
 
 
+def item_box(x0=0.0):
+    """The mystery box: a purple rounded cube in a dark metal frame, a glowing "?" on each side, gems at the corners."""
+    k = kit()
+    purple = mat("nx_purple", "#8b3dff", rough=0.22, metal=0.15)
+    q = mat("nx_q", "#fff3b0", rough=0.2, emit="#ffd23a", emit_strength=GLOW * 1.4)
+    p = [box((0.86, 0.86, 0.86), (x0, 0, 0.5), purple, bevel=0.14, segs=4, name="cube")]
+    for ax in range(3):
+        for a in (-1, 1):
+            for b in (-1, 1):
+                size = [0.09, 0.09, 0.09]
+                size[ax] = 0.8
+                loc = [x0, 0, 0.5]
+                o1, o2 = [i for i in range(3) if i != ax]
+                loc[o1] += a * 0.43
+                loc[o2] += b * 0.43
+                p.append(box(tuple(size), tuple(loc), k["dark"], bevel=0.04, segs=2, name="frame"))
+    for a in (-1, 1):
+        for b in (-1, 1):
+            for c in (-1, 1):
+                p.append(sphere(0.06, (x0 + a * 0.43, b * 0.43, 0.5 + c * 0.43), k["cyan_glow"], segs=12, rings=8, name="gem"))
+    p.append(text("?", 0.6, (x0, -0.44, 0.48), q, rot=(math.radians(90), 0, 0), extrude=0.035))
+    p.append(text("?", 0.6, (x0, 0.44, 0.48), q, rot=(math.radians(90), 0, math.radians(180)), extrude=0.035))
+    p.append(text("?", 0.6, (x0 + 0.44, 0, 0.48), q, rot=(math.radians(90), 0, math.radians(90)), extrude=0.035))
+    p.append(text("?", 0.6, (x0 - 0.44, 0, 0.48), q, rot=(math.radians(90), 0, math.radians(-90)), extrude=0.035))
+    p.append(text("?", 0.6, (x0, 0, 0.94), q, rot=(0, 0, 0), extrude=0.035))
+    return join(p, "item_box")
+
+
 if __name__ == "__main__":
     reset()
     objs = {
@@ -222,8 +251,9 @@ if __name__ == "__main__":
         "arch": neon_arch(1.9),
         "crates": crates(3.9),
         "barrel": barrel(5.8),
+        "box": item_box(7.2),
     }
-    rmp = ramp(8.4)
+    rmp = ramp(9.6)
     for o in [*objs.values(), rmp]:
         bake_ao(o)
     preview([*objs.values(), rmp], os.path.abspath(os.path.join(OUT, "preview_neon.jpg")), size=(1500, 560), cam_loc=(2.6, -14.5, 4.2), look=(2.6, -1.5, 1.0), lens=28)

@@ -154,7 +154,7 @@ const gamesStepOf = (c) => gamesRoad().find((g) => (c.cid ?? c.id) === g.char ||
  */
 const COLLECTION = [
   { id: "momo", name: "Momo", color: "#e9ecef", rarity: "epic", via: "pack" },
-  { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "rare", via: "pass", passLv: 15 },
+  { id: "pandu", name: "Pandu", color: "#e8e8e8", rarity: "epic", via: "pass", passLv: 15 },
   { id: "sharky", name: "Sharky", color: "#3f8fe0", rarity: "epic", via: "pass", passLv: 1 }, // yours the moment you buy the Gold Pass
   { id: "striker", name: "Siete", color: "#e02424", rarity: "legendary", via: "pack", legacy: { medal: "gold", count: 6 } },
   // heroes and stars
@@ -1499,7 +1499,7 @@ function renderItems() {
 // ── the character catalog: every character, its rarity and how you get it ──
 
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
-const STARTER_RARITY = ["rare", "rare", "rare", "rare", "rare", "rare", "rare", "epic", "epic", "epic", "legendary", "rare", "legendary"]; // nothing below rare
+const STARTER_RARITY = ["rare", "rare", "rare", "rare", "rare", "rare", "rare", "epic", "epic", "epic", "legendary", "epic", "legendary"]; // nothing below rare
 /** A collectible that is also a 3D runner: its runner index (you can race with it). */
 const runnerOf = (id) => (id in CID_RUNNER ? { idx: CID_RUNNER[id], playable: true, tag: RUNNERS[CID_RUNNER[id]].tag, img: portrait(CID_RUNNER[id]) } : {}); // 3D runners: the same framed portrait as the starters
 function allChars() {
@@ -1677,12 +1677,42 @@ function selectRunner(c) {
 
 // inspect one character: big picture, rarity, how to get it, and the one action that makes sense
 const charModal = $("#charModal");
+/** Every runner's little story, by name (shown on their card). */
+const CHAR_STORY = {
+  Rex: "Sailed in from the north on a longboat. Still thinks every finish line is something to conquer.",
+  Bolt: "Was once struck by lightning. Has been running ever since and refuses to slow down.",
+  Ivy: "Jogs five kilometres before breakfast. The breakfast is also a smoothie she drinks while running.",
+  Gizmo: "A delivery robot that took a wrong turn onto the race track and never looked back.",
+  Pip: "The smallest pirate on the seven seas. Lost her ship, kept the hat.",
+  Kiko: "Nobody has ever seen Kiko start running. Kiko is simply already ahead.",
+  Dino: "Got the dino costume for his birthday and hasn't taken it off in 400 days. Rawr.",
+  Nova: "Trained on the Moon, where everything is easy. Earth's gravity is her only real rival.",
+  Gloop: "Escaped from a science fair. Leaves a trail. Please don't step in it.",
+  Sharky: "Owns the beach, the boardwalk and most of the sunglasses. Bites only on Tuesdays.",
+  "Captain Brainstorm": "His big brain makes the weather. When he gets angry, take an umbrella.",
+  Pandu: "Black belt in karate, white belt in napping. Usually both at once.",
+  Siete: "Scored the winning goal in his sleep once. Still celebrates it every morning.",
+  "Prof. Brainz": "Built a brain bigger than his head and put it in a jar. It does the thinking, he does the running.",
+  "Big Dunk": "Can touch the ceiling without jumping. Jumps anyway.",
+  Webster: "Swings between lamp posts on the City map. Says it counts as running.",
+  "MC Gold": "Raps about winning before every race. Then wins, which is very annoying.",
+  Momo: "Grew up in the snowy peaks, in a panda onesie, with a very warm heart.",
+  Glorb: "A space octopus with eight legs and zero patience. Came to Earth for the races, stayed for the snacks.",
+  "Disco Dash": "The music never stops in Disco Dash's head. Every step is a dance move.",
+  "Pharaoh Ra": "Rules the desert, the pyramids and, if you let him, your lane too.",
+  Aurum: "Made of solid gold, which should make him slow. Somehow it doesn't.",
+};
 function inspectChar(c) {
   const owned = ownsChar(c);
   $("#charHero").replaceChildren(el("i", { class: `glow ${c.rarity}` }), el("img", { src: c.hero, alt: "" }));
   $("#charName").textContent = c.name;
-  $("#charTags").replaceChildren(el("span", { class: `tag ${c.rarity}`, text: c.rarity }), el("span", { class: "tag via", text: `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` }), c.playable ? el("span", { class: "tag play", text: "🏃 Playable" }) : el("span", { class: "tag soon", text: "Collectible · playable soon" }));
-  $("#charHow").textContent = owned ? (c.playable ? c.tag ?? "" : "In your collection. 3D racing version coming soon!") : howToGet(c);
+  // every runner is playable: the card shows the rarity, where it comes from, and its little story
+  $("#charTags").replaceChildren(el("span", { class: `tag ${c.rarity}`, text: c.rarity }), el("span", { class: "tag via", text: `${VIA_ICON[c.via]} ${VIA_LABEL[c.via]}` }));
+  const story = CHAR_STORY[c.name];
+  $("#charStory").textContent = story ? `“${story}”` : c.tag ?? "";
+  $("#charStory").hidden = !$("#charStory").textContent;
+  $("#charHow").textContent = owned ? "" : howToGet(c);
+  $("#charHow").hidden = owned;
   const btn = $("#charAct");
   btn.className = "gbtn";
   btn.disabled = false;
@@ -4752,7 +4782,7 @@ const world = (() => {
   const fileProgress = new Map();
   /** The Artlist remake of a model (md_*), or the original if that file is missing. */
   function loadGLBOr(file, fallback) {
-    return loadGLB(`/assets/${file}.glb?v=bl2`, 2).catch(() => loadGLB(`/assets/${fallback}.glb`)); // v: the Blender-made props (bust cached copies)
+    return loadGLB(`/assets/${file}.glb?v=bl3`, 2).catch(() => loadGLB(`/assets/${fallback}.glb`)); // v: the Blender-made props (bust cached copies)
   }
   // a dropped download (flaky mobile data, a deploy swapping files) retries twice, fresh from the server
   function loadGLB(url, tries = 3) {
