@@ -7290,8 +7290,8 @@ const world = (() => {
     c.height = 128;
     const g = c.getContext("2d");
     const grad = g.createLinearGradient(0, 0, 0, 128);
-    grad.addColorStop(0, `${col}55`);
-    grad.addColorStop(1, `${col}cc`);
+    grad.addColorStop(0, `${col}66`);
+    grad.addColorStop(1, `${col}d9`);
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 128);
     // chevrons: up (forward) on green, down (back at you) on red
@@ -7338,12 +7338,12 @@ const world = (() => {
     const topGlow = new THREE.Mesh(new THREE.BoxGeometry(W - 0.1, 0.05, 0.2), edge);
     topGlow.position.y = H - 0.11;
     g.add(topGlow);
-    const panelMat = new THREE.MeshBasicMaterial({ map: portalPanelTex(col, green), transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+    const panelMat = new THREE.MeshBasicMaterial({ map: portalPanelTex(col, green), transparent: true, depthWrite: false, side: THREE.DoubleSide }); // normal blending: stays clearly green/red on bright maps too
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.14, H - 0.1), panelMat);
     panel.position.y = (H - 0.1) / 2;
     g.add(panel);
     // the lane in front of the gate glows in its colour
-    const floorMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending });
+    const floorMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.38, depthWrite: false });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.1, 4), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(0, 0.035, 2);
