@@ -3274,3 +3274,7 @@ html, body { background: var(--k1); }
 .wl-rw.got { border-color: #ffd84a; background: rgba(255, 216, 74, 0.14); box-shadow: 0 0 12px rgba(255, 216, 74, 0.45); }
 .wl-rw.got img { filter: none; }
 .wl-rw.claimed { border-color: #b6f72a; background: rgba(182, 247, 42, 0.12); box-shadow: none; }
+.trow.tb .tr-prize { flex-direction: row; white-space: nowrap; min-width: 0; }
+.trow.tb .tr-prize .prz-v { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 13px; line-height: 1; }
+.trow.tb .tr-prize .prz-v img { width: 18px; height: 24px; object-fit: contain; filter: none; grid-row: auto; }
+.trow.tb { padding-bottom: 14px; }
