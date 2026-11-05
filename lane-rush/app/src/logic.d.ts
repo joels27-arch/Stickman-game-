@@ -34,6 +34,7 @@ export function buildCourse(seed: number, len?: number, boost?: number): {
   rows: { z: number; lanes: (string | null)[]; looks: number[]; intro?: string }[];
   boosts: { z: number; lane: number }[];
   slows: { z: number; lane: number }[];
+  portals: { z: number; lanes: string[] }[];
   boxes: { z: number; lane: number }[];
   hearts: { z: number; lane: number }[];
   buses: { lane: number; z0: number; z1: number; look: number; ramp: boolean }[];
@@ -76,6 +77,10 @@ export const GAME_MODES: string[];
 export const CUP_MODES: string[];
 export const MAPS: string[];
 export const SLOW_PAD_MS: number;
+export const PORTAL_FROM: number;
+export const PORTAL_CHANCE: number;
+export const PORTAL_BOOST_MS: number;
+export function portalLanes(r: () => number): string[];
 export function livesOf(state: unknown): number;
 export const BOT_LEVELS: Record<string, { skill: [number, number]; pace: number }>;
 export const MAX_EMPTY_M: number;

@@ -36,6 +36,7 @@ import {
   BANANA_BEHIND_M,
   CUP_POINTS,
   SLOW_PAD_MS,
+  PORTAL_BOOST_MS,
   ROUND_OPTIONS,
   ROUND_KINDS,
   PARTY_KINDS,
@@ -5052,7 +5053,9 @@ const world = (() => {
       loadGLB("/assets/throw.glb").then((g) => (throwClip = g.animations[0] ? upperBody(g.animations[0]) : null)).catch(() => {}),
       loadGLBOr("bl_banana", "banana").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
       // gates are wide enough that their pillars stand outside the fences
-      loadGLBOr("bl_boost_pad", "boost_pad").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
+      // green pad: chevrons down the track; red pad: chevrons pointing back at the runner (art/blender/build_pads.py)
+      loadGLBOr("bl_pad_go", "boost_pad").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
+      loadGLB("/assets/bl_pad_slow.glb").then((g) => (assets.props.slowPad = fitPad(g.scene))).catch(() => {}),
       loadGLBOr("bl_bus", "bus").then((g) => (assets.props.bus = fitBus(g.scene))).catch(() => {}),
       // the Artlist bus and ramp: every other bus uses them (to compare with the first pair)
       loadGLB("/assets/bus2.glb").then((g) => (assets.props.bus2 = fitBus(g.scene, BUS2_TURN))).catch(() => {}),
@@ -7157,7 +7160,7 @@ const world = (() => {
       if (row.z < z + 40 || row.lanes.includes("roller") || row.z - rows[rows.length - 1].z < 38) continue;
       rows.push(row);
     }
-    return { ...course, rows, slows: [], buses: [], boosts: (course.boosts || []).filter((b) => b.z > z) };
+    return { ...course, rows, slows: [], portals: [], buses: [], boosts: (course.boosts || []).filter((b) => b.z > z) };
   }
   function buildCourseObjects(seed, len, boost = 0) {
     const out = buildCourseObjectsInner(seed, len, boost);
@@ -7248,7 +7251,10 @@ const world = (() => {
     // red slow pads: the boost pad turned round (arrows pointing back) and painted red
     for (const b of course.slows ?? []) {
       let pad;
-      if (assets.props.boostPad) {
+      if (assets.props.slowPad) {
+        pad = assets.props.slowPad.clone();
+        pad.position.set(laneX(b.lane), 0.02, -b.z);
+      } else if (assets.props.boostPad) {
         pad = assets.props.boostPad.clone();
         pad.traverse((o) => {
           if (o.isMesh) o.material = slowPadMat(o.material);
@@ -7263,7 +7269,87 @@ const world = (() => {
       raceGroup.add(pad);
       cullables.push({ obj: pad, z: b.z });
     }
+    // portal rows: a glowing gate in every lane, green boosts you, red slows you
+    for (const pt of course.portals ?? []) {
+      pt.lanes.forEach((c, lane) => {
+        const o = portalProto(c).clone();
+        o.position.set(laneX(lane), 0, -pt.z);
+        raceGroup.add(o);
+        cullables.push({ obj: o, z: pt.z });
+      });
+    }
     return course;
+  }
+
+  // ── portals: built in code (a few boxes and two see-through panels, shared by every gate) ──
+  const portalTex = [];
+  const portalProtos = {};
+  function portalPanelTex(col, up) {
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 128;
+    const g = c.getContext("2d");
+    const grad = g.createLinearGradient(0, 0, 0, 128);
+    grad.addColorStop(0, `${col}55`);
+    grad.addColorStop(1, `${col}cc`);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 128);
+    // chevrons: up (forward) on green, down (back at you) on red
+    g.strokeStyle = "rgba(255,255,255,0.85)";
+    g.lineWidth = 7;
+    g.lineCap = "round";
+    for (let i = 0; i < 2; i++) {
+      const y = 32 + i * 64;
+      const d = up ? -12 : 12;
+      g.beginPath();
+      g.moveTo(14, y - d);
+      g.lineTo(32, y + d);
+      g.lineTo(50, y - d);
+      g.stroke();
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapT = THREE.RepeatWrapping;
+    t.userData.dir = up ? -1 : 1;
+    portalTex.push(t);
+    return t;
+  }
+  function portalProto(c) {
+    if (portalProtos[c]) return portalProtos[c];
+    const green = c === "g";
+    const col = green ? "#38ff6a" : "#ff3a33";
+    const W = LANE_W - 0.12;
+    const H = 2.7;
+    const g = new THREE.Group();
+    const frame = new THREE.MeshStandardMaterial({ color: "#1d2129", metalness: 0.6, roughness: 0.4 });
+    const edge = new THREE.MeshBasicMaterial({ color: col });
+    const post = new THREE.BoxGeometry(0.14, H, 0.14);
+    for (const sx of [-1, 1]) {
+      const m = new THREE.Mesh(post, frame);
+      m.position.set((sx * W) / 2, H / 2, 0);
+      g.add(m);
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.05, H - 0.1, 0.16), edge);
+      strip.position.set((sx * (W - 0.2)) / 2, H / 2, 0);
+      g.add(strip);
+    }
+    const top = new THREE.Mesh(new THREE.BoxGeometry(W + 0.14, 0.16, 0.18), frame);
+    top.position.y = H;
+    g.add(top);
+    const topGlow = new THREE.Mesh(new THREE.BoxGeometry(W - 0.1, 0.05, 0.2), edge);
+    topGlow.position.y = H - 0.11;
+    g.add(topGlow);
+    const panelMat = new THREE.MeshBasicMaterial({ map: portalPanelTex(col, green), transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.14, H - 0.1), panelMat);
+    panel.position.y = (H - 0.1) / 2;
+    g.add(panel);
+    // the lane in front of the gate glows in its colour
+    const floorMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.1, 4), floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0.035, 2);
+    g.add(floor);
+    portalProtos[c] = g;
+    return g;
   }
 
   const slowMats = new Map();
@@ -7969,6 +8055,7 @@ const world = (() => {
   // barrels start rolling at you when you get close; boxes spin and bob
   function animateCourse(d, raceT, dt) {
     nrTick(d, dt);
+    for (const t of portalTex) t.offset.y = (t.offset.y + t.userData.dir * dt * 0.9) % 1; // the chevrons stream through the gates
     for (const r of rollers) {
       if (r.startedAt === null && raceT !== null && d >= r.z0 - ROLLER_TRIGGER_M) {
         r.startedAt = raceT;
@@ -8941,6 +9028,23 @@ function stepMe(dt) {
       sfx.slip();
       buzz(40);
       banner("🐢 SLOWED!", 700);
+    }
+  }
+  // portals: you go through whichever gate is in your lane (a rocket flies over them)
+  for (const pt of course.portals ?? []) {
+    if (pt.z <= prevD || pt.z > me.d || me.power === "rocket") continue;
+    const c = pt.lanes[Math.max(0, Math.min(LANES - 1, Math.round(me.x)))];
+    if (c === "g") {
+      me.boostT = Math.max(me.boostT, PORTAL_BOOST_MS / 1000);
+      me.slowPadT = 0;
+      sfx.boost();
+      banner("⚡ PORTAL BOOST!", 800);
+    } else {
+      me.slowPadT = SLOW_PAD_MS / 1000;
+      me.boostT = 0;
+      sfx.slip();
+      buzz(40);
+      banner("🐢 RED PORTAL!", 800);
     }
   }
   for (const b of course.boosts) {

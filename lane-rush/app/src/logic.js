@@ -617,6 +617,19 @@ export function busFront(course, lane, d0, d1) {
 export function busAt(course, lane, d) {
   return (course?.buses ?? []).some((b) => b.lane === lane && d >= b.z0 - 0.5 && d <= b.z1 + 0.5);
 }
+/** Portal rows: from this far on, after this share of patterns. */
+export const PORTAL_FROM = 110;
+export const PORTAL_CHANCE = 0.16;
+/** Running through a green portal boosts you this long (ms); a red one slows you like a slow pad. */
+export const PORTAL_BOOST_MS = 2600;
+/** Which lanes of a portal row are green ("g") and which red ("r"): one or two green, the rest red. */
+export function portalLanes(r) {
+  const lanes = ["r", "r", "r", "r"];
+  const a = Math.floor(r() * 4);
+  lanes[a] = "g";
+  if (r() < 0.4) lanes[(a + 1 + Math.floor(r() * 3)) % 4] = "g";
+  return lanes;
+}
 /** Running over a red slow pad slows you down this long (ms). */
 export const SLOW_PAD_MS = 1300;
 /** The longest run without an obstacle row (metres): about 3 s even at the start. */
@@ -629,6 +642,9 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
   // slow pads use their own stream, so adding them never moves the obstacles
   const r3 = rng((seed ^ 0x7f4a7c15) >>> 0);
   const slows = [];
+  // portal rows use their own stream too
+  const r4 = rng((seed ^ 0x2545f491) >>> 0);
+  const portals = [];
   const endless = len > TRACK_LEN;
   const kind = endless ? "survival" : "sprint";
   const rows = [];
@@ -747,13 +763,19 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
       hearts.push({ z: Math.round((z + gap * 0.45) * 10) / 10, lane: Math.floor(r2() * 4) });
       lastHeart = z;
     }
-    if (r() < 0.3) boosts.push({ z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) });
+    // a portal row now and then: a gate across every lane, green ones boost you, red ones slow you
+    const portal = z > PORTAL_FROM && gap >= 8 && r4() < PORTAL_CHANCE;
+    if (portal) portals.push({ z: Math.round((z + gap * 0.62) * 10) / 10, lanes: portalLanes(r4) });
+    if (r() < 0.3) {
+      const b = { z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) };
+      if (!portal) boosts.push(b); // (the draw still happens, so the layout never moves)
+    }
     // red slow pads: the opposite of a boost (from 90 m on, so the start stays easy)
     if (z > 90 && r3() < 0.32) slows.push({ z: Math.round((z + gap * 0.3) * 10) / 10, lane: Math.floor(r3() * 4) });
-    else if (z > 60 && (sinceBox >= 4 || r2() < 0.22)) addBox(z + gap * 0.55);
+    else if (!portal && z > 60 && (sinceBox >= 4 || r2() < 0.22)) addBox(z + gap * 0.55);
     z += gap;
   }
-  return { rows, boosts, slows, boxes, hearts, buses, len };
+  return { rows, boosts, slows, portals, boxes, hearts, buses, len };
 }
 
 // ── moving obstacles: each map has two, sweeping across the lanes ──────────
@@ -1469,6 +1491,12 @@ function stepBots(state, t) {
       for (const sp of course.slows ?? []) {
         if (sp.z <= d0 || sp.z > d1 || sp.lane !== p.lane) continue;
         if (roll(state.seed, bi, sp.z + 0.9) < sharp) continue;
+        p.slowUntil = Math.max(p.slowUntil ?? 0, t + SLOW_PAD_MS);
+      }
+      // a red portal slows a bot that runs into it (sharp bots pick the green one)
+      for (const pt of course.portals ?? []) {
+        if (pt.z <= d0 || pt.z > d1 || pt.lanes[p.lane] !== "r") continue;
+        if (roll(state.seed, bi, pt.z + 1.3) < sharp) continue;
         p.slowUntil = Math.max(p.slowUntil ?? 0, t + SLOW_PAD_MS);
       }
     }
