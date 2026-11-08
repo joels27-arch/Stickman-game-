@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "/vendor/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "/vendor/jsm/utils/SkeletonUtils.js";
 import { THEMES } from "/themes.js";
-import { Pipeline, sharpen } from "/nr/pipeline.js";
+import { Pipeline, sharpen, RIM } from "/nr/pipeline.js";
 import { NR_WORLD, NR, deckMaterial, groundPlane, parapets, loadWorld, tickUniforms, startGate, backdropOf } from "/nr/lane.js";
 import {
   buildCourse,
@@ -5797,8 +5797,26 @@ const world = (() => {
     if (v.back) v.back.visible = nrLookBack && d < 420;
   }
   let nrLookBack = false;
+  // Space Rider's neon: on its worlds the obstacles' glowing parts are pushed far into HDR so they bloom,
+  // and the runners get a cool rim of light; daylight maps keep the models as made and a soft warm rim
+  let glowMats = null;
+  function setGlow(neon) {
+    if (!glowMats) {
+      glowMats = new Map();
+      for (const proto of Object.values(assets.props))
+        proto?.traverse?.((o) => {
+          if (!o.isMesh) return;
+          for (const m of Array.isArray(o.material) ? o.material : [o.material])
+            if (m?.emissive && m.emissiveIntensity > 0 && m.emissive.getHex() !== 0 && !glowMats.has(m)) glowMats.set(m, m.emissiveIntensity);
+        });
+    }
+    for (const [m, base] of glowMats) m.emissiveIntensity = base * (neon ? 3.2 : 1);
+    if (neon) RIM.value.setRGB(0.3, 0.5, 1.1);
+    else RIM.value.setRGB(0.16, 0.14, 0.1);
+  }
   function setSky(map) {
     const nrw = NR_WORLD[map];
+    if (ready) setGlow(Boolean(nrw));
     nrActivate(nrw ?? null);
     if (nrw) {
       // a Neon Rush world brings its own sky: no dome, no painted plate, no clouds
@@ -7346,7 +7364,7 @@ const world = (() => {
     const H = 2.7;
     const g = new THREE.Group();
     const frame = new THREE.MeshStandardMaterial({ color: "#1d2129", metalness: 0.6, roughness: 0.4 });
-    const edge = new THREE.MeshBasicMaterial({ color: col });
+    const edge = new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(3.5) }); // HDR: the frame blooms like Space Rider's gates
     const post = new THREE.BoxGeometry(0.14, H, 0.14);
     for (const sx of [-1, 1]) {
       const m = new THREE.Mesh(post, frame);

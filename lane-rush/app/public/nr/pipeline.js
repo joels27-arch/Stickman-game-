@@ -26,7 +26,10 @@ export const PIPE_LEVELS = [
   { msaa: 0, bloom: 4, mblur: 0 },
 ];
 
-/** Keep these objects sharp under the motion blur: their opaque materials write alpha 0 (Space Rider's car trick). */
+/** Rim light on the runners (Space Rider's lamp sheen, cut down): its colour is set per map by the game. */
+export const RIM = { value: new THREE.Color(0, 0, 0) };
+/** Keep these objects sharp under the motion blur: their opaque materials write alpha 0 (Space Rider's car trick),
+    and give lit ones a rim of light so the runners stand out from the world. */
 const sharpened = new WeakSet();
 export function sharpen(root) {
   root.traverse((o) => {
@@ -37,7 +40,13 @@ export function sharpen(root) {
       const prev = m.onBeforeCompile;
       m.onBeforeCompile = (sh, r) => {
         prev?.call(m, sh, r);
-        sh.fragmentShader = sh.fragmentShader.replace(/}\s*$/, "  gl_FragColor.a = 0.;\n}");
+        const lit = sh.fragmentShader.includes("#include <normal_fragment_begin>");
+        if (lit) {
+          sh.uniforms.uRim = RIM;
+          sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform vec3 uRim;");
+        }
+        const rim = lit ? "  gl_FragColor.rgb += uRim*pow(1. - abs(dot(normalize(normal), normalize(vViewPosition))), 3.);\n" : "";
+        sh.fragmentShader = sh.fragmentShader.replace(/}\s*$/, rim + "  gl_FragColor.a = 0.;\n}");
       };
       const key = m.customProgramCacheKey?.bind(m);
       m.customProgramCacheKey = () => (key ? key() : "") + "|sharp";
