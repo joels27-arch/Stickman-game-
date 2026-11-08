@@ -28,6 +28,9 @@ export const PIPE_LEVELS = [
 
 /** Rim light on the runners (Space Rider's lamp sheen, cut down): its colour is set per map by the game. */
 export const RIM = { value: new THREE.Color(0, 0, 0) };
+/** A floor on the runners' brightness (their own colours times this): on a dark map the world stays dark
+    but the runners still look as they do in daylight. 0 = off. */
+export const FILL = { value: 0 };
 /** Keep these objects sharp under the motion blur: their opaque materials write alpha 0 (Space Rider's car trick),
     and give lit ones a rim of light so the runners stand out from the world. */
 const sharpened = new WeakSet();
@@ -43,9 +46,14 @@ export function sharpen(root) {
         const lit = sh.fragmentShader.includes("#include <normal_fragment_begin>");
         if (lit) {
           sh.uniforms.uRim = RIM;
-          sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform vec3 uRim;");
+          sh.uniforms.uFill = FILL;
+          sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform vec3 uRim;\nuniform float uFill;");
         }
-        const rim = lit ? "  gl_FragColor.rgb += uRim*pow(1. - abs(dot(normalize(normal), normalize(vViewPosition))), 3.);\n" : "";
+        const rim = lit
+          ? "  { float nv = abs(dot(normalize(normal), normalize(vViewPosition)));\n" +
+            "    gl_FragColor.rgb = max(gl_FragColor.rgb, diffuseColor.rgb*uFill*(.62 + .38*nv));\n" +
+            "    gl_FragColor.rgb += uRim*pow(1. - nv, 3.); }\n"
+          : "";
         sh.fragmentShader = sh.fragmentShader.replace(/}\s*$/, rim + "  gl_FragColor.a = 0.;\n}");
       };
       const key = m.customProgramCacheKey?.bind(m);

@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "/vendor/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "/vendor/jsm/utils/SkeletonUtils.js";
 import { THEMES } from "/themes.js";
-import { Pipeline, sharpen, RIM } from "/nr/pipeline.js";
+import { Pipeline, sharpen, RIM, FILL } from "/nr/pipeline.js";
 import { NR_WORLD, NR, deckMaterial, groundPlane, parapets, loadWorld, tickUniforms, startGate, backdropOf } from "/nr/lane.js";
 import {
   buildCourse,
@@ -5813,6 +5813,8 @@ const world = (() => {
     for (const [m, base] of glowMats) m.emissiveIntensity = base * (neon ? 3.2 : 1);
     if (neon) RIM.value.setRGB(0.3, 0.5, 1.1);
     else RIM.value.setRGB(0.16, 0.14, 0.1);
+    // dark maps stay dark, the runners don't: at the neon worlds' exposure this is about daylight brightness
+    FILL.value = neon ? 1.7 : 0.45;
   }
   function setSky(map) {
     const nrw = NR_WORLD[map];
