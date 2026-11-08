@@ -36,6 +36,7 @@ export function buildCourse(seed: number, len?: number, boost?: number): {
   slows: { z: number; lane: number }[];
   portals: { z: number; lanes: string[]; flip?: boolean; words?: string[] }[];
   flips: { z: number; on: boolean }[];
+  loops: { z: number; len: number }[];
   boxes: { z: number; lane: number }[];
   hearts: { z: number; lane: number }[];
   buses: { lane: number; z0: number; z1: number; look: number; ramp: boolean }[];
@@ -83,6 +84,9 @@ export const PORTAL_CHANCE: number;
 export const PORTAL_BOOST_MS: number;
 export function portalLanes(r: () => number): string[];
 export const TRICKS_FROM: number;
+export const LOOP_LEN: number;
+export const LOOP_R: number;
+export const LOOP_SHIFT: number;
 export function gateRow(r: () => number, z: number): { z: number; lanes: string[]; flip?: boolean; words?: string[] };
 export function gateGood(row: { lanes: string[]; flip?: boolean }, lane: number): boolean;
 export function livesOf(state: unknown): number;

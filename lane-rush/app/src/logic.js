@@ -669,6 +669,11 @@ export function portalLanes(r) {
   if (r() < 0.4) lanes[(a + 1 + Math.floor(r() * 3)) % 4] = "g";
   return lanes;
 }
+/** Space Rider's loop-the-loop: a stretch of LOOP_LEN metres of running that goes up and over (radius LOOP_R),
+    swaying LOOP_SHIFT metres sideways so the way in and the way out pass each other. Nothing to dodge in it. */
+export const LOOP_LEN = 44;
+export const LOOP_R = 9;
+export const LOOP_SHIFT = 5.5;
 /** After this far, gate labels can lie (Space Rider's trick words): the word says one colour, the gate is the other. */
 export const TRICKS_FROM = 300;
 /**
@@ -715,6 +720,8 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
   const r4 = rng((seed ^ 0x2545f491) >>> 0);
   const portals = [];
   const flips = [];
+  const loops = [];
+  let nextLoop = 170 + r4() * 120;
   const endless = len > TRACK_LEN;
   const kind = endless ? "survival" : "sprint";
   const rows = [];
@@ -754,6 +761,18 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
     const stage = stageAt(dz);
     const speed = speedAtDistance(kind, z);
     const step = speed * stage.react;
+    // a loop-the-loop every 450–700 m (never in the last stretch)
+    if (z >= nextLoop && z < len - LOOP_LEN - 80) {
+      if (rows.length && z - prevZ > MAX_EMPTY_M) z = prevZ + MAX_EMPTY_M;
+      z = Math.max(z, prevZ + step);
+      const lz = Math.ceil(z * 10) / 10;
+      loops.push({ z: lz, len: LOOP_LEN });
+      z = lz + LOOP_LEN + step * 0.9;
+      prevZ = lz + LOOP_LEN;
+      reach = new Map([[0, "run"], [1, "run"], [2, "run"], [3, "run"]]);
+      nextLoop = z + 450 + r4() * 250;
+      continue;
+    }
 
     // the stage's mix, minus last pattern, minus warm-up patterns not due yet
     // barrels only once crates have been taught (you learn to change lanes first)
@@ -877,7 +896,7 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
     else if (!portal && z > 60 && (sinceBox >= 4 || r2() < 0.22)) addBox(z + gap * 0.55);
     z += gap;
   }
-  return { rows, boosts, slows, portals, flips, boxes, hearts, buses, len };
+  return { rows, boosts, slows, portals, flips, loops, boxes, hearts, buses, len };
 }
 
 // ── moving obstacles: each map has two, sweeping across the lanes ──────────

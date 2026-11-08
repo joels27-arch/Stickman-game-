@@ -183,7 +183,7 @@ describe("difficulty manager", () => {
     for (let seed = 0; seed < 200; seed++) {
       const c = L.buildCourse(seed * 7919, L.SURVIVAL_LEN);
       // a bus (its ramp, front and end) is something to deal with too, not empty track
-      const z = [...c.rows.map((r) => r.z), ...(c.portals ?? []).map((p) => p.z), ...c.buses.flatMap((b) => [b.z0 - L.RAMP_LEN, b.z0, b.z1])].sort((a, b) => a - b).filter((x) => x < 2000);
+      const z = [...c.rows.map((r) => r.z), ...(c.portals ?? []).map((p) => p.z), ...(c.loops ?? []).flatMap((l) => [l.z, l.z + l.len]), ...c.buses.flatMap((b) => [b.z0 - L.RAMP_LEN, b.z0, b.z1])].sort((a, b) => a - b).filter((x) => x < 2000);
       expect(z[0]).toBeLessThanOrEqual(L.MAX_EMPTY_M);
       for (let i = 1; i < z.length; i++) expect(z[i]! - z[i - 1]!).toBeLessThanOrEqual(L.MAX_EMPTY_M + 12); // + a fairness widening at most
       expect(z.filter((x) => x < 800).length).toBeGreaterThanOrEqual(28);

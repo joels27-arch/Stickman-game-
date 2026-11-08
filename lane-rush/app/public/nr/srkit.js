@@ -182,8 +182,44 @@ export function makeSrKit(gltfScene) {
     }
   }
 
+  // the hover-bus and its ramp (Space Rider's makeBus): metallic paint, black glass, cyan LEDs, a deck of running amber arrows
+  const busPaint = new THREE.MeshStandardMaterial({ color: 0xd8dade, metalness: 0.55, roughness: 0.3, envMapIntensity: 1.3 });
+  const busGlass = new THREE.MeshStandardMaterial({ color: 0x05070c, metalness: 0.9, roughness: 0.08, envMapIntensity: 1.7 });
+  const busLed = HDR(0.4, 3.5, 4.2);
+  const rampDeck = new THREE.ShaderMaterial({
+    toneMapped: false,
+    uniforms: { uTime: time },
+    vertexShader: vsUv,
+    fragmentShader: `varying vec2 vUv; uniform float uTime;
+      void main(){
+        float x = abs(vUv.x - .5);
+        float y = fract(vUv.y*4. - x*1.4 - uTime*1.8);
+        float arrow = smoothstep(.55, .62, y)*smoothstep(1., .93, y);
+        float edge = smoothstep(.42, .47, x);
+        gl_FragColor = vec4(mix(vec3(.05, .045, .04), vec3(5.2, 3., .5), max(arrow*.9, edge)), 1.);
+      }`,
+  });
+  const busSwap = (n) => (n === "busbody" ? busPaint : n === "glass" ? busGlass : n === "led" ? busLed : n === "rampdeck" ? rampDeck : mats[n] || mats.steel);
+  const dress = (src) => {
+    const c = clone(src, busSwap);
+    c.position.set(0, 0, 0);
+    return c;
+  };
+  // the coin: Space Rider's disc and its gold
+  let coinGeo = null;
+  get("coin")?.traverse((o) => {
+    if (o.isMesh && !coinGeo) coinGeo = o.geometry;
+  });
+  const coinMat = new THREE.MeshStandardMaterial({ color: 0xffc14a, metalness: 1, roughness: 0.2, emissive: new THREE.Color(1, 0.55, 0.08), emissiveIntensity: 1.1, envMapIntensity: 1.8 });
+
   return {
     time,
+    busPaint,
+    /** Fresh copies of the hover-bus and its ramp (the game fits them to its own sizes). */
+    busModel: () => dress(get("hoverbus")),
+    rampModel: () => dress(get("busramp")),
+    coinGeo,
+    coinMat,
     /** A gate for one lane: c is "g" or "r"; word ("RED" / "GREEN") puts Space Rider's label over it. */
     gate(c, wordText) {
       const o = gates[c].clone();

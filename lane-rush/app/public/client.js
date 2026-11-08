@@ -40,6 +40,8 @@ import {
   SLOW_PAD_MS,
   PORTAL_BOOST_MS,
   gateGood,
+  LOOP_R,
+  LOOP_SHIFT,
   ROUND_OPTIONS,
   ROUND_KINDS,
   PARTY_KINDS,
@@ -282,6 +284,29 @@ const VIEW_BEHIND = 20;
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 const laneX = (lane) => (lane - (LANES - 1) / 2) * LANE_W;
+/**
+ * Space Rider's loop-the-loop. Running distance d stays linear (the rules don't know about loops);
+ * only where things are drawn bends: through a loop starting at z0 (length L, radius R) the track
+ * goes up, over the top running backwards, and down again, swaying sideways so the way in and out
+ * pass each other. loopPlace moves a point given as (x, local height y, z = -d) onto the loop and
+ * returns the angle (0 … 2π) to tilt a runner by, or null outside every loop.
+ */
+let curLoops = [];
+function loopAt(d) {
+  for (const l of curLoops) if (d > l.z && d < l.z + l.len) return l;
+  return null;
+}
+function loopPlace(d, v) {
+  const l = loopAt(d);
+  if (!l) return null;
+  const u = (d - l.z) / l.len;
+  const th = u * Math.PI * 2;
+  const h = v.y; // height above the track, along the loop's "up"
+  v.x += LOOP_SHIFT * Math.sin(th);
+  v.y = LOOP_R * (1 - Math.cos(th)) + h * Math.cos(th);
+  v.z = -(l.z + l.len * u + LOOP_R * Math.sin(th)) + h * Math.sin(th);
+  return th;
+}
 const $ = (s) => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ordinal = (n) => (n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th");
@@ -5081,7 +5106,15 @@ const world = (() => {
       // gates are wide enough that their pillars stand outside the fences
       // green pad: chevrons down the track; red pad: chevrons pointing back at the runner (art/blender/build_pads.py)
       // Space Rider's course props: its gates, barriers, low bars and craters (nr/srkit.js)
-      loadGLB("/assets/sr_props.glb").then((g) => (assets.srKit = makeSrKit(g.scene))).catch((e) => console.error("sr props", e)),
+      loadGLB("/assets/sr_props.glb")
+        .then((g) => {
+          const kit = (assets.srKit = makeSrKit(g.scene));
+          // its hover-bus and ramp, and its smaller coin
+          assets.srBus = fitBus(kit.busModel(), false);
+          assets.srRamp = fitRamp(kit.rampModel());
+          if (kit.coinGeo) useSrCoins(kit.coinGeo, kit.coinMat);
+        })
+        .catch((e) => console.error("sr props", e)),
       loadGLBOr("bl_pad_go", "boost_pad").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
       loadGLB("/assets/bl_pad_slow.glb").then((g) => (assets.props.slowPad = fitPad(g.scene))).catch(() => {}),
       loadGLBOr("bl_bus", "bus").then((g) => (assets.props.bus = fitBus(g.scene))).catch(() => {}),
@@ -7220,6 +7253,8 @@ const world = (() => {
     clearCourse();
     let course = buildCourse(seed, len, boost);
     if (world.easy) course = easyCourse(course);
+    curLoops = course.loops ?? [];
+    for (const l of curLoops) raceGroup.add(loopTrack(l));
     rollers = [];
     boxes = [];
     hearts = [];
@@ -7260,12 +7295,13 @@ const world = (() => {
     // buses (a second level to run on) and the ramps up to their roofs
     for (const b of course.buses ?? []) {
       const artlist = b.look % 2 === 0 && assets.props.bus2;
-      const bus = (artlist ? assets.props.bus2 : assets.props.bus ?? (assets.props.bus = busStandIn())).clone();
+      const sr = activeMap !== "meadow" && assets.srBus;
+      const bus = (sr ? assets.srBus : artlist ? assets.props.bus2 : assets.props.bus ?? (assets.props.bus = busStandIn())).clone();
       bus.position.set(laneX(b.lane), 0, -(b.z0 + b.z1) / 2);
       raceGroup.add(bus);
       cullables.push({ obj: bus, z: b.z0, z1: b.z1 });
       if (b.ramp === false) continue;
-      const ramp = assets.props.ramp2 ? assets.props.ramp2.clone() : makeRamp(); // the Blender ramp on every map
+      const ramp = sr && assets.srRamp ? assets.srRamp.clone() : assets.props.ramp2 ? assets.props.ramp2.clone() : makeRamp(); // Space Rider's ramp, the Blender one on the meadow
       ramp.position.set(laneX(b.lane), 0, -(b.z0 - RAMP_LEN));
       raceGroup.add(ramp);
       cullables.push({ obj: ramp, z: b.z0 - RAMP_LEN, z1: b.z0 });
@@ -7332,6 +7368,53 @@ const world = (() => {
     return course;
   }
 
+  /** The loop-the-loop's own track: a ribbon as wide as the track, dark deck, lane lines, glowing edges. */
+  let loopTex = null;
+  function loopTrack(l) {
+    if (!loopTex) {
+      const c = document.createElement("canvas");
+      c.width = 256;
+      c.height = 64;
+      const g = c.getContext("2d");
+      g.fillStyle = "#15131c";
+      g.fillRect(0, 0, 256, 64);
+      g.fillStyle = "#ffffff";
+      for (let i = 1; i < LANES; i++) g.fillRect((i / LANES) * 256 - 2, 0, 4, 40);
+      g.fillStyle = "#ff3fd0";
+      g.fillRect(0, 0, 8, 64);
+      g.fillStyle = "#3ff0ff";
+      g.fillRect(248, 0, 8, 64);
+      loopTex = new THREE.CanvasTexture(c);
+      loopTex.colorSpace = THREE.SRGBColorSpace;
+      loopTex.wrapT = THREE.RepeatWrapping;
+    }
+    const N = 160;
+    const W = TRACK_W / 2;
+    const pos = [];
+    const uv = [];
+    const idx = [];
+    const v = new THREE.Vector3();
+    for (let i = 0; i <= N; i++) {
+      const d = l.z + (l.len * i) / N;
+      for (const side of [-1, 1]) {
+        v.set(side * W, 0, -d);
+        if (i === 0 || i === N) v.set(side * W, 0, -d);
+        else loopPlace(d, v);
+        pos.push(v.x, v.y, v.z);
+        uv.push(side < 0 ? 0 : 1, (i / N) * 30);
+      }
+      if (i < N) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: loopTex, emissiveMap: loopTex, emissive: new THREE.Color(1.6, 1.6, 1.6), roughness: 0.35, metalness: 0.4, side: THREE.DoubleSide }));
+    m.position.y = 0.03;
+    m.frustumCulled = false;
+    return m;
+  }
   /** Space Rider's model for an obstacle, if its kit is loaded: crates are its barriers, hurdles its low bars, look 2 a crater. */
   function srProto(kind, look) {
     const kit = assets.srKit;
@@ -7765,6 +7848,13 @@ const world = (() => {
   scene.add(runCoinMesh);
   let runCoins = [];
   let runLo = 0;
+  // Space Rider's coin (a thin disc facing you, half the old size) once its kit has loaded
+  let srCoin = false;
+  function useSrCoins(geo, mat) {
+    runCoinMesh.geometry = geo;
+    runCoinMesh.material = mat;
+    srCoin = true;
+  }
   // energy bolts (races with other runners): 20 charge the sprint button
   const boltShape = new THREE.Shape();
   [[0.12, 0.62], [-0.3, -0.02], [-0.02, -0.02], [-0.16, -0.62], [0.32, 0.1], [0.04, 0.1], [0.2, 0.62]].forEach(([x, y], i) => (i ? boltShape.lineTo(x, y) : boltShape.moveTo(x, y)));
@@ -7813,10 +7903,12 @@ const world = (() => {
         boltMesh.setMatrixAt(nb++, rcM.compose(rcP, rcQ, rcS));
         continue;
       }
+      rcE.x = srCoin ? 0 : Math.PI / 2;
       rcE.y = k * 3 + c.z;
       rcQ.setFromEuler(rcE);
-      rcP.set(laneX(c.lane), c.y + 0.85 + Math.sin(k * 4 + c.z) * 0.08, -c.z);
-      rcS.setScalar(c.v > 1 ? 0.95 : 0.62);
+      rcP.set(laneX(c.lane), c.y + (srCoin ? 0.7 : 0.85) + Math.sin(k * 4 + c.z) * 0.08, -c.z);
+      loopPlace(c.z, rcP, null);
+      rcS.setScalar(srCoin ? (c.v > 1 ? 0.62 : 0.42) : c.v > 1 ? 0.95 : 0.62);
       runCoinMesh.setMatrixAt(n++, rcM.compose(rcP, rcQ, rcS));
     }
     runCoinMesh.count = n;
@@ -9098,6 +9190,7 @@ function stepMe(dt) {
       banner("🐢 SLOWED!", 700);
     }
   }
+  for (const l of course.loops ?? []) if (l.z > prevD && l.z <= me.d) banner("🎢 LOOP!", 1200);
   // rule flips (Space Rider): for a stretch, red gates are the good ones
   for (const f of course.flips ?? []) {
     if (f.z <= prevD || f.z > me.d) continue;
@@ -11385,6 +11478,8 @@ function frame(now) {
     const zMe = -me.d;
     if (me.runner) {
       me.runner.group.position.set(laneX(me.x), me.base + me.y, zMe);
+      me.loopTh = loopPlace(me.d, me.runner.group.position);
+      me.runner.group.rotation.x = me.loopTh ?? 0;
       if (equipped().trail && me.speed > 2 && !me.out) world.trail(equipped().trail, laneX(me.x), me.base + me.y, zMe);
       me.runner.group.visible = !(me.invulnT > 0 && me.stumbleT <= 0 && !me.power && Math.floor(now / 90) % 2 === 0);
       animateRunner(me.runner, currentAct(), me.speed, dt * ts, me.power);
@@ -11410,6 +11505,7 @@ function frame(now) {
       r.dispX += (laneX(p.lane) - r.dispX) * Math.min(1, dt * 12);
       r.dispY += (p.y - r.dispY) * Math.min(1, dt * 18);
       r.runner.group.position.set(r.dispX, r.dispY, -r.dispD);
+      r.runner.group.rotation.x = loopPlace(r.dispD, r.runner.group.position) ?? 0;
       // far behind or far ahead: off screen, so skip the animation work
       if (!me.out && (r.dispD < me.d - 25 || r.dispD > me.d + VIEW_AHEAD)) {
         r.runner.group.visible = false;
@@ -11477,6 +11573,21 @@ function frame(now) {
       camGoal.set(tx, back ? 2.5 + fy * 0.6 : camUp + fy * 0.75, back ? fz - 4.2 : fz + camBack); // reused: no garbage per frame (closer and lower: your runner big, the track fast)
       camPos.lerp(camGoal, Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     }
+    // through a loop: the camera rides round with your runner, its "up" turning with the track
+    if (!intro && !me.out && !back && me.loopTh != null && me.runner) {
+      const th = me.loopTh;
+      const rp = me.runner.group.position;
+      loopUp.set(0, Math.cos(th), Math.sin(th));
+      loopFwd.set(0, Math.sin(th), -Math.cos(th));
+      camPos.copy(rp).addScaledVector(loopUp, camUp - 0.4).addScaledVector(loopFwd, -camBack);
+      camera.position.copy(camPos);
+      camera.up.copy(loopUp);
+      camLook.copy(rp).addScaledVector(loopUp, 1.15).addScaledVector(loopFwd, 10);
+      camera.lookAt(camLook);
+      world.lookBack(false);
+      world.cull(fd);
+    } else {
+    camera.up.set(0, 1, 0);
     camera.position.copy(camPos);
     if (shake > 0) {
       shake = Math.max(0, shake - dt);
@@ -11489,6 +11600,7 @@ function frame(now) {
     camera.lookAt(camLook);
     world.lookBack(back);
     world.cull(back ? fd - 30 : fd);
+    }
     world.syncBananas(net.view?.bananas || [], slipped);
     world.syncCloud(net.view?.cloud, (id) => {
       const g = id === playerId ? me.runner?.group : remote.map.get(id)?.runner?.group;
@@ -11550,6 +11662,8 @@ function frame(now) {
   adaptQuality(dt);
 }
 
+const loopUp = new THREE.Vector3();
+const loopFwd = new THREE.Vector3();
 const introPath = new THREE.CatmullRomCurve3([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], false, "centripetal");
 const hudEl = { timer: $("#timer"), dist: $("#distText"), place: $("#place"), dots: $("#dots") };
 function updateHud() {
