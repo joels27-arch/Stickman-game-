@@ -17,6 +17,7 @@ import { GLTFLoader } from "/vendor/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "/vendor/jsm/utils/SkeletonUtils.js";
 import { THEMES } from "/themes.js";
 import { Pipeline, sharpen, RIM, FILL } from "/nr/pipeline.js";
+import { makeSrKit } from "/nr/srkit.js";
 import { NR_WORLD, NR, deckMaterial, groundPlane, parapets, loadWorld, tickUniforms, startGate, backdropOf } from "/nr/lane.js";
 import {
   buildCourse,
@@ -38,6 +39,7 @@ import {
   CUP_POINTS,
   SLOW_PAD_MS,
   PORTAL_BOOST_MS,
+  gateGood,
   ROUND_OPTIONS,
   ROUND_KINDS,
   PARTY_KINDS,
@@ -272,6 +274,7 @@ const POWER_TIPS = 3; // how many times a power-up is explained when you pick it
 // phones and tablets (iPads can report a fine pointer, so check for touch too)
 const TOUCH = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0 || "ontouchstart" in window;
 const BOOST_S = 1.6;
+const OVERDRIVE_S = 6; // Space Rider: five good gates in a row → six seconds of Overdrive
 const LANE_SWITCH_SPEED = 9; // lanes per second
 const SEND_MS = 100;
 const VIEW_AHEAD = 120;
@@ -5077,6 +5080,8 @@ const world = (() => {
       loadGLBOr("bl_banana", "banana").then((g) => (assets.props.banana = fitProp(g.scene, { width: 1.0, maxHeight: 0.3 }))).catch(() => (assets.props.banana = bananaStandIn())),
       // gates are wide enough that their pillars stand outside the fences
       // green pad: chevrons down the track; red pad: chevrons pointing back at the runner (art/blender/build_pads.py)
+      // Space Rider's course props: its gates, barriers, low bars and craters (nr/srkit.js)
+      loadGLB("/assets/sr_props.glb").then((g) => (assets.srKit = makeSrKit(g.scene))).catch((e) => console.error("sr props", e)),
       loadGLBOr("bl_pad_go", "boost_pad").then((g) => (assets.props.boostPad = fitPad(g.scene))).catch(() => {}),
       loadGLB("/assets/bl_pad_slow.glb").then((g) => (assets.props.slowPad = fitPad(g.scene))).catch(() => {}),
       loadGLBOr("bl_bus", "bus").then((g) => (assets.props.bus = fitBus(g.scene))).catch(() => {}),
@@ -7233,7 +7238,7 @@ const world = (() => {
         let look = row.looks?.[lane] ?? 0;
         // no cows or hay bales in the city, the stadium or space
         if (BUILT_MAPS.has(activeMap) && look === 1 && (kind === "crate" || kind === "hurdle")) look = 0;
-        const proto = (activeMap === "artlist" && assets.props[`al_${kind}`]) || (activeMap === "meadow" && (assets.props[`vl_${kind}${look}`] || assets.props[`vl_${kind}0`])) || assets.props[`${kind}${look}`] || assets.props[`${kind}0`];
+        const proto = (activeMap !== "meadow" && srProto(kind, look)) || (activeMap === "artlist" && assets.props[`al_${kind}`]) || (activeMap === "meadow" && (assets.props[`vl_${kind}${look}`] || assets.props[`vl_${kind}0`])) || assets.props[`${kind}${look}`] || assets.props[`${kind}0`];
         const o = proto.clone();
         o.position.set(laneX(lane), 0, -row.z);
         if (kind === "crate") o.rotation.y = ((row.z * 7 + lane) % 3 - 1) * 0.12 + (look === 1 ? (lane < 2 ? 0.5 : -0.5) : 0);
@@ -7313,10 +7318,12 @@ const world = (() => {
       raceGroup.add(pad);
       cullables.push({ obj: pad, z: b.z });
     }
-    // portal rows: a glowing gate in every lane, green boosts you, red slows you
+    // gate rows (Space Rider's rules): run through a green gate, never a red one (the other way round while the rules are flipped)
     for (const pt of course.portals ?? []) {
       pt.lanes.forEach((c, lane) => {
-        const o = portalProto(c).clone();
+        if (c === "e") return; // no gate: a safe lane
+        const kit = assets.srKit;
+        const o = kit ? kit.gate(c, pt.words?.[lane]) : portalProto(c).clone();
         o.position.set(laneX(lane), 0, -pt.z);
         raceGroup.add(o);
         cullables.push({ obj: o, z: pt.z });
@@ -7325,6 +7332,14 @@ const world = (() => {
     return course;
   }
 
+  /** Space Rider's model for an obstacle, if its kit is loaded: crates are its barriers, hurdles its low bars, look 2 a crater. */
+  function srProto(kind, look) {
+    const kit = assets.srKit;
+    if (!kit) return null;
+    if (kind === "crate") return kit.barrier;
+    if (kind === "hurdle") return look === 2 ? kit.crater : kit.lowbar;
+    return null;
+  }
   // ── portals: built in code (a few boxes and two see-through panels, shared by every gate) ──
   const portalTex = [];
   const portalProtos = {};
@@ -8100,6 +8115,7 @@ const world = (() => {
   function animateCourse(d, raceT, dt) {
     nrTick(d, dt);
     for (const t of portalTex) t.offset.y = (t.offset.y + t.userData.dir * dt * 0.9) % 1; // the chevrons stream through the gates
+    assets.srKit?.tick(performance.now() / 1000);
     for (const r of rollers) {
       if (r.startedAt === null && raceT !== null && d >= r.z0 - ROLLER_TRIGGER_M) {
         r.startedAt = raceT;
@@ -8270,6 +8286,8 @@ const me = {
   stumbleT: 0,
   invulnT: 0,
   boostT: 0,
+  od: 0,
+  odT: 0,
   items: [], // power-ups you're holding: [next, saved] (two at most)
   frozenT: 0, // slowed by someone's freeze
   score: 0, // style points: clean jumps, slides and close calls
@@ -8415,6 +8433,8 @@ function enterRace(v) {
     stumbleT: 0,
     invulnT: 0,
     boostT: 0,
+    od: 0,
+    odT: 0,
     sprintT: 0,
     bolts: 0,
     // everyone starts each race holding a random power-up
@@ -8907,6 +8927,10 @@ function stepMe(dt) {
   me.stumbleT = Math.max(0, me.stumbleT - dt);
   me.invulnT = Math.max(0, me.invulnT - dt);
   me.boostT = Math.max(0, me.boostT - dt);
+  if (me.odT > 0) {
+    me.odT = Math.max(0, me.odT - dt);
+    me.boostT = Math.max(me.boostT, me.odT);
+  }
   me.frozenT = Math.max(0, me.frozenT - dt);
   me.waveT = Math.max(0, (me.waveT ?? 0) - dt);
   me.glueT = Math.max(0, (me.glueT ?? 0) - dt);
@@ -9074,21 +9098,34 @@ function stepMe(dt) {
       banner("🐢 SLOWED!", 700);
     }
   }
-  // portals: you go through whichever gate is in your lane (a rocket flies over them)
+  // rule flips (Space Rider): for a stretch, red gates are the good ones
+  for (const f of course.flips ?? []) {
+    if (f.z <= prevD || f.z > me.d) continue;
+    banner(f.on ? "🔀 RULES FLIP · RED IS GOOD" : "✅ RULES BACK · GREEN IS GOOD", 1600);
+    sfx.boost();
+  }
+  // gate rows (Space Rider's rules): a good gate kicks your speed and charges Overdrive, a wrong one is a hit
   for (const pt of course.portals ?? []) {
     if (pt.z <= prevD || pt.z > me.d || me.power === "rocket") continue;
-    const c = pt.lanes[Math.max(0, Math.min(LANES - 1, Math.round(me.x)))];
-    if (c === "g") {
+    const lane = Math.max(0, Math.min(LANES - 1, Math.round(me.x)));
+    if (gateGood(pt, lane)) {
+      if (pt.lanes[lane] === "e") continue; // the empty lane: safe, nothing more
       me.boostT = Math.max(me.boostT, PORTAL_BOOST_MS / 1000);
       me.slowPadT = 0;
       sfx.boost();
-      banner("⚡ PORTAL BOOST!", 800);
-    } else {
-      me.slowPadT = SLOW_PAD_MS / 1000;
-      me.boostT = 0;
-      sfx.slip();
-      buzz(40);
-      banner("🐢 RED PORTAL!", 800);
+      if ((me.odT ?? 0) > 0) continue;
+      me.od = Math.min(1, (me.od ?? 0) + 0.2);
+      if (me.od >= 1) {
+        me.od = 0;
+        me.odT = OVERDRIVE_S;
+        me.boostT = OVERDRIVE_S;
+        banner("⚡ OVERDRIVE!", 1400);
+        buzz(60);
+      } else banner(`⚡ GATE ${Math.round(me.od * 5)}/5`, 700);
+    } else if ((me.odT ?? 0) <= 0) {
+      me.od = Math.max(0, (me.od ?? 0) - 0.25);
+      banner(pt.flip ? "❌ GREEN WAS WRONG!" : "❌ RED GATE!", 900);
+      hit("gate");
     }
   }
   for (const b of course.boosts) {
@@ -9103,6 +9140,7 @@ function stepMe(dt) {
 
 function hit(kind) {
   if (me.invulnT > 0 || me.stumbleT > 0) return;
+  if ((me.odT ?? 0) > 0) return; // Overdrive smashes through everything
   if (me.power === "shield") {
     endPower();
     me.invulnT = 0.8;

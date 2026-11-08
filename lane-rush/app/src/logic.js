@@ -289,7 +289,7 @@ export const ZAP_COOLDOWN_MS = 3000;
 export const ROLLER_SPEED = 6; // m/s a barrel rolls toward you once it's triggered
 export const ROLLER_TRIGGER_M = 34; // a barrel starts rolling when you're this close
 /** How many visual variants each obstacle kind has (same collision rules). */
-export const LOOKS = { hurdle: 2, gate: 2, crate: 3, roller: 1 };
+export const LOOKS = { hurdle: 3, gate: 2, crate: 3, roller: 1 }; // hurdle look 2: a meteor crater
 
 /** Every country and territory a runner can cheer for (ISO 3166 alpha-2 + English name, A–Z; Kosovo as XK). */
 export const COUNTRIES = [
@@ -456,6 +456,44 @@ const PATTERNS = {
   combo: {
     rows: () => [["hurdle", "hurdle", "hurdle", "hurdle"], ["hurdle", "hurdle", "hurdle", "hurdle"]],
   },
+  // ── Space Rider's patterns, widened to four lanes ──
+  // barrier: one or two lanes shut (change lane)
+  barrier: {
+    rows: (r) => {
+      const lanes = [null, null, null, null];
+      for (const i of shuffled(r).slice(0, r() < 0.55 ? 2 : 1)) lanes[i] = "crate";
+      return [lanes];
+    },
+  },
+  // slalom: three single barriers in random lanes
+  slalom: { rows: (r) => [0, 1, 2].map(() => placeOne(r, "crate")) },
+  // low bars: one or two lanes (jump them for the coins, or change lane)
+  lowbars: {
+    rows: (r) => {
+      const lanes = [null, null, null, null];
+      for (const i of shuffled(r).slice(0, r() < 0.55 ? 2 : 1)) lanes[i] = "hurdle";
+      return [lanes];
+    },
+  },
+  // forced: barriers everywhere but one lane, and that lane has a bar: you must jump
+  forced: {
+    rows: (r) => {
+      const lanes = ["crate", "crate", "crate", "crate"];
+      lanes[Math.floor(r() * 4)] = "hurdle";
+      return [lanes];
+    },
+  },
+  // meteor strike: craters in two or three lanes (jump them, or take the open lane)
+  strike: {
+    look: 2,
+    rows: (r) => {
+      const lanes = ["hurdle", "hurdle", "hurdle", "hurdle"];
+      for (const i of shuffled(r).slice(0, r() < 0.5 ? 2 : 1)) lanes[i] = null;
+      return [lanes];
+    },
+  },
+  // a full-width hurdle, then a gate row straight after
+  jumpGate: { gateAfter: true, rows: () => [["hurdle", "hurdle", "hurdle", "hurdle"]] },
   // a slalom where every gap also needs a jump or a slide
   zigzag: {
     rows: (r) => slalom(r, 3).map((lanes, i) => lanes.map((k) => (k === null && i % 2 ? "hurdle" : k))),
@@ -489,14 +527,15 @@ function slalom(r, n) {
  *   Master        2.4 km zigzags, everything, tightest (but always fair) timing
  */
 export const STAGES = [
-  { name: "Warm-up", from: 0, react: 1.3, mix: { hurdleOne: 4, hurdleWall: 2, crateOne: 2, bus: 12 } },
-  { name: "Getting going", from: 250, react: 1.15, mix: { hurdleOne: 1, crateOne: 1, hurdleWall: 1, split: 2.5, barrels: 1.2, bus: 16, breather: 0.7 } },
-  { name: "In the zone", from: 700, react: 1.02, mix: { split: 2, barrels: 1, tunnel: 1.2, slalom2: 1.5, hurdleWall: 1, bus: 16, breather: 0.55 } },
-  { name: "Pro", from: 1400, react: 1.05, mix: { split: 1.2, tunnel: 1, slalom2: 1, slalom3: 1.3, combo: 1.2, barrels2: 1, bus: 15, breather: 0.45 } },
-  { name: "Master", from: 2400, react: 0.92, mix: { tunnel: 1, slalom3: 1.5, combo: 1.3, zigzag: 1.2, barrels2: 1, split: 1, bus: 15, breather: 0.35 } },
+  // Space Rider's mix (its weights ×10; gates/gates2/flip are gate rows, see buildCourse), plus Lane Rush's buses and breathers
+  { name: "Warm-up", from: 0, react: 1.3, mix: { gates: 5, hurdleOne: 1.5, hurdleWall: 1.5, crateOne: 1, bus: 12 } },
+  { name: "Getting going", from: 250, react: 1.15, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 0.5, hurdleWall: 1.5, combo: 0.9, lowbars: 1.5, jumpGate: 0.9, strike: 0.8, flip: 0.5, barrels: 0.9, bus: 16, breather: 0.5 } },
+  { name: "In the zone", from: 700, react: 1.05, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 0.8, hurdleWall: 1.5, combo: 0.9, lowbars: 1.5, jumpGate: 0.9, forced: 0.9, strike: 0.8, flip: 0.7, barrels: 0.9, bus: 16, breather: 0.45 } },
+  { name: "Pro", from: 1400, react: 1.0, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 1, slalom2: 0.6, hurdleWall: 1.5, combo: 1.3, lowbars: 1.5, jumpGate: 0.9, forced: 0.9, strike: 0.8, flip: 0.7, barrels2: 0.9, bus: 15, breather: 0.4 } },
+  { name: "Master", from: 2400, react: 0.92, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 1, slalom3: 1, hurdleWall: 1.5, combo: 1.3, lowbars: 1.5, jumpGate: 0.9, forced: 0.9, strike: 0.8, flip: 0.7, zigzag: 0.6, barrels2: 0.9, bus: 15, breather: 0.35 } },
 ];
 /** In the warm-up, each first-time pattern waits until here (so they come one at a time). */
-const FIRST_AT = { hurdleOne: 0, bus: 40, hurdleWall: 125, crateOne: 150 };
+const FIRST_AT = { hurdleOne: 0, gates: 20, bus: 40, hurdleWall: 125, crateOne: 150 };
 export function stageAt(z) {
   let st = STAGES[0];
   for (const x of STAGES) if (z >= x.from) st = x;
@@ -630,6 +669,36 @@ export function portalLanes(r) {
   if (r() < 0.4) lanes[(a + 1 + Math.floor(r() * 3)) % 4] = "g";
   return lanes;
 }
+/** After this far, gate labels can lie (Space Rider's trick words): the word says one colour, the gate is the other. */
+export const TRICKS_FROM = 300;
+/**
+ * A Space Rider gate row across the four lanes: "g" green, "r" red, "e" no gate (always safe).
+ * 14 %: all red but one empty lane. Otherwise one green (sometimes two), and 35 % of the time one red is missing.
+ */
+export function gateRow(r, z) {
+  let lanes;
+  if (r() < 0.14) {
+    lanes = ["r", "r", "r", "r"];
+    lanes[Math.floor(r() * 4)] = "e";
+  } else {
+    lanes = ["r", "r", "r", "r"];
+    const a = Math.floor(r() * 4);
+    lanes[a] = "g";
+    if (r() < 0.3) lanes[(a + 1 + Math.floor(r() * 3)) % 4] = "g";
+    if (r() < 0.35) {
+      const reds = lanes.map((c, i) => (c === "r" ? i : -1)).filter((i) => i >= 0);
+      if (reds.length) lanes[reds[Math.floor(r() * reds.length)]] = "e";
+    }
+  }
+  const row = { z, lanes };
+  if (z > TRICKS_FROM && r() < 0.32) row.words = lanes.map((c) => (c === "e" ? "" : (r() < 0.62) === (c === "g") ? "RED" : "GREEN"));
+  return row;
+}
+/** Is this lane of a gate row a good one? Green (red while the rules are flipped), or no gate at all. */
+export function gateGood(row, lane) {
+  const c = row.lanes[lane];
+  return c === "e" || c === (row.flip ? "r" : "g");
+}
 /** Running over a red slow pad slows you down this long (ms). */
 export const SLOW_PAD_MS = 1300;
 /** The longest run without an obstacle row (metres): about 3 s even at the start. */
@@ -645,6 +714,7 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
   // portal rows use their own stream too
   const r4 = rng((seed ^ 0x2545f491) >>> 0);
   const portals = [];
+  const flips = [];
   const endless = len > TRACK_LEN;
   const kind = endless ? "survival" : "sprint";
   const rows = [];
@@ -661,6 +731,18 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
   let sinceRest = 0;
   let reach = new Map([[0, "run"], [1, "run"], [2, "run"], [3, "run"]]);
   let prevZ = 0;
+  // a gate row counts like an obstacle row for fairness: red lanes are shut, green and empty ones open
+  const placeGate = (pt, gz) => {
+    const asRow = { lanes: pt.lanes.map((c, l) => (gateGood(pt, l) ? null : "crate")) };
+    const v = speedAtDistance(kind, prevZ);
+    const need = worstNeed(reach, asRow) * v;
+    if (gz - prevZ < need) gz = prevZ + need + 0.5;
+    pt.z = Math.ceil(gz * 10) / 10;
+    reach = nextReach(reach, asRow, Math.max((pt.z - prevZ) / v, need / v));
+    prevZ = pt.z;
+    portals.push(pt);
+    return pt.z;
+  };
   const addBox = (bz) => {
     const first = Math.floor(r2() * 4);
     boxes.push({ z: Math.round(bz * 10) / 10, lane: first });
@@ -717,6 +799,25 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
       sinceRest += 1;
       continue;
     }
+    if (name === "gates" || name === "gates2" || name === "flip") {
+      // Space Rider's gate rows: run through a green one (red while the rules are flipped)
+      const n = name === "gates" ? 1 : name === "gates2" ? 2 : 3;
+      const flip = name === "flip";
+      if (flip) {
+        flips.push({ z: Math.round(z * 10) / 10, on: true });
+        z += step * 1.5;
+      }
+      for (let i = 0; i < n && z < len - 40; i++) {
+        if (rows.length && z - prevZ > MAX_EMPTY_M) z = prevZ + MAX_EMPTY_M;
+        const pt = gateRow(r4, z);
+        if (flip) pt.flip = true;
+        z = placeGate(pt, z);
+        if (i < n - 1) z += step * 1.05;
+      }
+      if (flip) flips.push({ z: Math.round((z + step * 0.5) * 10) / 10, on: false });
+      z += step * 1.1;
+      continue;
+    }
     if (name === "breather") {
       addBox(z + step * 0.3);
       boosts.push({ z: Math.round((z + step * 0.8) * 10) / 10, lane: Math.floor(r() * 4) });
@@ -731,7 +832,8 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
     let stop = false;
     out.forEach((lanes, i) => {
       if (stop || z >= len - 40) return (stop = true);
-      const looks = lanes.map((k) => (k ? Math.floor(r2() * LOOKS[k]) : 0));
+      // (a crater, hurdle look 2, only comes from a strike: random looks stay among the regular ones)
+      const looks = lanes.map((k) => (k ? (pat.look ?? Math.floor(r2() * (k === "hurdle" ? 2 : LOOKS[k]))) : 0));
       const row = { z: 0, lanes, looks };
       // a first-ever obstacle type gets room and a hint
       const fresh = lanes.find((k) => k && !seen.has(k));
@@ -754,6 +856,7 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
       if (i < out.length - 1) z += step;
     });
     if (stop) break;
+    if (pat.gateAfter && z < len - 60) z = placeGate(gateRow(r4, z + step), z + step * 1.0);
     // room to land and line up for the next pattern (more slack early on)
     const k = Math.min(1, dz / 2400);
     // (kept short: there's never a long empty stretch, even in the warm-up)
@@ -763,9 +866,8 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
       hearts.push({ z: Math.round((z + gap * 0.45) * 10) / 10, lane: Math.floor(r2() * 4) });
       lastHeart = z;
     }
-    // a portal row now and then: a gate across every lane, green ones boost you, red ones slow you
-    const portal = z > PORTAL_FROM && gap >= 8 && r4() < PORTAL_CHANCE;
-    if (portal) portals.push({ z: Math.round((z + gap * 0.62) * 10) / 10, lanes: portalLanes(r4) });
+    // (gate rows are patterns of their own now, Space Rider style)
+    const portal = false;
     if (r() < 0.3) {
       const b = { z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) };
       if (!portal) boosts.push(b); // (the draw still happens, so the layout never moves)
@@ -775,7 +877,7 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
     else if (!portal && z > 60 && (sinceBox >= 4 || r2() < 0.22)) addBox(z + gap * 0.55);
     z += gap;
   }
-  return { rows, boosts, slows, portals, boxes, hearts, buses, len };
+  return { rows, boosts, slows, portals, flips, boxes, hearts, buses, len };
 }
 
 // ── moving obstacles: each map has two, sweeping across the lanes ──────────
@@ -1067,7 +1169,9 @@ function newCup(mode, t, rounds = 1, party = PARTY_KINDS) {
 const coinCache = new Map();
 export function coinLines(course) {
   const out = [];
-  const rows = course.rows;
+  // gate rows count as rows here: coins lead through their good lanes (red lanes are shut)
+  const gates = (course.portals ?? []).map((pt) => ({ z: pt.z, lanes: pt.lanes.map((c, l) => (gateGood(pt, l) ? null : "crate")) }));
+  const rows = gates.length ? [...course.rows, ...gates].sort((a, b) => a.z - b.z) : course.rows;
   for (let i = 0; i + 1 < rows.length; i++) {
     const a = rows[i];
     const b = rows[i + 1];
@@ -1495,7 +1599,7 @@ function stepBots(state, t) {
       }
       // a red portal slows a bot that runs into it (sharp bots pick the green one)
       for (const pt of course.portals ?? []) {
-        if (pt.z <= d0 || pt.z > d1 || pt.lanes[p.lane] !== "r") continue;
+        if (pt.z <= d0 || pt.z > d1 || gateGood(pt, p.lane)) continue;
         if (roll(state.seed, bi, pt.z + 1.3) < sharp) continue;
         p.slowUntil = Math.max(p.slowUntil ?? 0, t + SLOW_PAD_MS);
       }
