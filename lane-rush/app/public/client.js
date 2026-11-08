@@ -16,6 +16,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "/vendor/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "/vendor/jsm/utils/SkeletonUtils.js";
 import { THEMES } from "/themes.js";
+import { Pipeline, sharpen } from "/nr/pipeline.js";
 import { NR_WORLD, NR, deckMaterial, groundPlane, parapets, loadWorld, tickUniforms, startGate, backdropOf } from "/nr/lane.js";
 import {
   buildCourse,
@@ -3923,14 +3924,36 @@ function renderBloom(dt, grade = PLAIN_GRADE) {
   bloom.composer.render(dt);
 }
 
+// Space Rider's HDR pipeline (nr/pipeline.js) draws every frame; ?pipe=0 falls back to the plain renderer
+const usePipe = !/[?&]pipe=0\b/.test(location.search);
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: gfx.aa, powerPreference: "high-performance", stencil: false });
+  // with the pipeline, edges are smoothed on its own scene target: none on the canvas (it only shows the final picture)
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: gfx.aa && !usePipe, powerPreference: "high-performance", stencil: false });
 } catch {
   $("#loadHint").textContent = "Your browser can't show 3D (WebGL is off). Try Safari or Chrome.";
 }
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 400);
+let pipe = null;
+try {
+  if (renderer && usePipe) pipe = new Pipeline(renderer, scene, camera);
+} catch (e) {
+  console.error("pipeline", e);
+}
+/** Space Rider's grade per kind of map: its neon worlds at its own exposure, the daylight maps as bright as before. */
+const PIPE_NEON = { exposure: 1.0, knee: [0.75, 2.6], bloom: 0.06 };
+const PIPE_DAY = { exposure: 2.3, knee: [0.5, 1.4], bloom: 0.05 };
+// the pipeline steps down (no MSAA, fewer blur taps, no blur) when a race keeps missing the screen's pace
+let pipeSlow = 0;
+function pipeGovern(dt) {
+  if (!pipe || game.mode !== "race" || dt > 0.25 || dt <= 0) return;
+  pipeSlow = dt * 1000 > Math.max(paceMs * 1.3, 21) ? pipeSlow + dt : Math.max(0, pipeSlow - dt * 0.5);
+  if (pipeSlow > 2 && pipe.level < 2) {
+    pipe.setLevel(pipe.level + 1);
+    pipeSlow = 0;
+  }
+}
 if (renderer) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gfx.ratio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -5235,6 +5258,7 @@ const world = (() => {
     const a = assets.chars[charIdx];
     const g = new THREE.Group();
     const body = SkeletonUtils.clone(a.scene);
+    sharpen(body); // the motion blur leaves runners sharp
     const pivot = new THREE.Group();
     pivot.add(body);
     body.position.y = -a.footY;
@@ -11451,7 +11475,14 @@ function frame(now) {
   if (game.mode === "race" || game.mode === "results-pending") world.stepRunCoins(me.d);
   if (startGfx.shadows) world.followSun(camera.position.x * 0.5, camera.position.z - 9);
   world.tick(camera.position.z, dt, game.mode === "race" ? me.speed : 0);
-  if (NR_WORLD[world.activeMap] && loadBloom()) renderBloom(dt, NR_GRADE); // the neon of the Neon Rush worlds blooms
+  if (pipe) {
+    const g = NR_WORLD[world.activeMap] ? PIPE_NEON : PIPE_DAY;
+    pipe.exposure = g.exposure;
+    pipe.bloomMix = g.bloom;
+    pipe.setKnee(g.knee[0], g.knee[1]);
+    pipe.render(dt, now / 1000);
+    pipeGovern(dt);
+  } else if (NR_WORLD[world.activeMap] && loadBloom()) renderBloom(dt, NR_GRADE); // the neon of the Neon Rush worlds blooms
   else {
     if (renderer) renderer.toneMappingExposure = NR_WORLD[world.activeMap] ? NR_GRADE.exposure : PLAIN_GRADE.exposure;
     renderer?.render(scene, camera);
