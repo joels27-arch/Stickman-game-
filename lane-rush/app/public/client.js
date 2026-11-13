@@ -11692,6 +11692,8 @@ function frame(now) {
   if (pipe) {
     const g = NR_WORLD[world.activeMap] ? PIPE_NEON : PIPE_DAY;
     pipe.exposure = g.exposure;
+    // no motion blur while the camera turns through a loop (it would smear the whole picture)
+    pipe.blurAmount = me.loopTh != null || (game.mode === "race" && loopAt(me.d - 6)) ? 0 : 1;
     pipe.bloomMix = g.bloom;
     pipe.setKnee(g.knee[0], g.knee[1]);
     pipe.render(dt, now / 1000);
