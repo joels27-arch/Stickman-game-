@@ -22,7 +22,7 @@ function pass(fragmentShader, uniforms) {
 /** Quality levels, best first: MSAA on the scene target, bloom mips, motion-blur taps (0 = no blur pass). */
 export const PIPE_LEVELS = [
   { msaa: 2, bloom: 5, mblur: 7 },
-  { msaa: 0, bloom: 5, mblur: 5 },
+  { msaa: 0, bloom: 5, mblur: 0 }, // phones start here: the motion-blur pass costs a full-screen read of 7 taps
   { msaa: 0, bloom: 4, mblur: 0 },
 ];
 

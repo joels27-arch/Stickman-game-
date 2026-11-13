@@ -259,10 +259,15 @@ describe("difficulty manager", () => {
   });
 
   it("starts later rounds of a match further along the curve", () => {
-    const plain = L.buildCourse(9, L.SURVIVAL_LEN);
-    const boosted = L.buildCourse(9, L.SURVIVAL_LEN, 700);
-    const crates = (c: any) => c.rows.filter((r: any) => r.z < 400).reduce((a: number, r: any) => a + r.lanes.filter((k: any) => k === "crate").length, 0);
-    expect(crates(boosted)).toBeGreaterThan(crates(plain));
+    // (Space Rider's mix: count every blocked lane in the first 400 m, over a few seeds)
+    const blocked = (c: any) => c.rows.filter((r: any) => r.z < 400).reduce((a: number, r: any) => a + r.lanes.filter((k: any) => k).length, 0);
+    let plain = 0;
+    let boosted = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      plain += blocked(L.buildCourse(seed, L.SURVIVAL_LEN));
+      boosted += blocked(L.buildCourse(seed, L.SURVIVAL_LEN, 700));
+    }
+    expect(boosted).toBeGreaterThan(plain);
   });
 });
 
@@ -291,7 +296,7 @@ describe("obstacles and power-ups", () => {
         expect(b.z).toBeLessThan(L.TRACK_LEN);
       }
     }
-    expect(rollers).toBeGreaterThan(60);
+    expect(rollers).toBe(0); // Space Rider's rules: no rolling barrels
     expect(boxes).toBeGreaterThan(300);
   });
 
@@ -1150,7 +1155,11 @@ describe("new modes", () => {
 });
 
 describe("moving obstacles", () => {
-  it("each map gets its own two movers, spaced out in the wide gaps", () => {
+  it("Space Rider's rules have no per-map movers", () => {
+    const course = L.buildCourse(7, L.SURVIVAL_LEN);
+    for (const map of L.MAPS) expect(L.moversFor(course, 7, map)).toEqual([]);
+  });
+  it.runIf(L.MOVERS_ON)("each map gets its own two movers, spaced out in the wide gaps", () => {
     const course = L.buildCourse(7, L.SURVIVAL_LEN);
     for (const map of L.MAPS) {
       const ms = L.moversFor(course, 7, map);

@@ -529,10 +529,10 @@ function slalom(r, n) {
 export const STAGES = [
   // Space Rider's mix (its weights ×10; gates/gates2/flip are gate rows, see buildCourse), plus Lane Rush's buses and breathers
   { name: "Warm-up", from: 0, react: 1.3, mix: { gates: 5, hurdleOne: 1.5, hurdleWall: 1.5, crateOne: 1, bus: 12 } },
-  { name: "Getting going", from: 250, react: 1.15, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 0.5, hurdleWall: 1.5, combo: 0.9, lowbars: 1.5, jumpGate: 0.9, strike: 0.8, flip: 0.5, barrels: 0.9, bus: 16, breather: 0.5 } },
-  { name: "In the zone", from: 700, react: 1.05, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 0.8, hurdleWall: 1.5, combo: 0.9, lowbars: 1.5, jumpGate: 0.9, forced: 0.9, strike: 0.8, flip: 0.7, barrels: 0.9, bus: 16, breather: 0.45 } },
-  { name: "Pro", from: 1400, react: 1.0, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 1, slalom2: 0.6, hurdleWall: 1.5, combo: 1.3, lowbars: 1.5, jumpGate: 0.9, forced: 0.9, strike: 0.8, flip: 0.7, barrels2: 0.9, bus: 15, breather: 0.4 } },
-  { name: "Master", from: 2400, react: 0.92, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 1, slalom3: 1, hurdleWall: 1.5, combo: 1.3, lowbars: 1.5, jumpGate: 0.9, forced: 0.9, strike: 0.8, flip: 0.7, zigzag: 0.6, barrels2: 0.9, bus: 15, breather: 0.35 } },
+  { name: "Getting going", from: 250, react: 1.15, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 0.5, hurdleWall: 1.5, combo: 0.9, lowbars: 1.5, jumpGate: 0.9, strike: 0.8, flip: 0.5, bus: 16, breather: 0.5 } },
+  { name: "In the zone", from: 700, react: 1.05, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 0.8, hurdleWall: 1.5, combo: 0.9, lowbars: 1.5, jumpGate: 0.9, forced: 0.9, strike: 0.8, flip: 0.7, bus: 16, breather: 0.45 } },
+  { name: "Pro", from: 1400, react: 1.0, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 1, slalom2: 0.6, hurdleWall: 1.5, combo: 1.3, lowbars: 1.5, jumpGate: 0.9, forced: 0.9, strike: 0.8, flip: 0.7, bus: 15, breather: 0.4 } },
+  { name: "Master", from: 2400, react: 0.92, mix: { gates: 2.6, gates2: 0.9, barrier: 1, slalom: 1, slalom3: 1, hurdleWall: 1.5, combo: 1.3, lowbars: 1.5, jumpGate: 0.9, forced: 0.9, strike: 0.8, flip: 0.7, zigzag: 0.6, bus: 15, breather: 0.35 } },
 ];
 /** In the warm-up, each first-time pattern waits until here (so they come one at a time). */
 const FIRST_AT = { hurdleOne: 0, gates: 20, bus: 40, hurdleWall: 125, crateOne: 150 };
@@ -839,7 +839,7 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
     }
     if (name === "breather") {
       addBox(z + step * 0.3);
-      boosts.push({ z: Math.round((z + step * 0.8) * 10) / 10, lane: Math.floor(r() * 4) });
+      Math.floor(r() * 4); // (was a boost pad: Space Rider's gates give the boost now; the draw keeps the layout)
       z += step * 1.2;
       sinceRest = 0;
       continue;
@@ -889,10 +889,10 @@ export function buildCourse(seed, len = TRACK_LEN, boost = 0) {
     const portal = false;
     if (r() < 0.3) {
       const b = { z: Math.round((z + gap / 2) * 10) / 10, lane: Math.floor(r() * 4) };
-      if (!portal) boosts.push(b); // (the draw still happens, so the layout never moves)
+      void b; // (no floor pads any more: Space Rider's gates boost you. The draw still happens, so the layout never moves)
     }
     // red slow pads: the opposite of a boost (from 90 m on, so the start stays easy)
-    if (z > 90 && r3() < 0.32) slows.push({ z: Math.round((z + gap * 0.3) * 10) / 10, lane: Math.floor(r3() * 4) });
+    if (z > 90 && r3() < 0.32) Math.floor(r3() * 4); // (was a red slow pad; red gates do that now)
     else if (!portal && z > 60 && (sinceBox >= 4 || r2() < 0.22)) addBox(z + gap * 0.55);
     z += gap;
   }
@@ -935,7 +935,10 @@ export function moverCovers(m, lane, t) {
   return Math.abs(moverX(m, t) - lane) < MOVER_KINDS[m.kind].half + 0.35;
 }
 /** The course's moving obstacles for a map: one every ~150 m (from 150 m on), in a wide gap between rows. */
+/** Space Rider's rules have no per-map moving obstacles: off (the recipes stay for reference). */
+export const MOVERS_ON = false;
 export function moversFor(course, seed, map) {
+  if (!MOVERS_ON) return [];
   const base = MAP_MOVERS[map] ?? (MOVER_BASES.includes(map) ? map : "meadow");
   const kinds = Object.keys(MOVER_KINDS).filter((k) => MOVER_KINDS[k].map === base);
   if (!kinds.length) return [];

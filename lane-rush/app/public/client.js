@@ -3954,6 +3954,7 @@ function renderBloom(dt, grade = PLAIN_GRADE) {
 
 // Space Rider's HDR pipeline (nr/pipeline.js) draws every frame; ?pipe=0 falls back to the plain renderer
 const usePipe = !/[?&]pipe=0\b/.test(location.search);
+const PIPE_PHONE = /iPhone|iPad|iPod|Android|Mobi/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || ""));
 let renderer;
 try {
   // with the pipeline, edges are smoothed on its own scene target: none on the canvas (it only shows the final picture)
@@ -3965,25 +3966,33 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 400);
 let pipe = null;
 try {
-  if (renderer && usePipe) pipe = new Pipeline(renderer, scene, camera);
+  if (renderer && usePipe) {
+    pipe = new Pipeline(renderer, scene, camera);
+    if (PIPE_PHONE) pipe.setLevel(1); // phones: no MSAA, no motion blur to start with
+  }
 } catch (e) {
   console.error("pipeline", e);
 }
 /** Space Rider's grade per kind of map: its neon worlds at its own exposure, the daylight maps as bright as before. */
 const PIPE_NEON = { exposure: 1.0, knee: [0.75, 2.6], bloom: 0.06 };
 const PIPE_DAY = { exposure: 2.3, knee: [0.5, 1.4], bloom: 0.05 };
-// the pipeline steps down (no MSAA, fewer blur taps, no blur) when a race keeps missing the screen's pace
+// the pipeline steps down (no MSAA, no blur, fewer bloom mips) when a race keeps missing the screen's pace,
+// and if even its lightest level can't keep up, it is switched off for the session (the plain renderer draws)
 let pipeSlow = 0;
 function pipeGovern(dt) {
   if (!pipe || game.mode !== "race" || dt > 0.25 || dt <= 0) return;
-  pipeSlow = dt * 1000 > Math.max(paceMs * 1.3, 21) ? pipeSlow + dt : Math.max(0, pipeSlow - dt * 0.5);
-  if (pipeSlow > 2 && pipe.level < 2) {
-    pipe.setLevel(pipe.level + 1);
-    pipeSlow = 0;
+  pipeSlow = dt * 1000 > Math.max(paceMs * 1.25, 20) ? pipeSlow + dt : Math.max(0, pipeSlow - dt * 0.5);
+  if (pipeSlow < 1.5) return;
+  pipeSlow = 0;
+  if (pipe.level < 2) pipe.setLevel(pipe.level + 1);
+  else {
+    pipe.dispose();
+    pipe = null;
+    renderer.setRenderTarget(null);
   }
 }
 if (renderer) {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gfx.ratio));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, usePipe && PIPE_PHONE ? Math.min(gfx.ratio, 1.3) : gfx.ratio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.14;
@@ -4004,7 +4013,7 @@ const QUALITY_STEPS = [1, 0.85, 0.72, 0.6];
 function applyQuality() {
   if (!renderer) return;
   gfx = GFX[gfxTier()];
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gfx.ratio * QUALITY_STEPS[qualityIdx]));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, (usePipe && PIPE_PHONE ? Math.min(gfx.ratio, 1.3) : gfx.ratio) * QUALITY_STEPS[qualityIdx]));
   world?.setDetail?.(gfx);
   resize();
 }
@@ -7273,7 +7282,7 @@ const world = (() => {
         let look = row.looks?.[lane] ?? 0;
         // no cows or hay bales in the city, the stadium or space
         if (BUILT_MAPS.has(activeMap) && look === 1 && (kind === "crate" || kind === "hurdle")) look = 0;
-        const proto = (activeMap !== "meadow" && srProto(kind, look)) || (activeMap === "artlist" && assets.props[`al_${kind}`]) || (activeMap === "meadow" && (assets.props[`vl_${kind}${look}`] || assets.props[`vl_${kind}0`])) || assets.props[`${kind}${look}`] || assets.props[`${kind}0`];
+        const proto = srProto(kind, look) || (activeMap === "artlist" && assets.props[`al_${kind}`]) || (activeMap === "meadow" && (assets.props[`vl_${kind}${look}`] || assets.props[`vl_${kind}0`])) || assets.props[`${kind}${look}`] || assets.props[`${kind}0`];
         const o = proto.clone();
         o.position.set(laneX(lane), 0, -row.z);
         if (kind === "crate") o.rotation.y = ((row.z * 7 + lane) % 3 - 1) * 0.12 + (look === 1 ? (lane < 2 ? 0.5 : -0.5) : 0);
@@ -7295,7 +7304,7 @@ const world = (() => {
     // buses (a second level to run on) and the ramps up to their roofs
     for (const b of course.buses ?? []) {
       const artlist = b.look % 2 === 0 && assets.props.bus2;
-      const sr = activeMap !== "meadow" && assets.srBus;
+      const sr = assets.srBus; // Space Rider's hover-bus on every map
       const bus = (sr ? assets.srBus : artlist ? assets.props.bus2 : assets.props.bus ?? (assets.props.bus = busStandIn())).clone();
       bus.position.set(laneX(b.lane), 0, -(b.z0 + b.z1) / 2);
       raceGroup.add(bus);
@@ -11652,7 +11661,7 @@ function frame(now) {
     pipe.setKnee(g.knee[0], g.knee[1]);
     pipe.render(dt, now / 1000);
     pipeGovern(dt);
-  } else if (NR_WORLD[world.activeMap] && loadBloom()) renderBloom(dt, NR_GRADE); // the neon of the Neon Rush worlds blooms
+  } else if (!usePipe && NR_WORLD[world.activeMap] && loadBloom()) renderBloom(dt, NR_GRADE); // the neon of the Neon Rush worlds blooms (old renderer only)
   else {
     if (renderer) renderer.toneMappingExposure = NR_WORLD[world.activeMap] ? NR_GRADE.exposure : PLAIN_GRADE.exposure;
     renderer?.render(scene, camera);

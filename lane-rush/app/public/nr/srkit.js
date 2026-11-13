@@ -95,7 +95,7 @@ export function makeSrKit(gltfScene) {
   const cG = carpet(new THREE.Color(0.12, 2.2, 0.55)), cR = carpet(new THREE.Color(2.6, 0.08, 0.14));
   const bG = beacon(new THREE.Color(0.5, 5, 1.6)), bR = beacon(new THREE.Color(6, 0.35, 0.5));
   const planeG = new THREE.PlaneGeometry(2.75, 3.3);
-  const carpetGeo = new THREE.PlaneGeometry(2.9, 30);
+  const carpetGeo = new THREE.PlaneGeometry(2.9, 14); // (Space Rider's is 30 m: shorter here, far less see-through overdraw on phones)
   const beaconGeo = new THREE.PlaneGeometry(7, 3);
   const labelGeo = new THREE.PlaneGeometry(2.3, 0.86);
   const word = (w, c) => new THREE.MeshBasicMaterial({ map: wordTexture(w, c), transparent: true, toneMapped: false, color: new THREE.Color(2.4, 2.4, 2.4) });
@@ -110,7 +110,7 @@ export function makeSrKit(gltfScene) {
     o.add(f);
     const c = new THREE.Mesh(carpetGeo, green ? cG : cR);
     c.rotation.x = -Math.PI / 2;
-    c.position.set(0, 0.05, 15);
+    c.position.set(0, 0.05, 7);
     o.add(c);
     const b = new THREE.Mesh(beaconGeo, green ? bG : bR);
     b.position.y = 3.65;

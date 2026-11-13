@@ -85,6 +85,7 @@ export const PORTAL_BOOST_MS: number;
 export function portalLanes(r: () => number): string[];
 export const TRICKS_FROM: number;
 export const LOOP_LEN: number;
+export const MOVERS_ON: boolean;
 export const LOOP_R: number;
 export const LOOP_SHIFT: number;
 export function gateRow(r: () => number, z: number): { z: number; lanes: string[]; flip?: boolean; words?: string[] };
