@@ -30,7 +30,8 @@ function wordTexture(word, color) {
 }
 
 /** Build the kit from Space Rider's props.glb scene. */
-export function makeSrKit(gltfScene) {
+/** lite (phones): no beacon glow over the gates (a big additive plane each: overdraw). */
+export function makeSrKit(gltfScene, { lite = false } = {}) {
   const get = (n) => gltfScene.getObjectByName(n);
   const mats = {
     carbon: std({ color: 0x0c0c10, metalness: 0.5, roughness: 0.36 }),
@@ -112,9 +113,11 @@ export function makeSrKit(gltfScene) {
     c.rotation.x = -Math.PI / 2;
     c.position.set(0, 0.05, 7);
     o.add(c);
-    const b = new THREE.Mesh(beaconGeo, green ? bG : bR);
-    b.position.y = 3.65;
-    o.add(b);
+    if (!lite) {
+      const b = new THREE.Mesh(beaconGeo, green ? bG : bR);
+      b.position.y = 3.65;
+      o.add(b);
+    }
     const g = new THREE.Group();
     o.scale.setScalar(1.1 * S);
     g.add(o);

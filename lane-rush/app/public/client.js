@@ -296,10 +296,40 @@ function loopAt(d) {
   for (const l of curLoops) if (d > l.z && d < l.z + l.len) return l;
   return null;
 }
+// the loop's shape as a function of u (0 … 1); drawn by arc length, so whatever runs it keeps an even pace
+// (straight by u, the way in would race at 2× and the top crawl backwards)
+const LOOP_N = 256;
+function loopArc(l) {
+  if (l.arc) return l.arc;
+  const s = new Float32Array(LOOP_N + 1);
+  let px = 0, py = 0, pz = 0;
+  for (let i = 0; i <= LOOP_N; i++) {
+    const u = i / LOOP_N;
+    const th = u * Math.PI * 2;
+    const x = LOOP_SHIFT * Math.sin(th), y = LOOP_R * (1 - Math.cos(th)), z = l.len * u + LOOP_R * Math.sin(th);
+    if (i) s[i] = s[i - 1] + Math.hypot(x - px, y - py, z - pz);
+    px = x;
+    py = y;
+    pz = z;
+  }
+  return (l.arc = s);
+}
+function loopU(l, d) {
+  const s = loopArc(l);
+  const want = ((d - l.z) / l.len) * s[LOOP_N];
+  let lo = 0, hi = LOOP_N;
+  while (hi - lo > 1) {
+    const m = (lo + hi) >> 1;
+    if (s[m] < want) lo = m;
+    else hi = m;
+  }
+  const f = (want - s[lo]) / Math.max(1e-6, s[hi] - s[lo]);
+  return (lo + Math.min(1, Math.max(0, f))) / LOOP_N;
+}
 function loopPlace(d, v) {
   const l = loopAt(d);
   if (!l) return null;
-  const u = (d - l.z) / l.len;
+  const u = loopU(l, d);
   const th = u * Math.PI * 2;
   const h = v.y; // height above the track, along the loop's "up"
   v.x += LOOP_SHIFT * Math.sin(th);
@@ -3874,7 +3904,8 @@ const canvas = $("#scene");
  *   full-detail scenery · env: sky light on materials · fx: share of particles and weather
  */
 const GFX = {
-  high: { ratio: 1.5, aa: true, shadows: true, lod: 50, env: true, fx: 0.9 }, // 1.5× pixels: on a phone screen as sharp to the eye as 2×, and about half the work
+  // phones: no sun shadow pass (a second render of the scene every frame); the runners keep their blob shadows
+  high: { ratio: 1.5, aa: true, shadows: !/iPhone|iPad|iPod|Android|Mobi/.test(navigator.userAgent), lod: 50, env: true, fx: 0.9 }, // 1.5× pixels: on a phone screen as sharp to the eye as 2×, and about half the work
   balanced: { ratio: 1.6, aa: true, shadows: false, lod: 40, env: true, fx: 0.7 },
   performance: { ratio: 1.15, aa: false, shadows: false, lod: 22, env: false, fx: 0.4 },
 };
@@ -3953,8 +3984,9 @@ function renderBloom(dt, grade = PLAIN_GRADE) {
 }
 
 // Space Rider's HDR pipeline (nr/pipeline.js) draws every frame; ?pipe=0 falls back to the plain renderer
-const usePipe = !/[?&]pipe=0\b/.test(location.search);
 const PIPE_PHONE = /iPhone|iPad|iPod|Android|Mobi/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || ""));
+// phones draw plainly (the HDR pipeline's full-screen passes cost them their 60 fps); ?pipe=1 / ?pipe=0 force it
+const usePipe = /[?&]pipe=1\b/.test(location.search) || (!PIPE_PHONE && !/[?&]pipe=0\b/.test(location.search));
 let renderer;
 try {
   // with the pipeline, edges are smoothed on its own scene target: none on the canvas (it only shows the final picture)
@@ -3992,7 +4024,7 @@ function pipeGovern(dt) {
   }
 }
 if (renderer) {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, usePipe && PIPE_PHONE ? Math.min(gfx.ratio, 1.3) : gfx.ratio));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PIPE_PHONE ? Math.min(gfx.ratio, 1.3) : gfx.ratio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.14;
@@ -4013,7 +4045,7 @@ const QUALITY_STEPS = [1, 0.85, 0.72, 0.6];
 function applyQuality() {
   if (!renderer) return;
   gfx = GFX[gfxTier()];
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, (usePipe && PIPE_PHONE ? Math.min(gfx.ratio, 1.3) : gfx.ratio) * QUALITY_STEPS[qualityIdx]));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, (PIPE_PHONE ? Math.min(gfx.ratio, 1.3) : gfx.ratio) * QUALITY_STEPS[qualityIdx]));
   world?.setDetail?.(gfx);
   resize();
 }
@@ -5117,7 +5149,7 @@ const world = (() => {
       // Space Rider's course props: its gates, barriers, low bars and craters (nr/srkit.js)
       loadGLB("/assets/sr_props.glb")
         .then((g) => {
-          const kit = (assets.srKit = makeSrKit(g.scene));
+          const kit = (assets.srKit = makeSrKit(g.scene, { lite: PIPE_PHONE }));
           // its hover-bus and ramp, and its smaller coin
           assets.srBus = fitBus(kit.busModel(), false);
           assets.srRamp = fitRamp(kit.rampModel());
@@ -11582,21 +11614,24 @@ function frame(now) {
       camGoal.set(tx, back ? 2.5 + fy * 0.6 : camUp + fy * 0.75, back ? fz - 4.2 : fz + camBack); // reused: no garbage per frame (closer and lower: your runner big, the track fast)
       camPos.lerp(camGoal, Math.min(1, dt * (me.out ? 3 : back ? 10 : 6)));
     }
-    // through a loop: the camera rides round with your runner, its "up" turning with the track
-    if (!intro && !me.out && !back && me.loopTh != null && me.runner) {
-      const th = me.loopTh;
-      const rp = me.runner.group.position;
-      loopUp.set(0, Math.cos(th), Math.sin(th));
-      loopFwd.set(0, Math.sin(th), -Math.cos(th));
-      camPos.copy(rp).addScaledVector(loopUp, camUp - 0.4).addScaledVector(loopFwd, -camBack);
+    // through a loop: the camera rides the track a few metres behind your runner, like the next car of a coaster,
+    // its "up" turning with the track. The same spot outside a loop is the normal camera, so going in and out never jumps.
+    if (!intro && !me.out && !back && me.runner && (loopAt(me.d) || loopAt(me.d - camBack))) {
+      loopCam.set(tx, camUp + fy * 0.75, 0);
+      const thC = loopPlace(me.d - camBack, loopCam) ?? 0;
+      if (!loopAt(me.d - camBack)) loopCam.z = fz + camBack;
+      loopLook.set(tx * 0.8, 1.15 + fy * 0.6, 0);
+      if (loopPlace(me.d + 10, loopLook) == null) loopLook.z = fz - 10;
+      camPos.lerp(loopCam, Math.min(1, dt * 14));
       camera.position.copy(camPos);
-      camera.up.copy(loopUp);
-      camLook.copy(rp).addScaledVector(loopUp, 1.15).addScaledVector(loopFwd, 10);
+      loopUp.set(0, Math.cos(thC), Math.sin(thC));
+      camera.up.lerp(loopUp, Math.min(1, dt * 10)).normalize();
+      camLook.lerp(loopLook, Math.min(1, dt * 14));
       camera.lookAt(camLook);
       world.lookBack(false);
       world.cull(fd);
     } else {
-    camera.up.set(0, 1, 0);
+    camera.up.lerp(UP_Y, Math.min(1, dt * 10)).normalize();
     camera.position.copy(camPos);
     if (shake > 0) {
       shake = Math.max(0, shake - dt);
@@ -11661,7 +11696,7 @@ function frame(now) {
     pipe.setKnee(g.knee[0], g.knee[1]);
     pipe.render(dt, now / 1000);
     pipeGovern(dt);
-  } else if (!usePipe && NR_WORLD[world.activeMap] && loadBloom()) renderBloom(dt, NR_GRADE); // the neon of the Neon Rush worlds blooms (old renderer only)
+  } else if (!usePipe && !PIPE_PHONE && NR_WORLD[world.activeMap] && loadBloom()) renderBloom(dt, NR_GRADE); // the neon of the Neon Rush worlds blooms (old renderer only)
   else {
     if (renderer) renderer.toneMappingExposure = NR_WORLD[world.activeMap] ? NR_GRADE.exposure : PLAIN_GRADE.exposure;
     renderer?.render(scene, camera);
@@ -11672,7 +11707,9 @@ function frame(now) {
 }
 
 const loopUp = new THREE.Vector3();
-const loopFwd = new THREE.Vector3();
+const loopCam = new THREE.Vector3();
+const loopLook = new THREE.Vector3();
+const UP_Y = new THREE.Vector3(0, 1, 0);
 const introPath = new THREE.CatmullRomCurve3([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], false, "centripetal");
 const hudEl = { timer: $("#timer"), dist: $("#distText"), place: $("#place"), dots: $("#dots") };
 function updateHud() {
